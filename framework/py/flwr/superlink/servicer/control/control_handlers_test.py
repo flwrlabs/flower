@@ -45,6 +45,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationRequest,
     UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
@@ -459,6 +460,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                         "flwr": {
                             "app": {
                                 "config": {"agent": {"input": ""}},
+                                "components": {"agentapp": "agent:app"},
                                 "display-name": "Local Agent",
                                 "color": "rose",
                             }
@@ -471,9 +473,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ".get_metadata_from_config",
                 return_value=("flwr/agent", "v0.0.1"),
             ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_app_type",
-                return_value=TaskType.AGENT_APP,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=SimulationConfig(),
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers"
