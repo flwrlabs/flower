@@ -59,6 +59,9 @@ jobs:
           - task: quality
             name: Quality
             python: '3.13'
+          - task: quality
+            name: Quality
+            python: '3.14'
           - task: pytest
             name: Pytest
             python: '3.11'
@@ -68,6 +71,9 @@ jobs:
           - task: pytest
             name: Pytest
             python: '3.13'
+          - task: pytest
+            name: Pytest
+            python: '3.14'
           - task: pytest_serial
             name: Pytest serial scopes
             python: '3.11'
@@ -77,6 +83,9 @@ jobs:
           - task: pytest_serial
             name: Pytest serial scopes
             python: '3.13'
+          - task: pytest_serial
+            name: Pytest serial scopes
+            python: '3.14'
 
     name: ${{ matrix.name }} (Python ${{ matrix.python }})
 
