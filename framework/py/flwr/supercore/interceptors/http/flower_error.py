@@ -35,7 +35,8 @@ class FlowerErrorHttpInterceptor:
         """Restore Flower errors while preserving other HTTP exceptions."""
         try:
             response = call_next(context)
-            response.raise_for_status()
+            if response.is_error:
+                response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             if error := FlowerError.from_json(exc.response.text):
                 raise error from exc
