@@ -32,7 +32,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
 )
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 Request = (
     StartRunRequest | StreamLogsRequest | GetLoginDetailsRequest | GetAuthTokensRequest
@@ -62,13 +62,8 @@ def get_current_account_info() -> AccountInfo:
 class ControlAccountAuthInterceptor(grpc.ServerInterceptor):  # type: ignore
     """Control API interceptor for account authentication."""
 
-    def __init__(
-        self,
-        authn_plugin: ControlAuthnPlugin,
-        authz_plugin: ControlAuthzPlugin,
-    ):
+    def __init__(self, authn_plugin: ControlAuthnPlugin):
         self.authn_plugin = authn_plugin
-        self.authz_plugin = authz_plugin
 
     def intercept_service(
         self,
@@ -118,14 +113,6 @@ class ControlAccountAuthInterceptor(grpc.ServerInterceptor):  # type: ignore
                     raise grpc.RpcError()
                 # Store account info in contextvars for authenticated accounts
                 shared_account_info.set(account_info)
-                # Check if the account is authorized
-                if not self.authz_plugin.authorize(account_info):
-                    context.abort(
-                        grpc.StatusCode.PERMISSION_DENIED,
-                        "❗️ Account not authorized. "
-                        "Please contact the SuperLink administrator.",
-                    )
-                    raise grpc.RpcError()
                 return call(request, context)  # type: ignore
 
             # If the account is not authenticated, refresh tokens
@@ -139,15 +126,6 @@ class ControlAccountAuthInterceptor(grpc.ServerInterceptor):  # type: ignore
                     raise grpc.RpcError()
                 # Store account info in contextvars for authenticated accounts
                 shared_account_info.set(account_info)
-                # Check if the account is authorized
-                if not self.authz_plugin.authorize(account_info):
-                    context.abort(
-                        grpc.StatusCode.PERMISSION_DENIED,
-                        "❗️ Account not authorized. "
-                        "Please contact the SuperLink administrator.",
-                    )
-                    raise grpc.RpcError()
-
                 context.send_initial_metadata(tokens)
                 return call(request, context)  # type: ignore
 

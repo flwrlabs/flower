@@ -115,5 +115,4 @@ And here is an example when a SuperNode pulls a message from the SuperLink:
 .. code-block:: shell
 
     INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "FleetServicer.PullMessages", "run_id": null, "fab_hash": null}, "status": "started"}
-    INFO :      [Fleet.PullMessages] node_id=...
     INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "FleetServicer.PullMessages", "run_id": null, "fab_hash": null}, "status": "completed"}

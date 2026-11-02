@@ -36,3 +36,12 @@ class AggregationError(AppExitException):
 
     def __init__(self, reason: str):
         super().__init__(reason)
+
+
+class PrivacyBudgetExhausted(AppExitException):
+    """Exception triggered before a release would exceed the privacy budget."""
+
+    exit_code = ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET
+
+    def __init__(self, reason: str):
+        super().__init__(reason)

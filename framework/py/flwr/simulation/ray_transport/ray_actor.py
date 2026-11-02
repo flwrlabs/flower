@@ -27,7 +27,7 @@ from ray.util.actor_pool import ActorPool
 
 from flwr.app import Context, Message
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
-from flwr.common.logger import log
+from flwr.supercore import log
 
 ClientAppFn = Callable[[], ClientApp]
 

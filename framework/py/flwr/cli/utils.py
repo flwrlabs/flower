@@ -20,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
-import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from io import StringIO
@@ -28,33 +27,31 @@ from pathlib import Path
 from typing import Any, cast
 
 import click
-import grpc
+import httpx
 import pathspec
 import typer
 from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import AuthnType, CliOutputFormat
-from flwr.common.logger import print_json_error, redirect_output, restore_output
-from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
+from flwr.proto.control_pb2 import RefreshAuthTokensRequest  # pylint: disable=E0611
+from flwr.supercore.auth.typing import AccountAuthCredentials
 from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
     APP_PUBLISH_INCLUDE_PATTERNS,
     MAX_DIR_DEPTH,
     MAX_NAME_LENGTH,
 )
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 from flwr.supercore.error import FlowerError
-from flwr.supercore.grpc import (
-    GRPC_MAX_MESSAGE_LENGTH,
-    create_channel,
-    on_channel_state_change,
-)
-from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.interceptors import RuntimeVersionHttpInterceptor
+from flwr.supercore.logger import print_json_error, redirect_output, restore_output
 from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
-from .cli_account_auth_interceptor import CliAccountAuthInterceptor
+from .cli_account_auth_interceptor import CliAccountAuthHttpInterceptor
+from .cli_client_interceptor import CliClientHttpInterceptor
 from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
@@ -64,8 +61,9 @@ SUPERLINK_UNAVAILABLE_MESSAGE = (
     "Connection to the SuperLink is unavailable. Please check your network "
     "connection and 'address' in the SuperLink connection configuration."
 )
-CONTROL_API_READY_TIMEOUT_SECONDS = 5
-CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
+AUTHENTICATION_FAILED_MESSAGE = (
+    "Authentication failed. Please run `flwr login` to authenticate and try again."
+)
 
 
 def print_json_to_stdout(data: str | Any) -> None:
@@ -122,6 +120,8 @@ def cli_output_handler(
         if is_json:
             restore_output()
             print_json_error(captured_output.getvalue(), err)
+            if isinstance(err, typer.Exit):
+                raise
         else:
             if isinstance(err, typer.Exit):
                 raise  # Allow typer.Exit to escape normally
@@ -321,10 +321,11 @@ def get_executed_command() -> str:
     return " ".join(cmd_parts)
 
 
-def init_channel_from_connection(
-    connection: SuperLinkConnection, auth_plugin: CliAuthPlugin | None = None
-) -> grpc.Channel:
-    """Initialize gRPC channel to the Control API.
+def init_http_client_from_connection(
+    connection: SuperLinkConnection,
+    auth_plugin: CliAuthPlugin | None = None,
+) -> ControlHttpClient:
+    """Initialize an HTTP client for the Control API.
 
     Parameters
     ----------
@@ -335,45 +336,56 @@ def init_channel_from_connection(
 
     Returns
     -------
-    grpc.Channel
-        Configured gRPC channel with authentication interceptors.
+    ControlHttpClient
+        Configured HTTP client with runtime-version and authentication interceptors.
     """
     connection = ensure_local_superlink(connection)
+
     address = cast(str, connection.address)
     log_superlink_connection(connection)
+    root_certificates = load_certificate_in_connection(connection)
 
-    root_certificates_bytes = load_certificate_in_connection(connection)
-
-    # Load authentication plugin
     if auth_plugin is None:
         auth_plugin = load_cli_auth_plugin_from_connection(address)
-    # Load tokens
     auth_plugin.load_tokens()
 
-    # Create the gRPC channel
-    channel = create_channel(
+    # The callback runs only after the returned client has been fully initialized.
+    # Closing over the client lets refresh requests reuse its TLS and HTTP settings.
+    http_client: ControlHttpClient | None = None
+
+    def refresh_tokens(refresh_token: str) -> AccountAuthCredentials:
+        """Refresh and return the account credentials."""
+        if http_client is None:
+            raise RuntimeError("HTTP client is not initialized")
+        response = http_client.RefreshAuthTokens(
+            RefreshAuthTokensRequest(refresh_token=refresh_token)
+        )
+        return AccountAuthCredentials(
+            access_token=response.access_token,
+            refresh_token=response.refresh_token,
+        )
+
+    # Keep version compatibility and account authentication consistent for every
+    # Control API request made through this client.
+    http_client = ControlHttpClient.from_server_address(
         server_address=address,
         insecure=connection.insecure,
-        root_certificates=root_certificates_bytes,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
+        root_certificates=root_certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr CLI"),
-            CliAccountAuthInterceptor(auth_plugin),
+            CliClientHttpInterceptor(),
+            RuntimeVersionHttpInterceptor(component_name="flwr CLI"),
+            CliAccountAuthHttpInterceptor(auth_plugin, refresh_tokens),
         ],
     )
-    channel.subscribe(on_channel_state_change)
-
-    # Wait for the channel to be ready before returning it
-    wait_for_control_api_channel(channel)
-    return channel
+    return http_client
 
 
 @contextmanager  # docsig: disable=SIG503
-def cli_output_control_stub(
+def cli_output_control_client(
     superlink: str | None,
     output_format: str = CliOutputFormat.DEFAULT,
-) -> Iterator[tuple[ControlStub, bool]]:
-    """Manage CLI output handling and Control API stub lifecycle.
+) -> Iterator[tuple[ControlHttpClient, bool]]:
+    """Manage CLI output handling and Control API client lifecycle.
 
     Parameters
     ----------
@@ -384,51 +396,32 @@ def cli_output_control_stub(
 
     Yields
     ------
-    tuple[ControlStub, bool]
-        A tuple of (ControlStub, is_json), where `is_json` indicates JSON output.
+    tuple[ControlHttpClient, bool]
+        A tuple of (ControlHttpClient, is_json), where `is_json` indicates JSON
+        output.
     """
     with cli_output_handler(output_format=output_format) as is_json:
         superlink_connection = read_superlink_connection(superlink)
-        channel = init_channel_from_connection(superlink_connection)
+        control_client = init_http_client_from_connection(superlink_connection)
         try:
-            yield ControlStub(channel), is_json
+            yield control_client, is_json
         finally:
-            channel.close()
-
-
-def wait_for_control_api_channel(
-    channel: grpc.Channel,
-    timeout: float = CONTROL_API_READY_TIMEOUT_SECONDS,
-    check_interval: float = CONTROL_API_READY_CHECK_INTERVAL_SECONDS,
-) -> None:
-    """Wait for the Control API channel to become ready before sending an RPC."""
-    deadline = time.monotonic() + timeout
-    future = grpc.channel_ready_future(channel)
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE)
-        try:
-            future.result(timeout=min(check_interval, remaining))
-            return
-        except grpc.FutureTimeoutError:
-            continue
+            control_client.close()
 
 
 @contextmanager  # docsig: disable=SIG503
-def flwr_cli_grpc_exc_handler(
-    custom_handler: Callable[[grpc.RpcError], None] | None = None,
+def flwr_cli_exc_handler(
+    custom_handler: Callable[[Exception], None] | None = None,
 ) -> Iterator[None]:
-    """Context manager to handle Flower and gRPC CLI errors.
+    """Handle Flower CLI errors from the HTTP Control API.
 
-    Catches gRPC errors, translates serialized FlowerError details into click
-    exceptions with user-facing messages, and falls back to transport-specific
-    messages or raw gRPC details.
+    Translate structured Flower errors and transport failures into Click exceptions
+    with consistent user-facing messages.
 
     Parameters
     ----------
-    custom_handler : Callable[[grpc.RpcError], None] | None (default: None)
-        Optional custom handler called with the caught gRPC error before applying
+    custom_handler : Callable[[Exception], None] | None
+        Optional handler called with the caught transport error before applying the
         default Flower CLI error handling.
 
     Yields
@@ -439,34 +432,33 @@ def flwr_cli_grpc_exc_handler(
     Raises
     ------
     click.ClickException
-        For handled gRPC errors, with user-friendly messages. Or raw gRPC error details
-        will be shown.
+        For handled API and transport errors, with a user-friendly message.
     """
     try:
         yield
-    except grpc.RpcError as e:
+    except httpx.HTTPError as err:
         if custom_handler is not None:
-            custom_handler(e)
+            custom_handler(err)
 
-        # Control API serializes FlowerError into gRPC details. If the payload is
-        # not a valid FlowerError, the raw gRPC fallback below handles it.
-        details = cast(str, e.details())  # pylint: disable=E1101
-        if flower_error := FlowerError.from_json(details):
-            raise click.ClickException(_format_flower_error(flower_error)) from None
-
-        # Keep special handling only for transport-level errors that are not part
-        # of the FlowerError catalog.
-        # pylint: disable-next=E1101
-        if e.code() == grpc.StatusCode.UNAUTHENTICATED:
-            raise click.ClickException(
-                "Authentication failed. Please run `flwr login`"
-                " to authenticate and try again."
-            ) from None
-        if e.code() == grpc.StatusCode.UNAVAILABLE:
+        if isinstance(err, httpx.RequestError):
             raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
 
-        # Log details from grpc error directly
-        raise click.ClickException(details) from None
+        if isinstance(err, httpx.HTTPStatusError):
+            response = err.response
+            if flower_error := FlowerError.from_json(response.text):
+                raise click.ClickException(_format_flower_error(flower_error)) from None
+
+            if response.status_code == httpx.codes.UNAUTHORIZED:
+                raise click.ClickException(AUTHENTICATION_FAILED_MESSAGE) from None
+
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = None
+            if isinstance(payload, dict) and isinstance(payload.get("detail"), str):
+                raise click.ClickException(payload["detail"]) from None
+
+        raise click.ClickException(str(err)) from None
 
 
 def build_pathspec(
@@ -521,6 +513,29 @@ def depth_of(relative_path: Path) -> int:
     return max(0, len(relative_path.parts) - 1)
 
 
+class AppPathDepthError(ValueError):
+    """Error raised when a Flower App path exceeds the depth limit."""
+
+    def __init__(self, path: str, max_depth: int) -> None:
+        """Initialize the error with the offending path and configured limit."""
+        self.path = path
+        self.max_depth = max_depth
+        super().__init__(
+            f"'{path}' in the project exceeds the maximum directory depth "
+            f"of {max_depth}. Consider refactoring your project structure to "
+            "reduce nesting."
+        )
+
+    def to_click_exception(self) -> click.ClickException:
+        """Convert the error to an actionable Click exception."""
+        return click.ClickException(
+            "The Flower App does not meet the project structure requirements:\n"
+            f"{self}\n\n"
+            "If this file is not part of the app source, exclude it by adding an "
+            "appropriate pattern to .gitignore."
+        )
+
+
 def collect_files(root: Path) -> dict[str, Path]:
     """Collect all files under the root directory and return a mapping of relative POSIX
     paths to absolute Paths.
@@ -563,7 +578,7 @@ def filter_paths_for_publish(
 
     Raises
     ------
-    ValueError
+    AppPathDepthError
         Raised if any path exceeds the maximum directory depth.
     """
     # Load gitignore patterns if exists
@@ -583,11 +598,7 @@ def filter_paths_for_publish(
     ret_files = {}
     for rel_pth in cast(Iterable[str], filtered_paths):
         if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
-            raise ValueError(
-                f"'{rel_pth}' in the project exceeds the maximum directory depth "
-                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
-                "reduce nesting."
-            )
+            raise AppPathDepthError(rel_pth, MAX_DIR_DEPTH)
         ret_files[rel_pth] = files[rel_pth]
     return ret_files
 

@@ -25,7 +25,7 @@ from typing import Any
 import grpc
 
 from flwr.common.constant import MAX_RETRY_DELAY
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
 from flwr.supercore.run import RunNotRunningException
 

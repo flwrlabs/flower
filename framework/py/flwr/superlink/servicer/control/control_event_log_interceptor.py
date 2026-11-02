@@ -61,9 +61,20 @@ class ControlEventLogInterceptor(grpc.ServerInterceptor):  # type: ignore
             request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage | Iterator[GrpcMessage] | BaseException:
-            log_entry: LogEntry
+            def write_after_event(
+                response: GrpcMessage | BaseException | None,
+            ) -> None:
+                log_entry = self.log_plugin.compose_log_after_event(
+                    request=request,
+                    context=context,
+                    account_info=get_current_account_info(),
+                    method_name=method_name,
+                    response=response,
+                )
+                self.log_plugin.write_log(log_entry)
+
             # Log before call
-            log_entry = self.log_plugin.compose_log_before_event(
+            log_entry: LogEntry = self.log_plugin.compose_log_before_event(
                 request=request,
                 context=context,
                 account_info=get_current_account_info(),
@@ -82,23 +93,20 @@ class ControlEventLogInterceptor(grpc.ServerInterceptor):  # type: ignore
                     error = e
                     raise
                 finally:
-                    log_entry = self.log_plugin.compose_log_after_event(
-                        request=request,
-                        context=context,
-                        account_info=get_current_account_info(),
-                        method_name=method_name,
-                        response=unary_response or error,
-                    )
-                    self.log_plugin.write_log(log_entry)
+                    write_after_event(unary_response or error)
                 return unary_response
 
             # For unary-stream calls, wrap the response iterator and write the event log
             # after iteration completes
             if method_handler.unary_stream:
-                response_iterator = cast(
-                    Iterator[GrpcMessage],
-                    method_handler.unary_stream(request, context),
-                )
+                try:
+                    response_iterator = cast(
+                        Iterator[GrpcMessage],
+                        method_handler.unary_stream(request, context),
+                    )
+                except BaseException as e:
+                    write_after_event(e)
+                    raise
 
                 def response_wrapper() -> Iterator[GrpcMessage]:
                     stream_response, error = None, None
@@ -112,14 +120,7 @@ class ControlEventLogInterceptor(grpc.ServerInterceptor):  # type: ignore
                     finally:
                         # This block is executed after the client has consumed
                         # the entire stream, or if iteration is interrupted
-                        log_entry = self.log_plugin.compose_log_after_event(
-                            request=request,
-                            context=context,
-                            account_info=get_current_account_info(),
-                            method_name=method_name,
-                            response=stream_response or error,
-                        )
-                        self.log_plugin.write_log(log_entry)
+                        write_after_event(stream_response or error)
 
                 return response_wrapper()
 

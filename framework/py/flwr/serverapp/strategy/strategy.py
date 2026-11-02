@@ -22,11 +22,11 @@ from collections.abc import Callable, Iterable
 from logging import INFO
 
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
-from flwr.common import log
+from flwr.supercore import log
 
 from ..grid import Grid
 from .result import Result
-from .strategy_utils import log_strategy_start_info
+from .strategy_utils import log_strategy_start_info, send_and_receive
 
 
 class Strategy(ABC):
@@ -141,6 +141,7 @@ class Strategy(ABC):
         train_config: ConfigRecord | None = None,
         evaluate_config: ConfigRecord | None = None,
         evaluate_fn: Callable[[int, ArrayRecord], MetricRecord | None] | None = None,
+        should_stop: Callable[[int, Result], bool] | None = None,
     ) -> Result:
         """Execute the federated learning strategy.
 
@@ -155,9 +156,10 @@ class Strategy(ABC):
         initial_arrays : ArrayRecord
             Initial model parameters (arrays) to be used for federated learning.
         num_rounds : int (default: 3)
-            Number of federated learning rounds to execute.
+            Maximum number of federated learning rounds to execute.
         timeout : float (default: 3600)
-            Timeout in seconds for waiting for node responses.
+            Timeout in seconds for waiting for node responses. Outstanding responses
+            from nodes that become unavailable are replaced with error replies.
         train_config : ConfigRecord, optional
             Configuration to be sent to nodes during training rounds.
             If unset, an empty ConfigRecord will be used.
@@ -169,6 +171,12 @@ class Strategy(ABC):
             server round number and array record, returns a MetricRecord or None. If
             provided, will be called before the first round and after each round.
             Defaults to None.
+        should_stop : Callable[[int, Result], bool], optional
+            Optional predicate to determine whether to stop training early.
+            Called at the end of each round with the round number and accumulated
+            results. Return True to stop and return the model and metrics collected
+            so far. Not called for round zero. Results must not be modified.
+            Defaults to None (no early stopping).
 
         Returns
         -------
@@ -186,7 +194,7 @@ class Strategy(ABC):
         # Initialize if None
         train_config = ConfigRecord() if train_config is None else train_config
         evaluate_config = ConfigRecord() if evaluate_config is None else evaluate_config
-        result = Result()
+        result = Result(arrays=initial_arrays)
 
         t_start = time.time()
         # Evaluate starting global parameters
@@ -208,7 +216,8 @@ class Strategy(ABC):
 
             # Call strategy to configure training round
             # Send messages and wait for replies
-            train_replies = grid.send_and_receive(
+            train_replies = send_and_receive(
+                grid=grid,
                 messages=self.configure_train(
                     current_round,
                     arrays,
@@ -238,7 +247,8 @@ class Strategy(ABC):
 
             # Call strategy to configure evaluation round
             # Send messages and wait for replies
-            evaluate_replies = grid.send_and_receive(
+            evaluate_replies = send_and_receive(
+                grid=grid,
                 messages=self.configure_evaluate(
                     current_round,
                     arrays,
@@ -270,6 +280,10 @@ class Strategy(ABC):
                 log(INFO, "\t└──> MetricRecord: %s", res)
                 if res is not None:
                     result.evaluate_metrics_serverapp[current_round] = res
+
+            if should_stop is not None and should_stop(current_round, result):
+                log(INFO, "Stopping early after round %s", current_round)
+                break
 
         log(INFO, "")
         log(INFO, "Strategy execution finished in %.2fs", time.time() - t_start)

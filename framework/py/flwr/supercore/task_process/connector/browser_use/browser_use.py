@@ -27,8 +27,11 @@ from browser_use.llm.schema import SchemaOptimizer
 from browser_use.llm.views import ChatInvokeCompletion
 from pydantic import BaseModel
 
-from flwr.supercore.task_process.model.provider import invoke_model_provider
-from flwr.supercore.task_process.usage import TaskUsageRecorder
+from flwr.supercore.model_provider import invoke_model_provider
+from flwr.supercore.task_process.usage import (
+    TaskUsageRecorder,
+    task_usage_from_open_response,
+)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 _DEFAULT_BROWSER_USE_MODEL = "openai/gpt-5.5"
@@ -170,11 +173,10 @@ class FlowerResponsesChatModel(BaseChatModel):
                 }
             }
 
-        response = await asyncio.to_thread(
-            invoke_model_provider,
-            request,
-            usage_recorder=self._usage_recorder,
-        )
+        response = await invoke_model_provider(request)
+        usage = task_usage_from_open_response(response, provider=self.model)
+        if usage is not None:
+            await asyncio.to_thread(self._usage_recorder.record, usage)
         # Some Responses-compatible providers include the SDK-style convenience
         # field directly on the response object.
         raw_output_text = response.get("output_text")

@@ -28,3 +28,12 @@ message RunSeries {
   RunStatus last_run_status = 7;
   repeated uint64 run_ids = 8;
 }
+
+message CompactedContext {
+  uint64 id = 1;
+  uint64 series_id = 2;
+  uint64 through_event_id = 3;
+  string text = 4;
+  string created_at = 5;
+  uint64 token_count = 6;
+}

@@ -10,6 +10,17 @@
         layout: elk
 ---
 erDiagram
+  agent {
+    BIGINT agent_id PK
+    VARCHAR app_spec
+    TIMESTAMP created_at
+    TEXT description "nullable"
+    VARCHAR flwr_aid
+    VARCHAR name
+    VARCHAR title "nullable"
+    TIMESTAMP updated_at
+  }
+
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
@@ -25,11 +36,25 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  compacted_contexts {
+    BIGINT id PK
+    TIMESTAMP created_at
+    BIGINT series_id
+    TEXT text
+    BIGINT through_event_id
+    BIGINT token_count
+  }
+
   connector {
-    VARCHAR connector_ref PK
-    VARCHAR flwr_aid PK
+    INTEGER connector_id PK
     VARCHAR config_json
+    VARCHAR connector_ref
+    TIMESTAMP created_at
+    VARCHAR created_by
     VARCHAR credentials_json
+    TIMESTAMP deleted_at "nullable"
+    VARCHAR deleted_by "nullable"
+    VARCHAR federation_id
   }
 
   connector_oauth_session {
@@ -38,15 +63,11 @@ erDiagram
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
+    VARCHAR federation_id
     VARCHAR flwr_aid
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri
     VARCHAR state
-  }
-
-  context {
-    BIGINT run_id FK "nullable"
-    BLOB context "nullable"
   }
 
   fab {
@@ -55,47 +76,44 @@ erDiagram
     VARCHAR verifications
   }
 
-  logs {
-    BIGINT run_id FK "nullable"
-    VARCHAR log "nullable"
-    BIGINT node_id "nullable"
-    FLOAT timestamp "nullable"
+  federation_app {
+    VARCHAR app_id PK
+    VARCHAR federation_id PK
+    TIMESTAMP added_at
+    VARCHAR added_by
+    VARCHAR app_type
+    VARCHAR color "nullable"
+    VARCHAR description "nullable"
+    VARCHAR display_name "nullable"
+    VARCHAR fab_hash
+    BOOLEAN is_hub_app "nullable"
+    TIMESTAMP updated_at
   }
 
-  message_ins {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
-  }
-
-  message_res {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
+  message {
+    VARCHAR message_id PK
+    VARCHAR reply_to_message_id FK "nullable"
+    TIMESTAMP acknowledged_at "nullable"
+    TIMESTAMP cancelled_at "nullable"
+    BOOLEAN cleared
+    DOUBLE created_at
+    BIGINT dst_node_id
+    BIGINT dst_task_id "nullable"
+    TIMESTAMP expires_at
+    VARCHAR group_id
+    VARCHAR message_type
+    BIGINT run_id
+    BIGINT src_node_id
+    BIGINT src_task_id "nullable"
+    DOUBLE ttl
   }
 
   node {
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
+    VARCHAR location "nullable"
+    VARCHAR name "nullable"
     BIGINT node_id UK "nullable"
     FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
@@ -164,7 +182,7 @@ erDiagram
   }
 
   run_connector {
-    VARCHAR connector_ref PK
+    INTEGER connector_id PK
     BIGINT run_id PK
   }
 
@@ -178,6 +196,7 @@ erDiagram
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation_id
+    BOOLEAN is_agent
     TIMESTAMP updated_at
   }
 
@@ -194,6 +213,7 @@ erDiagram
 
   task {
     TIMESTAMP active_until "nullable"
+    INTEGER connector_id "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
@@ -210,7 +230,7 @@ erDiagram
   }
 
   task_event {
-    INTEGER id PK
+    BIGINT id PK
     BIGINT task_id FK
     VARCHAR data
     VARCHAR event
@@ -250,10 +270,7 @@ erDiagram
     VARCHAR usage_type
   }
 
-  run ||--o| context : run_id
-  run ||--o{ logs : run_id
-  run ||--o{ message_ins : run_id
-  run ||--o{ message_res : run_id
+  message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
