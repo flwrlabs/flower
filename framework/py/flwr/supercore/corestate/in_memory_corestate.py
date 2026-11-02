@@ -77,6 +77,9 @@ from .utils import (
     validate_task_message,
 )
 
+FileKey = tuple[str, str]
+FileRevisionKey = tuple[str, str, int]
+
 
 @dataclass
 class TokenRecord:
@@ -166,8 +169,8 @@ class InMemoryCoreState(
     # pylint: disable-next=too-many-statements
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
-        self.file_store: dict[tuple[str, str], FileRecord] = {}
-        self.file_revision_store: dict[tuple[str, str, int], FileRevisionRecord] = {}
+        self.file_store: dict[FileKey, FileRecord] = {}
+        self.file_revision_store: dict[FileRevisionKey, FileRevisionRecord] = {}
         self.lock_file_store = Lock()
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
