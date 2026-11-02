@@ -71,6 +71,8 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         self._cleanup_started = False
         self._maintenance_started_at = config.monotonic()
         self._maintenance_lock = threading.Lock()
+        self._capacity_generation = 0
+        self._cold_launches = 0
         self._maintenance_requested = threading.Event()
         self._maintenance_stopped = threading.Event()
         self._maintenance_start_lock = threading.Lock()
@@ -214,7 +216,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             ]
         for pod_name, creation in pending:
             if self._config.monotonic() >= creation.retry_at:
-                if not self._has_creation_capacity(
+                if not self._reserve_creation_capacity(
                     reserved_pod_capacity, reusing_pending=True
                 ):
                     continue
@@ -236,42 +238,100 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             )
         pods_to_create = max(pool.size - compatible_count - pending_count, 0)
         for index in range(pods_to_create):
-            # Foreground cold launches may consume headroom during a slow create.
-            if not self._has_creation_capacity(reserved_pod_capacity):
-                return
-            executor_id = new_warm_executor_id()
-            with self._lock:
-                if self._state.closed:
-                    return
-                if index == 0 and pool.key.fab_hash is not None:
+            creation = PendingWarmExecutor(pool.key, new_warm_executor_id())
+            pod_name = self._resources.pod_name(creation.executor_id)
+
+            def reserve_warm(
+                name: str = pod_name,
+                pending: PendingWarmExecutor = creation,
+                first: bool = index == 0,
+            ) -> None:
+                if first and pool.key.fab_hash is not None:
                     self._delay_pool_creation(pool.key)
-                pod_name = self._resources.pod_name(executor_id)
-                self._pending_creations[pod_name] = PendingWarmExecutor(
-                    pool.key, executor_id
-                )
+                self._pending_creations[name] = pending
+
+            if not self._reserve_creation_capacity(
+                reserved_pod_capacity, reserve=reserve_warm
+            ):
+                return
             if not self._create_pending_pod(pod_name):
                 return
 
-    def _has_creation_capacity(
-        self, reserved_pod_capacity: int, *, reusing_pending: bool = False
+    def launch_cold(self, launch: Callable[[], LaunchResult]) -> LaunchResult | None:
+        """Reserve cold capacity through submission, or request an admission retry."""
+        with self._lock:
+            if self._state.closed:
+                return LaunchResult.failed("Warm executor pool is closed.")
+        if self._config.active_pod_budget is None:
+            return launch()
+
+        def reserve_cold() -> None:
+            self._cold_launches += 1
+
+        if not self._reserve_creation_capacity(
+            0, reserve=reserve_cold, allow_capacity_error=True
+        ):
+            return None
+        try:
+            return launch()
+        finally:
+            with self._lock:
+                self._cold_launches -= 1
+                self._capacity_generation += 1
+            self.request_maintenance()
+
+    def _reserve_creation_capacity(
+        self,
+        reserved_pod_capacity: int,
+        *,
+        reusing_pending: bool = False,
+        reserve: Callable[[], None] | None = None,
+        allow_capacity_error: bool = False,
     ) -> bool:
-        """Keep cold-launch headroom and account for unobserved warm creations."""
+        """Check capacity outside the state lock, then atomically reserve a slot."""
         with self._lock:
             if self._state.closed:
                 return False
             pending_names = set(self._pending_creations)
-        if self._config.active_pod_budget is None:
+            generation = self._capacity_generation
+            cold_launches = self._cold_launches
+        active_count = len(pending_names)
+        if self._config.active_pod_budget is not None:
+            try:
+                active_count = self._active_pod_count(pending_names)
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(
+                    WARNING,
+                    (
+                        "Kubernetes capacity check failed; proceeding without waiting."
+                        if allow_capacity_error
+                        else "Warm executor capacity check failed; retrying later."
+                    ),
+                    exc_info=True,
+                )
+                if not allow_capacity_error:
+                    return False
+        with self._lock:
+            if self._state.closed:
+                return False
+            if self._config.active_pod_budget is not None:
+                # A cold reservation may have started and finished during the read.
+                if generation != self._capacity_generation or pending_names != set(
+                    self._pending_creations
+                ):
+                    return False
+                required = (
+                    active_count
+                    + cold_launches
+                    + reserved_pod_capacity
+                    + int(not reusing_pending)
+                )
+                if required > self._config.active_pod_budget:
+                    return False
+            if reserve is not None:
+                reserve()
+                self._capacity_generation += 1
             return True
-        try:
-            required = self._active_pod_count(pending_names) + reserved_pod_capacity
-            return required + int(not reusing_pending) <= self._config.active_pod_budget
-        except Exception:  # pylint: disable=broad-exception-caught
-            log(
-                WARNING,
-                "Warm executor capacity check failed; retrying later.",
-                exc_info=True,
-            )
-            return False
 
     def _create_pending_pod(self, pod_name: str) -> bool:
         """Retry possibly accepted creations without resurrecting claimed workers."""

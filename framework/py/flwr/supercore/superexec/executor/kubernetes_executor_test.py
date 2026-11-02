@@ -2133,36 +2133,87 @@ def test_active_budget_counts_surviving_owned_pods_after_labels_change() -> None
     assert executor._active_pod_count() == 2  # pylint: disable=protected-access
 
 
-def test_wait_for_capacity_reserves_space_for_a_cold_task() -> None:
-    """Reconciling warm capacity must not consume the cold task's last slot."""
+@pytest.mark.parametrize("blocked_path", ["warm", "cold"])
+def test_warm_and_cold_creation_share_last_budget_slot(
+    monkeypatch: pytest.MonkeyPatch, blocked_path: str
+) -> None:
+    """A stale count cannot admit both a cold launch and a warm replacement."""
     client = Mock()
-    sleep = Mock()
-    pool_key = _warm_executor_pool_key(
-        runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
-    )
-    config = _executor_config(
-        active_pod_budget=3,
-        warm_executor_owner="superexec-a",
-        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
-        sleep=sleep,
-    )
-    active_pod_count = 3
-
-    def _list_pods(_namespace: str, label_selector: str) -> dict[str, Any]:
-        if "warm-executor-owner" in label_selector:
-            return {"items": []}
-        return {"items": [_pod("Running")] * active_pod_count}
-
-    client.list_namespaced_pod.side_effect = _list_pods
+    pods = [_pod("Running", name="existing-cold")]
+    key = _warm_executor_pool_key(runtime_image="ghcr.io/flwrlabs/taskexecutor:dev")
+    client.list_namespaced_pod.side_effect = lambda _namespace, label_selector: {
+        "items": (
+            [pod for pod in pods if "warm" in pod["metadata"]["name"]]
+            if "warm-executor-owner" in label_selector
+            else pods.copy()
+        )
+    }
     client.list_namespaced_secret.return_value = {"items": []}
-    executor = _executor(client=client, config=config)
-    client.create_namespaced_pod.reset_mock()
-    active_pod_count = 2
+    peak_count = [1]
 
-    executor.wait_for_capacity(TaskType.CONNECTOR)
+    def create_pod(_namespace: str, body: dict[str, Any]) -> None:
+        pods.append(_pod("Pending", name=body["metadata"]["name"]))
+        peak_count[0] = max(peak_count[0], len(pods))
 
-    client.create_namespaced_pod.assert_not_called()
-    sleep.assert_not_called()
+    client.create_namespaced_pod.side_effect = create_pod
+    executor = _executor(
+        client=client,
+        config=_executor_config(
+            active_pod_budget=2,
+            warm_executor_owner="superexec-a",
+            warm_executor_pools=(WarmExecutorPoolConfig(key=key, size=1),),
+            sleep=lambda _interval: pods.pop(0),
+        ),
+    )
+    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
+    assert manager is not None
+    monkeypatch.setattr(manager, "request_maintenance", Mock())
+    # pylint: disable-next=protected-access
+    count_pods = executor._resources.active_pod_count
+    checked = threading.Event()
+    resume = threading.Event()
+
+    def stale_count(pending: set[str] | None = None) -> int:
+        count = count_pods(pending)
+        if threading.current_thread().name == blocked_path and not checked.is_set():
+            checked.set()
+            assert resume.wait(3)
+        return count
+
+    monkeypatch.setattr(
+        # pylint: disable-next=protected-access
+        executor._resources,
+        "active_pod_count",
+        stale_count,
+    )
+    monkeypatch.setattr(manager, "_active_pod_count", stale_count)
+    results: list[LaunchResult] = []
+    threads = [
+        threading.Thread(target=manager.ensure_capacity, name="warm"),
+        threading.Thread(
+            target=lambda: results.append(
+                executor.launch(_execution_spec(insecure=True))
+            ),
+            name="cold",
+        ),
+    ]
+    if blocked_path == "cold":
+        threads.reverse()
+    try:
+        threads[0].start()
+        assert checked.wait(2)
+        threads[1].start()
+        threads[1].join(2)
+        assert not threads[1].is_alive()
+    finally:
+        resume.set()
+        threads[0].join(2)
+        if threads[1].ident is not None:
+            threads[1].join(2)
+        executor.close()
+    assert not threads[0].is_alive()
+    assert peak_count[0] == 2
+    assert [result.status for result in results] == [LaunchResultStatus.ACCEPTED]
 
 
 def test_warm_pool_cannot_fill_the_active_pod_budget() -> None:

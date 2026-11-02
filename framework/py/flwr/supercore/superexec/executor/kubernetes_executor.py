@@ -256,7 +256,13 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
                         allow_warm_dispatch=allow_warm_dispatch,
                         reconcile_warm_pools=False,
                     ):
-                        break
+                        cold_result = self._warm_executor_pool_manager.launch_cold(
+                            lambda: self._resources.launch_cold(
+                                spec, runtime_root_certificates
+                            )
+                        )
+                        if cold_result is not None:
+                            return cold_result
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return launch_result_from_exception(exc)
         return self._resources.launch_cold(spec, runtime_root_certificates)
