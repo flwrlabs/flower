@@ -26,7 +26,9 @@ import time
 import unittest
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Barrier
 from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -2170,6 +2172,50 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         )
         state.initialize()
         return state
+
+    @parameterized.expand(  # type: ignore
+        [("create",), ("update",), ("recreate",), ("delete",), ("update-delete",)]
+    )
+    def test_file_concurrent_mutations(self, operation: str) -> None:
+        """Only one concurrent operation can satisfy the same file precondition."""
+        state = self.state_factory()
+        expected_revision = None
+        if operation != "create":
+            expected_revision = state.put_file("scope", "file", b"old", None)
+        if operation == "recreate":
+            assert expected_revision is not None
+            state.delete_file("scope", "file", expected_revision)
+            expected_revision = None
+        barrier = Barrier(2)
+
+        def mutate(index: int) -> bool:
+            barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
+            try:
+                if operation == "delete" or (
+                    operation == "update-delete" and index == 1
+                ):
+                    assert expected_revision is not None
+                    state.delete_file("scope", "file", expected_revision)
+                else:
+                    state.put_file(
+                        "scope", "file", str(index).encode(), expected_revision
+                    )
+                return True
+            except FlowerError as exc:
+                self.assertEqual(exc.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT)
+                return False
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(mutate, range(2)))
+
+        self.assertEqual(sum(results), 1)
+        file = state.get_file("scope", "file")
+        if operation == "delete" or (operation == "update-delete" and results[1]):
+            self.assertIsNone(file)
+            self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+        else:
+            assert file is not None
+            self.assertEqual(file.data, str(results.index(True)).encode())
 
     def _shared_sql_database(self, tmpdir: str) -> str:
         """Return database location shared by concurrent SqlLinkState replicas."""
