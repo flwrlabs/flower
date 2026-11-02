@@ -16,10 +16,11 @@
 
 
 import numpy as np
+import pytest
 
 from flwr.app import ArrayRecord
 
-from .fedtrimmedavg import FedTrimmedAvg
+from .fedtrimmedavg import FedTrimmedAvg, trim_mean
 from .strategy_utils_test import create_mock_reply
 
 
@@ -60,3 +61,17 @@ def test_aggregate_fit_with_scalar_weights() -> None:
     actual = actual_aggregated.to_numpy_ndarrays()[0]
     assert actual.shape == ()
     np.testing.assert_equal(actual, np.array(1.5))
+
+
+@pytest.mark.parametrize("beta", [-0.1, 0.5])
+def test_init_rejects_invalid_beta(beta: float) -> None:
+    """Test that invalid trimming fractions are rejected during setup."""
+    with pytest.raises(ValueError, match=r"\[0, 0\.5\)"):
+        FedTrimmedAvg(beta=beta)
+
+
+@pytest.mark.parametrize("cut_fraction", [-0.1, 0.5])
+def test_trim_mean_rejects_invalid_cut_fraction(cut_fraction: float) -> None:
+    """Test that trim_mean rejects invalid cut fractions."""
+    with pytest.raises(ValueError, match=r"\[0, 0\.5\)"):
+        trim_mean(np.array([[1.0], [2.0]]), cut_fraction)

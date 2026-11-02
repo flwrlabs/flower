@@ -22,23 +22,26 @@ IPV6: int = 6
 
 
 def parse_address(address: str) -> tuple[str, int, bool | None] | None:
-    """Parse an IP address into host, port, and version.
+    """Parse a host-port address into host, port, and version.
 
     Parameters
     ----------
     address : str
         The string representation of a domain, an IPv4, or an IPV6 address
-        with the port number.
+        with the port number, without a URL prefix.
 
         For example, '127.0.0.1:8080', or [::1]:8080.
 
     Returns
     -------
     Optional[Tuple[str, int, Optional[bool]]]
-        If the port provided is incorrect,
+        If a URL prefix is supplied or the port provided is incorrect,
         the function will return None, otherwise it will return the host,
         (str), port number (int), and version (bool).
     """
+    if "://" in address:
+        return None
+
     try:
         raw_host, _, raw_port = address.rpartition(":")
 

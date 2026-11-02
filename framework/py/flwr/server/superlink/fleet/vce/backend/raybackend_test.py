@@ -18,6 +18,7 @@
 from collections.abc import Callable
 from math import pi
 from unittest import TestCase
+from unittest.mock import patch
 
 import ray
 
@@ -120,24 +121,21 @@ class TestRayBackend(TestCase):
         if ray.is_initialized():
             ray.shutdown()
 
-    def test_backend_creation_and_termination(self) -> None:
-        """Test creation of RayBackend and its termination."""
-        backend = RayBackend(backend_config={})
-        backend_build_process_and_termination(
-            backend=backend, app_fn=_load_app, process_args=None
-        )
-
-    def test_backend_creation_submit_and_termination(
-        self,
-        client_app_loader: Callable[[], ClientApp] = _load_app,
-    ) -> None:
+    def test_backend_creation_submit_and_termination(self) -> None:
         """Test submitting a message to a given ClientApp."""
-        backend = RayBackend(backend_config={})
+        backend_config: BackendConfig = {
+            "init_args": {"num_cpus": 2},
+            "client_resources": {"num_cpus": 1, "num_gpus": 0},
+        }
+        backend = RayBackend(backend_config=backend_config)
+
+        nodes = ray.nodes()  # type: ignore[no-untyped-call]
+        assert nodes[0]["Resources"]["CPU"] == backend_config["init_args"]["num_cpus"]
 
         message, context, expected_output = _create_message_and_context()
 
         res = backend_build_process_and_termination(
-            backend=backend, app_fn=client_app_loader, process_args=(message, context)
+            backend=backend, app_fn=_load_app, process_args=(message, context)
         )
 
         if res is None:
@@ -157,70 +155,41 @@ class TestRayBackend(TestCase):
         ]
         assert obtained_result_in_context == expected_output
 
-    def test_backend_creation_submit_and_termination_existing_client_app(
-        self,
-    ) -> None:
-        """Testing with ClientApp module that exist."""
-        self.test_backend_creation_submit_and_termination(
-            client_app_loader=_load_app,
-        )
-
-    def test_backend_creation_with_init_arguments(self) -> None:
-        """Testing whether init args are properly parsed to Ray."""
+        # Validate forwarding of an additional init argument without starting another
+        # Ray runtime. The integration assertion above covers the actual resource setup.
         backend_config_4: BackendConfig = {
             "init_args": {"num_cpus": 4},
             "client_resources": {"num_cpus": 1, "num_gpus": 0},
         }
+        with (
+            patch(
+                "flwr.server.superlink.fleet.vce.backend.raybackend.ray.is_initialized",
+                return_value=False,
+            ),
+            patch(
+                "flwr.server.superlink.fleet.vce.backend.raybackend.ray.init"
+            ) as ray_init,
+        ):
+            RayBackend(backend_config=backend_config_4)
 
-        backend_config_2: BackendConfig = {
-            "init_args": {"num_cpus": 2},
-            "client_resources": {"num_cpus": 1, "num_gpus": 0},
-        }
-
-        RayBackend(
-            backend_config=backend_config_4,
-        )
-        nodes = ray.nodes()  # type: ignore[no-untyped-call]
-
-        assert nodes[0]["Resources"]["CPU"] == backend_config_4["init_args"]["num_cpus"]
-
-        ray.shutdown()
-
-        RayBackend(
-            backend_config=backend_config_2,
-        )
-        nodes = ray.nodes()  # type: ignore[no-untyped-call]
-
-        assert nodes[0]["Resources"]["CPU"] == backend_config_2["init_args"]["num_cpus"]
+        assert ray_init.call_args.kwargs["num_cpus"] == 4
 
     def test_case_with_no_cpu_resources_on_node(self) -> None:
         """Test mixed environment with zero and non-zero CPU nodes."""
-        try:
-            # Start Ray with head node (zero CPU)
-            ray.init(num_cpus=0)
-
-            # Mock ray.nodes() to return both head node and worker node
-            original_nodes = ray.nodes
-
-            head_node = ray.nodes()[0].copy()  # type: ignore[no-untyped-call]
-
-            ray.nodes = lambda: [
-                head_node,  # Head node initialized with no cpu
+        # The pool-size calculation only needs the node resource shape; starting a
+        # Ray cluster here adds several seconds without exercising another code path.
+        client_resources: dict[str, int | float] = {
+            "num_cpus": 2,
+            "num_gpus": 0,
+        }
+        with patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[
+                {"Resources": {"CPU": 0}},  # Head node initialized with zero CPU
                 {"Resources": {"CPU": 8}},  # Worker node with 8 CPUs
-            ]
+            ],
+        ):
+            pool_size = pool_size_from_resources(client_resources)
 
-            try:
-                # Test the pool size calculation
-                client_resources: dict[str, int | float] = {
-                    "num_cpus": 2,
-                    "num_gpus": 0,
-                }
-                pool_size = pool_size_from_resources(client_resources)
-                # Should calculate based on the worker node (8 CPUs)
-                self.assertEqual(pool_size, 4)  # 8 / 2 CPUs required for each task
-            finally:
-                # Restore original functions
-                ray.nodes = original_nodes
-
-        finally:
-            ray.shutdown()
+        # Should calculate based on the worker node (8 CPUs).
+        self.assertEqual(pool_size, 4)  # 8 / 2 CPUs required for each task

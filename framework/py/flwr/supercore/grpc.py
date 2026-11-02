@@ -24,7 +24,7 @@ from typing import Any
 
 import grpc
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.address import is_port_in_use
 
 GRPC_MAX_MESSAGE_LENGTH: int = 2_147_483_647  # == 2048 * 1024 * 1024 -1 (2GB)

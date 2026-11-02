@@ -60,6 +60,11 @@ on:
         required: false
         default: ""
         type: string
+      export-index-digest:
+        description: "Upload the final OCI index digest for collection by the caller."
+        required: false
+        type: boolean
+        default: false
     secrets:
       docker-registry-token:
         required: false
@@ -84,7 +89,7 @@ jobs:
       matrix:
         platform:
           [
-            { name: "amd64", docker: "linux/amd64", runner-os: "ubuntu-22.04" },
+            { name: "amd64", docker: "linux/amd64", runner-os: "ubuntu-24.04" },
             {
               name: "arm64",
               docker: "linux/arm64",
@@ -139,12 +144,12 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ inputs.image-repository }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Validate Docker registry credentials
         env:
@@ -162,14 +167,14 @@ jobs:
           fi
 
       - name: Login to Docker registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ inputs.registry }}
           username: ${{ inputs.docker-registry-user }}
           password: ${{ secrets.docker-registry-token }}
 
       - name: Build and push
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3.8.0
+        uses: Wandalen/wretry.action@df981d2bb22b26b5b23754bb516d0de8c1bfbbec # Node 24 support
         id: build
         with:
           action: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
@@ -188,11 +193,11 @@ jobs:
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
-          digest="${{ fromJSON(steps.build.outputs.outputs).digest }}"
+          digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: digests-${{ steps.build-id.outputs.id }}-${{ matrix.platform.name }}
           path: /tmp/digests/*
@@ -201,14 +206,14 @@ jobs:
 
   build-manifest:
     name: Build and push Docker manifest for all platforms
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: build
     outputs:
       metadata: ${{ steps.meta.outputs.json }}
     steps:
       - name: Download digests
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: digests-${{ needs.build.outputs.build-id }}-*
           path: /tmp/digests
@@ -216,13 +221,13 @@ jobs:
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ inputs.image-repository }}
           tags: ${{ inputs.tags }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Validate Docker registry credentials
         env:
@@ -240,7 +245,7 @@ jobs:
           fi
 
       - name: Login to Docker registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ inputs.registry }}
           username: ${{ inputs.docker-registry-user }}
@@ -259,7 +264,37 @@ jobs:
             digest_args+=("${{ inputs.image-repository }}@sha256:${digest}")
           done
 
-          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+          docker buildx imagetools create \
+            --metadata-file /tmp/manifest-metadata.json \
+            "${tag_args[@]}" \
+            "${digest_args[@]}"
 
       - name: Inspect Docker image
-        run: docker buildx imagetools inspect ${{ inputs.image-repository }}:${{ steps.meta.outputs.version }}
+        env:
+          IMAGE: ${{ inputs.image-repository }}:${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}"
+
+      - name: Export OCI index digest
+        if: ${{ inputs.export-index-digest }}
+        env:
+          IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        run: |
+          mkdir -p /tmp/index-digest
+          digest="$(jq --exit-status --raw-output \
+            '.["containerimage.descriptor"].digest | select(test("^sha256:[0-9a-f]{64}$"))' \
+            /tmp/manifest-metadata.json)"
+          jq -n \
+            --arg repository "${IMAGE_REPOSITORY}" \
+            --arg digest "${digest}" \
+            --argjson tags "$(jq -c '.tags' <<< "${DOCKER_METADATA_OUTPUT_JSON}")" \
+            '{repository: $repository, tags: $tags, index_digest: $digest}' \
+            > "/tmp/index-digest/${{ needs.build.outputs.build-id }}.json"
+
+      - name: Upload OCI index digest
+        if: ${{ inputs.export-index-digest }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: index-digest-${{ needs.build.outputs.build-id }}
+          path: /tmp/index-digest/*.json
+          if-no-files-found: error
+          retention-days: 1

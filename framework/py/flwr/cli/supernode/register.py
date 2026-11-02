@@ -31,19 +31,20 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RegisterNodeResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_ec_curve
+from flwr.supercore.utils import validate_node_location
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
 
-def register(  # pylint: disable=R0914
+def register(  # pylint: disable=R0913,R0914
     ctx: typer.Context,
     public_key: Annotated[
         Path,
@@ -55,6 +56,21 @@ def register(  # pylint: disable=R0914
         str | None,
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
+    *,
+    location: Annotated[
+        str | None,
+        typer.Option(
+            "--location",
+            help=(
+                'Location of the SuperNode as "<latitude>,<longitude>", '
+                'for example "37.4056,-122.0775".'
+            ),
+        ),
+    ] = None,
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Name of the SuperNode."),
+    ] = None,
     output_format: Annotated[
         Literal["default", "json"],
         typer.Option(
@@ -65,6 +81,8 @@ def register(  # pylint: disable=R0914
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Add a SuperNode to the federation."""
+    location = _validate_location(location)
+
     # Load public key
     public_key_bytes = try_load_public_key(public_key.expanduser())
 
@@ -74,28 +92,37 @@ def register(  # pylint: disable=R0914
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             _register_node(
-                stub=stub,
+                stub=control_client,
                 public_key=public_key_bytes,
                 is_json=is_json,
+                location=location,
+                name=name,
             )
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
-def _register_node(stub: ControlStub, public_key: bytes, is_json: bool) -> None:
+def _register_node(
+    stub: ControlHttpClient,
+    public_key: bytes,
+    is_json: bool,
+    location: str | None = None,
+    name: str | None = None,
+) -> None:
     """Register a node."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(
-            request=RegisterNodeRequest(public_key=public_key)
+            request=RegisterNodeRequest(
+                public_key=public_key, location=location, name=name
+            )
         )
     if response.node_id:
         typer.secho(
@@ -111,6 +138,19 @@ def _register_node(stub: ControlStub, public_key: bytes, is_json: bool) -> None:
             )
     else:
         raise click.ClickException("SuperNode couldn't be registered.")
+
+
+def _validate_location(location: str | None) -> str | None:
+    """Validate the optional SuperNode location."""
+    if location is None:
+        return None
+
+    try:
+        validate_node_location(location)
+    except ValueError as err:
+        raise click.BadParameter(str(err), param_hint="--location") from err
+
+    return location
 
 
 def try_load_public_key(public_key_path: Path) -> bytes:
