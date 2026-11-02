@@ -35,7 +35,6 @@ from flwr.common.args import (
 from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
-    FLWR_INTERNAL_GRPC_CONTROL_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -69,7 +68,6 @@ from flwr.superlink.config_loader import (
     load_control_event_log_plugin,
     load_fleet_event_log_plugin,
 )
-from flwr.superlink.servicer.control import run_control_api_grpc
 
 try:
     from flwr.ee import add_ee_args_superlink, get_ee_artifact_provider
@@ -85,13 +83,7 @@ except ImportError:
 
 
 class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
-    """Own the shared SuperLink lifespan state and legacy network servers.
-
-    Long-term, the gRPC-specific parts of this class should shrink until it only
-    initializes shared services used by FastAPI routers. During the migration,
-    FastAPI lifespan can use this object to start the existing gRPC APIs as
-    compatibility adapters.
-    """
+    """Own the shared SuperLink lifespan state and network services."""
 
     def __init__(
         self,
@@ -102,12 +94,11 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
-        self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
         self._started = False
 
     def startup(self) -> None:
-        """Start shared lifespan and legacy SuperLink gRPC servers."""
+        """Start shared lifespan resources and the optional health server."""
         log(INFO, "SuperLinkLifespan: start")
         if self._started:
             return
@@ -115,14 +106,12 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         # Force initialization before starting network servers
         self.state_factory.state()
 
-        if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
-            self._start_control_api()
         self._start_superexec_if_needed()
         self._start_health_server_if_needed()
         self._started = True
 
     def shutdown(self) -> None:
-        """Stop legacy gRPC servers started by this lifespan."""
+        """Stop services started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
         if (
             not self._started
@@ -150,26 +139,11 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
     def wait_until_background_thread_exits(self) -> None:
         """Block like the historical `flower-superlink` command.
 
-        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
-        intentionally true, so this loop blocks until a signal handler exits the
-        process. This preserves the current CLI behavior.
+        With no background threads, `all([])` is intentionally true, so this loop
+        blocks until a signal handler exits the process.
         """
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
-
-    def _start_control_api(self) -> None:
-        config = self.config
-        control_server: grpc.Server = run_control_api_grpc(
-            address=config.control_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            certificates=config.certificates,
-            authn_plugin=config.authn_plugin,
-            event_log_plugin=config.event_log_plugin,
-            artifact_provider=config.artifact_provider,
-            fleet_api_type=config.fleet_api_type,
-        )
-        self.grpc_servers.append(control_server)
 
     def _start_superexec_if_needed(self) -> None:
         config = self.config
@@ -242,7 +216,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
 
     # Parse IP addresses
-    control_address, _, _ = _format_address(args.control_api_address)
     health_server_address = None
     if args.health_server_address is not None:
         health_server_address, _, _ = _format_address(args.health_server_address)
@@ -337,7 +310,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
 
     return SuperLinkLifespanConfig(
-        control_address=control_address,
         health_server_address=health_server_address,
         host=args.host,
         port=args.port,

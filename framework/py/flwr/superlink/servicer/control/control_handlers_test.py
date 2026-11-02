@@ -396,6 +396,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         mock_store_app.assert_not_called()
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
+        self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
+        tasks = self.state.get_tasks()
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
@@ -480,6 +484,13 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
+        series = self.state.get_run_series(series_ids=[run.series_id])[0]
+        tasks = self.state.get_tasks()
+        self.assertEqual(run.primary_task_type, TaskType.AGENT_APP)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(series.description, "Hello")
+        self.assertEqual(app.app_type, TaskType.AGENT_APP)
         self.assertEqual(app.display_name, "Local Agent")
         self.assertEqual(app.description, "Local agent")
         self.assertEqual(app.color, "rose")
