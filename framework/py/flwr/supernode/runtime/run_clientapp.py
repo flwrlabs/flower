@@ -45,6 +45,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.error import FlowerError
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
@@ -322,5 +323,5 @@ def push_task_output(  # pylint: disable=R0913, R0917
                 details=details,
             )
         )
-    except httpx.HTTPError as err:
+    except (httpx.HTTPError, FlowerError) as err:
         log(ERROR, "Failed to push task output: %s", str(err))

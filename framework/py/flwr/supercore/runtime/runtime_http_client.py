@@ -72,13 +72,16 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.supercore.interceptors.http import FlowerErrorHttpInterceptor
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
 class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
-    """Protobuf-over-HTTP client for the Runtime API."""
+    """Protobuf-over-HTTP client that restores structured Runtime API errors."""
+
+    _default_interceptors = (FlowerErrorHttpInterceptor(),)
 
     def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
         """Acquire the oldest eligible pending task."""

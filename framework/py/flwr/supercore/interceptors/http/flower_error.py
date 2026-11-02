@@ -24,7 +24,7 @@ class FlowerErrorHttpInterceptor:
     """Raise structured HTTP errors as FlowerError instances.
 
     Add this interceptor explicitly to a protobuf client's interceptor list.
-    Translated errors bypass the client's HTTP retry policy.
+    The original HTTP exception is retained as the cause for retry policies.
     """
 
     def intercept(

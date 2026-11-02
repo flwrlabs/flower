@@ -104,6 +104,8 @@ def _wrap_interceptor(
 class ProtobufClient:
     """Client providing shared protobuf-over-HTTP request handling."""
 
+    _default_interceptors: tuple[ProtobufClientInterceptor, ...] = ()
+
     def __init__(  # pylint: disable=too-many-arguments
         self,
         base_url: str,
@@ -114,7 +116,7 @@ class ProtobufClient:
         retry_invoker: RetryInvoker | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        self._interceptors = tuple(interceptors)
+        self._interceptors = self._default_interceptors + tuple(interceptors)
         self._retry_invoker = retry_invoker
         self._client = httpx.Client(
             verify=verify,
