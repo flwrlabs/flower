@@ -1,0 +1,227 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""SuperNode Runtime HTTP authentication integration tests."""
+
+from typing import cast
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from google.protobuf.message import Message
+from httpx import Response
+
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    PullObjectRequest,
+    PullObjectResponse,
+)
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
+    CreateTaskRequest,
+    GetNodesRequest,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
+    PushTaskEventsRequest,
+)
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
+from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
+from flwr.supercore.dependencies.runtime import get_runtime_state
+from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
+from flwr.supercore.routers.runtime import router
+from flwr.supercore.run import Run
+from flwr.supernode.nodestate import NodeState, NodeStateFactory
+from flwr.supernode.servicer.runtime import runtime_handlers
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
+_ACQUIRE_TASK_METHOD = "/flwr.proto.Runtime/AcquireTask"
+
+
+@pytest.fixture(name="state")
+def fixture_state() -> NodeState:
+    """Create an in-memory NodeState."""
+    return NodeStateFactory(objectstore_factory=ObjectStoreFactory()).state()
+
+
+def _create_app(state: NodeState, secret: bytes | None) -> FastAPI:
+    """Create the Runtime HTTP application with real dependencies."""
+    app = FastAPI()
+    app.state.superexec_auth_secret = secret
+    app.state.runtime_handlers = runtime_handlers
+    app.include_router(router)
+    app.add_middleware(ProtobufTranslationMiddleware)
+    app.middleware("http")(http_error_translator)
+    app.dependency_overrides[get_runtime_state] = lambda: state
+    return app
+
+
+@pytest.fixture(name="client")
+def fixture_client(state: NodeState) -> TestClient:
+    """Create a Runtime HTTP client with SuperExec auth enabled."""
+    return TestClient(_create_app(state, _SUPEREXEC_SECRET))
+
+
+@pytest.fixture(name="valid_token")
+def fixture_valid_token(state: NodeState) -> str:
+    """Claim the ClientApp task and return its token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None
+    return token
+
+
+def _post(
+    client: TestClient,
+    path: str,
+    proto_request: Message,
+    *,
+    token: str | None = None,
+    auth_headers: dict[str, str] | None = None,
+) -> Response:
+    """Send a protobuf request with optional authentication headers."""
+    headers = {"content-type": PROTOBUF_MEDIA_TYPE}
+    if token is not None:
+        headers[TASK_TOKEN_HEADER] = token
+    if auth_headers is not None:
+        headers.update(auth_headers)
+    return cast(
+        Response,
+        client.post(
+            f"/v1/runtime/{path}",
+            content=proto_request.SerializeToString(),
+            headers=headers,
+        ),
+    )
+
+
+def test_runtime_flower_error_is_translated(
+    client: TestClient, valid_token: str
+) -> None:
+    """Translate a handler FlowerError into its configured HTTP status."""
+    response = _post(
+        client, "create-task", CreateTaskRequest(type="unknown"), token=valid_token
+    )
+
+    assert response.status_code == 412
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST
+
+
+def test_pull_object_denied_without_metadata_token(client: TestClient) -> None:
+    """Protected routes should deny requests missing a task token."""
+    response = _post(client, "pull-object", PullObjectRequest(object_id="obj-1"))
+
+    assert response.status_code == 401
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+
+
+def test_pull_object_denied_with_invalid_metadata_token(client: TestClient) -> None:
+    """Protected routes should deny requests with an invalid task token."""
+    response = _post(
+        client,
+        "pull-object",
+        PullObjectRequest(object_id="obj-2"),
+        token="invalid-token",
+    )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+
+
+def test_pull_object_allows_with_valid_metadata_token(
+    client: TestClient, valid_token: str
+) -> None:
+    """Protected routes should allow requests with a valid task token."""
+    response = _post(
+        client, "pull-object", PullObjectRequest(object_id="obj-3"), token=valid_token
+    )
+
+    assert response.status_code == 200
+    assert isinstance(
+        PullObjectResponse.FromString(response.content), PullObjectResponse
+    )
+
+
+def test_acquire_task_allows_with_superexec_metadata(
+    client: TestClient, state: NodeState
+) -> None:
+    """Signed acquisition returns a task and its claim token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
+    headers = create_superexec_auth_metadata(
+        auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
+        method=_ACQUIRE_TASK_METHOD,
+        request=proto_request,
+    )
+
+    response = _post(client, "acquire-task", proto_request, auth_headers=headers)
+
+    assert response.status_code == 200
+    claimed = AcquireTaskResponse.FromString(response.content)
+    assert claimed.task.task_id == task_id
+    assert claimed.token
+    claimed_task = state.get_task_by_token(claimed.token)
+    assert claimed_task is not None and claimed_task.task_id == task_id
+
+
+def test_get_nodes_allows_auth_then_returns_permission_denied(
+    client: TestClient, valid_token: str
+) -> None:
+    """GetNodes should authenticate, then reject ClientApp tasks."""
+    response = _post(client, "get-nodes", GetNodesRequest(), token=valid_token)
+
+    assert response.status_code == 403
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+
+
+def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
+    """AgentApp events should be readable through the SuperNode Runtime API."""
+    run = Run.create_empty(run_id=99)
+    run.series_id = 7
+    state.store_run(run)
+    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None
+    task_event = TaskEvent(
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
+
+    push_response = _post(
+        client,
+        "push-task-events",
+        PushTaskEventsRequest(events=[task_event]),
+        token=token,
+    )
+    get_response = _post(
+        client,
+        "get-run-series-events",
+        GetRunSeriesEventsRequest(),
+        token=token,
+    )
+
+    assert push_response.status_code == 200
+    assert get_response.status_code == 200
+    events = GetRunSeriesEventsResponse.FromString(get_response.content).events
+    assert len(events) == 1
+    assert events[0].run_id == run.run_id
+    assert events[0].task_id == task_id
+    assert events[0].event == task_event.event
+    assert events[0].data == task_event.data

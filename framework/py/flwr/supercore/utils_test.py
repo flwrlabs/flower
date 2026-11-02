@@ -43,6 +43,7 @@ from .utils import (
     simulation_config_to_json,
     strict_json_dumps,
     strict_json_loads,
+    strict_json_loads_object,
     uint64_to_int64,
 )
 
@@ -111,6 +112,14 @@ def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None
 def test_strict_json_loads() -> None:
     """Parse valid JSON values."""
     assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_object() -> None:
+    """Accept strict JSON objects and reject other top-level values."""
+    assert strict_json_loads_object('{"key":[1,true,null]}') == {"key": [1, True, None]}
+    for raw in ("[]", "null", '{"key":NaN}'):
+        with pytest.raises(ValueError):
+            strict_json_loads_object(raw)
 
 
 def test_strict_json_loads_rejects_non_finite_numbers() -> None:

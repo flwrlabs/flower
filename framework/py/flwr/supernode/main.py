@@ -24,13 +24,22 @@ from logging import INFO
 from fastapi import FastAPI
 
 from flwr import __version__
-from flwr.common import log
-from flwr.supercore.error import http_error_translator
+from flwr.supercore import log
+from flwr.supercore.dependencies.runtime import RuntimeHandlers
+from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
-from flwr.supernode.routers import runtime
+from flwr.supercore.routers.runtime import create_runtime_router, responses_router
+from flwr.supernode.nodestate import NodeState, NodeStateFactory
+from flwr.supernode.servicer.runtime import runtime_handlers
+
+_RUNTIME_HANDLERS: RuntimeHandlers[NodeState] = runtime_handlers
 
 
-def create_app() -> FastAPI:
+def create_app(
+    state_factory: NodeStateFactory | None = None,
+    superexec_auth_secret: bytes | None = None,
+) -> FastAPI:
     """Create the SuperNode FastAPI app."""
 
     @asynccontextmanager
@@ -46,12 +55,22 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
+    fastapi_app.state.runtime_state_factory = state_factory
+    fastapi_app.state.runtime_state_factory_error = (
+        ApiErrorCode.NODESTATE_NOT_INITIALIZED,
+        "SuperNode NodeStateFactory is not initialized.",
+    )
+    fastapi_app.state.runtime_handlers = _RUNTIME_HANDLERS
+    fastapi_app.state.superexec_auth_secret = superexec_auth_secret
 
     # Core APIs
     fastapi_app.include_router(health.router)
 
     # SuperNode APIs
-    fastapi_app.include_router(runtime.router)
+    fastapi_app.include_router(create_runtime_router("SuperNode"))
+    fastapi_app.include_router(responses_router)
+
+    fastapi_app.add_middleware(ProtobufTranslationMiddleware)
 
     # Apply the FlowerError translation layer last to make it outermost
     fastapi_app.middleware("http")(http_error_translator)

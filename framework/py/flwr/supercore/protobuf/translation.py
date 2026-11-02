@@ -16,41 +16,97 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import cast
 
-from fastapi import Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi import Depends, Request
+from fastapi.responses import Response
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
+    AddAppRequest,
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
+    BeginConnectorOAuthRequest,
+    CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
+    CreateAgentRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
+    DisconnectConnectorRequest,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
     GetRunSeriesRequest,
+    ListAgentsRequest,
+    ListAppAssociationsRequest,
+    ListAppsRequest,
     ListAutomationsRequest,
+    ListConnectorsRequest,
     ListFederationsRequest,
     ListInvitationsRequest,
     ListNodesRequest,
+    ListRunSeriesEventsRequest,
     ListRunSeriesRequest,
     ListRunsRequest,
+    PullArtifactsRequest,
+    RefreshAuthTokensRequest,
     RegisterNodeRequest,
     RejectInvitationRequest,
     RemoveAccountFromFederationRequest,
+    RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
+    SetFederationIconRequest,
     ShowFederationRequest,
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamLogsRequest,
+    StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateRunSeriesDescriptionRequest,
+)
+from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
+from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
+    DeactivateNodeRequest,
+    PullMessagesRequest,
+    PushMessagesRequest,
+    RegisterNodeFleetRequest,
+    UnregisterNodeFleetRequest,
+)
+from flwr.proto.heartbeat_pb2 import SendNodeHeartbeatRequest  # pylint: disable=E0611
+from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    PullObjectRequest,
+    PushObjectRequest,
+)
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    CreateTaskRequest,
+    DeleteFileRequest,
+    GetCompactedContextsRequest,
+    GetConnectorRequest,
+    GetFileRequest,
+    GetNodesRequest,
+    GetRunSeriesEventsRequest,
+    ListFilesRequest,
+    PullAppMessagesRequest,
+    PullTaskInputRequest,
+    PullTaskMessageRequest,
+    PushAppMessagesRequest,
+    PushTaskEventsRequest,
+    PushTaskMessageRequest,
+    PushTaskOutputRequest,
+    PutCompactedContextRequest,
+    PutFileRequest,
+    RecordTaskUsageRequest,
+    SendTaskHeartbeatRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
@@ -58,25 +114,62 @@ from flwr.supercore.protobuf.constants import (
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
+from flwr.supercore.protobuf.streaming import (
+    CancellableProtobufStreamingResponse,
+    ProtobufStreamContext,
+    get_protobuf_stream_context,
+)
 
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
+    ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
+    ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
+    ("POST", "/v1/fleet/unregister-node"): UnregisterNodeFleetRequest,
+    ("POST", "/v1/fleet/send-node-heartbeat"): SendNodeHeartbeatRequest,
+    ("POST", "/v1/fleet/pull-messages"): PullMessagesRequest,
+    ("POST", "/v1/fleet/push-messages"): PushMessagesRequest,
+    ("POST", "/v1/fleet/get-run"): GetRunRequest,
+    ("POST", "/v1/fleet/get-fab"): GetFabRequest,
+    ("POST", "/v1/fleet/push-object"): PushObjectRequest,
+    ("POST", "/v1/fleet/pull-object"): PullObjectRequest,
+    ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
+    ("POST", "/v1/control/create-agent"): CreateAgentRequest,
+    ("POST", "/v1/control/list-agents"): ListAgentsRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
     ("POST", "/v1/control/get-run-series"): GetRunSeriesRequest,
+    (
+        "POST",
+        "/v1/control/update-run-series-description",
+    ): UpdateRunSeriesDescriptionRequest,
+    ("POST", "/v1/control/list-run-series-events"): ListRunSeriesEventsRequest,
     ("POST", "/v1/control/stop-run"): StopRunRequest,
     ("POST", "/v1/control/start-automation"): StartAutomationRequest,
     ("POST", "/v1/control/list-automations"): ListAutomationsRequest,
     ("POST", "/v1/control/stop-automation"): StopAutomationRequest,
     ("POST", "/v1/control/get-login-details"): GetLoginDetailsRequest,
     ("POST", "/v1/control/get-auth-tokens"): GetAuthTokensRequest,
+    ("POST", "/v1/control/refresh-auth-tokens"): RefreshAuthTokensRequest,
+    ("POST", "/v1/control/list-connectors"): ListConnectorsRequest,
+    ("POST", "/v1/control/disconnect-connector"): DisconnectConnectorRequest,
+    ("POST", "/v1/control/begin-connector-oauth"): BeginConnectorOAuthRequest,
+    ("POST", "/v1/control/complete-connector-oauth"): CompleteConnectorOAuthRequest,
+    ("POST", "/v1/control/stream-logs"): StreamLogsRequest,
+    ("POST", "/v1/control/stream-run-events"): StreamRunEventsRequest,
+    ("POST", "/v1/control/pull-artifacts"): PullArtifactsRequest,
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
+    ("POST", "/v1/control/list-apps"): ListAppsRequest,
+    ("POST", "/v1/control/list-app-associations"): ListAppAssociationsRequest,
+    ("POST", "/v1/control/add-app"): AddAppRequest,
+    ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
+    ("POST", "/v1/control/set-federation-icon"): SetFederationIconRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,
     ("POST", "/v1/control/archive-federation"): ArchiveFederationRequest,
     ("POST", "/v1/control/add-node-to-federation"): AddNodeToFederationRequest,
@@ -97,6 +190,34 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
         "POST",
         "/v1/control/configure-simulation-federation",
     ): ConfigureSimulationFederationRequest,
+    ("POST", "/v1/runtime/put-file"): PutFileRequest,
+    ("POST", "/v1/runtime/get-file"): GetFileRequest,
+    ("POST", "/v1/runtime/list-files"): ListFilesRequest,
+    ("POST", "/v1/runtime/delete-file"): DeleteFileRequest,
+    ("POST", "/v1/runtime/acquire-task"): AcquireTaskRequest,
+    ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
+    ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,
+    ("POST", "/v1/runtime/push-task-output"): PushTaskOutputRequest,
+    ("POST", "/v1/runtime/push-object"): PushObjectRequest,
+    ("POST", "/v1/runtime/pull-object"): PullObjectRequest,
+    (
+        "POST",
+        "/v1/runtime/confirm-message-received",
+    ): ConfirmMessageReceivedRequest,
+    ("POST", "/v1/runtime/create-task"): CreateTaskRequest,
+    ("POST", "/v1/runtime/start-automation"): StartAutomationRequest,
+    ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
+    ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
+    ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
+    ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
+    ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
+    ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,
+    ("POST", "/v1/runtime/record-task-usage"): RecordTaskUsageRequest,
+    ("POST", "/v1/runtime/get-connector"): GetConnectorRequest,
+    ("POST", "/v1/runtime/push-logs"): PushLogsRequest,
+    ("POST", "/v1/runtime/push-messages"): PushAppMessagesRequest,
+    ("POST", "/v1/runtime/pull-messages"): PullAppMessagesRequest,
+    ("POST", "/v1/runtime/get-nodes"): GetNodesRequest,
 }
 
 
@@ -118,6 +239,18 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         response = await call_next(request)
 
+        # Only completed JSON errors can bypass protobuf response translation.
+        if response.status_code >= 400:
+            content_type = response.headers.get("content-type", "")
+            media_type = content_type.partition(";")[0].strip().lower()
+            if media_type == "application/json" or media_type.endswith("+json"):
+                return response
+            raise FlowerError(
+                ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
+                "Protobuf route returned a non-JSON HTTP error response with "
+                f"Content-Type {content_type!r}.",
+            )
+
         if not hasattr(request.state, "protobuf_response"):
             raise FlowerError(
                 ApiErrorCode.INVALID_PROTOBUF_RESPONSE,
@@ -125,7 +258,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
 
         result = request.state.protobuf_response
-        protobuf_response = self._response_for(result)
+        protobuf_response = self._response_for(
+            result, get_protobuf_stream_context(request)
+        )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
         protobuf_response.status_code = response.status_code
@@ -159,7 +294,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         return message
 
     @staticmethod
-    def _response_for(result: object) -> Response:
+    def _response_for(
+        result: object, stream_context: ProtobufStreamContext
+    ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
         # first. Unary responses are not framed; framing is reserved for streams.
@@ -168,18 +305,22 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
                 content=result.SerializeToString(), media_type=PROTOBUF_MEDIA_TYPE
             )
 
-        # Synchronous generators and other iterables are streamed lazily too.
+        # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
-            return StreamingResponse(
-                (frame_message(message) for message in cast(Iterable[Message], result)),
-                media_type=PROTOBUF_STREAM_MEDIA_TYPE,
+        if isinstance(result, Iterator):
+            content = (
+                frame_message(message) for message in cast(Iterator[Message], result)
+            )
+            return CancellableProtobufStreamingResponse(
+                content,
+                stream_context,
+                PROTOBUF_STREAM_MEDIA_TYPE,
             )
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
             "Invalid response returned from Control handler: expected a protobuf "
-            "Message or Iterable[Message], got "
+            "Message or Iterator[Message], got "
             f"{result!r} ({type(result).__name__})",
         )
 
@@ -194,3 +335,6 @@ def get_protobuf_request(request: Request) -> Message:
             f"Message, got {type(protobuf_request).__name__}.",
         )
     return protobuf_request
+
+
+PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)

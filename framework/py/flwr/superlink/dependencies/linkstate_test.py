@@ -56,17 +56,13 @@ async def _get_linkstate_after_lifespan_startup(
         return get_linkstate(_make_request(app))
 
 
-def _create_app_with_linkstate_factory(
-    state_factory_mock: Mock, *, start_legacy_grpc: bool
-) -> FastAPI:
-    """Create a FastAPI app for either SuperLink HTTP mode."""
+def _create_app_with_linkstate_factory(state_factory_mock: Mock) -> FastAPI:
+    """Create a configured SuperLink FastAPI app."""
     linkstate_factory = cast(LinkStateFactory, state_factory_mock)
     config = Mock()
     config.simulation = False
     config.database = ":flwr-in-memory:"
-    config.disable_grpc_api = not start_legacy_grpc
     config.authn_plugin = Mock()
-    config.authz_plugin = Mock()
     with (
         patch("flwr.superlink.main.get_federation_manager"),
         patch(
@@ -74,22 +70,15 @@ def _create_app_with_linkstate_factory(
             return_value=(Mock(), linkstate_factory),
         ),
     ):
-        lifespan_class = cast(Any, Mock()) if start_legacy_grpc else None
-        return create_app(cast(Any, config), lifespan_class)
+        return create_app(cast(Any, config), cast(Any, Mock()))
 
 
-@pytest.mark.parametrize("start_legacy_grpc", [False, True])
-def test_get_linkstate_returns_linkstate_after_startup(
-    start_legacy_grpc: bool,
-) -> None:
-    """get_linkstate should return LinkState in both FastAPI HTTP modes."""
+def test_get_linkstate_returns_linkstate_after_startup() -> None:
+    """get_linkstate should return LinkState after FastAPI startup."""
     expected_linkstate = cast(LinkState, Mock(spec=LinkState))
     state_factory_mock = Mock(spec=LinkStateFactory)
     state_factory_mock.state.return_value = expected_linkstate
-    app = _create_app_with_linkstate_factory(
-        state_factory_mock,
-        start_legacy_grpc=start_legacy_grpc,
-    )
+    app = _create_app_with_linkstate_factory(state_factory_mock)
 
     with patch("flwr.superlink.extensions.get_lifespan_contexts", return_value=()):
         linkstate = asyncio.run(_get_linkstate_after_lifespan_startup(app))

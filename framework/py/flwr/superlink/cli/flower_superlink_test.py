@@ -17,13 +17,18 @@
 
 import argparse
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import grpc
 import pytest
 
-from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
+from flwr.common.constant import (
+    FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
+    FLWR_INTERNAL_GRPC_CONTROL_API,
+    FLWR_INTERNAL_GRPC_FLEET_API,
+)
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import (
@@ -35,6 +40,7 @@ from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
 from .flower_superlink import (
+    SuperLinkLifespan,
     _obtain_superlink_certificates,
     _parse_args_run_superlink,
     _parse_superlink_lifespan_config,
@@ -42,6 +48,62 @@ from .flower_superlink import (
 
 app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 config_loader_module = importlib.import_module("flwr.superlink.config_loader")
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected_call_count"),
+    [(None, 0), ("0", 0), ("1", 1)],
+)
+def test_superlink_lifespan_starts_grpc_control_api_only_when_enabled(
+    env_value: str | None,
+    expected_call_count: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should require an explicit opt-in for the gRPC Control API."""
+    if env_value is None:
+        monkeypatch.delenv(FLWR_INTERNAL_GRPC_CONTROL_API, raising=False)
+    else:
+        monkeypatch.setenv(FLWR_INTERNAL_GRPC_CONTROL_API, env_value)
+
+    state_factory = Mock()
+    lifespan = SuperLinkLifespan(Mock(), state_factory)
+    start_control_api = Mock()
+    monkeypatch.setattr(lifespan, "_start_control_api", start_control_api)
+    monkeypatch.setattr(lifespan, "_start_fleet_api", Mock())
+    monkeypatch.setattr(lifespan, "_start_superexec_if_needed", Mock())
+    monkeypatch.setattr(lifespan, "_start_health_server_if_needed", Mock())
+
+    lifespan.startup()
+
+    assert start_control_api.call_count == expected_call_count
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected_call_count"),
+    [(None, 0), ("0", 0), ("1", 1)],
+)
+def test_superlink_lifespan_starts_grpc_fleet_api_only_when_enabled(
+    env_value: str | None,
+    expected_call_count: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should require an explicit opt-in for the gRPC Fleet API."""
+    if env_value is None:
+        monkeypatch.delenv(FLWR_INTERNAL_GRPC_FLEET_API, raising=False)
+    else:
+        monkeypatch.setenv(FLWR_INTERNAL_GRPC_FLEET_API, env_value)
+
+    state_factory = Mock()
+    lifespan = SuperLinkLifespan(Mock(), state_factory)
+    start_fleet_api = Mock()
+    monkeypatch.setattr(lifespan, "_start_control_api", Mock())
+    monkeypatch.setattr(lifespan, "_start_fleet_api", start_fleet_api)
+    monkeypatch.setattr(lifespan, "_start_superexec_if_needed", Mock())
+    monkeypatch.setattr(lifespan, "_start_health_server_if_needed", Mock())
+
+    lifespan.startup()
+
+    assert start_fleet_api.call_count == expected_call_count
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -63,23 +125,46 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
 
     config = _parse_superlink_lifespan_config()
 
-    assert (
-        config.serverappio_address == app_module.SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
-    )
     assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
     assert config.fleet_api_address == app_module.FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
     assert config.health_server_address is None
     assert config.certificates is None
-    assert config.appio_certificates is None
     assert config.superexec_auth_secret is None
-    assert config.enable_http_api is False
-    assert config.disable_grpc_api is False
     assert config.host == app_module.UVICORN_DEFAULT_HOST
-    assert config.port == app_module.UVICORN_DEFAULT_PORT
+    assert config.port == app_module.SUPERLINK_UVICORN_DEFAULT_PORT
     assert config.insecure is True
     assert config.enable_supernode_auth is False
     assert config.simulation is False
     assert config.database == FLWR_IN_MEMORY_DB_NAME
+
+
+def test_parse_superlink_lifespan_config_loads_event_log_plugins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load Control and Fleet writers when event logging is enabled."""
+    control_plugin = Mock()
+    fleet_plugin = Mock()
+    monkeypatch.setattr(
+        app_module,
+        "add_ee_args_superlink",
+        lambda parser: parser.add_argument("--enable-event-log", action="store_true"),
+    )
+    monkeypatch.setattr(
+        app_module, "load_control_event_log_plugin", Mock(return_value=control_plugin)
+    )
+    monkeypatch.setattr(
+        app_module, "load_fleet_event_log_plugin", Mock(return_value=fleet_plugin)
+    )
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        ["flower-superlink", "--insecure", "--enable-event-log"],
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.event_log_plugin is control_plugin
+    assert config.fleet_event_log_plugin is fleet_plugin
 
 
 def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulation(
@@ -97,24 +182,61 @@ def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulatio
     assert config.fleet_api_address is None
 
 
-def test_parse_superlink_lifespan_config_maps_exec_api_address(
+def test_parse_superlink_lifespan_config_disables_all_tls_when_insecure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Deprecated Exec API address should end up as Control API config."""
+    """The insecure flag should also disable Runtime API TLS."""
     monkeypatch.setattr(
         app_module.sys,
         "argv",
         [
             "flower-superlink",
             "--insecure",
-            "--exec-api-address",
-            "127.0.0.1:9099",
+            "--ssl-ca-certfile",
+            "~/ca.pem",
+            "--ssl-certfile",
+            "~/cert.pem",
+            "--ssl-keyfile",
+            "~/key.pem",
         ],
     )
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.control_address == "127.0.0.1:9099"
+    assert config.certificates is None
+    assert config.ssl_ca_certfile is None
+    assert config.ssl_certfile is None
+    assert config.ssl_keyfile is None
+
+
+def test_parse_superlink_lifespan_config_expands_tls_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """TLS paths should support the home-directory shorthand."""
+    monkeypatch.setattr(
+        app_module.sys,
+        "argv",
+        [
+            "flower-superlink",
+            "--ssl-ca-certfile",
+            "~/ca.pem",
+            "--ssl-certfile",
+            "~/cert.pem",
+            "--ssl-keyfile",
+            "~/key.pem",
+        ],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "_obtain_superlink_certificates",
+        lambda _args: (b"ca", b"cert", b"key"),
+    )
+
+    config = _parse_superlink_lifespan_config()
+
+    assert config.ssl_ca_certfile == str(Path("~/ca.pem").expanduser())
+    assert config.ssl_certfile == str(Path("~/cert.pem").expanduser())
+    assert config.ssl_keyfile == str(Path("~/key.pem").expanduser())
 
 
 def test_parse_superlink_log_rotation_args_custom_values() -> None:
@@ -135,24 +257,6 @@ def test_parse_superlink_log_rotation_args_custom_values() -> None:
     assert args.log_file == "/tmp/superlink.log"
     assert args.log_rotation_interval_hours == 12
     assert args.log_rotation_backup_count == 14
-
-
-def test_parse_superlink_appio_tls_args() -> None:
-    """SuperLink should parse AppIO-specific TLS args for ServerAppIo."""
-    args = _parse_args_run_superlink().parse_args(
-        [
-            "--appio-ssl-certfile",
-            "appio-cert.pem",
-            "--appio-ssl-keyfile",
-            "appio-key.pem",
-            "--appio-ssl-ca-certfile",
-            "appio-ca.pem",
-        ]
-    )
-
-    assert args.appio_ssl_certfile == "appio-cert.pem"
-    assert args.appio_ssl_keyfile == "appio-key.pem"
-    assert args.appio_ssl_ca_certfile == "appio-ca.pem"
 
 
 @pytest.mark.parametrize(
@@ -241,87 +345,51 @@ def test_flower_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> 
     assert captured == ["update", "flower-superlink"]
 
 
-def test_flower_superlink_legacy_factory_error_exits_invalid_args(
+def test_flower_superlink_runs_runtime_http_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Legacy mode factory creation errors should use the CLI invalid-args exit."""
-
-    class _SentinelError(Exception):
-        pass
-
-    config = SimpleNamespace(
-        enable_http_api=False,
-        simulation=False,
-        database="dummysql://localhost/flwr",
-    )
-    captured: dict[str, object] = {}
-
-    def _raise_value_error(*_args: object, **_kwargs: object) -> object:
-        raise ValueError("Unsupported value for `--database`.")
-
-    def _capture_exit(code: int, message: str) -> None:
-        captured["code"] = code
-        captured["message"] = message
-        raise _SentinelError()
+    """SuperLink should run the Runtime HTTP API unconditionally."""
+    config = SimpleNamespace()
+    run_http = Mock()
 
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", lambda **_: None)
     monkeypatch.setattr(app_module, "event", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(app_module, "_parse_superlink_lifespan_config", lambda: config)
-    monkeypatch.setattr(
-        app_module,
-        "get_objectstore_linkstate_factories",
-        _raise_value_error,
-    )
-    monkeypatch.setattr(app_module, "flwr_exit", _capture_exit)
+    monkeypatch.setattr(app_module, "_run_superlink_http_api", run_http)
 
-    with pytest.raises(_SentinelError):
-        app_module.flower_superlink()
+    app_module.flower_superlink()
 
-    assert captured == {
-        "code": app_module.ExitCode.SUPERLINK_INVALID_ARGS,
-        "message": "Unsupported value for `--database`.",
-    }
+    run_http.assert_called_once_with(lifespan_config=config)
 
 
-def test_obtain_superlink_certificates_keeps_appio_separate(
+def test_obtain_superlink_certificates_uses_single_triplet(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperLink should load separate certificate tuples for Fleet and AppIO."""
-    fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
-    appio_certificates = (b"appio-ca", b"appio-cert", b"appio-key")
+    """SuperLink should use a single certificate triplet for all APIs."""
+    certificates = (b"ca", b"cert", b"key")
     monkeypatch.setattr(
-        app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
-    )
-    monkeypatch.setattr(
-        app_module,
-        "try_obtain_optional_appio_server_certificates",
-        lambda _args: appio_certificates,
+        app_module, "try_obtain_server_certificates", lambda _args: certificates
     )
     args = argparse.Namespace(insecure=False)
 
-    certificates, appio_certificates_result = _obtain_superlink_certificates(args)
+    result = _obtain_superlink_certificates(args)
 
-    assert certificates == fleet_certificates
-    assert appio_certificates_result == appio_certificates
+    assert result == certificates
 
 
-def test_obtain_superlink_certificates_allows_plaintext_appio_when_secure(
+def test_obtain_superlink_certificates_returns_certificates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperLink should allow plaintext ServerAppIo with secure Fleet/Control APIs."""
+    """SuperLink returns certificates when TLS is enabled."""
     fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
     monkeypatch.setattr(
         app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
     )
-    monkeypatch.setattr(
-        app_module, "try_obtain_optional_appio_server_certificates", lambda _args: None
-    )
     args = argparse.Namespace(insecure=False)
 
-    certificates, appio_certificates = _obtain_superlink_certificates(args)
+    result = _obtain_superlink_certificates(args)
 
-    assert certificates == fleet_certificates
-    assert appio_certificates is None
+    assert result == fleet_certificates
 
 
 def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
@@ -329,23 +397,15 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
 ) -> None:
     """SuperLink should not load any TLS certificates when insecure."""
     obtain_server_certificates_mock = Mock()
-    obtain_appio_certificates_mock = Mock()
     monkeypatch.setattr(
         app_module, "try_obtain_server_certificates", obtain_server_certificates_mock
     )
-    monkeypatch.setattr(
-        app_module,
-        "try_obtain_optional_appio_server_certificates",
-        obtain_appio_certificates_mock,
-    )
     args = argparse.Namespace(insecure=True)
 
-    certificates, appio_certificates = _obtain_superlink_certificates(args)
+    result = _obtain_superlink_certificates(args)
 
-    assert certificates is None
-    assert appio_certificates is None
     obtain_server_certificates_mock.assert_not_called()
-    obtain_appio_certificates_mock.assert_not_called()
+    assert result is None
 
 
 def test_run_fleet_api_grpc_rere_orders_default_interceptors(

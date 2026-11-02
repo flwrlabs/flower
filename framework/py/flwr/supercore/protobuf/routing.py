@@ -17,15 +17,51 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
-from typing import Any, cast, get_type_hints
+from collections.abc import Awaitable, Callable, Iterator
+from functools import update_wrapper
+from typing import Any, cast, get_origin, get_type_hints
 
 from fastapi import Request
 from fastapi.responses import Response
 from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
 
+from flwr.supercore.protobuf.constants import (
+    PROTOBUF_MEDIA_TYPE,
+    PROTOBUF_STREAM_MEDIA_TYPE,
+)
+
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
+_BINARY_SCHEMA = {"type": "string", "format": "binary"}
+
+
+def _configure_openapi(
+    endpoint_hints: dict[str, Any],
+    kwargs: dict[str, Any],
+) -> None:
+    """Add the common protobuf wire contract to OpenAPI metadata."""
+    openapi_extra = dict(kwargs.get("openapi_extra") or {})
+    openapi_extra["requestBody"] = {
+        "required": True,
+        "content": {
+            PROTOBUF_MEDIA_TYPE: {"schema": _BINARY_SCHEMA},
+        },
+    }
+    kwargs["openapi_extra"] = openapi_extra
+    kwargs["response_class"] = Response
+
+    response_annotation = endpoint_hints.get("return", inspect.Signature.empty)
+    response_media_type = (
+        PROTOBUF_STREAM_MEDIA_TYPE
+        if get_origin(response_annotation) is Iterator
+        else PROTOBUF_MEDIA_TYPE
+    )
+    responses = dict(kwargs.get("responses") or {})
+    responses[200] = {
+        "description": "Successful Response",
+        "content": {response_media_type: {"schema": _BINARY_SCHEMA}},
+    }
+    kwargs["responses"] = responses
 
 
 class ProtobufRoute(APIRoute):
@@ -43,6 +79,11 @@ class ProtobufRoute(APIRoute):
         endpoint: Callable[..., object],
         **kwargs: Any,
     ) -> None:
+        # Resolve postponed annotations before replacing the handler's signature.
+        endpoint_signature = inspect.signature(endpoint)
+        endpoint_hints = get_type_hints(endpoint, include_extras=True)
+        _configure_openapi(endpoint_hints, kwargs)
+
         async def protobuf_endpoint(*args: Any, **endpoint_kwargs: Any) -> Response:
             # Remove the injected HTTP request before calling the original handler.
             http_request = cast(Request, endpoint_kwargs.pop(_HTTP_REQUEST_PARAMETER))
@@ -60,12 +101,9 @@ class ProtobufRoute(APIRoute):
             http_request.state.protobuf_response = result
             return Response()
 
-        # Retain the handler name in route metadata, operation IDs, and logs.
-        protobuf_endpoint.__name__ = endpoint.__name__
+        # Preserve handler metadata for route descriptions, operation IDs, and logs.
+        update_wrapper(protobuf_endpoint, endpoint)
 
-        # Resolve postponed annotations in the original handler's module.
-        endpoint_signature = inspect.signature(endpoint)
-        endpoint_hints = get_type_hints(endpoint, include_extras=True)
         if _HTTP_REQUEST_PARAMETER in endpoint_signature.parameters:
             raise TypeError(
                 f"{endpoint.__name__} parameter {_HTTP_REQUEST_PARAMETER!r} is reserved"

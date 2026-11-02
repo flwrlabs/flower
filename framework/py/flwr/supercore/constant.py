@@ -22,8 +22,10 @@ from datetime import timedelta
 from enum import StrEnum
 
 from flwr.common.constant import (
+    CLIENT_OCTET,
     FLWR_DIR,
     NOOP_ACCOUNT_NAME,
+    SERVER_OCTET,
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_TOLERANCE,
 )
@@ -59,6 +61,7 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
+HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
@@ -71,18 +74,22 @@ FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
 
 # Constants for Uvicorn-backed API servers
 UVICORN_DEFAULT_HOST = "127.0.0.1"
-UVICORN_DEFAULT_PORT = 8000
+SUPERLINK_UVICORN_DEFAULT_PORT = 8000
+SUPERNODE_UVICORN_DEFAULT_PORT = 9094
+SUPERLINK_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
+SUPERLINK_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERLINK_UVICORN_DEFAULT_PORT}"
+SUPERNODE_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
+SUPERNODE_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SUPERNODE_UVICORN_DEFAULT_PORT}"
+
+# Maximum serialized protobuf stream message size
+MAX_PROTOBUF_STREAM_MESSAGE_LENGTH = 2_147_483_647  # 2 GiB - 1 byte
 
 # SuperGrid constants
-SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "supergrid.flower.ai")
+SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "api.flower.ai")
 
 # Control API constants
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
-UNAUTHENTICATED_PATHS = {
-    "/v1/control/get-login-details",
-    "/v1/control/get-auth-tokens",
-}
 
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
@@ -101,6 +108,7 @@ APP_PUBLISH_INCLUDE_PATTERNS = (
 )
 APP_PUBLISH_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
+    ".venv/**",
     "**/__pycache__/**",
 )
 MAX_TOTAL_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -136,10 +144,18 @@ DEFAULT_FEDERATION_SIMULATION = "workspace"
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+HTTP_SERVER_SHUTDOWN_TIMEOUT = 3
 TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
+
+# Runtime auth constants
+TASK_TOKEN_HEADER = "flwr-task-token"
+
+# Fleet HTTP node auth constants
+FLEET_HTTP_PUBLIC_KEY_HEADER = "flwr-public-key"
+FLEET_HTTP_SIGNATURE_HEADER = "flwr-signature"
 
 # SuperExec auth constants
 SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
@@ -149,6 +165,9 @@ SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
 SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
 MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
+
+# Flower client metadata
+FLWR_CLIENT_METADATA_KEY = "x-flwr-client"
 
 # Constants for Flower runtime version metadata
 FLWR_PACKAGE_NAME_METADATA_KEY = "flwr-package-name"
@@ -199,6 +218,11 @@ class InvitationStatus(StrEnum):
 
 AUTOMATION_BATCH_LIMIT = 1
 
+FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
+
+AGENT_MESSAGE_CONTENT_RECORD_KEY = "agent"
+AGENT_MESSAGE_TEXT_KEY = "text"
+
 
 class AutomationStatus(StrEnum):
     """Status of an automation."""
@@ -230,23 +254,20 @@ class TaskType(StrEnum):
     CLIENT_APP = "flwr-clientapp"
     SIMULATION = "flwr-simulation"
     AGENT_APP = "flwr-agentapp"
-    MODEL = "flwr-model"
     CONNECTOR = "flwr-connector"
 
 
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
-    TaskType.AGENT_APP: "--serverappio-api-address",
-    TaskType.CLIENT_APP: "--clientappio-api-address",
-    TaskType.CONNECTOR: "--serverappio-api-address",
-    TaskType.MODEL: "--serverappio-api-address",
-    TaskType.SERVER_APP: "--serverappio-api-address",
-    TaskType.SIMULATION: "--serverappio-api-address",
+    TaskType.AGENT_APP: "--runtime-api-address",
+    TaskType.CLIENT_APP: "--runtime-api-address",
+    TaskType.CONNECTOR: "--runtime-api-address",
+    TaskType.SERVER_APP: "--runtime-api-address",
+    TaskType.SIMULATION: "--runtime-api-address",
 }
 TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",
     TaskType.CLIENT_APP: "flwr-clientapp",
     TaskType.CONNECTOR: "flwr-connector",
-    TaskType.MODEL: "flwr-model",
     TaskType.SERVER_APP: "flwr-serverapp",
     TaskType.SIMULATION: "flwr-simulation",
 }
@@ -264,7 +285,6 @@ TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
         TaskType.AGENT_APP,
     }
 )
-TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
 TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
     {TaskType.CONNECTOR}
 )

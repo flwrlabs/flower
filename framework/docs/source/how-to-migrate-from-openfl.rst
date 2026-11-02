@@ -40,9 +40,9 @@
 
 .. _result_link: ref-api/flwr.serverapp.strategy.Result.html
 
-########################
- OpenFL Migration Guide
-########################
+#####################
+ Migrate from OpenFL
+#####################
 
 It was `recently announced
 <https://github.com/securefederatedai/openfederatedlearning>`_ that The Open Federated

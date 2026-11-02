@@ -22,13 +22,13 @@ case "$2" in
       server_auth='--enable-supernode-auth'
       client_auth_1='--auth-supernode-private-key ../keys/client_credentials_1'
       client_auth_2='--auth-supernode-private-key ../keys/client_credentials_2'
-      server_address='127.0.0.1:9092'
+      server_address='127.0.0.1:8000'
       ;;
     *)
     server_auth=''
     client_auth_1=''
     client_auth_2=''
-    server_address='127.0.0.1:9092'
+    server_address='127.0.0.1:8000'
     ;;
 esac
 
@@ -60,10 +60,10 @@ pip install -e . --no-deps
 # Check if the first argument is 'insecure'
 if [ "$1" == "insecure" ]; then
   # If $1 is 'insecure', append the first line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure = true" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\ninsecure = true" >> pyproject.toml
 else
   # Otherwise, append the second line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"../certificates/ca.crt\"" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\nroot-certificates = \"../certificates/ca.crt\"" >> pyproject.toml
 fi
 
 if [ "$3" = "simulation-engine" ]; then
@@ -77,6 +77,9 @@ background_pids=()
 cleanup() {
   if [ "${#background_pids[@]}" -gt 0 ]; then
     kill "${background_pids[@]}" 2>/dev/null || true
+    sleep 1
+    # SuperNodes can keep retrying after the SuperLink exits.
+    kill -KILL "${background_pids[@]}" 2>/dev/null || true
     wait "${background_pids[@]}" 2>/dev/null || true
   fi
 }
@@ -100,14 +103,14 @@ fi
 if [ "$3" = "deployment-engine" ]; then
   flower-supernode $client_arg \
       --superlink $server_address $client_auth_1 \
-      --clientappio-api-address localhost:9094 \
+      --host localhost --port 9094 \
       --node-config "partition-id=0 num-partitions=2" --max-retries 0 &
   background_pids+=("$!")
   sleep 2
 
   flower-supernode $client_arg \
       --superlink $server_address $client_auth_2 \
-      --clientappio-api-address localhost:9095 \
+      --host localhost --port 9095 \
       --node-config "partition-id=1 num-partitions=2" --max-retries 0 &
   background_pids+=("$!")
   sleep 2

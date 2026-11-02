@@ -10,14 +10,13 @@ import time
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
-    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     Status,
     SubStatus,
 )
+from flwr.supercore.constant import SUPERLINK_DEFAULT_CLIENT_ADDRESS
 
 use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
 superlink_connection = "e2e-sim" if use_sim else "e2e"
-plugin_type_arg = "simulation" if use_sim else "serverapp"
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
 SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 COMMAND_TIMEOUT = 30
@@ -40,8 +39,7 @@ def run_superlink(database_path: str, secret_path: str) -> subprocess.Popen:
 def run_superexec(secret_path: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
-    cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
-    cmd += ["--plugin-type", plugin_type_arg]
+    cmd += ["--runtime-api-address", SUPERLINK_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--superexec-auth-secret-file", secret_path]
     return subprocess.Popen(cmd)
 
@@ -197,8 +195,8 @@ def main() -> None:
             print("Starting SuperLink...")
             superlink_proc = run_superlink(database_path, secret_path)
 
-            # Allow time for SuperLink to start
-            time.sleep(3)
+            # Wait until SuperLink accepts Control API requests
+            flwr_ls(time.monotonic() + PROCESS_START_TIMEOUT, max_retries=30)
 
             # Start the SuperExec
             print("Starting SuperExec...")

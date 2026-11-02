@@ -14,6 +14,7 @@
 # ==============================================================================
 """Control API router."""
 
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -21,44 +22,72 @@ from fastapi import APIRouter, Depends
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
+    BeginConnectorOAuthRequest,
+    BeginConnectorOAuthResponse,
+    CompleteConnectorOAuthRequest,
+    CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DisconnectConnectorRequest,
+    DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
+    ListConnectorsRequest,
+    ListConnectorsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    PullArtifactsRequest,
+    PullArtifactsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
     RegisterNodeRequest,
     RegisterNodeResponse,
     RejectInvitationRequest,
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -69,34 +98,96 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamLogsRequest,
+    StreamLogsResponse,
+    StreamRunEventsRequest,
+    StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
+from flwr.supercore.protobuf.streaming import (
+    ProtobufStreamContext,
+    get_protobuf_stream_context,
+)
 from flwr.supercore.protobuf.translation import get_protobuf_request
+from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
+from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
+from flwr.superlink.dependencies.fleet_api import FleetApiTypeDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
+from .tracing import RunCreationTracingDependency
+
+router = APIRouter(
+    prefix="/v1/control",
+    tags=["Control"],
+    route_class=ProtobufRoute,
+    dependencies=[
+        Depends(
+            VersionDependency(
+                component_name="SuperLink",
+                connection_name="flwr CLI <-> SuperLink Control API",
+                reject_incompatible=False,
+            )
+        )
+    ],
+)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
+ProtobufStreamContextDependency = Annotated[
+    ProtobufStreamContext, Depends(get_protobuf_stream_context)
+]
+ArtifactProviderDependency = Annotated[
+    ArtifactProvider | None, Depends(get_artifact_provider)
+]
+
+
+@router.post("/create-agent")
+def create_agent(
+    request: Annotated[CreateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateAgentResponse:
+    """Create an agent."""
+    return control_handlers.create_agent(request, account, linkstate)
+
+
+@router.post("/list-agents")
+def list_agents(
+    request: Annotated[ListAgentsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAgentsResponse:
+    """List agents."""
+    return control_handlers.list_agents(request, account, linkstate)
 
 
 @router.post("/start-run")
-def start_run(
+def start_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
+    fleet_api_type: FleetApiTypeDependency,
+    run_source: RunSourceDependency,
+    tracing: RunCreationTracingDependency,
 ) -> StartRunResponse:
     """Start a run."""
-    # Temporary: pass an empty Fleet API type
-    return control_handlers.start_run(request, account, linkstate, "")
+    response = control_handlers.start_run(
+        request, account, linkstate, fleet_api_type, source=run_source
+    )
+    tracing.set_attribute("flwr.run_id", str(response.run_id))
+    return response
 
 
 @router.post("/list-runs")
@@ -129,6 +220,28 @@ def get_run_series(
     return control_handlers.get_run_series(request, account, linkstate)
 
 
+@router.post("/update-run-series-description")
+def update_run_series_description(
+    request: Annotated[
+        UpdateRunSeriesDescriptionRequest, Depends(get_protobuf_request)
+    ],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateRunSeriesDescriptionResponse:
+    """Update a run series description."""
+    return control_handlers.update_run_series_description(request, account, linkstate)
+
+
+@router.post("/list-run-series-events")
+def list_run_series_events(
+    request: Annotated[ListRunSeriesEventsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListRunSeriesEventsResponse:
+    """List events for all runs in a run series."""
+    return control_handlers.list_run_series_events(request, account, linkstate)
+
+
 @router.post("/stop-run")
 def stop_run(
     request: Annotated[StopRunRequest, Depends(get_protobuf_request)],
@@ -137,6 +250,54 @@ def stop_run(
 ) -> StopRunResponse:
     """Stop a run."""
     return control_handlers.stop_run(request, account, linkstate)
+
+
+@router.post("/stream-logs")
+def stream_logs(
+    request: Annotated[StreamLogsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    stream_context: ProtobufStreamContextDependency,
+) -> Iterator[StreamLogsResponse]:
+    """Stream logs for a run."""
+    return control_handlers.stream_logs(
+        request,
+        account,
+        linkstate,
+        stream_context.is_active,
+    )
+
+
+@router.post("/stream-run-events")
+def stream_run_events(
+    request: Annotated[StreamRunEventsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    stream_context: ProtobufStreamContextDependency,
+) -> Iterator[StreamRunEventsResponse]:
+    """Stream task events for a run."""
+    return control_handlers.stream_run_events(
+        request,
+        account,
+        linkstate,
+        stream_context.is_active,
+    )
+
+
+@router.post("/pull-artifacts")
+def pull_artifacts(
+    request: Annotated[PullArtifactsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    artifact_provider: ArtifactProviderDependency,
+) -> PullArtifactsResponse:
+    """Pull artifacts generated during a run."""
+    return control_handlers.pull_artifacts(
+        request,
+        account,
+        linkstate,
+        artifact_provider,
+    )
 
 
 @router.post("/start-automation")
@@ -187,6 +348,55 @@ def get_auth_tokens(
     return control_handlers.get_auth_tokens(request, authn_plugin)
 
 
+@router.post("/refresh-auth-tokens")
+def refresh_auth_tokens(
+    request: Annotated[RefreshAuthTokensRequest, Depends(get_protobuf_request)],
+    authn_plugin: AuthnPluginDependency,
+) -> RefreshAuthTokensResponse:
+    """Refresh authentication tokens."""
+    return control_handlers.refresh_auth_tokens(request, authn_plugin)
+
+
+@router.post("/list-connectors")
+def list_connectors(
+    request: Annotated[ListConnectorsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListConnectorsResponse:
+    """List OAuth connectors available to the authenticated account."""
+    return control_handlers.list_connectors(request, account, linkstate)
+
+
+@router.post("/disconnect-connector")
+def disconnect_connector(
+    request: Annotated[DisconnectConnectorRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DisconnectConnectorResponse:
+    """Disconnect connector credentials for the authenticated account."""
+    return control_handlers.disconnect_connector(request, account, linkstate)
+
+
+@router.post("/begin-connector-oauth")
+def begin_connector_oauth(
+    request: Annotated[BeginConnectorOAuthRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> BeginConnectorOAuthResponse:
+    """Begin OAuth connector authorization flow."""
+    return control_handlers.begin_connector_oauth(request, account, linkstate)
+
+
+@router.post("/complete-connector-oauth")
+def complete_connector_oauth(
+    request: Annotated[CompleteConnectorOAuthRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CompleteConnectorOAuthResponse:
+    """Complete OAuth connector authorization flow."""
+    return control_handlers.complete_connector_oauth(request, account, linkstate)
+
+
 @router.post("/register-node")
 def register_node(
     request: Annotated[RegisterNodeRequest, Depends(get_protobuf_request)],
@@ -227,6 +437,47 @@ def list_federations(
     return control_handlers.list_federations(request, account, linkstate)
 
 
+@router.post("/list-apps")
+def list_apps(
+    request: Annotated[ListAppsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppsResponse:
+    """List apps associated with a federation."""
+    return control_handlers.list_apps(request, account, linkstate)
+
+
+@router.post("/list-app-associations")
+def list_app_associations(
+    request: Annotated[ListAppAssociationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppAssociationsResponse:
+    """List federations associated with an app."""
+    return control_handlers.list_app_associations(request, account, linkstate)
+
+
+@router.post("/add-app")
+def add_app(
+    request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    fleet_api_type: FleetApiTypeDependency,
+) -> AddAppResponse:
+    """Add an app to a federation."""
+    return control_handlers.add_app(request, account, linkstate, fleet_api_type)
+
+
+@router.post("/remove-app")
+def remove_app(
+    request: Annotated[RemoveAppRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> RemoveAppResponse:
+    """Remove an app from a federation."""
+    return control_handlers.remove_app(request, account, linkstate)
+
+
 @router.post("/show-federation")
 def show_federation(
     request: Annotated[ShowFederationRequest, Depends(get_protobuf_request)],
@@ -235,6 +486,16 @@ def show_federation(
 ) -> ShowFederationResponse:
     """Show a federation."""
     return control_handlers.show_federation(request, account, linkstate)
+
+
+@router.post("/set-federation-icon")
+def set_federation_icon(
+    request: Annotated[SetFederationIconRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SetFederationIconResponse:
+    """Set or clear a federation icon."""
+    return control_handlers.set_federation_icon(request, account, linkstate)
 
 
 @router.post("/create-federation")

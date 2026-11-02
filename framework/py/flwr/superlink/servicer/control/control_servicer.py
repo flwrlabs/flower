@@ -22,6 +22,8 @@ from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -32,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -44,6 +48,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -54,6 +64,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -66,10 +78,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -86,13 +102,18 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.utils import get_metadata_str
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.run_source import resolve_source
 
 from . import control_handlers
 from .control_account_auth_interceptor import get_current_account_info
@@ -117,12 +138,37 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self.artifact_provider = artifact_provider
         self.fleet_api_type = fleet_api_type
 
+    def CreateAgent(
+        self, request: CreateAgentRequest, context: grpc.ServicerContext
+    ) -> CreateAgentResponse:
+        """Create an agent."""
+        return control_handlers.create_agent(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """List agents."""
+        return control_handlers.list_agents(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
+        # Best-effort analytics attribution only;
+        # trust caller-provided client labels and default missing sources to unknown.
+        metadata = context.invocation_metadata()
+        run_source = get_metadata_str(metadata, FLWR_CLIENT_METADATA_KEY)
+
         return control_handlers.start_run(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+            source=resolve_source(run_source),
         )
 
     def StreamLogs(  # pylint: disable=C0103
@@ -159,6 +205,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     ) -> GetRunSeriesResponse:
         """Get run series."""
         return control_handlers.get_run_series(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def UpdateRunSeriesDescription(
+        self,
+        request: UpdateRunSeriesDescriptionRequest,
+        context: grpc.ServicerContext,
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return control_handlers.update_run_series_description(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListRunSeriesEvents(
+        self, request: ListRunSeriesEventsRequest, context: grpc.ServicerContext
+    ) -> ListRunSeriesEventsResponse:
+        """List events for all runs in a run series."""
+        return control_handlers.list_run_series_events(
             request, _get_account(), self.linkstate_factory.state()
         )
 
@@ -289,11 +353,54 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
+    def ListApps(
+        self, request: ListAppsRequest, context: grpc.ServicerContext
+    ) -> ListAppsResponse:
+        """List apps in a federation."""
+        return control_handlers.list_apps(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest, context: grpc.ServicerContext
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return control_handlers.list_app_associations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def AddApp(
+        self, request: AddAppRequest, context: grpc.ServicerContext
+    ) -> AddAppResponse:
+        """Add an app to a federation."""
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
+
+    def RemoveApp(
+        self, request: RemoveAppRequest, context: grpc.ServicerContext
+    ) -> RemoveAppResponse:
+        """Remove an app from a federation."""
+        return control_handlers.remove_app(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
         return control_handlers.show_federation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest, context: grpc.ServicerContext
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return control_handlers.set_federation_icon(
             request, _get_account(), self.linkstate_factory.state()
         )
 

@@ -1,140 +1,145 @@
 # Run an AgentApp on SuperGrid
 
-Use SuperGrid to submit an AgentApp, follow its progress, inspect its logs, and
-stop it when necessary.
+Run a local or downloaded AgentApp in Flower Chat, then inspect or stop its
+SuperGrid runs.
 
-If you haven't created an AgentApp yet, start with [Write your first
-AgentApp](../tutorials/write-your-first-agentapp.md).
+Start with [Write your first
+AgentApp](../tutorials/write-your-first-agentapp.md) if you do not have a valid
+AgentApp project. This guide targets Flower {{ stable_flwr_version }}.
 
 To run the same app without SuperGrid, see [Run an AgentApp with a local
 SuperLink](run-with-local-superlink.md).
 
 ## Prepare the CLI
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you
-haven't already, then authenticate with SuperGrid:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and log in:
+
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
+```
+
+Use {substitution-code}`uvx --from flwr==|stable_flwr_version|` for standalone
+commands. Use `uv run flwr` for commands that must load the local project
+environment.
+
+(get-an-agentapp-project)=
+
+## Get an AgentApp project
+
+Use a local AgentApp project, or browse [Flower Hub](https://flower.ai/apps)
+and select **Agent** under **Types** to find one to download:
+
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr new '@<publisher>/<agent>'
+```
+
+The command creates a local project directory. Use its path when loading the
+app in Flower Chat. To check a project before chatting, run from its directory:
 
 ```console
-$ uvx flwr login supergrid
+$ uv sync
+$ uv run flwr build
 ```
 
-Your SuperGrid account must have access to the Flower Agent runtime. The
-`supergrid` connection is included in Flower's default CLI configuration.
+Fix configuration, dependency, and component-reference errors locally before
+starting a remote run.
 
-This guide uses `uvx flwr` for standalone CLI commands and `uv run flwr` for
-commands that need a local project's environment.
+(load-an-agentapp-in-flower-chat)=
 
-If this is your first Flower Agent run, follow [Get started with Flower
-Agent](../tutorials/get-started-with-flower-agent.md) first. That tutorial uses
-the built-in AgentApp to check your account and CLI setup without a local
-project.
+## Load and chat with the AgentApp
 
-## Run a local AgentApp
-
-To run your own AgentApp, open a terminal in a project whose `pyproject.toml`
-declares an `agentapp` component:
+From an existing project directory, start Flower Chat with the project's Flower
+installation:
 
 ```console
-$ uv run flwr run . supergrid
+$ uv run flwr chat
 ```
 
-Flower validates the project, builds a Flower App Bundle, and submits it with
-the run request. Override configured values for one run with `--run-config`:
+For a downloaded project, you can start Flower Chat outside its directory with
+the documented Flower version:
 
-```console
-$ uv run flwr run . supergrid \
-    --run-config 'agent.input="Compare federated learning and centralized learning."'
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr chat
 ```
 
-An override key must already exist in the app's
-`[tool.flwr.app.config]` configuration.
+At the chat prompt, load the project and send a message:
 
-For a longer set of overrides, put them in a TOML file:
-
-```toml
-# run-config.toml
-[agent]
-input = "Compare federated learning and centralized learning."
+```text
+/load <path-to-app>
+Explain Flower Agent in one sentence.
 ```
 
-Then pass the file to `--run-config`:
+Use `/load .` when you started chat in the project directory. The path is
+resolved relative to the directory where you started Flower Chat; quote paths
+with spaces.
 
-```console
-$ uv run flwr run . supergrid --run-config run-config.toml
+Flower builds the app when you load it and sends each message as a run. Continue
+chatting at the prompt. Changes to the local app are rebuilt before the next
+message. If a build fails, the previous build stays selected.
+
+```{tip}
+To switch federations or select an assigned agent, see [Use agents and
+federations](use-agents-and-federations.md).
 ```
-
-Don't combine a TOML file with inline `--run-config` values in the same command.
-
-## Run in another federation
-
-Every SuperGrid account has a default federation, and the commands above use it
-automatically. To run in another federation, pass its full ID:
-
-```console
-$ uv run flwr run . supergrid \
-    --federation @<account>/<federation-name> \
-    --run-config 'agent.input="Hello from this federation."'
-```
-
-The account must be a member of the target federation and entitled to start an
-AgentApp run there.
 
 ## Observe the run
 
-Once SuperGrid accepts the request, `flwr run` prints a run ID. Keep it handy:
-you can use it to inspect the status and process logs:
+The response and supported activity stream into Flower Chat. If you have a run
+ID, inspect the run from the CLI:
 
-```console
-$ uvx flwr list --run-id <run-id> supergrid
-$ uvx flwr log <run-id> supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
 
-Add `--stream` to the original run command to follow logs immediately:
+`flwr log` streams by default. Use `--show` to print the available logs once.
+Open the run in SuperGrid to inspect structured model output, connector
+activity, federation, and persisted context.
 
-```console
-$ uv run flwr run . supergrid --stream
-```
-
-Process logs show app output and exceptions. Open the run in the SuperGrid
-dashboard to inspect structured model responses, connector activity, and the
-persisted agent context.
+Process logs are useful for app output and exceptions. Connector activity is a
+better signal than a general **Working** label when diagnosing which child task
+is active.
 
 ## Stop a run
 
-Stop an active run with:
+Press {kbd}`Ctrl+C` during a Flower Chat run to request that it stop. If you
+have its run ID, you can also use:
 
-```console
-$ uvx flwr stop <run-id> supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr stop <run-id> supergrid
 ```
 
-Flower sends a stop request to SuperGrid and records the stopped run status.
+Wait for the run to reach a stopped terminal state before submitting a
+replacement that could duplicate external work.
 
-## Troubleshoot a failed run
+Stopping a run does not stop future automation executions. Stop the automation
+separately under **Settings** > **Automations**.
 
-Start with the detailed status and logs:
+## Recover from failure
 
-```console
-$ uvx flwr list --run-id <run-id> supergrid
-$ uvx flwr log <run-id> supergrid --stream
-```
+Use [Troubleshoot AgentApp runs](troubleshoot-agent-runs.md) for authentication,
+agent catalog, connector, heartbeat, interruption, and stuck-run recovery.
 
-Common failures include:
+For a custom app, start with:
 
-- **Invalid component reference:** confirm that
-  `[tool.flwr.app.components].agentapp` uses `<module>:<attribute>` and resolves
-  to an `AgentApp`.
-- **Invalid run configuration:** define the key under
-  `[tool.flwr.app.config]` before overriding it.
-- **Missing dependency:** add every imported third-party package to
-  `[project].dependencies`.
-- **Unsupported model or connector:** use a model and connector available to
-  the account. Account-backed connectors must be connected and included by the
-  person starting the run.
-- **Federation or entitlement error:** verify the federation ID, membership,
-  and Flower Agent access for the account.
+```{code-block} console
+:substitutions:
 
-To catch configuration and component-reference errors before submission, run:
-
-```console
 $ uv run flwr build
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
+
+Keep the run ID, series ID when visible, federation ID, app spec, Flower
+version, and exact public error. Never include credentials or private connector
+content in a support report.

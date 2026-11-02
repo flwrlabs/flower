@@ -16,12 +16,22 @@
 
 
 import numpy as np
+import pytest
 
 from flwr.app import Array, ArrayRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.common import NDArray
+from flwr.supercore.task_identity import TaskIdentity
 
 from .comms_mods import arrays_size_mod, message_size_mod
+
+
+@pytest.fixture(autouse=True)
+def task_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the task identity used by instruction message tests."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 123)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 456)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 789)
 
 
 def _make_context() -> Context:

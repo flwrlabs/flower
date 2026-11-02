@@ -335,12 +335,12 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: flwr/superlink:|stable_flwr_version|
                 args:
                   - "--insecure"
+                  - "--host"
+                  - "0.0.0.0"
                   - "--isolation"
                   - "process"
                 ports:  # which ports to expose/available
-                - containerPort: 9091
-                - containerPort: 9092
-                - containerPort: 9093
+                - containerPort: 8000
         ---
         apiVersion: v1
         kind: Service
@@ -351,17 +351,9 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
             app: superlink
           ports:  # like a dynamic IP routing table/mapping that routes traffic to the designated ports
           - protocol: TCP
-            port: 9091   # Port for ServerApp connection
-            targetPort: 9091  # the SuperLink container port
-            name: superlink-serverappioapi
-          - protocol: TCP
-            port: 9092   # Port for SuperNode connection
-            targetPort: 9092  # the SuperLink container port
-            name: superlink-fleetapi
-          - protocol: TCP
-            port: 9093   # Port for Flower app submission
-            targetPort: 9093  # the SuperLink container port
-            name: superlink-controlapi
+            port: 8000   # Port for Fleet, Control, and Runtime APIs over HTTP
+            targetPort: 8000  # the SuperLink container port
+            name: superlink-http-api
           type: LoadBalancer  # balances workload, makes the service publicly available
 
 .. dropdown:: supernode-1-deployment.yaml
@@ -389,9 +381,11 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "superlink-service:8000"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                   - "--isolation"
                   - "process"
                 ports:
@@ -434,9 +428,11 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 args:
                   - "--insecure"
                   - "--superlink"
-                  - "superlink-service:9092"
-                  - "--clientappio-api-address"
-                  - "0.0.0.0:9094"
+                  - "superlink-service:8000"
+                  - "--host"
+                  - "0.0.0.0"
+                  - "--port"
+                  - "9094"
                   - "--isolation"
                   - "process"
                 ports:
@@ -478,10 +474,8 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
-                  - "superlink-service:9091"
-                  - "--plugin-type"
-                  - "serverapp"
+                  - "--runtime-api-address"
+                  - "superlink-service:8000"
 
 .. dropdown:: superexec-clientapp-1-deployment.yaml
 
@@ -507,10 +501,8 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
+                  - "--runtime-api-address"
                   - "supernode-1-service:9094"
-                  - "--plugin-type"
-                  - "clientapp"
 
 .. dropdown:: superexec-clientapp-2-deployment.yaml
 
@@ -536,10 +528,8 @@ provide the definition of the six ``yaml`` files that are necessary to deploy th
                 image: us-central1-docker.pkg.dev/<YOUR_PROJECT_ID>/flower-gcp-example-artifacts/quickstart_numpy_superexec:0.0.1
                 args:
                   - "--insecure"
-                  - "--appio-api-address"
+                  - "--runtime-api-address"
                   - "supernode-2-service:9094"
-                  - "--plugin-type"
-                  - "clientapp"
 
 Once you have created the required files, you can use the following ``k8s-deploy.sh``
 helper script to deploy all the ``Pods``.
@@ -625,7 +615,7 @@ Flower Configuration file:
        :caption: config.toml
 
        [superlink.gcp-deployment]
-       address = "<EXTERNAL_IP>:9093" # replace the EXTERNAL_IP with the correct value
+       address = "<EXTERNAL_IP>:8000" # replace the EXTERNAL_IP with the correct value
        insecure = true
 
 Then we can execute the example on the GCP cluster by running:

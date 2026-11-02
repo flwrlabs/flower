@@ -14,9 +14,11 @@
 # ==============================================================================
 """Tests for runtime dependency installation CLI arguments."""
 
-
 import argparse
+import io
+import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -25,7 +27,9 @@ from flwr.common.args import (
     add_args_runtime_dependency_install,
     try_obtain_flwr_app_token,
 )
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INSTALL
+
+_VALID_TASK_TOKEN = "a" * (FLWR_TASK_TOKEN_LENGTH * 2)
 
 
 def test_runtime_dependency_install_args_defaults() -> None:
@@ -111,6 +115,17 @@ def test_flwr_app_common_args_reject_token_and_token_file() -> None:
         parser.parse_args(["--token", "test-token", "--token-file", "/path/to/token"])
 
 
+def test_flwr_app_common_args_accepts_only_one_token_source() -> None:
+    """The private stdin mode should be opt-in and mutually exclusive."""
+    parser = argparse.ArgumentParser()
+    add_args_flwr_app_common(parser, include_token_stdin=True)
+
+    assert parser.parse_args(["--token-stdin"]).token_stdin is True
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--token-stdin"])
+
+
 def test_flwr_app_common_args_reject_run_once() -> None:
     """The removed deprecated flag should no longer parse."""
     parser = argparse.ArgumentParser()
@@ -154,3 +169,44 @@ def test_try_obtain_flwr_app_token_rejects_empty_token_file(tmp_path: Path) -> N
 
     with pytest.raises(SystemExit):
         try_obtain_flwr_app_token(args)
+
+
+def test_try_obtain_flwr_app_token_accumulates_split_stdin_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A valid task token can arrive across multiple standard-input reads."""
+    token_stdin = Mock()
+    token_stdin.buffer.read1.side_effect = [
+        _VALID_TASK_TOKEN[:128].encode("ascii"),
+        f"{_VALID_TASK_TOKEN[128:]}\n".encode("ascii"),
+    ]
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+
+    token = try_obtain_flwr_app_token(argparse.Namespace(token_stdin=True))
+
+    assert token == _VALID_TASK_TOKEN
+    assert token_stdin.buffer.read1.call_count == 2
+    token_stdin.close.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "token_input",
+    [
+        "",
+        "not-a-task-token",
+        f"{_VALID_TASK_TOKEN}\n{_VALID_TASK_TOKEN}\n",
+    ],
+)
+def test_try_obtain_flwr_app_token_rejects_invalid_stdin_without_disclosure(
+    token_input: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invalid private handoffs should fail closed without echoing their input."""
+    token_stdin = io.TextIOWrapper(io.BytesIO(token_input.encode("ascii")))
+    monkeypatch.setattr(sys, "stdin", token_stdin)
+
+    with pytest.raises(SystemExit) as exc_info:
+        try_obtain_flwr_app_token(argparse.Namespace(token_stdin=True))
+
+    assert token_stdin.closed
+    assert not token_input or token_input not in str(exc_info.value)

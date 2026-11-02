@@ -25,11 +25,13 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, MetaData, create_engine, event, inspect, make_url, text
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.sql.dml import Insert
 
-from flwr.common.logger import log
+from flwr.supercore import log
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_SQLITE_DB_URL,
     SQL_ALLOWED_DIALECTS,
@@ -195,6 +197,15 @@ class SqlMixin(ABC):
             _current_sessions.reset(token)
             session.close()
 
+    def dialect_insert(self, table: Any) -> Insert:
+        """Return a dialect-specific insert statement for the active backend."""
+        if self.database_backend == "sqlite":
+            return sqlite_insert(table)
+
+        raise NotImplementedError(
+            f"No dialect-specific insert configured for {self.database_backend!r}."
+        )
+
     def get_metadata(self) -> MetaData | None:
         """Return the MetaData object for this class.
 
@@ -208,7 +219,7 @@ class SqlMixin(ABC):
         """
         return None
 
-    def initialize(self, log_queries: bool = False) -> list[str]:
+    def initialize(self, log_queries: bool = False, **engine_kwargs: Any) -> list[str]:
         """Connect to the DB and create tables if needed.
 
         This method creates the SQLAlchemy engine and session factory,
@@ -218,6 +229,9 @@ class SqlMixin(ABC):
         ----------
         log_queries : bool
             Log each query which is executed.
+        **engine_kwargs : Any
+            Keyword arguments passed to SQLAlchemy's `create_engine`, overriding
+            dialect-specific defaults.
 
         Returns
         -------
@@ -225,14 +239,13 @@ class SqlMixin(ABC):
             The list of all tables in the DB.
         """
         # Create engine with dialect-specific settings
-        engine_kwargs: dict[str, Any] = {}
         if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
-            engine_kwargs["connect_args"] = {"check_same_thread": False}
+            engine_kwargs.setdefault("connect_args", {"check_same_thread": False})
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
         if self._is_in_memory_sqlite:
-            engine_kwargs["poolclass"] = StaticPool
+            engine_kwargs.setdefault("poolclass", StaticPool)
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness

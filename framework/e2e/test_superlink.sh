@@ -4,7 +4,9 @@ set -e
 case "$1" in
   e2e-bare-https | e2e-bare-auth)
     ./generate.sh
-    server_arg="--ssl-ca-certfile certificates/ca.crt --ssl-certfile certificates/server.pem --ssl-keyfile certificates/server.key"
+    server_arg='--ssl-ca-certfile certificates/ca.crt
+                --ssl-certfile certificates/server.pem
+                --ssl-keyfile certificates/server.key'
     client_arg="--root-certificates certificates/ca.crt"
     server_dir="./"
     ;;
@@ -17,7 +19,7 @@ esac
 
 case "$2" in
   sqlite)
-    server_address="127.0.0.1:9092"
+    server_address="127.0.0.1:8000"
     server_app_address="127.0.0.1:9091"
     db_arg="--database $(date +%s).db"
     server_auth=""
@@ -25,7 +27,7 @@ case "$2" in
     client_auth_2=""
     ;;
   client-auth)
-    server_address="127.0.0.1:9092"
+    server_address="127.0.0.1:8000"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
     server_auth="--enable-supernode-auth"
@@ -33,7 +35,7 @@ case "$2" in
     client_auth_2="--auth-supernode-private-key keys/client_credentials_2 --auth-supernode-public-key keys/client_credentials_2.pub"
     ;;
   *)
-    server_address="127.0.0.1:9092"
+    server_address="127.0.0.1:8000"
     server_app_address="127.0.0.1:9091"
     db_arg="--database :flwr-in-memory:"
     server_auth=""
@@ -63,10 +65,10 @@ sed -i '/^\[tool\.flwr\.federations\.e2e\]/,/^$/d' pyproject.toml
 # Check if the first argument is 'insecure'
 if [ "$server_arg" = "--insecure" ]; then
   # If $server_arg is '--insecure', append the first line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\ninsecure = true" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\ninsecure = true" >> pyproject.toml
 else
   # Otherwise, append the second line
-  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"certificates/ca.crt\"" >> pyproject.toml
+  echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:8000\"\nroot-certificates = \"certificates/ca.crt\"" >> pyproject.toml
 fi
 
 background_pids=()
@@ -103,7 +105,7 @@ fi
 
 flower-supernode $client_arg \
   --superlink $server_address $client_auth_1 \
-  --clientappio-api-address "localhost:9094" \
+  --host localhost --port 9094 \
   --max-retries 0 &
 cl1_pid=$!
 background_pids+=("$cl1_pid")
@@ -111,7 +113,7 @@ sleep 3
 
 flower-supernode $client_arg \
   --superlink $server_address $client_auth_2 \
-  --clientappio-api-address "localhost:9096" \
+  --host localhost --port 9096 \
   --max-retries 0 &
 cl2_pid=$!
 background_pids+=("$cl2_pid")
