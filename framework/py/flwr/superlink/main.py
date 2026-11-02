@@ -150,7 +150,7 @@ def create_app(  # pylint: disable=too-many-statements
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
+    # Instantiate the lifespan for process-wide resources.
     superlink_lifespan = None
     if config:
         if superlink_lifespan_class is None:
@@ -166,8 +166,6 @@ def create_app(  # pylint: disable=too-many-statements
 
         try:
             if superlink_lifespan:
-                # Temporary compatibility path: start the existing gRPC APIs from
-                # FastAPI lifespan
                 superlink_lifespan.startup()
 
             lifespan_state: dict[str, object] = {}
