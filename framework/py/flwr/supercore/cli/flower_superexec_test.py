@@ -16,14 +16,13 @@
 
 
 import importlib
+from logging import WARN
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
 from flwr.common.constant import ExecPluginType
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.version import package_version
 
@@ -45,14 +44,17 @@ def test_parse_superexec_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
-def test_parse_superexec_accepts_kubernetes_executor_config() -> None:
+@pytest.mark.parametrize(
+    "address_flag", ["--runtime-api-address", "--appio-api-address"]
+)
+def test_parse_superexec_accepts_kubernetes_executor_config(
+    address_flag: str,
+) -> None:
     """SuperExec should accept Kubernetes executor selection and config path."""
     args = _parse_args().parse_args(
         [
-            "--appio-api-address",
+            address_flag,
             "127.0.0.1:9091",
-            "--plugin-type",
-            ExecPluginType.CLIENT_APP,
             "--executor",
             "kubernetes",
             "--executor-config",
@@ -62,6 +64,41 @@ def test_parse_superexec_accepts_kubernetes_executor_config() -> None:
 
     assert args.executor == ExecutorType.KUBERNETES
     assert args.executor_config == "executor.yaml"
+    assert args.plugin_type is None
+
+
+@pytest.mark.parametrize(
+    "address_args",
+    [
+        ["--appio-api-address", "127.0.0.1:9091"],
+        ["--appio-api-address=127.0.0.1:9091"],
+    ],
+)
+def test_flower_superexec_warns_for_renamed_appio_api_address(
+    monkeypatch: pytest.MonkeyPatch, address_args: list[str]
+) -> None:
+    """SuperExec should warn when the renamed address flag is used."""
+    monkeypatch.setattr(
+        flower_superexec_module.sys,
+        "argv",
+        ["flower-superexec", *address_args],
+    )
+    monkeypatch.setattr(flower_superexec_module, "_parse_args", Mock())
+    monkeypatch.setattr(
+        flower_superexec_module, "warn_if_flwr_update_available", lambda **_: None
+    )
+    log_mock = Mock(side_effect=RuntimeError)
+    monkeypatch.setattr(flower_superexec_module, "log", log_mock)
+
+    with pytest.raises(RuntimeError):
+        flower_superexec_module.flower_superexec()
+
+    log_mock.assert_called_once_with(
+        WARN,
+        "The `--appio-api-address` argument has been renamed to "
+        "`--runtime-api-address`. Please update your command; the old name will "
+        "be removed in a future release.",
+    )
 
 
 def test_flower_superexec_checks_for_update(
@@ -103,95 +140,6 @@ def test_flower_superexec_checks_for_update(
     assert captured == ["update", "flower-superexec"]
 
 
-def test_flower_superexec_clientapp_allows_missing_secret(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """ClientApp plugin should not require a SuperExec auth secret."""
-    args = SimpleNamespace(
-        insecure=True,
-        plugin_type=ExecPluginType.CLIENT_APP,
-        plugin_config=None,
-        root_certificates=None,
-        superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
-        parent_pid=None,
-        health_server_address=None,
-        runtime_dependency_install=False,
-        executor=ExecutorType.SUBPROCESS,
-    )
-    captured: dict[str, object] = {}
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return parsed arguments for the test path."""
-            return args
-
-    def _run_superexec(**kwargs: object) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "warn_if_flwr_update_available",
-        lambda **_: None,
-    )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ClientAppIoStub),
-    )
-    monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
-
-    flower_superexec_module.flower_superexec()
-
-    assert captured["superexec_auth_secret"] is None
-
-
-def test_flower_superexec_serverapp_allows_missing_secret(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """ServerApp plugin should allow missing secret in subprocess-mode flows."""
-    args = SimpleNamespace(
-        insecure=True,
-        plugin_type=ExecPluginType.SERVER_APP,
-        plugin_config=None,
-        root_certificates=None,
-        superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
-        parent_pid=None,
-        health_server_address=None,
-        runtime_dependency_install=False,
-        executor=ExecutorType.SUBPROCESS,
-    )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return parsed arguments for the test path."""
-            return args
-
-    captured: dict[str, object] = {}
-
-    def _run_superexec(**kwargs: object) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "warn_if_flwr_update_available",
-        lambda **_: None,
-    )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ServerAppIoStub),
-    )
-    monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
-
-    flower_superexec_module.flower_superexec()
-
-    assert captured["superexec_auth_secret"] is None
-
-
 def test_flower_superexec_passes_executor_to_run_superexec(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -202,7 +150,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         plugin_config=None,
         root_certificates=None,
         superexec_auth_secret_file=None,
-        appio_api_address="127.0.0.1:9091",
+        runtime_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
@@ -219,11 +167,6 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     )
     monkeypatch.setattr(
         flower_superexec_module, "_parse_args", Mock(return_value=parser)
-    )
-    monkeypatch.setattr(
-        flower_superexec_module,
-        "_get_plugin_and_stub_class",
-        lambda _plugin_type: (object, ClientAppIoStub),
     )
     monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 

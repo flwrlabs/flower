@@ -56,46 +56,29 @@ async def _get_linkstate_after_lifespan_startup(
         return get_linkstate(_make_request(app))
 
 
-def _create_app_with_linkstate_factory(
-    state_factory_mock: Mock, *, start_legacy_grpc: bool
-) -> FastAPI:
-    """Create a FastAPI app for either SuperLink HTTP mode."""
+def _create_app_with_linkstate_factory(state_factory_mock: Mock) -> FastAPI:
+    """Create a configured SuperLink FastAPI app."""
     linkstate_factory = cast(LinkStateFactory, state_factory_mock)
-    authn_plugin = Mock()
-    authz_plugin = Mock()
-    if not start_legacy_grpc:
-        return create_app(
-            linkstate_factory=linkstate_factory,
-            authn_plugin=authn_plugin,
-            authz_plugin=authz_plugin,
-        )
-
-    superlink_lifespan = Mock()
-    superlink_lifespan.state_factory = None
-    superlink_lifespan.startup.side_effect = lambda: setattr(
-        superlink_lifespan, "state_factory", linkstate_factory
-    )
-    return create_app(
-        linkstate_factory=linkstate_factory,
-        authn_plugin=authn_plugin,
-        authz_plugin=authz_plugin,
-        superlink_lifespan=cast(Any, superlink_lifespan),
-        start_legacy_grpc=True,
-    )
+    config = Mock()
+    config.simulation = False
+    config.database = ":flwr-in-memory:"
+    config.authn_plugin = Mock()
+    with (
+        patch("flwr.superlink.main.get_federation_manager"),
+        patch(
+            "flwr.superlink.main.get_objectstore_linkstate_factories",
+            return_value=(Mock(), linkstate_factory),
+        ),
+    ):
+        return create_app(cast(Any, config), cast(Any, Mock()))
 
 
-@pytest.mark.parametrize("start_legacy_grpc", [False, True])
-def test_get_linkstate_returns_linkstate_after_startup(
-    start_legacy_grpc: bool,
-) -> None:
-    """get_linkstate should return LinkState in both FastAPI HTTP modes."""
+def test_get_linkstate_returns_linkstate_after_startup() -> None:
+    """get_linkstate should return LinkState after FastAPI startup."""
     expected_linkstate = cast(LinkState, Mock(spec=LinkState))
     state_factory_mock = Mock(spec=LinkStateFactory)
     state_factory_mock.state.return_value = expected_linkstate
-    app = _create_app_with_linkstate_factory(
-        state_factory_mock,
-        start_legacy_grpc=start_legacy_grpc,
-    )
+    app = _create_app_with_linkstate_factory(state_factory_mock)
 
     with patch("flwr.superlink.extensions.get_lifespan_contexts", return_value=()):
         linkstate = asyncio.run(_get_linkstate_after_lifespan_startup(app))

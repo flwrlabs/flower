@@ -87,10 +87,8 @@ VM Networking
 
 During the execution of the Flower application, the server VM (``SuperLink``) will be
 responsible to orchestrate the execution of the application across the client VMs
-(``SuperNode``). When the SuperLink server starts, by default, it listens to the
-following ports: ``{9092, 9093}``. Port `9092` is used to communicate with the
-Federation clients (``SuperNode``) and port ``9093`` to receive and execute Flower
-applications.
+(``SuperNode``). By default, SuperNodes use the Fleet API on port ``8000``. The
+SuperLink also serves the Control and Runtime APIs over HTTP on that port.
 
 Therefore, to enable this communication we need to allow inbound traffic to the server
 VM instance. To achieve this, we need to navigate to the Networking page of the server
@@ -107,48 +105,17 @@ The rest of the fields can be left at their default values.
     - - **Source**
       - ``IP Addresses``
     - - **Source IP addresses/CIDR ranges**
-      - add client VMs' Public IP (separated by comma)
+      - add client VMs' Public IPs and your local machine's Public IP
     - - **Destination**
       - ``Any``
     - - **Service**
       - ``custom``
     - - **Destination port ranges**
-      - ``9092``
+      - ``8000``
     - - **Protocol**
       - ``TCP``
 
-Finally, we need to also open port 9093 to allow receiving and executing incoming
-application requests. To enable this we just need to repeat the steps above, i.e.,
-create a new inbound rule, where for port range we assign port 9093. If we already know
-the Public IP from which our local machine (e.g., laptop) will be submitting
-applications to the Azure cluster, then we just need to specify the Source IP
-address/CIDR range. However, if we want to keep the port widely open we simply need to
-change source to ``Any``.
-
-To be more precise, if we know the Public IP of our machine, then we make the following
-changes:
-
-.. list-table::
-    :align: left
-    :widths: 25 25
-    :header-rows: 0
-
-    - - **Source IP addresses/CIDR ranges**
-      - add machine's Public IP
-    - - **Destination port ranges**
-      - ``9093``
-
-Otherwise, we change the properties as follows:
-
-.. list-table::
-    :align: left
-    :widths: 25 25
-    :header-rows: 0
-
-    - - **Source**
-      - ``Any``
-    - - **Destination port ranges**
-      - ``9093``
+This rule also allows your local machine to submit applications through the Control API.
 
 ********************
  Flower Environment
@@ -183,17 +150,17 @@ and then at each client (``SuperNode``).
 .. code-block:: bash
 
     # Server VM (SuperLink)
-    flower-superlink --insecure
+    flower-superlink --insecure --host="0.0.0.0"
 
     # Client-1 VM (SuperNode-1)
     flower-supernode \
       --insecure \
-      --superlink="SUPERLINK_PUBLIC_IP:9092"  # SuperLink public ip and port
+      --superlink="SUPERLINK_PUBLIC_IP:8000"  # SuperLink public ip and port
 
     # Client-2 VM (SuperNode-2)
     flower-supernode \
       --insecure \
-      --superlink="SUPERLINK_PUBLIC_IP:9092"  # SuperLink public ip and port
+      --superlink="SUPERLINK_PUBLIC_IP:8000"  # SuperLink public ip and port
 
 Run Flower App
 ==============
@@ -231,7 +198,7 @@ Next, we need to create a new SuperLink connection in the Flower Configuration f
        :caption: config.toml
 
        [superlink.my-federation]
-       address = "SUPERLINK_PUBLIC_IP:9093"  # Address of the SuperLink Control API
+       address = "SUPERLINK_PUBLIC_IP:8000"  # Address of the SuperLink Control API
        insecure = true
 
 Then from our local machine we need to run ``flwr run . my-federation``.

@@ -43,6 +43,7 @@ from .utils import (
     simulation_config_to_json,
     strict_json_dumps,
     strict_json_loads,
+    strict_json_loads_object,
     uint64_to_int64,
 )
 
@@ -111,6 +112,14 @@ def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None
 def test_strict_json_loads() -> None:
     """Parse valid JSON values."""
     assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_object() -> None:
+    """Accept strict JSON objects and reject other top-level values."""
+    assert strict_json_loads_object('{"key":[1,true,null]}') == {"key": [1, True, None]}
+    for raw in ("[]", "null", '{"key":NaN}'):
+        with pytest.raises(ValueError):
+            strict_json_loads_object(raw)
 
 
 def test_strict_json_loads_rejects_non_finite_numbers() -> None:
@@ -507,7 +516,7 @@ def test_simulation_config_from_json_rejects_unknown_fields() -> None:
         (90000, "1d 1h"),  # day + hour
     ]
 )
-def test_humanize_duration(seconds, expected) -> None:
+def test_humanize_duration(seconds: int, expected: str) -> None:
     """Test the humanize_duration function."""
     assert humanize_duration(seconds) == expected
 
@@ -521,6 +530,6 @@ def test_humanize_duration(seconds, expected) -> None:
         (3 * 1024**3, "3.0 GB"),  # GB < 10
     ]
 )
-def test_humanize_bytes(num_bytes, expected) -> None:
+def test_humanize_bytes(num_bytes: int, expected: str) -> None:
     """Test the humanize_bytes function."""
     assert humanize_bytes(num_bytes) == expected

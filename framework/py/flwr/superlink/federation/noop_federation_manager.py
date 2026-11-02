@@ -92,12 +92,20 @@ class NoOpFederationManager(FederationManager):
             Federation(
                 id=NOOP_FEDERATION_ID,
                 description=NOOP_FEDERATION_DESCRIPTION,
-                members=[],
+                members=[
+                    Member(
+                        account=Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME),
+                        role="owner",
+                    )
+                ],
                 nodes=[],
                 runs=[],
                 archived=False,
                 simulation=self._simulation,
                 config=self._simulation_config,
+                can_invite_members=False,
+                can_add_supernodes=False,
+                member_count=1,
             )
         ]
 
@@ -120,6 +128,9 @@ class NoOpFederationManager(FederationManager):
             archived=False,
             simulation=self._simulation,
             config=self._simulation_config,
+            can_invite_members=False,
+            can_add_supernodes=False,
+            member_count=1,
         )
 
     def get_simulation_config(self, federation_id: str) -> SimulationConfig | None:
@@ -150,6 +161,14 @@ class NoOpFederationManager(FederationManager):
                 f"'{federation_id}'.",
             ) from None
         cast(SimulationConfig, self._simulation_config).MergeFrom(config)
+
+    def set_icon_key(
+        self, flwr_aid: str, federation_id: str, icon_key: str | None
+    ) -> None:
+        """Set or clear the custom icon for a federation."""
+        raise UnsupportedError(
+            "`set_icon_key` is not supported by NoOpFederationManager."
+        )
 
     def create_federation(
         self,

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower constants."""
 
-
 from __future__ import annotations
 
 import os
@@ -30,19 +29,11 @@ TRANSPORT_TYPES = [
 
 # Addresses
 # Ports
-CLIENTAPPIO_PORT = "9094"
-SERVERAPPIO_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
 CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
-# SuperNode
-CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CLIENTAPPIO_PORT}"
-CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{CLIENTAPPIO_PORT}"
-# SuperLink
-SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SERVERAPPIO_PORT}"
-SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SERVERAPPIO_PORT}"
 FLEET_API_GRPC_RERE_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_GRPC_RERE_PORT}"
 FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
     "[::]:8080"  # IPv6 to keep start_server compatible
@@ -126,9 +117,6 @@ GRPC_ADAPTER_METADATA_SHOULD_EXIT_KEY = "should-exit"
 GRPC_ADAPTER_METADATA_MESSAGE_MODULE_KEY = "grpc-message-module"
 GRPC_ADAPTER_METADATA_MESSAGE_QUALNAME_KEY = "grpc-message-qualname"
 
-# Message TTL
-MESSAGE_TTL_TOLERANCE = 1e-1
-
 # Isolation modes
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
@@ -138,6 +126,10 @@ RUNTIME_DEPENDENCY_INSTALL = False
 FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
     "FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION"
 )
+
+# Internal API toggles
+FLWR_INTERNAL_GRPC_CONTROL_API = "FLWR_INTERNAL_GRPC_CONTROL_API"
+FLWR_INTERNAL_GRPC_FLEET_API = "FLWR_INTERNAL_GRPC_FLEET_API"
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
@@ -150,13 +142,8 @@ LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 MAX_RETRY_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for account authentication
-AUTHN_TYPE_JSON_KEY = "authn-type"  # For key name in JSON file
-AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
-
-# Constants for account authorization
-AUTHZ_TYPE_YAML_KEY = "authz_type"  # For key name in YAML file
 
 # Constants for node authentication
 PUBLIC_KEY_HEADER = "flwr-public-key-bin"  # Must end with "-bin" for binary data
@@ -178,6 +165,8 @@ INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
 # Constants for task-token generation
 FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
+FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
+FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_TASK_TOKEN_ACCEPTED"
 
 # SuperLink Fleet API constants
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
@@ -210,12 +199,9 @@ class ErrorCode:
     UNKNOWN = 0
     LOAD_CLIENT_APP_EXCEPTION = 1
     CLIENT_APP_RAISED_EXCEPTION = 2
-    MESSAGE_UNAVAILABLE = 3
-    REPLY_MESSAGE_UNAVAILABLE = 4
     NODE_UNAVAILABLE = 5
     MOD_FAILED_PRECONDITION = 6
     INVALID_FAB = 7
-    CLIENT_APP_CRASHED = 8
 
     def __new__(cls) -> ErrorCode:
         """Prevent instantiation."""
@@ -269,16 +255,6 @@ class AuthnType:
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 
 
-class AuthzType:
-    """Account authorization types."""
-
-    NOOP = "noop"
-
-    def __new__(cls) -> AuthzType:
-        """Prevent instantiation."""
-        raise TypeError(f"{cls.__name__} cannot be instantiated.")
-
-
 class EventLogWriterType:
     """Event log writer types."""
 
@@ -295,7 +271,6 @@ class ExecPluginType:
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"  # Deprecated
-    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""

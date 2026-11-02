@@ -13,6 +13,10 @@ echo "RUN_PYTEST: $RUN_PYTEST"
 
 echo "- Start Python checks"
 
+echo "- connector registry: start"
+python -m dev.generate_connector --check
+echo "- connector registry: done"
+
 echo "- clang-format:  start"
 clang-format --Werror --dry-run proto/flwr/proto/*
 echo "- clang-format:  done"
@@ -136,7 +140,9 @@ if $RUN_FULL_TEST; then
 fi
 
 echo "- licensecheck: start"
-python -m licensecheck --fail-licenses gpl --zero
+# Newer licensecheck needs Python 3.12+ and Rich 15; isolate it from Flower.
+python -m uv tool run --python '>=3.12' \
+    licensecheck==2026.0.8 --fail-licenses gpl --zero
 echo "- licensecheck: done"
 
 echo "- All license checks passed"

@@ -35,3 +35,7 @@ class Federation:  # pylint: disable=R0902
     archived: bool
     simulation: bool
     config: SimulationConfig | None
+    can_invite_members: bool
+    can_add_supernodes: bool
+    member_count: int | None = None
+    icon_key: str | None = None

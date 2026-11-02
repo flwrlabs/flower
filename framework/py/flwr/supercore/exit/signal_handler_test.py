@@ -48,7 +48,7 @@ class TestExitHandlers(unittest.TestCase):
         # Execute
         os.kill(os.getpid(), signal.SIGTERM)
         # This should be called in `flwr_exit`, but we patched it above
-        trigger_exit_handlers()
+        trigger_exit_handlers(run_before_force_exit=False)
 
         # Assert
         mock_flwr_exit.assert_called_once()
@@ -64,4 +64,5 @@ class TestExitHandlers(unittest.TestCase):
         add_exit_handler(handler)
 
         # Assert
-        self.assertIn(handler, registered_exit_handlers)
+        self.assertEqual(registered_exit_handlers[0].exit_handler, handler)
+        self.assertFalse(registered_exit_handlers[0].run_before_force_exit)

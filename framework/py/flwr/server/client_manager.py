@@ -20,7 +20,7 @@ import threading
 from abc import ABC, abstractmethod
 from logging import INFO
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 from .client_proxy import ClientProxy
 from .criterion import Criterion

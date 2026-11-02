@@ -14,37 +14,311 @@
 # ==============================================================================
 """Flower connector task process."""
 
-
 from __future__ import annotations
 
+import os
+import signal
+import threading
+from collections.abc import Callable, Iterator
+from concurrent.futures import Future
+from contextlib import ExitStack, contextmanager
 from logging import DEBUG, ERROR
-
-import grpc
+from types import FrameType
+from typing import Any
 
 from flwr.common.constant import SubStatus
-from flwr.common.logger import log
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.grpc import create_channel, on_channel_state_change
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
-from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
+from flwr.supercore.constant import (
+    FORCE_EXIT_TIMEOUT_SECONDS,
+    TELEMETRY_TIMEOUT_SECONDS,
 )
-from flwr.supercore.retry import RetryInvoker, make_simple_grpc_retry_invoker, wrap_stub
+from flwr.supercore.exit import (
+    ExitCode,
+    add_exit_handler,
+    flwr_exit,
+    register_signal_handlers,
+)
+from flwr.supercore.exit.signal_handler import SIGNAL_TO_EXIT_CODE
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_http
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
+from flwr.supercore.retry import RetryInvoker, make_simple_http_retry_invoker
+from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 
 from .task import handle_task
 
 
-def run_connector(  # pylint: disable=too-many-locals
-    serverappio_api_address: str,
+class _ConnectorTaskLifecycle:  # pylint: disable=too-many-instance-attributes
+    """Own task-scoped Connector state and its exactly-once finalization."""
+
+    def __init__(
+        self,
+        runtime_api_address: str,
+        token: str,
+        insecure: bool,
+        certificates: bytes | None,
+    ) -> None:
+        self.timings = PhaseTimings()
+        self._runtime_api_address = runtime_api_address
+        self._token = token
+        self._insecure = insecure
+        self._certificates = certificates
+        self._client: RuntimeHttpClient | None = None
+        self._retry_invoker: RetryInvoker | None = None
+        self._heartbeat_sender: HeartbeatSender | None = None
+        self._sub_status = SubStatus.FAILED
+        self._details = "Connector task failed with unknown error."
+        self._lock = threading.RLock()
+        self._finalized = False
+        self._task_finished = False
+        self._leave_event_started = False
+        self._trace_attributes = {"flwr.component": "connector"}
+
+    def run(self) -> int:
+        """Execute the task and return its Flower exit code."""
+        exit_code = ExitCode.SUCCESS
+        try:
+            if self._client is None:
+                raise RuntimeError("Connector Runtime client initialization failed.")
+            self._heartbeat_sender = HeartbeatSender(
+                make_task_heartbeat_fn_http(self._client)
+            )
+            self._heartbeat_sender.start()
+
+            log(DEBUG, "[flwr-connector] Pull task input")
+            with self.timings.measure("task.input"):
+                task_input: PullTaskInputResponse = self._client.PullTaskInput(
+                    PullTaskInputRequest()
+                )
+            TaskIdentity.task_id = task_input.task_id
+            TaskIdentity.run_id = task_input.run.run_id
+            TaskIdentity.node_id = task_input.context.node_id
+            attributes = {
+                "flwr.component": "connector",
+                "flwr.task_id": str(task_input.task_id),
+                "flwr.run_id": str(task_input.run.run_id),
+            }
+            self._trace_attributes.update(attributes)
+            self.timings.publish("task.bootstrap", attributes)
+
+            event(EventType.FLWR_CONNECTOR_RUN_ENTER)
+            with trace_span("connector.execute", attributes=attributes):
+                handle_task(client=self._client)
+
+            with self._lock:
+                self._sub_status = SubStatus.COMPLETED
+                self._details = ""
+                self._task_finished = True
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            log(ERROR, "`flwr-connector` failed", exc_info=ex)
+            with self._lock:
+                self._sub_status = SubStatus.FAILED
+                self._details = f"Connector task failed with exception: {str(ex)}"
+                self._task_finished = True
+            exit_code = (
+                ExitCode.COMMON_APP_IMPORT_ERROR
+                if isinstance(ex, ImportError)
+                else ExitCode.TASK_PROC_EXCEPTION
+            )
+        return exit_code
+
+    def initialize(self) -> None:
+        """Create fresh task-scoped Runtime state if it is not initialized."""
+        if self._client is not None:
+            return
+        self._client, self._retry_invoker = _create_runtime_client(
+            runtime_api_address=self._runtime_api_address,
+            token=self._token,
+            insecure=self._insecure,
+            certificates=self._certificates,
+        )
+
+    def mark_interrupted(self) -> None:
+        """Record a graceful interruption before final task output is pushed."""
+        with self._lock:
+            if self._finalized or self._task_finished:
+                return
+            self._sub_status = SubStatus.FAILED
+            self._details = "Connector task stopped by user."
+
+    def finalize(self) -> None:
+        """Push final status and release task state exactly once."""
+        with _ignore_graceful_signals(), self._lock, ExitStack() as tracing:
+            if self._finalized:
+                return
+            self._finalized = True
+            tracing.callback(flush_traces)
+            tracing.enter_context(
+                trace_span("task.finalize", attributes=self._trace_attributes)
+            )
+
+            log(DEBUG, "[flwr-connector] Will push Connector task output")
+            if self._client is None or self._retry_invoker is None:
+                return
+            self._retry_invoker.max_tries = 1
+            try:
+                self._client.PushTaskOutput(
+                    PushTaskOutputRequest(
+                        sub_status=self._sub_status,
+                        details=self._details,
+                    )
+                )
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to push task output", exc_info=err)
+
+            try:
+                if self._heartbeat_sender and self._heartbeat_sender.is_running:
+                    self._heartbeat_sender.stop()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to stop Connector task heartbeat", exc_info=err)
+            try:
+                self._client.close()
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to close Connector Runtime client", exc_info=err)
+
+    def complete(self, exit_code: int) -> None:
+        """Finalize and emit one bounded leave event for a resident worker."""
+        with _ignore_graceful_signals():
+            self.finalize()
+            with self._lock:
+                if self._leave_event_started:
+                    return
+                self._leave_event_started = True
+            try:
+                future: Future[str] = event(
+                    EventType.FLWR_CONNECTOR_RUN_LEAVE, {"exit_code": exit_code}
+                )
+                future.result(timeout=TELEMETRY_TIMEOUT_SECONDS)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+
+@contextmanager
+def _ignore_graceful_signals() -> Iterator[None]:
+    """Ignore graceful signals process-wide while finalization is in progress."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    previous_handlers: dict[int, Any] = {}
+    try:
+        for sig in SIGNAL_TO_EXIT_CODE:
+            previous_handlers[sig] = signal.signal(sig, signal.SIG_IGN)
+        yield
+    finally:
+        for sig, previous_handler in previous_handlers.items():
+            signal.signal(sig, previous_handler)
+
+
+def _run_connector_task(  # pylint: disable=too-many-arguments
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    certificates: bytes | None,
+    *,
+    resident: bool,
+    on_started: Callable[[], None] | None = None,
+) -> tuple[_ConnectorTaskLifecycle, int]:
+    """Create and execute one task through the Connector lifecycle."""
+    lifecycle = _ConnectorTaskLifecycle(
+        runtime_api_address,
+        token,
+        insecure,
+        certificates,
+    )
+    with lifecycle.timings.measure("task.runtime_client"):
+        lifecycle.initialize()
+    if resident:
+        _register_resident_signal_handlers(lifecycle)
+    else:
+        # Preserve the cold path's existing ordering: create its Runtime client
+        # before installing task signal handlers.
+        register_signal_handlers(
+            event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
+            exit_message="Task stopped by user.",
+            exit_handlers=[lifecycle.finalize],
+        )
+    # Transfer task authority only after Runtime state and signal ownership exist.
+    if on_started is not None:
+        with lifecycle.timings.measure("task.accept"):
+            on_started()
+    return lifecycle, lifecycle.run()
+
+
+def _register_resident_signal_handlers(lifecycle: _ConnectorTaskLifecycle) -> None:
+    """Register coordinated graceful exits for the resident PID 1 worker."""
+    default_handlers: dict[int, Any] = {}
+    is_exiting = False
+    lock = threading.Lock()
+
+    def graceful_exit_handler(signalnum: int, _frame: FrameType | None) -> None:
+        nonlocal is_exiting
+        with lock:
+            if is_exiting:
+                return
+            is_exiting = True
+
+        for sig, default_handler in default_handlers.items():
+            signal.signal(sig, default_handler)
+
+        exit_code = SIGNAL_TO_EXIT_CODE[signalnum]
+        lifecycle.mark_interrupted()
+        add_exit_handler(lambda: lifecycle.complete(exit_code))
+        flwr_exit(
+            exit_code,
+            message="Task stopped by user.",
+            emit_telemetry=False,
+        )
+
+    for sig in SIGNAL_TO_EXIT_CODE:
+        default_handlers[sig] = signal.signal(sig, graceful_exit_handler)
+
+
+def run_connector_once(
+    runtime_api_address: str,
+    token: str,
+    insecure: bool,
+    certificates: bytes | None = None,
+    on_started: Callable[[], None] | None = None,
+) -> int:
+    """Run one Connector task without terminating the containing process."""
+    lifecycle, exit_code = _run_connector_task(
+        runtime_api_address,
+        token,
+        insecure,
+        certificates,
+        resident=True,
+        on_started=on_started,
+    )
+    returncode = 0 if exit_code == ExitCode.SUCCESS else 1
+    force_exit_timer = threading.Timer(
+        FORCE_EXIT_TIMEOUT_SECONDS,
+        os._exit,
+        args=(returncode,),
+    )
+    force_exit_timer.daemon = True
+    force_exit_timer.start()
+    try:
+        lifecycle.complete(exit_code)
+    finally:
+        force_exit_timer.cancel()
+    return returncode
+
+
+def run_connector(
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -54,93 +328,34 @@ def run_connector(  # pylint: disable=too-many-locals
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    channel, stub, retry_invoker = _create_serverappio_stub(
-        serverappio_api_address=serverappio_api_address,
-        token=token,
-        insecure=insecure,
-        certificates=certificates,
+    _, exit_code = _run_connector_task(
+        runtime_api_address,
+        token,
+        insecure,
+        certificates,
+        resident=False,
     )
-
-    heartbeat_sender = None
-    sub_status = SubStatus.FAILED
-    details = "Connector task failed with unknown error."
-    exit_code = ExitCode.SUCCESS
-
-    def on_exit() -> None:
-        log(DEBUG, "[flwr-connector] Will push Connector task output")
-
-        retry_invoker.max_tries = 1
-
-        pushoutput_req = PushTaskOutputRequest(
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError as err:
-            log(ERROR, "Failed to push task output: %s", str(err))
-
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        channel.close()
-
-    register_signal_handlers(
-        event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
-        exit_message="Task stopped by user.",
-        exit_handlers=[on_exit],
-    )
-
-    try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
-        heartbeat_sender.start()
-
-        log(DEBUG, "[flwr-connector] Pull task input")
-        task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
-
-        event(EventType.FLWR_CONNECTOR_RUN_ENTER)
-
-        handle_task(
-            stub=stub,
-            task_id=task_input.task_id,
-            run_id=task_input.run.run_id,
-        )
-
-        sub_status = SubStatus.COMPLETED
-        details = ""
-
-    except Exception as ex:  # pylint: disable=broad-exception-caught
-        log(ERROR, "`flwr-connector` failed", exc_info=ex)
-
-        sub_status = SubStatus.FAILED
-        details = f"Connector task failed with exception: {str(ex)}"
-
-        exit_code = ExitCode.TASK_PROC_EXCEPTION
-        if isinstance(ex, ImportError):
-            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
-
     flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
 
-def _create_serverappio_stub(
+def _create_runtime_client(
     *,
-    serverappio_api_address: str,
+    runtime_api_address: str,
     token: str,
     insecure: bool,
     certificates: bytes | None,
-) -> tuple[grpc.Channel, ServerAppIoStub, RetryInvoker]:
-    """Create a ServerAppIo stub authenticated as the connector task."""
-    channel = create_channel(
-        server_address=serverappio_api_address,
+) -> tuple[RuntimeHttpClient, RetryInvoker]:
+    """Create a Runtime HTTP client authenticated as the connector task."""
+    retry_invoker = make_simple_http_retry_invoker()
+    client = RuntimeHttpClient.from_server_address(
+        server_address=runtime_api_address,
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="flwr-connector"),
-            AppIoTokenClientInterceptor(token),
+            RuntimeTracingInterceptor(),
+            RuntimeVersionHttpInterceptor(component_name="flwr-connector"),
+            RuntimeTokenHttpInterceptor(token),
         ],
+        retry_invoker=retry_invoker,
     )
-    channel.subscribe(on_channel_state_change)
-    stub = ServerAppIoStub(channel)
-    retry_invoker = make_simple_grpc_retry_invoker()
-    wrap_stub(stub, retry_invoker)
-    return channel, stub, retry_invoker
+    return client, retry_invoker

@@ -278,11 +278,10 @@ example, if we want to increase the timeout to 2 hours, we would do:
         timeout=7200,  # 2 hours
     )
 
-Finally, the last argument in ``start`` is named ``evaluate_fn`` and it allows passing
-to it a callback function to evaluate the aggregated model on some local data that the
-``ServerApp`` might have access to. This callback is also useful if you want to save the
-global model at the end of every round (or every N rounds). Let's see what the signature
-of this callback is and how to use it:
+The ``evaluate_fn`` argument allows passing a callback function to evaluate the
+aggregated model on some local data that the ``ServerApp`` might have access to. This
+callback is also useful if you want to save the global model at the end of every round
+(or every N rounds). Let's see what the signature of this callback is and how to use it:
 
 .. code-block:: python
 
@@ -313,3 +312,44 @@ of this callback is and how to use it:
     <https://github.com/flwrlabs/flower/blob/main/examples/quickstart-pytorch>`_ example
     on GitHub for a complete example using several of the concepts presented in this
     how-to guide.
+
+***************************
+ Stop a strategy run early
+***************************
+
+Pass a ``should_stop`` callback to ``start`` to stop before reaching ``num_rounds``. The
+callback receives the completed round number and accumulated
+:class:`~flwr.serverapp.strategy.Result`. For example, stop when aggregated federated
+evaluation accuracy reaches 90%:
+
+.. code-block:: python
+
+    from flwr.serverapp.strategy import Result
+
+
+    def target_reached(server_round: int, result: Result) -> bool:
+        metrics = result.evaluate_metrics_clientapp.get(server_round)
+        if metrics is None:
+            return False
+        accuracy = metrics["accuracy"]
+        return isinstance(accuracy, (int, float)) and accuracy >= 0.90
+
+
+    result = strategy.start(
+        grid=grid,
+        initial_arrays=arrays,
+        num_rounds=100,
+        should_stop=target_reached,
+    )
+
+The predicate runs once after each full round, including federated evaluation and any
+centralized evaluation. It does not run after the initial evaluation at round zero.
+Return ``True`` to stop and ``False`` to continue, and treat the results as read-only.
+When the predicate returns ``True``, no further round is dispatched. The returned
+``Result`` contains the current global model and all metrics collected so far, so the
+ServerApp can continue with saving the model or other application logic.
+
+``num_rounds`` remains the maximum number of rounds. Without ``should_stop``, all
+configured rounds run as before. Errors raised by the predicate propagate normally.
+Custom strategies that override ``start`` must forward ``should_stop`` to the base
+implementation or invoke it in their own round loop.
