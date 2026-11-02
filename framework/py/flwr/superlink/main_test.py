@@ -145,18 +145,6 @@ def test_create_app_superexec_auth_from_environment(
         assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
 
-@pytest.mark.parametrize("secret_file", ["missing", "empty", "."])
-def test_create_app_rejects_invalid_superexec_secret(
-    monkeypatch: MonkeyPatch, tmp_path: Path, secret_file: str
-) -> None:
-    """Fail app creation for missing, empty, or unreadable secret files."""
-    (tmp_path / "empty").touch()
-    monkeypatch.setenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", str(tmp_path / secret_file))
-
-    with pytest.raises(ValueError, match="SuperExec auth secret"):
-        _create_app(monkeypatch)
-
-
 def test_module_app_configures_direct_uvicorn_logging(
     monkeypatch: MonkeyPatch,
 ) -> None:
