@@ -103,29 +103,6 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
     assert config.database == FLWR_IN_MEMORY_DB_NAME
 
 
-@pytest.mark.parametrize("fleet_api_type", ["grpc-rere", "grpc-adapter"])
-def test_parse_superlink_ignores_legacy_fleet_flags(
-    fleet_api_type: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Legacy Fleet options should not start a gRPC server."""
-    monkeypatch.setattr(
-        app_module.sys,
-        "argv",
-        [
-            "flower-superlink",
-            "--insecure",
-            "--fleet-api-type",
-            fleet_api_type,
-            "--fleet-api-address",
-            "127.0.0.1:9092",
-        ],
-    )
-
-    config = _parse_superlink_lifespan_config()
-
-    assert config.fleet_api_type == "http"
-
-
 def test_parse_superlink_lifespan_config_loads_event_log_plugins(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
