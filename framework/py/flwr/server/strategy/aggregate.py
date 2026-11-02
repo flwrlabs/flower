@@ -264,12 +264,13 @@ def _trim_mean(array: NDArray, proportiontocut: float) -> NDArray:
     https://docs.scipy.org/doc/scipy/reference/generated/
     scipy.stats.trim_mean.html.
     """
+    if not 0.0 <= proportiontocut < 0.5:
+        raise ValueError("Proportion to cut must be in the range [0, 0.5).")
+
     axis = 0
     nobs = array.shape[axis]
     lowercut = int(proportiontocut * nobs)
     uppercut = nobs - lowercut
-    if lowercut > uppercut:
-        raise ValueError("Proportion too big.")
 
     atmp = np.partition(array, (lowercut, uppercut - 1), axis)
 

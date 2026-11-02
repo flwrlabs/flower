@@ -1,12 +1,11 @@
 from logging import INFO
 
 import torch
-from datasets import load_dataset
 from flwr.app import Array, ArrayRecord, Context, Message, RecordDict
 from flwr.common import log
 from flwr.serverapp import Grid, ServerApp
 
-from vertical_fl.task import FEATURE_COLUMNS, ServerModel, evaluate_head_model
+from vertical_fl.task import FEATURE_COLUMNS, ServerModel, load_labels
 
 # Create ServerApp
 app = ServerApp()
@@ -25,10 +24,10 @@ def main(grid: Grid, context: Context) -> None:
             f"(got {sum(in_feature_dim_clientapp)} vs. {len(FEATURE_COLUMNS)})."
         )
     out_feature_dim_clientapp: int = context.run_config["out-feature-dim-clientapp"]
+    reply_timeout = float(context.run_config["reply-timeout"])
 
-    # Get dataset
-    dataset = load_dataset("julien-c/titanic-survival", split="train")
-    labels = dataset["Survived"]
+    # Use the same shuffled row order as the clients' feature partitions.
+    labels = load_labels(in_feature_dim_clientapp)
     labels = torch.tensor(labels).float().unsqueeze(1)
 
     # Serverapp model
@@ -63,8 +62,7 @@ def main(grid: Grid, context: Context) -> None:
         embeddings, node_pos_mapping = get_remote_embeddings(
             grid=grid,
             node_ids=node_ids,
-            num_nodes=len(labels),
-            embedding_dim=out_feature_dim_clientapp,
+            timeout=reply_timeout,
         )
 
         # 2. Complete forward pass and compute loss
@@ -73,23 +71,24 @@ def main(grid: Grid, context: Context) -> None:
         loss = criterion(output, labels)
         loss.backward()
 
-        # 4. Extract gradients w.r.t. embeddings
+        # 3. Extract gradients w.r.t. embeddings
         embeddings_grad = embeddings.grad.split(
             [out_feature_dim_clientapp] * len(node_ids), dim=1
         )
 
-        # Update the head model
-        optimizer.step()
-
-        # 3. Compute accuracy using updated head model
+        # 4. Report training metrics from the same forward pass, before updates.
         if i % eval_interval == 0 or i == num_rounds:
-            accuracy = evaluate_head_model(head, embeddings, labels)
+            predicted = (output.detach() > 0.5).float()
+            accuracy = (predicted == labels).float().mean().item() * 100
             log(INFO, f"Round {i}, Loss: {loss.item():.4f}, Accuracy: {accuracy:.2f}%")
             accuracies.append((i, accuracy))
             losses.append((i, loss.item()))
 
-        # 5. Send gradients to clients
-        send_gradients_to_clients(grid, node_pos_mapping, embeddings_grad)
+        # 5. Update every model before requesting the next round's embeddings.
+        optimizer.step()
+        send_gradients_to_clients(
+            grid, node_pos_mapping, embeddings_grad, timeout=reply_timeout
+        )
 
     # Log final results
     log(INFO, "")
@@ -104,7 +103,8 @@ def main(grid: Grid, context: Context) -> None:
 def send_gradients_to_clients(
     grid: Grid,
     node_pos_mapping: dict[int, int],
-    embeddings_grad: list[torch.Tensor],
+    embeddings_grad: tuple[torch.Tensor, ...],
+    timeout: float,
 ) -> None:
     """Send gradients to clients."""
 
@@ -120,16 +120,25 @@ def send_gradients_to_clients(
         )
         messages.append(message)
 
-    # Send messages, but don't wait for results (no replies expected)
+    # Wait for every update to complete, including in the final round.
     log(INFO, "Sending gradients to %s nodes...", len(messages))
-    grid.push_messages(messages)
+    replies = grid.send_and_receive(messages, timeout=timeout)
+    acknowledged = set()
+    for reply in replies:
+        node_id = reply.metadata.src_node_id
+        if reply.has_error():
+            raise RuntimeError(
+                f"Gradient update failed at node {node_id}: {reply.error}"
+            )
+        acknowledged.add(node_id)
+    if acknowledged != set(node_pos_mapping):
+        raise RuntimeError("Did not receive all gradient update acknowledgements")
 
 
 def get_remote_embeddings(
     grid: Grid,
-    node_ids: list[str],
-    num_nodes: int,
-    embedding_dim: int,
+    node_ids: list[int],
+    timeout: float,
 ) -> tuple[torch.Tensor, dict[int, int]]:
     """Get embeddings from sampled remote nodes."""
 
@@ -146,20 +155,26 @@ def get_remote_embeddings(
 
     # Send messages and wait for all results
     log(INFO, "Requesting embeddings from %s nodes...", len(messages))
-    replies = grid.send_and_receive(messages)
+    replies = list(grid.send_and_receive(messages, timeout=timeout))
     log(INFO, "\tReceived %s/%s results", len(replies), len(messages))
 
-    embeddings = torch.zeros((num_nodes, embedding_dim * len(node_ids)))
+    embeddings: dict[int, torch.Tensor] = {}
 
     # Convert all embeddings back to pytorch tensors
     # and place them in the corresponding feature segment
     node_pos_mapping: dict[int, int] = {}
     for reply in replies:
-        if reply.has_content():
-            arr = reply.content["arrays"]["embedding"]
-            embd = torch.from_numpy(arr.numpy())
-            pos = reply.content["config"]["pos"]
-            node_pos_mapping[reply.metadata.src_node_id] = pos
-            embeddings[:, pos * embedding_dim : (pos + 1) * embedding_dim] = embd
+        node_id = reply.metadata.src_node_id
+        if reply.has_error():
+            raise RuntimeError(
+                f"Embedding query failed at node {node_id}: {reply.error}"
+            )
+        pos = reply.content["config"]["pos"]
+        embeddings[pos] = torch.from_numpy(reply.content["arrays"]["embedding"].numpy())
+        node_pos_mapping[node_id] = pos
 
-    return embeddings.requires_grad_(), node_pos_mapping
+    # VFL needs every feature block; a missing party cannot be replaced by zeros.
+    if set(embeddings) != set(range(len(node_ids))):
+        raise RuntimeError("Did not receive embeddings from every feature party")
+    ordered_embeddings = [embeddings[pos] for pos in range(len(node_ids))]
+    return torch.cat(ordered_embeddings, dim=1).requires_grad_(), node_pos_mapping

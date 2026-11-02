@@ -17,20 +17,21 @@
 
 import time
 from collections.abc import Iterable
+from copy import deepcopy
 from typing import cast
 from uuid import uuid4
 
 from flwr.app import Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.logger import warn_deprecated_feature
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.serverapp.grid import Grid
+from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.run import Run
 
 
 class InMemoryGrid(Grid):
-    """`InMemoryGrid` class provides an interface to the ServerAppIo API.
+    """`InMemoryGrid` class provides an interface to the Runtime API.
 
     Parameters
     ----------
@@ -51,16 +52,6 @@ class InMemoryGrid(Grid):
         self.state = state_factory.state()
         self.pull_interval = pull_interval
         self.node = Node(node_id=SUPERLINK_NODE_ID)
-
-    def _check_message(self, message: Message) -> None:
-        # Check if the message is valid
-        if not (
-            message.metadata.message_id != ""
-            and message.metadata.reply_to_message_id == ""
-            and message.metadata.ttl > 0
-            and message.metadata.delivered_at == ""
-        ):
-            raise ValueError(f"Invalid message: {message}")
 
     def set_run(self, run: Run) -> None:
         """Initialize the run."""
@@ -102,6 +93,10 @@ class InMemoryGrid(Grid):
         """Get node IDs."""
         return self.state.get_nodes(cast(Run, self._run).run_id)
 
+    def get_nodes(self) -> Iterable[NodeInfo]:
+        """Get nodes."""
+        return deepcopy(self.state.get_node_info(node_ids=list(self.get_node_ids())))
+
     def push_messages(self, messages: Iterable[Message]) -> Iterable[str]:
         """Push messages to specified node IDs.
 
@@ -110,36 +105,42 @@ class InMemoryGrid(Grid):
         """
         msg_ids: list[str] = []
         for msg in messages:
-            # Populate metadata
-            msg.metadata.__dict__["_run_id"] = cast(Run, self._run).run_id
-            msg.metadata.__dict__["_src_node_id"] = self.node.node_id
+            if msg.metadata.ttl <= 0:
+                raise ValueError("Message TTL must be greater than zero.")
+            # Populate message ID
             msg.metadata.__dict__["_message_id"] = str(uuid4())
-            # Check message
-            self._check_message(msg)
             # Store in state
-            msg_id = self.state.store_message_ins(msg)
-            if msg_id:
-                msg_ids.append(str(msg_id))
+            accepted = self.state.store_messages([msg])[0]
+            msg_ids.append(msg.metadata.message_id if accepted else "")
 
         return msg_ids
 
-    def pull_messages(self, message_ids: Iterable[str]) -> Iterable[Message]:
-        """Pull messages based on message IDs.
+    def pull_messages(
+        self,
+        reply_to_message_ids: Iterable[str] | None = None,
+        *,
+        message_ids: Iterable[str] | None = None,
+    ) -> Iterable[Message]:
+        """Pull messages with an optional correlation filter."""
+        if message_ids is not None:
+            if reply_to_message_ids is not None:
+                raise TypeError(
+                    "Specify only one of `reply_to_message_ids` and `message_ids`."
+                )
+            warn_deprecated_feature(
+                "`message_ids` is deprecated. Use `reply_to_message_ids` instead."
+            )
+            reply_to_message_ids = message_ids
+        messages = self.state.get_messages(
+            dst_node_id=self.node.node_id,
+            run_id=cast(Run, self._run).run_id,
+            reply_to_message_ids=(
+                set(reply_to_message_ids) if reply_to_message_ids is not None else None
+            ),
+        )
+        self.state.acknowledge_messages([msg.metadata.message_id for msg in messages])
 
-        This method is used to collect messages from the SuperLink that correspond to a
-        set of given message IDs.
-        """
-        msg_ids = set(message_ids)
-        # Pull Messages
-        message_res_list = self.state.get_message_res(message_ids=msg_ids)
-        # Get IDs of Messages these replies are for
-        message_ins_ids_to_delete = {
-            msg_res.metadata.reply_to_message_id for msg_res in message_res_list
-        }
-        # Delete
-        self.state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
-
-        return message_res_list
+        return messages
 
     def send_and_receive(
         self,
@@ -154,7 +155,7 @@ class InMemoryGrid(Grid):
         received or the specified timeout duration is exceeded.
         """
         # Push messages
-        msg_ids = set(self.push_messages(messages))
+        msg_ids = {msg_id for msg_id in self.push_messages(messages) if msg_id}
         del messages
 
         # Pull messages

@@ -14,19 +14,16 @@
 # ==============================================================================
 """Control API servicer."""
 
-import time
 from collections.abc import Generator
-from logging import INFO
-from typing import Any, NoReturn, cast
 
 import grpc
 
-from flwr.common.constant import LOG_STREAM_INTERVAL, RUN_EVENTS_STREAM_INTERVAL, Status
-from flwr.common.logger import log
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
+    AddAppRequest,
+    AddAppResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
     ArchiveFederationRequest,
@@ -37,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -49,6 +48,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
+    ListAppsRequest,
+    ListAppsResponse,
     ListAutomationsRequest,
     ListAutomationsResponse,
     ListConnectorsRequest,
@@ -59,6 +64,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesEventsRequest,
+    ListRunSeriesEventsResponse,
     ListRunSeriesRequest,
     ListRunSeriesResponse,
     ListRunsRequest,
@@ -71,10 +78,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RejectInvitationResponse,
     RemoveAccountFromFederationRequest,
     RemoveAccountFromFederationResponse,
+    RemoveAppRequest,
+    RemoveAppResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -91,29 +102,22 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateRunSeriesDescriptionRequest,
+    UpdateRunSeriesDescriptionResponse,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.constant import FLWR_CLIENT_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.utils import get_metadata_str
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
+from flwr.superlink.run_source import resolve_source
 
 from . import control_handlers
 from .control_account_auth_interceptor import get_current_account_info
-from .control_handlers import (
-    _resolve_federation_id,
-    _validate_federation_membership_in_request,
-)
-
-
-def _abort_automations_unimplemented(context: grpc.ServicerContext) -> NoReturn:
-    """Abort an automation RPC that has no implementation yet."""
-    context.abort(
-        grpc.StatusCode.UNIMPLEMENTED,
-        "Automations are not implemented.",
-    )
-    raise NotImplementedError("Automations are not implemented.")
+from .control_handlers import _resolve_federation_id
 
 
 # pylint: disable=too-many-public-methods
@@ -134,63 +138,49 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self.artifact_provider = artifact_provider
         self.fleet_api_type = fleet_api_type
 
+    def CreateAgent(
+        self, request: CreateAgentRequest, context: grpc.ServicerContext
+    ) -> CreateAgentResponse:
+        """Create an agent."""
+        return control_handlers.create_agent(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAgents(
+        self, request: ListAgentsRequest, context: grpc.ServicerContext
+    ) -> ListAgentsResponse:
+        """List agents."""
+        return control_handlers.list_agents(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def StartRun(
         self, request: StartRunRequest, context: grpc.ServicerContext
     ) -> StartRunResponse:
         """Create run ID."""
+        # Best-effort analytics attribution only;
+        # trust caller-provided client labels and default missing sources to unknown.
+        metadata = context.invocation_metadata()
+        run_source = get_metadata_str(metadata, FLWR_CLIENT_METADATA_KEY)
+
         return control_handlers.start_run(
-            request, _get_account(), self.linkstate_factory.state(), self.fleet_api_type
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+            source=resolve_source(run_source),
         )
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
-    ) -> Generator[StreamLogsResponse, Any, None]:
+    ) -> Generator[StreamLogsResponse, None, None]:
         """Get logs."""
-        log(INFO, self.StreamLogs.__qualname__)
-
-        # Init link state
-        state = self.linkstate_factory.state()
-
-        # Retrieve run ID and run
-        run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
-
-        # Exit if `run_id` not found
-        if not runs:
-            raise FlowerError(
-                ApiErrorCode.RUN_ID_NOT_FOUND,
-                f"Run {run_id} not found while streaming logs.",
-            )
-        run = runs[0]
-        task_id = cast(int, run.primary_task_id)
-
-        account = _get_account()
-        flwr_aid = account.flwr_aid
-        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
-
-        after_timestamp = request.after_timestamp + 1e-6
-        while context.is_active():
-            log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
-            if log_msg:
-                yield StreamLogsResponse(
-                    log_output=log_msg,
-                    latest_timestamp=latest_timestamp,
-                )
-                # Add a small epsilon to the latest timestamp to avoid getting
-                # the same log
-                after_timestamp = max(latest_timestamp + 1e-6, after_timestamp)
-
-            # Wait for and continue to yield more log responses only if the
-            # run isn't completed yet. If the run is finished, the entire log
-            # is returned at this point and the server ends the stream.
-            run = state.get_run_info(run_ids=[run_id])[0]
-            if run.status.status == Status.FINISHED:
-                log(INFO, "All logs for run ID `%s` returned", run_id)
-
-                state.cleanup_run(run_id)
-                break
-
-            time.sleep(LOG_STREAM_INTERVAL)  # Sleep briefly to avoid busy waiting
+        return control_handlers.stream_logs(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            context.is_active,
+        )
 
     def ListRuns(
         self, request: ListRunsRequest, context: grpc.ServicerContext
@@ -218,6 +208,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
+    def UpdateRunSeriesDescription(
+        self,
+        request: UpdateRunSeriesDescriptionRequest,
+        context: grpc.ServicerContext,
+    ) -> UpdateRunSeriesDescriptionResponse:
+        """Update a run series description."""
+        return control_handlers.update_run_series_description(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListRunSeriesEvents(
+        self, request: ListRunSeriesEventsRequest, context: grpc.ServicerContext
+    ) -> ListRunSeriesEventsResponse:
+        """List events for all runs in a run series."""
+        return control_handlers.list_run_series_events(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext
     ) -> StopRunResponse:
@@ -230,19 +238,25 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StartAutomationRequest, context: grpc.ServicerContext
     ) -> StartAutomationResponse:
         """Start an automation."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.start_automation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def ListAutomations(
         self, request: ListAutomationsRequest, context: grpc.ServicerContext
     ) -> ListAutomationsResponse:
         """List automations."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.list_automations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def StopAutomation(
         self, request: StopAutomationRequest, context: grpc.ServicerContext
     ) -> StopAutomationResponse:
         """Stop an automation."""
-        _abort_automations_unimplemented(context)
+        return control_handlers.stop_automation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
@@ -339,11 +353,54 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             request, _get_account(), self.linkstate_factory.state()
         )
 
+    def ListApps(
+        self, request: ListAppsRequest, context: grpc.ServicerContext
+    ) -> ListAppsResponse:
+        """List apps in a federation."""
+        return control_handlers.list_apps(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest, context: grpc.ServicerContext
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return control_handlers.list_app_associations(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def AddApp(
+        self, request: AddAppRequest, context: grpc.ServicerContext
+    ) -> AddAppResponse:
+        """Add an app to a federation."""
+        return control_handlers.add_app(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            self.fleet_api_type,
+        )
+
+    def RemoveApp(
+        self, request: RemoveAppRequest, context: grpc.ServicerContext
+    ) -> RemoveAppResponse:
+        """Remove an app from a federation."""
+        return control_handlers.remove_app(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
     def ShowFederation(
         self, request: ShowFederationRequest, context: grpc.ServicerContext
     ) -> ShowFederationResponse:
         """Show details of a specific Federation."""
         return control_handlers.show_federation(
+            request, _get_account(), self.linkstate_factory.state()
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest, context: grpc.ServicerContext
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return control_handlers.set_federation_icon(
             request, _get_account(), self.linkstate_factory.state()
         )
 
@@ -439,59 +496,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
-    ) -> Generator[StreamRunEventsResponse, Any, None]:
+    ) -> Generator[StreamRunEventsResponse, None, None]:
         """Start run event stream."""
-        log(INFO, self.StreamRunEvents.__qualname__)
-
-        # Init link state
-        state = self.linkstate_factory.state()
-
-        # Retrieve run ID and run
-        run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
-
-        # Exit if `run_id` not found
-        if not runs:
-            raise FlowerError(
-                ApiErrorCode.RUN_ID_NOT_FOUND,
-                f"Run {run_id} not found while streaming run events.",
-            )
-        run = runs[0]
-
-        account = _get_account()
-        flwr_aid = account.flwr_aid
-        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
-
-        after_task_event_id = None
-        if request.HasField("after_task_event_id"):
-            after_task_event_id = request.after_task_event_id
-        while context.is_active():
-            should_break = run.status.status == Status.FINISHED
-
-            # Retrieve and yield all task events generated after the latest
-            # streamed task event
-            events = state.get_task_events(
-                run_id=run_id,
-                after_task_event_id=after_task_event_id,
-            )
-            for event in events:
-                after_task_event_id = event.id
-                yield StreamRunEventsResponse(task_event=event)
-
-            # If the run was already finished before fetching this batch, all
-            # events are returned at this point and the server ends the stream.
-            if should_break:
-                log(INFO, "All events for run ID `%s` returned", run_id)
-                break
-
-            # Refresh status after yielding. If streaming this batch raced with
-            # run completion, continue immediately and fetch one final batch.
-            run = state.get_run_info(run_ids=[run_id])[0]
-            if run.status.status == Status.FINISHED:
-                continue
-
-            # Sleep briefly to avoid busy waiting
-            time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+        return control_handlers.stream_run_events(
+            request,
+            _get_account(),
+            self.linkstate_factory.state(),
+            context.is_active,
+        )
 
     def _resolve_federation_id(self, account_name: str, federation_id: str) -> str:
         """Return the requested federation ID or derive the default federation ID."""

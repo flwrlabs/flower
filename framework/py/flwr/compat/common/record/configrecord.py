@@ -18,7 +18,7 @@ from logging import WARN
 
 from flwr.app.message import ConfigRecord
 from flwr.app.typing import ConfigRecordValues
-from flwr.common.logger import log
+from flwr.supercore import log
 
 
 class ConfigsRecord(ConfigRecord):
