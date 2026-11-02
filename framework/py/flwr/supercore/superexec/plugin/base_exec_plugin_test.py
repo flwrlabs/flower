@@ -59,9 +59,6 @@ def test_default_plugin_uses_task_type() -> None:
         task=_get_task(task_type=TaskType.AGENT_APP, fab_hash="fab-hash"),
     )
 
-    assert TaskType.MODEL not in plugin.supported_task_types
-    result = plugin.launch_task(token="token", task=_get_task(task_type=TaskType.MODEL))
-    assert result.status == "failed"
     executor.launch.assert_called_once()
 
     spec = _execution_spec_from_executor(executor)

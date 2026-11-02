@@ -195,7 +195,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     response = runtime_handlers.get_run_series_events(
         request,
         state,
-        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        Task(task_id=790, run_id=123, type=TaskType.CONNECTOR),
     )
 
     assert isinstance(response, GetRunSeriesEventsResponse)
@@ -214,7 +214,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     runtime_handlers.get_run_series_events(
         GetRunSeriesEventsRequest(after_event_id=10, last_n=0),
         state,
-        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        Task(task_id=790, run_id=123, type=TaskType.CONNECTOR),
     )
     state.get_task_events.assert_called_once_with(
         task_ids=[780, 789],
@@ -575,7 +575,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
         response = core_runtime_handlers.create_task(
-            CreateTaskRequest(type=TaskType.SIMULATION, model_ref="models/abc"),
+            CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
             self.state,
             self._auth_task,
         )
@@ -584,7 +584,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         task = self.state.get_tasks(task_ids=[response.task_id])[0]
         assert task.run_id == self._auth_run_id
         assert task.type == TaskType.SIMULATION
-        assert task.model_ref == "models/abc"
+        assert task.fab_hash == "fab-hash"
 
     def test_start_automation_enriches_connector_ids(self) -> None:
         """Enrich connector IDs and delegate automation creation."""
