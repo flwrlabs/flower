@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pt
+*.egg-info/
+.venv/
+results_*.txt
+.ruff_cache/
+results/
+*.bak
