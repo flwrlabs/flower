@@ -31,7 +31,6 @@ from flwr.common.constant import (
 
 # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import SendTaskHeartbeatRequest
-from flwr.supercore.error import FlowerError
 from flwr.supercore.retry import RetryInvoker, exponential
 from flwr.supercore.runtime import RuntimeHttpClient
 
@@ -129,11 +128,8 @@ def make_task_heartbeat_fn_http(
             res = client.SendTaskHeartbeat(req)
         except httpx.TransportError:
             return False
-        except (httpx.HTTPStatusError, FlowerError) as err:
-            http_error = err.__cause__ if isinstance(err, FlowerError) else err
-            if not isinstance(http_error, httpx.HTTPStatusError):
-                raise
-            if http_error.response.status_code in (
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code in (
                 httpx.codes.SERVICE_UNAVAILABLE,  # 503
                 httpx.codes.GATEWAY_TIMEOUT,  # 504
             ):

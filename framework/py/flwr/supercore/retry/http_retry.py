@@ -85,10 +85,6 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
 
     def _should_giveup(exc: Exception) -> bool:
         nonlocal shutdown_requested
-        if isinstance(exc, FlowerError) and isinstance(
-            exc.__cause__, httpx.HTTPStatusError
-        ):
-            exc = exc.__cause__
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
             if status_code == httpx.codes.FORBIDDEN:
@@ -115,7 +111,7 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
         if any(term in error_message for term in ("certificate", "ssl", "tls")):
             log(ERROR, "SSL/TLS handshake error detected.")
             return True
-        return isinstance(exc, FlowerError)
+        return False
 
     def _wait(wait_time: float) -> None:
         with lock:
@@ -136,7 +132,6 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
         recoverable_exceptions=(
             *_RETRYABLE_TRANSPORT_ERRORS,
             httpx.HTTPStatusError,
-            FlowerError,
         ),
         max_tries=None,
         max_time=None,
