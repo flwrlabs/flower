@@ -14,18 +14,23 @@
 # ==============================================================================
 """Tests for SuperLink FastAPI application construction."""
 
+from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 
+import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
+from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.federation import NoOpFederationManager
@@ -116,6 +121,30 @@ def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) ->
     assert main.get_ee_linkstate_db() == "sqlite:///state.db"
 
 
+@pytest.mark.parametrize("secret", [None, b"superexec-secret\n"])
+def test_create_app_superexec_auth_from_environment(
+    monkeypatch: MonkeyPatch, tmp_path: Path, secret: bytes | None
+) -> None:
+    """Load the configured secret and require signatures only when it is set."""
+    monkeypatch.delenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", raising=False)
+    if secret is not None:
+        secret_path = tmp_path / "secret"
+        secret_path.write_bytes(secret)
+        monkeypatch.setenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", str(secret_path))
+    app = _create_app(monkeypatch)
+
+    assert app.state.superexec_auth_secret == secret
+    response = TestClient(app).post(
+        "/v1/runtime/acquire-task",
+        content=AcquireTaskRequest().SerializeToString(),
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+
+    assert response.status_code == (200 if secret is None else 401)
+    if secret is not None:
+        assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+
+
 def test_module_app_configures_direct_uvicorn_logging(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -160,6 +189,7 @@ def test_create_app_exposes_configured_dependencies(
     monkeypatch: MonkeyPatch,
 ) -> None:
     """Expose lifespan configuration to HTTP dependencies and middleware."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", "/nonexistent/secret")
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
     monkeypatch.setattr(
@@ -183,6 +213,7 @@ def test_create_app_exposes_configured_dependencies(
 
     app = main.create_app(config, lifespan_class)
 
+    assert app.state.superexec_auth_secret is None
     assert app.state.artifact_provider is artifact_provider
     assert app.state.fleet_api_type == "grpc-rere"
     assert app.state.fleet_event_log_plugin is fleet_event_log_plugin
