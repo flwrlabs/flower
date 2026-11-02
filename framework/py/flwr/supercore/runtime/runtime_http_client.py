@@ -79,7 +79,7 @@ from flwr.supercore.protobuf.client import ProtobufClient
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
 class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
-    """Protobuf-over-HTTP client that restores structured Runtime API errors."""
+    """Protobuf-over-HTTP client for the Runtime API."""
 
     _default_interceptors = (FlowerErrorHttpInterceptor(),)
 
