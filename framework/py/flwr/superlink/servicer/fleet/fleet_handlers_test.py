@@ -80,8 +80,8 @@ from .fleet_handlers import (
 )
 
 
-@pytest.fixture
-def state() -> LinkState:
+@pytest.fixture(name="state")
+def fixture_state() -> LinkState:
     """Create isolated in-memory Fleet state."""
     return LinkStateFactory(
         FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
@@ -434,7 +434,7 @@ def test_confirm_message_received_releases_objects(state: LinkState) -> None:
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
         )
     )
-    message.content["config"] = ConfigRecord({"value": 123})
+    message.content["config"] = ConfigRecord({"value": 123})  # pylint: disable=E1137
     message.metadata.__dict__["_message_id"] = message.object_id
     assert state.store_messages([message]) == [True]
     state.object_store.preregister(run_id, get_object_tree(message))
