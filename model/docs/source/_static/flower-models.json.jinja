@@ -1,14 +1,14 @@
 {
   "models": [
     {
-      "slug": "flwrlabs/endeavor-1.0",
+      "slug": "{{ endeavor_model }}",
       "display_name": "Endeavor",
       "description": "Flower Endeavor through the Flower Labs Responses-compatible endpoint.",
       "base_instructions": "You are Flower Endeavor, a coding agent. Work with the user to complete the requested task. Inspect the workspace before making changes, use available tools when they are useful, and report the verified result concisely. Preserve unrelated user changes.",
       "context_window": 128000,
       "max_context_window": 128000,
       "auto_compact_token_limit": 96000,
-      "comp_hash": "flwrlabs-endeavor-1.0-customer-1",
+      "comp_hash": "flwrlabs-endeavor-{{ endeavor_version }}-customer-1",
       "default_reasoning_level": "low",
       "supported_reasoning_levels": [
         {
@@ -50,7 +50,7 @@
         "limit": 10000
       },
       "supported_in_api": true,
-      "minimal_client_version": "0.153.4",
+      "minimal_client_version": "0.163.0",
       "availability_nux": {
         "message": ""
       },
