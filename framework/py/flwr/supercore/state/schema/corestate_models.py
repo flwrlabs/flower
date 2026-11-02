@@ -68,6 +68,30 @@ class Fab(FlwrBase):
     verifications: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class File(FlwrBase):
+    """Represent the current head of a file, including deleted files."""
+
+    __tablename__ = "file"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    latest_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class FileRevision(FlwrBase):
+    """Represent immutable file contents at a particular revision."""
+
+    __tablename__ = "file_revision"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class Message(FlwrBase):
     """Represent message delivery with retained metadata.
 
