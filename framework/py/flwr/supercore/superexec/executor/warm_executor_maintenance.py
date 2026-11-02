@@ -467,7 +467,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             last_run_at = time.monotonic()
             try:
                 self._sweep_completed_pods()
-                self.ensure_capacity(reserved_pod_capacity=1)
+                self.ensure_capacity()
             except Exception:  # pylint: disable=broad-exception-caught
                 log(
                     WARNING,

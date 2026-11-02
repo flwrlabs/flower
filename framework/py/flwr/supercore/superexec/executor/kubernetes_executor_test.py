@@ -1477,9 +1477,11 @@ def test_rejected_warm_creation_does_not_reserve_capacity(status: int) -> None:
 def test_failed_warm_creation_retries_on_idle_with_same_pod_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Idle maintenance retries an uncertain creation with one Pod identity."""
+    """Idle maintenance refills beside a cold Pod and retries the same identity."""
     client = Mock()
-    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_pod.side_effect = lambda _namespace, label_selector: {
+        "items": [] if "warm-executor-owner" in label_selector else [_pod("Running")]
+    }
     client.list_namespaced_secret.return_value = {"items": []}
     client.create_namespaced_secret.side_effect = [
         None,
@@ -1499,12 +1501,15 @@ def test_failed_warm_creation_retries_on_idle_with_same_pod_identity(
     key = _warm_executor_pool_key(runtime_image="ghcr.io/flwrlabs/taskexecutor:dev")
     config = _executor_config(
         warm_executor_owner="superexec-a",
+        active_pod_budget=2,
         warm_executor_pools=(WarmExecutorPoolConfig(key=key, size=1),),
     )
     executor = _executor(client=client, config=config)
-    executor.reconcile()
-    assert created.wait(2)
-    executor.close()
+    try:
+        executor.reconcile()
+        assert created.wait(2)
+    finally:
+        executor.close()
 
     assert client.create_namespaced_pod.call_count == 2
     first, second = client.create_namespaced_pod.call_args_list
