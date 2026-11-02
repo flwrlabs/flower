@@ -270,6 +270,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="Invalid SuperNode location.",
     ),
+    ApiErrorCode.INVALID_AGENT_REQUEST: ApiErrorSpec(
+        status_code=StatusCode.INVALID_ARGUMENT,
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid agent request.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         status_code=StatusCode.FAILED_PRECONDITION,
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -368,6 +373,12 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_403_FORBIDDEN,
         public_message="Failed to get FAB.",
     ),
+    ApiErrorCode.FLEET_MESSAGE_SOURCE_NODE_ID_MISMATCH: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        http_status_code=status.HTTP_403_FORBIDDEN,
+        public_message="Message source node ID does not match the authenticated "
+        "SuperNode.",
+    ),
     ApiErrorCode.RUNTIME_CONNECTOR_CREDENTIALS_NOT_AVAILABLE: ApiErrorSpec(
         status_code=StatusCode.PERMISSION_DENIED,
         http_status_code=status.HTTP_403_FORBIDDEN,
@@ -448,5 +459,11 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.ALREADY_EXISTS,
         http_status_code=status.HTTP_409_CONFLICT,
         public_message="Compacted context already exists for this event in the series.",
+    ),
+    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT: ApiErrorSpec(
+        status_code=StatusCode.ABORTED,
+        http_status_code=status.HTTP_409_CONFLICT,
+        public_message="The file operation could not be completed because it "
+        "already exists, is missing, or has a different revision than expected.",
     ),
 }

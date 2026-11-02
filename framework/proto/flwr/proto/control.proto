@@ -27,154 +27,22 @@ import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
 
-service Control {
-  // Start run upon request
-  rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
-
-  // Stop run upon request
-  rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
-
-  // Start automation upon request
-  rpc StartAutomation(StartAutomationRequest)
-      returns (StartAutomationResponse) {}
-
-  // List automations
-  rpc ListAutomations(ListAutomationsRequest)
-      returns (ListAutomationsResponse) {}
-
-  // Stop automation
-  rpc StopAutomation(StopAutomationRequest) returns (StopAutomationResponse) {}
-
-  // Start log stream upon request
-  rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse) {}
-
-  // flwr ls command
-  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
-
-  // List run series
-  rpc ListRunSeries(ListRunSeriesRequest) returns (ListRunSeriesResponse) {}
-
-  // Get run series
-  rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
-
-  // Update run series description
-  rpc UpdateRunSeriesDescription(UpdateRunSeriesDescriptionRequest)
-      returns (UpdateRunSeriesDescriptionResponse) {}
-
-  // List events for all runs in a run series
-  rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
-      returns (ListRunSeriesEventsResponse) {}
-
-  // Get login details upon request
-  rpc GetLoginDetails(GetLoginDetailsRequest)
-      returns (GetLoginDetailsResponse) {}
-
-  // Get auth tokens upon request
-  rpc GetAuthTokens(GetAuthTokensRequest) returns (GetAuthTokensResponse) {}
-
-  // List OAuth connectors available to the authenticated account
-  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse) {}
-
-  // Disconnect connector credentials for the authenticated account
-  rpc DisconnectConnector(DisconnectConnectorRequest)
-      returns (DisconnectConnectorResponse) {}
-
-  // Begin OAuth connector authorization flow
-  rpc BeginConnectorOAuth(BeginConnectorOAuthRequest)
-      returns (BeginConnectorOAuthResponse) {}
-
-  // Complete OAuth connector authorization flow
-  rpc CompleteConnectorOAuth(CompleteConnectorOAuthRequest)
-      returns (CompleteConnectorOAuthResponse) {}
-
-  // Pull artifacts generated during a run (flwr pull)
-  rpc PullArtifacts(PullArtifactsRequest) returns (PullArtifactsResponse) {}
-
-  // Register SuperNode
-  rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse) {}
-
-  // Unregister SuperNode
-  rpc UnregisterNode(UnregisterNodeRequest) returns (UnregisterNodeResponse) {}
-
-  // List SuperNodes
-  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse) {}
-
-  // List Federations
-  rpc ListFederations(ListFederationsRequest)
-      returns (ListFederationsResponse) {}
-
-  // List Apps in a Federation
-  rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
-
-  // List Federations associated with an App
-  rpc ListAppAssociations(ListAppAssociationsRequest)
-      returns (ListAppAssociationsResponse) {}
-
-  // Add App to a Federation
-  rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
-
-  // Remove App from a Federation
-  rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
-
-  // Show Federation
-  rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
-
-  // Set Federation icon
-  rpc SetFederationIcon(SetFederationIconRequest)
-      returns (SetFederationIconResponse) {}
-
-  // Create Federation
-  rpc CreateFederation(CreateFederationRequest)
-      returns (CreateFederationResponse) {}
-
-  // Archive Federation
-  rpc ArchiveFederation(ArchiveFederationRequest)
-      returns (ArchiveFederationResponse) {}
-
-  // Add SuperNode to Federation
-  rpc AddNodeToFederation(AddNodeToFederationRequest)
-      returns (AddNodeToFederationResponse) {}
-
-  // Remove SuperNode from Federation
-  rpc RemoveNodeFromFederation(RemoveNodeFromFederationRequest)
-      returns (RemoveNodeFromFederationResponse) {}
-
-  // Remove Account from Federation
-  rpc RemoveAccountFromFederation(RemoveAccountFromFederationRequest)
-      returns (RemoveAccountFromFederationResponse) {}
-
-  // Create Invitation
-  rpc CreateInvitation(CreateInvitationRequest)
-      returns (CreateInvitationResponse) {}
-
-  // List Invitations
-  rpc ListInvitations(ListInvitationsRequest)
-      returns (ListInvitationsResponse) {}
-
-  // Accept Invitation
-  rpc AcceptInvitation(AcceptInvitationRequest)
-      returns (AcceptInvitationResponse) {}
-
-  // Reject Invitation
-  rpc RejectInvitation(RejectInvitationRequest)
-      returns (RejectInvitationResponse) {}
-
-  // Revoke Invitation
-  rpc RevokeInvitation(RevokeInvitationRequest)
-      returns (RevokeInvitationResponse) {}
-
-  // Set Simulation Configuration
-  rpc ConfigureSimulationFederation(ConfigureSimulationFederationRequest)
-      returns (ConfigureSimulationFederationResponse) {}
-
-  // ##############
-  // Unused for now
-  // ##############
-
-  // Start run event stream
-  rpc StreamRunEvents(StreamRunEventsRequest)
-      returns (stream StreamRunEventsResponse) {}
+message AgentConfig {
+  string name = 1;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
 }
+message Agent {
+  uint64 id = 1;
+  AgentConfig config = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}
+message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentResponse { Agent agent = 1; }
+message ListAgentsRequest {}
+message ListAgentsResponse { repeated Agent agents = 1; }
 
 message StartRunRequest {
   Fab fab = 1;

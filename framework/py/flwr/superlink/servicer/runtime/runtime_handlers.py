@@ -19,7 +19,6 @@
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
-from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import (
     context_from_proto,
@@ -65,7 +64,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.server.utils.validator import validate_message
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
@@ -163,11 +161,13 @@ def push_messages(
     log(DEBUG, "Runtime.PushMessages")
     run_id = task.run_id
 
-    _raise_if(
-        validation_error=len(request.messages_list) == 0,
-        request_name="PushMessages",
-        detail="`messages_list` must not be empty",
-    )
+    if not request.messages_list:
+        return PushAppMessagesResponse()
+    if len(request.messages_list) != len(request.message_object_trees):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT,
+            "Expected one object tree per message.",
+        )
     session_id = state.start_session(run_id)
     message_ids: list[str] = []
     missing_objects_lists: list[list[str]] = []
@@ -175,17 +175,17 @@ def push_messages(
         request.messages_list, request.message_object_trees, strict=True
     ):
         message = message_from_proto(message_proto=message_proto)
-        validation_errors = validate_message(message, is_reply_message=False)
-        _raise_if(
-            validation_error=bool(validation_errors),
-            request_name="PushMessages",
-            detail=", ".join(validation_errors),
-        )
-        _raise_if(
-            validation_error=run_id != message.metadata.run_id,
-            request_name="PushMessages",
-            detail="`Message.metadata` has mismatched `run_id`",
-        )
+        if message.metadata.src_node_id != SUPERLINK_NODE_ID:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PushMessages: `Message.metadata.src_node_id` must be the SuperLink "
+                "node ID",
+            )
+        if run_id != message.metadata.run_id:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PushMessages: `Message.metadata` has mismatched `run_id`",
+            )
         stored, missing_objects = state.store_message_and_object_tree(
             message, object_tree, session_id
         )
@@ -211,31 +211,26 @@ def pull_messages(  # pylint: disable=R0914
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
     run_id = task.run_id
-    message_ids = set(request.reply_to_message_ids.vals)
-    messages: list[Message] = state.get_message_res(
-        message_ids=message_ids, run_id=run_id
-    )
-    # Allow pulling instruction message for `flwr-agentapp`
-    messages += state.get_message_ins(
-        node_id=SUPERLINK_NODE_ID, limit=None, run_id=run_id
+    messages = state.get_messages(
+        dst_node_id=SUPERLINK_NODE_ID,
+        run_id=run_id,
+        reply_to_message_ids=(
+            request.reply_to_message_ids.vals
+            if request.HasField("reply_to_message_ids")
+            else None
+        ),
     )
 
     store = state.object_store
-    # Gather all the instruction message IDs to delete
-    message_ins_ids_to_delete = {
-        msg.metadata.reply_to_message_id or msg.metadata.message_id for msg in messages
-    }
-    state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
-
     messages_list = []
     trees = []
     while messages:
         msg = messages.pop(0)
-        _raise_if(
-            validation_error=run_id != msg.metadata.run_id,
-            request_name="PullMessages",
-            detail="`message.metadata` has mismatched `run_id`",
-        )
+        if run_id != msg.metadata.run_id:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PullMessages: `message.metadata` has mismatched `run_id`",
+            )
 
         try:
             msg_object_id = msg.metadata.message_id
@@ -244,7 +239,7 @@ def pull_messages(  # pylint: disable=R0914
             trees.append(obj_tree)
         except NoObjectInStoreError as err:
             log(ERROR, err.message)
-            state.delete_messages(message_ins_ids={msg_object_id})
+            state.cancel_messages(message_ids=[msg_object_id])
 
     return PullAppMessagesResponse(
         messages_list=messages_list, message_object_trees=trees
@@ -406,7 +401,7 @@ def push_object(
     run_id = task.run_id
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
-            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, "Unexpected node ID."
         )
     stored = state.store_object(
         run_id,
@@ -427,7 +422,7 @@ def pull_object(
     run_id = task.run_id
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
-            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, "Unexpected node ID."
         )
 
     content = state.get_object(run_id, request.object_id)
@@ -447,11 +442,10 @@ def confirm_message_received(
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    state.object_store.delete(request.message_object_id)
+    if request.run_id != task.run_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+            "ConfirmMessageReceived: Run ID does not match authenticated task's run ID",
+        )
+    state.acknowledge_messages([request.message_object_id])
     return ConfirmMessageReceivedResponse()
-
-
-def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
-    """Raise a `ValueError` with a detailed message if a validation error occurs."""
-    if validation_error:
-        raise ValueError(f"Malformed {request_name}: {detail}")

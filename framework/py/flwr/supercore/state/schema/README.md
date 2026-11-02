@@ -10,6 +10,17 @@
         layout: elk
 ---
 erDiagram
+  agent {
+    BIGINT agent_id PK
+    VARCHAR app_spec
+    TIMESTAMP created_at
+    TEXT description "nullable"
+    VARCHAR flwr_aid
+    VARCHAR name
+    VARCHAR title "nullable"
+    TIMESTAMP updated_at
+  }
+
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
@@ -79,6 +90,22 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  file {
+    VARCHAR key PK
+    VARCHAR scope PK
+    BOOLEAN is_deleted
+    BIGINT latest_revision
+    BIGINT size_bytes
+  }
+
+  file_revision {
+    VARCHAR key PK
+    BIGINT revision PK
+    VARCHAR scope PK
+    TIMESTAMP created_at
+    BLOB data
+  }
+
   message {
     VARCHAR message_id PK
     VARCHAR reply_to_message_id FK "nullable"
@@ -95,36 +122,6 @@ erDiagram
     BIGINT src_node_id
     BIGINT src_task_id "nullable"
     DOUBLE ttl
-  }
-
-  message_ins {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
-  }
-
-  message_res {
-    BIGINT run_id FK "nullable"
-    BLOB content "nullable"
-    FLOAT created_at "nullable"
-    VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
-    BLOB error "nullable"
-    VARCHAR group_id "nullable"
-    VARCHAR message_id UK "nullable"
-    VARCHAR message_type "nullable"
-    VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
-    FLOAT ttl "nullable"
   }
 
   node {
@@ -290,8 +287,6 @@ erDiagram
   }
 
   message ||--o{ message : reply_to_message_id
-  run ||--o{ message_ins : run_id
-  run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id

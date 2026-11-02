@@ -30,9 +30,7 @@ WARM_EXECUTOR_FAB_HASH_ANNOTATION = "flower.ai/warm-executor-fab-hash"
 WARM_EXECUTOR_FAB_PATH_ANNOTATION = "flower.ai/warm-executor-fab-path"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
-WARM_EXECUTOR_TASK_TYPES = frozenset(
-    {TaskType.AGENT_APP, TaskType.MODEL, TaskType.CONNECTOR}
-)
+WARM_EXECUTOR_TASK_TYPES = frozenset({TaskType.AGENT_APP, TaskType.CONNECTOR})
 
 
 @dataclass(frozen=True)

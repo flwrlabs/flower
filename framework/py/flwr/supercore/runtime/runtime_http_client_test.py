@@ -21,7 +21,12 @@ import pytest
 from flwr.supercore.protobuf.client import ProtobufClient
 from flwr.supercore.runtime import RuntimeHttpClient
 
+# For new RPCs, extend this list; do not add separate tests just for new RPCs.
 _UNARY_UNARY_PATHS = (
+    "put-file",
+    "get-file",
+    "list-files",
+    "delete-file",
     "acquire-task",
     "send-task-heartbeat",
     "pull-task-input",

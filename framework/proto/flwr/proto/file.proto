@@ -1,4 +1,4 @@
-// Copyright 2024 Flower Labs GmbH. All Rights Reserved.
+// Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ syntax = "proto3";
 
 package flwr.proto;
 
-service GrpcAdapter {
-  rpc SendReceive(MessageContainer) returns (MessageContainer) {}
+message FileMetadata {
+  string key = 1;
+  uint64 revision = 2;
+  uint64 size_bytes = 3;
 }
 
-message MessageContainer {
-  map<string, string> metadata = 1;
-  string grpc_message_name = 2;
-  bytes grpc_message_content = 3;
+message File {
+  FileMetadata metadata = 1;
+  bytes data = 2;
 }

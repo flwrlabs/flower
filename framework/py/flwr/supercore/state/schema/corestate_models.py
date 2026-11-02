@@ -68,6 +68,30 @@ class Fab(FlwrBase):
     verifications: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class File(FlwrBase):
+    """Represent the current head of a file, including deleted files."""
+
+    __tablename__ = "file"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    latest_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class FileRevision(FlwrBase):
+    """Represent immutable file contents at a particular revision."""
+
+    __tablename__ = "file_revision"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class Message(FlwrBase):
     """Represent message delivery with retained metadata.
 
@@ -141,6 +165,33 @@ class Message(FlwrBase):
         UTCDateTime(), nullable=True
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Agent(FlwrBase):
+    """Represent a persistent agent owned by a Flower account.
+
+    ``app_spec`` identifies the AgentApp and an optional version.
+    """
+
+    __tablename__ = "agent"
+    __table_args__ = (
+        Index("idx_agent_flwr_aid", "flwr_aid"),
+        {"sqlite_autoincrement": True},
+    )
+
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_spec: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class RunSeries(FlwrBase):

@@ -161,9 +161,7 @@ def test_get_executor_rejects_ambiguous_agentapp_pool_paths() -> None:
 
 @pytest.mark.parametrize("insecure", [False, True])
 @pytest.mark.parametrize("ca_source", [None, "executor", "task"])
-@pytest.mark.parametrize(
-    "task_type", [TaskType.AGENT_APP, TaskType.MODEL, TaskType.CONNECTOR]
-)
+@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.CONNECTOR])
 def test_get_executor_configures_usable_typed_warm_executor_pool(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

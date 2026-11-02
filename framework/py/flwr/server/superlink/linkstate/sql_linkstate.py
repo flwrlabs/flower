@@ -19,21 +19,10 @@
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from logging import ERROR, WARNING
+from logging import ERROR
 from typing import Any, Literal, cast
 
-from sqlalchemy import (
-    MetaData,
-    bindparam,
-    case,
-    delete,
-    exists,
-    func,
-    insert,
-    or_,
-    select,
-    update,
-)
+from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -41,7 +30,6 @@ from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
-    MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
@@ -53,7 +41,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
-from flwr.server.utils.validator import validate_message
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState
@@ -61,11 +48,10 @@ from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.state.schema.linkstate_models import MessageIns as MessageInsModel
-from flwr.supercore.state.schema.linkstate_models import MessageRes as MessageResModel
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
@@ -78,17 +64,7 @@ from flwr.supercore.utils import (
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
-from .utils import (
-    check_node_availability_for_in_message,
-    convert_sint64_values_in_dict_to_uint64,
-    convert_uint64_values_in_dict_to_sint64,
-    create_user_prompt_message,
-    dict_to_message,
-    generate_rand_int_from_bytes,
-    message_to_dict,
-    verify_found_message_replies,
-    verify_message_ids,
-)
+from .utils import create_user_prompt_message, generate_rand_int_from_bytes
 
 
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
@@ -121,553 +97,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
-    def _lock_run(
-        self, run_id: int, *, require_unfinished: bool = False
-    ) -> dict[str, Any] | None:
-        """Lock the run row if it is in the required state."""
-        stmt = update(RunModel).where(RunModel.run_id == uint64_to_int64(run_id))
-        if require_unfinished:
-            stmt = stmt.where(
-                exists(
-                    select(TaskModel.task_id).where(
-                        TaskModel.task_id == RunModel.primary_task_id,
-                        TaskModel.finished_at.is_(None),
-                    )
-                )
-            )
-        stmt = stmt.values(run_id=RunModel.run_id).returning(
-            RunModel.run_id,
-            RunModel.federation_id,
-            RunModel.primary_task_id,
-        )
-        with self.session() as session:
-            row = session.execute(stmt).mappings().one_or_none()
-            return dict(row) if row is not None else None
-
-    def store_message_ins(self, message: Message) -> str | None:
-        """Store one Message."""
-        # Validate message
-        errors = validate_message(message=message, is_reply_message=False)
-        if any(errors):
-            log(ERROR, errors)
-            return None
-
-        # Store Message
-        data = (message_to_dict(message),)
-
-        # Convert values from uint64 to sint64 for SQLite
-        convert_uint64_values_in_dict_to_sint64(
-            data[0], ["run_id", "src_node_id", "dst_node_id"]
-        )
-
-        # Validate source node ID
-        if message.metadata.src_node_id != SUPERLINK_NODE_ID:
-            log(
-                ERROR,
-                "Invalid source node ID for Message: %s",
-                message.metadata.src_node_id,
-            )
-            return None
-
-        try:
-            with self.session() as session:
-                # Validate run_id
-                run_row = self._lock_run(
-                    message.metadata.run_id, require_unfinished=True
-                )
-                if not run_row:
-                    log(
-                        ERROR,
-                        "Invalid run ID for Message: %s",
-                        message.metadata.run_id,
-                    )
-                    return None
-                federation_id: str = run_row["federation_id"]
-
-                # Validate destination node ID
-                dst_node_id = message.metadata.dst_node_id
-                node_id = session.scalar(
-                    select(NodeModel.node_id).where(
-                        NodeModel.node_id == data[0]["dst_node_id"],
-                        NodeModel.status.in_([NodeStatus.ONLINE, NodeStatus.OFFLINE]),
-                    )
-                )
-                if dst_node_id != SUPERLINK_NODE_ID and (
-                    node_id is None
-                    or not self.federation_manager.has_node(dst_node_id, federation_id)
-                ):
-                    log(
-                        ERROR,
-                        "Invalid destination node ID for Message: %s",
-                        message.metadata.dst_node_id,
-                    )
-                    return None
-
-                session.execute(insert(MessageInsModel).values(data[0]))
-        except IntegrityError as e:
-            orig = e.orig
-            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
-            is_duplicate_message_id = (
-                constraint == "message_ins_message_id_key"
-                if constraint
-                else "message_ins.message_id" in str(orig)
-            )
-            if not is_duplicate_message_id:
-                raise
-
-        return message.metadata.message_id
-
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
-        with self.session():
-            if message.metadata.reply_to_message_id:
-                stored = self.store_message_res(message) is not None
-            else:
-                stored = self.store_message_ins(message) is not None
-
-            if not stored:
+        with self.session() as session:
+            if not self.store_messages([message])[0]:
                 return False, []
+
+            # Retries must not re-upload the body of an already cleared message.
+            if session.scalar(
+                select(MessageModel.cleared).where(
+                    MessageModel.message_id == message.metadata.message_id
+                )
+            ):
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
-
-    # pylint: disable-next=too-many-locals
-    def _check_stored_messages(
-        self, message_ids: set[str], run_id: int | None = None
-    ) -> None:
-        """Check and delete the message if it's invalid."""
-        if not message_ids:
-            return
-
-        with self.session() as session:
-            message_rows = session.scalars(
-                select(MessageInsModel).where(
-                    MessageInsModel.message_id.in_(message_ids)
-                )
-            ).all()
-
-            if not message_rows:
-                return
-            if run_id is not None and any(
-                model.run_id != uint64_to_int64(run_id) for model in message_rows
-            ):
-                raise ValueError("`message_ids` contains invalid IDs")
-
-            # Build message lookup dict
-            message_dict: dict[str, MessageInsModel] = {
-                cast(str, model.message_id): model for model in message_rows
-            }
-
-            # Collect unique run_ids for batch federation lookup
-            run_ids = {model.run_id for model in message_rows}
-            run_rows = session.execute(
-                select(RunModel.run_id, RunModel.federation_id).where(
-                    RunModel.run_id.in_(run_ids)
-                )
-            ).all()
-
-            # Build run_id to federation ID mapping
-            run_id_to_federation_id: dict[int, str] = {
-                cast(int, run_id): cast(str, federation_id)
-                for run_id, federation_id in run_rows
-            }
-
-            invalid_msg_ids: set[str] = set()
-            current_time = now().timestamp()
-
-            # Check each message for validity
-            for msg_id in message_ids:
-                message_model = message_dict.get(msg_id)
-                if not message_model:
-                    continue
-
-                # Check if the message has expired
-                available_until = cast(float, message_model.created_at) + cast(
-                    float, message_model.ttl
-                )
-                if available_until <= current_time:
-                    invalid_msg_ids.add(msg_id)
-                    continue
-
-                # Check if run exists and get federation ID
-                message_run_id = cast(int, message_model.run_id)
-                federation_id = run_id_to_federation_id.get(message_run_id)
-                if not federation_id:
-                    invalid_msg_ids.add(msg_id)
-                    continue
-
-                # Convert sint64 to uint64 for node IDs
-                src_node_id = int64_to_uint64(cast(int, message_model.src_node_id))
-                dst_node_id = int64_to_uint64(cast(int, message_model.dst_node_id))
-
-                if src_node_id != dst_node_id:
-                    # Filter nodes to check if they're in the federation
-                    filtered = self.federation_manager.filter_nodes(
-                        {src_node_id, dst_node_id}, federation_id
-                    )
-                    if len(filtered) != 2:  # Not both nodes are in the federation
-                        invalid_msg_ids.add(msg_id)
-
-            # Delete all invalid messages
-            self.delete_messages(invalid_msg_ids)
-
-    def get_message_ins(
-        self,
-        node_id: int,
-        limit: int | None,
-        *,
-        run_id: int | None = None,
-    ) -> list[Message]:
-        """Get all Messages that have not been delivered yet."""
-        if limit is not None and limit < 1:
-            raise AssertionError("`limit` must be >= 1")
-
-        with self.session():
-            rows = self._claim_message_ins_rows(node_id, limit, run_id)
-            message_ids: set[str] = {row["message_id"] for row in rows}
-            self._check_stored_messages(message_ids)
-
-            # _check_stored_messages can delete claimed Messages if they became invalid
-            # (for example, node removed from federation), so re-read current rows.
-            if message_ids:
-                rows = self._load_message_ins_rows(message_ids)
-
-            for row in rows:
-                # Convert values from sint64 to uint64
-                convert_sint64_values_in_dict_to_uint64(
-                    row, ["run_id", "src_node_id", "dst_node_id"]
-                )
-
-        result = [dict_to_message(dict(row)) for row in rows]
-
-        return result
-
-    def _claim_message_ins_rows(
-        self,
-        node_id: int,
-        limit: int | None,
-        run_id: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Atomically claim eligible instruction Messages for a node."""
-        current_time = now()
-        common_conditions = [
-            MessageInsModel.dst_node_id == uint64_to_int64(node_id),
-            MessageInsModel.delivered_at == "",
-            MessageInsModel.created_at + MessageInsModel.ttl > current_time.timestamp(),
-        ]
-        if run_id is not None:
-            common_conditions.append(MessageInsModel.run_id == uint64_to_int64(run_id))
-        stmt = update(MessageInsModel).where(*common_conditions)
-        if limit is not None:
-            # Materialize limited candidates before updating. Some backends can
-            # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
-            candidates = (
-                select(MessageInsModel.message_id)
-                .where(*common_conditions)
-                .order_by(
-                    MessageInsModel.created_at.asc(),
-                    MessageInsModel.message_id.asc(),
-                )
-                .limit(limit)
-            )
-            if self.select_lock_sql:
-                if self.select_lock_sql.strip().upper() != "FOR UPDATE SKIP LOCKED":
-                    raise NotImplementedError(
-                        "Custom select_lock_sql values are not supported for ORM "
-                        "message_ins claims."
-                    )
-                candidates = candidates.with_for_update(skip_locked=True)
-            selected = candidates.cte("candidate_message_ins")
-            stmt = update(MessageInsModel).where(
-                MessageInsModel.message_id.in_(select(selected.c.message_id)),
-                MessageInsModel.delivered_at == "",
-            )
-
-        stmt = stmt.values(delivered_at=current_time.isoformat()).returning(
-            MessageInsModel
-        )
-        with self.session() as session:
-            models = list(session.scalars(stmt))
-            return [_message_model_to_dict(model) for model in models]
-
-    def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
-        """Load instruction Messages by IDs."""
-        stmt = (
-            select(MessageInsModel)
-            .where(MessageInsModel.message_id.in_(message_ids))
-            .order_by(
-                MessageInsModel.created_at.asc(), MessageInsModel.message_id.asc()
-            )
-        )
-        with self.session() as session:
-            return [
-                _message_model_to_dict(model) for model in session.scalars(stmt).all()
-            ]
-
-    def store_message_res(  # pylint: disable=too-many-return-statements
-        self, message: Message
-    ) -> str | None:
-        """Store one Message."""
-        # Validate message
-        errors = validate_message(message=message, is_reply_message=True)
-        if any(errors):
-            log(ERROR, errors)
-            return None
-
-        res_metadata = message.metadata
-        message_id = res_metadata.message_id
-
-        try:
-            with self.session() as session:
-                if not self._lock_run(res_metadata.run_id, require_unfinished=True):
-                    log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
-                    return None
-
-                msg_ins_id = res_metadata.reply_to_message_id
-                msg_ins_run_id = session.scalar(
-                    select(MessageInsModel.run_id).where(
-                        MessageInsModel.message_id == msg_ins_id
-                    )
-                )
-                if (
-                    msg_ins_run_id is not None
-                    and int64_to_uint64(msg_ins_run_id) != res_metadata.run_id
-                ):
-                    log(ERROR, "`metadata.run_id` is invalid")
-                    return None
-                msg_ins = self.get_valid_message_ins(msg_ins_id)
-                if msg_ins is None:
-                    log(
-                        ERROR,
-                        "Failed to store Message reply: "
-                        "The message it replies to with message_id %s does not exist "
-                        "or has expired, or was deleted because the target SuperNode "
-                        "was removed from the federation.",
-                        msg_ins_id,
-                    )
-                    return None
-                # Ensure that the dst_node_id of the original message matches the
-                # src_node_id of reply being processed.
-                if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
-                    return None
-
-                # Fail if the Message TTL exceeds the expiration time of the Message it
-                # replies to, with a small tolerance for floating-point precision.
-                max_allowed_ttl = (
-                    msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
-                )
-                if res_metadata.ttl and (
-                    res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
-                ):
-                    log(
-                        WARNING,
-                        "Received Message with TTL %.2f exceeding the allowed maximum "
-                        "TTL %.2f.",
-                        res_metadata.ttl,
-                        max_allowed_ttl,
-                    )
-                    return None
-
-                # Check idempotent retries before attempting INSERT. We cannot rely on
-                # IntegrityError details alone because `message_res` also has a unique
-                # constraint on `reply_to_message_id`, so the same retry can violate
-                # either constraint depending on backend/index behavior.
-                if (
-                    session.scalar(
-                        select(MessageResModel.message_id).where(
-                            MessageResModel.message_id == message_id
-                        )
-                    )
-                    is not None
-                ):
-                    return message_id
-
-                # Store Message
-                msg_dict = message_to_dict(message)
-
-                # Convert values from uint64 to sint64 for SQLite
-                convert_uint64_values_in_dict_to_sint64(
-                    msg_dict, ["run_id", "src_node_id", "dst_node_id"]
-                )
-
-                session.execute(insert(MessageResModel).values(msg_dict))
-        except IntegrityError:
-            log(
-                ERROR,
-                "Failed to store Message reply: duplicate reply for "
-                "reply_to_message_id %s or invalid run.",
-                res_metadata.reply_to_message_id,
-            )
-            return None
-
-        return message_id
-
-    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
-        """Get reply Messages for the given Message IDs."""
-        # pylint: disable=too-many-locals
-        if not message_ids:
-            return []
-
-        ret: dict[str, Message] = {}
-
-        with self.session() as session:
-            # Verify Message IDs
-            self._check_stored_messages(message_ids, run_id)
-            current = now().timestamp()
-            rows = [
-                _message_model_to_dict(model)
-                for model in session.scalars(
-                    select(MessageInsModel).where(
-                        MessageInsModel.message_id.in_(message_ids)
-                    )
-                ).all()
-            ]
-            found_message_ins_dict: dict[str, Message] = {}
-            for row in rows:
-                convert_sint64_values_in_dict_to_uint64(
-                    row, ["run_id", "src_node_id", "dst_node_id"]
-                )
-                found_message_ins_dict[row["message_id"]] = dict_to_message(row)
-            ret = verify_message_ids(
-                inquired_message_ids=message_ids,
-                found_message_ins_dict=found_message_ins_dict,
-                run_id=run_id,
-                current_time=current,
-            )
-
-            # Check node availability
-            dst_node_ids: set[int] = set()
-            for message_id in message_ids:
-                in_message = found_message_ins_dict.get(message_id)
-                if in_message is None:
-                    continue
-                sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
-                dst_node_ids.add(sint_node_id)
-            if dst_node_ids:
-                node_rows = session.execute(
-                    select(NodeModel.node_id, NodeModel.online_until).where(
-                        NodeModel.node_id.in_(dst_node_ids),
-                        NodeModel.status != NodeStatus.UNREGISTERED,
-                    )
-                ).all()
-            else:
-                node_rows = []
-            tmp_ret_dict = check_node_availability_for_in_message(
-                inquired_in_message_ids=message_ids,
-                found_in_message_dict=found_message_ins_dict,
-                node_id_to_online_until={
-                    int64_to_uint64(cast(int, node_id)): cast(float, online_until)
-                    for node_id, online_until in node_rows
-                },
-                current_time=current,
-            )
-            ret.update(tmp_ret_dict)
-
-            # Return accumulated replies if no IDs remain to avoid generating `IN ()`
-            if not message_ids:
-                for message in ret.values():
-                    self._store_generated_message(message)
-                return list(ret.values())
-
-            # Atomically claim all eligible reply Messages
-            delivered_at = now().isoformat()
-            rows = [
-                _message_model_to_dict(model)
-                for model in session.scalars(
-                    update(MessageResModel)
-                    .where(
-                        MessageResModel.reply_to_message_id.in_(message_ids),
-                        MessageResModel.delivered_at == "",
-                    )
-                    .values(delivered_at=delivered_at)
-                    .returning(MessageResModel)
-                )
-            ]
-            for row in rows:
-                convert_sint64_values_in_dict_to_uint64(
-                    row, ["run_id", "src_node_id", "dst_node_id"]
-                )
-            found_message_res_list = [dict_to_message(row) for row in rows]
-            found_message_res_ids = {
-                message.metadata.message_id for message in found_message_res_list
-            }
-            tmp_ret_dict = verify_found_message_replies(
-                inquired_message_ids=message_ids,
-                found_message_ins_dict=found_message_ins_dict,
-                found_message_res_list=found_message_res_list,
-                current_time=current,
-            )
-            ret.update(tmp_ret_dict)
-
-            for message in ret.values():
-                if message.metadata.message_id not in found_message_res_ids:
-                    self._store_generated_message(message)
-
-        return list(ret.values())
-
-    def num_message_ins(self) -> int:
-        """Calculate the number of instruction Messages in store.
-
-        This includes delivered but not yet deleted.
-        """
-        with self.session() as session:
-            # pylint: disable-next=not-callable
-            cnt = session.scalar(select(func.count()).select_from(MessageInsModel))
-            return cast(int, cnt)
-
-    def num_message_res(self) -> int:
-        """Calculate the number of reply Messages in store.
-
-        This includes delivered but not yet deleted.
-        """
-        with self.session() as session:
-            # pylint: disable-next=not-callable
-            cnt = session.scalar(select(func.count()).select_from(MessageResModel))
-            return cast(int, cnt)
-
-    def delete_messages(self, message_ins_ids: set[str]) -> None:
-        """Delete a Message and its reply based on provided Message IDs."""
-        if not message_ins_ids:
-            return
-
-        with self.session() as session:
-            session.execute(
-                delete(MessageInsModel).where(
-                    MessageInsModel.message_id.in_(message_ins_ids)
-                )
-            )
-            session.execute(
-                delete(MessageResModel).where(
-                    MessageResModel.reply_to_message_id.in_(message_ins_ids)
-                )
-            )
-
-    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Delete Messages belonging to an expired push session."""
-        if not message_object_ids:
-            return
-
-        with self.session() as session:
-            self.delete_messages(message_object_ids)
-            session.execute(
-                delete(MessageResModel).where(
-                    MessageResModel.message_id.in_(message_object_ids)
-                )
-            )
-
-    def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
-        """Get all instruction Message IDs for the given run_id."""
-        sint64_run_id = uint64_to_int64(run_id)
-        with self.session() as session:
-            message_ids = session.scalars(
-                select(MessageInsModel.message_id).where(
-                    MessageInsModel.run_id == sint64_run_id
-                )
-            ).all()
-
-        return {message_id for message_id in message_ids if message_id is not None}
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
@@ -1028,7 +475,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                     message = create_user_prompt_message(run_id, user_prompt)
-                    self.store_message_ins(message)
+                    self.store_messages([message])
                     self._store_generated_message(message)
                 if initial_task_event is not None:
                     initial_task_event.run_id = run_id
@@ -1301,21 +748,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session() as session:
             return session.scalar(stmt) is not None
 
-    def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
-        """Check if the Message exists and is valid (not expired).
-
-        Return Message if valid.
-        """
-        with self.session() as session:
-            self._check_stored_messages({message_id})
-            model = session.scalar(
-                select(MessageInsModel).where(MessageInsModel.message_id == message_id)
-            )
-            if model is None:
-                # Message does not exist
-                return None
-            return _message_model_to_dict(model)
-
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
         # Validate non-negative values
@@ -1413,31 +845,6 @@ def _node_info_from_model(model: NodeModel) -> NodeInfo:
         location=model.location,
         name=model.name,
     )
-
-
-def _message_model_to_dict(
-    model: MessageInsModel | MessageResModel,
-) -> dict[str, Any]:
-    """Convert a message model to the dictionary representation used by serde.
-
-    This is a temporary compatibility adapter while the message utilities still
-    consume dictionaries. It should be replaced and removed once those utilities
-    accept ORM models or typed domain objects directly.
-    """
-    return {
-        "message_id": model.message_id,
-        "group_id": model.group_id,
-        "run_id": model.run_id,
-        "src_node_id": model.src_node_id,
-        "dst_node_id": model.dst_node_id,
-        "reply_to_message_id": model.reply_to_message_id,
-        "created_at": model.created_at,
-        "delivered_at": model.delivered_at,
-        "ttl": model.ttl,
-        "message_type": model.message_type,
-        "content": model.content,
-        "error": model.error,
-    }
 
 
 def _run_from_models(run: RunModel, task: TaskModel) -> Run:

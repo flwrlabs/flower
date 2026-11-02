@@ -18,7 +18,6 @@ from logging import DEBUG, ERROR, INFO
 
 from google.protobuf.json_format import MessageToDict
 
-from flwr.app import Message
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -202,7 +201,7 @@ def pull_messages(  # pylint: disable=too-many-locals
     node_id: int = node.node_id
 
     # Retrieve Message from State
-    message_list: list[Message] = state.get_message_ins(node_id=node_id, limit=1)
+    message_list = state.get_messages(dst_node_id=node_id, limit=1)
 
     # Convert to Messages
     msg_proto = []
@@ -224,8 +223,8 @@ def pull_messages(  # pylint: disable=too-many-locals
 
         except NoObjectInStoreError as e:
             log(ERROR, e.message)
-            # Delete message ins from state
-            state.delete_messages(message_ins_ids={msg_object_id})
+            # Cancel a delivery whose objects are unavailable.
+            state.cancel_messages(message_ids=[msg_object_id])
 
     response = PullMessagesResponse(messages_list=msg_proto, message_object_trees=trees)
 
@@ -249,60 +248,31 @@ def push_messages(
     state: LinkState,
 ) -> PushMessagesResponse:
     """Push Messages handler."""
-    try:
-        if request.messages_list:
-            log(
-                INFO,
-                "[Fleet.PushMessages] Push replies from node_id=%s",
-                request.messages_list[0].metadata.src_node_id,
-            )
-        else:
-            log(INFO, "[Fleet.PushMessages] No replies to push")
-        # Convert Message from proto
-        msg = message_from_proto(message_proto=request.messages_list[0])
-        run_id = msg.metadata.run_id
-
-        # Record incoming traffic size
-        bytes_recv = request.ByteSize()
-
-        # Abort if the run is not running
-        abort_msg = check_abort(
-            run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
+    # Assume only one message is sent per request for now,
+    # before we support multi-tenancy SuperNode.
+    msg = message_from_proto(request.messages_list[0])
+    if msg.metadata.src_node_id != request.node.node_id:
+        raise FlowerError(
+            ApiErrorCode.FLEET_MESSAGE_SOURCE_NODE_ID_MISMATCH,
+            "Message source does not match the authenticated SuperNode.",
         )
-        if abort_msg:
-            raise InvalidRunStatusException(abort_msg)
-
-        # Store Message in State and preregister its objects.
-        session_id = state.start_session(run_id)
-        _, objects_to_push = state.store_message_and_object_tree(
-            msg, request.message_object_trees[0], session_id
+    run_id = msg.metadata.run_id
+    session_id = state.start_session(run_id)
+    stored, objects_to_push = state.store_message_and_object_tree(
+        msg, request.message_object_trees[0], session_id
+    )
+    response = PushMessagesResponse(
+        reconnect=Reconnect(reconnect=5),
+        objects_to_push=objects_to_push,
+        session_id=session_id,
+    )
+    if stored:
+        state.store_traffic(
+            run_id, bytes_sent=response.ByteSize(), bytes_recv=request.ByteSize()
         )
-
-        # Build response
-        response = PushMessagesResponse(
-            reconnect=Reconnect(reconnect=5),
-            results={msg.metadata.message_id: 0},
-            objects_to_push=objects_to_push,
-            session_id=session_id,
-        )
-
-        # Record outgoing traffic size
-        bytes_sent = response.ByteSize()
-
-        # Record traffic only if message was successfully processed
-        # Only one message is processed per request
-        state.store_traffic(run_id, bytes_sent=bytes_sent, bytes_recv=bytes_recv)
         if request.clientapp_runtime_list:
             state.add_clientapp_runtime(run_id, request.clientapp_runtime_list[0])
-
-        return response
-    except InvalidRunStatusException as exc:
-        raise FlowerError(
-            ApiErrorCode.FLEET_RUN_STATUS_NOT_ALLOWED,
-            f"SuperNode {request.node.node_id}, exception: {exc.message}",
-        ) from exc
+    return response
 
 
 def get_run(request: GetRunRequest, state: LinkState) -> GetRunResponse:
@@ -455,7 +425,6 @@ def pull_object(request: PullObjectRequest, state: LinkState) -> PullObjectRespo
 def confirm_message_received(
     request: ConfirmMessageReceivedRequest,
     state: LinkState,
-    store: ObjectStore,
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received handler."""
     try:
@@ -472,8 +441,7 @@ def confirm_message_received(
         if abort_msg:
             raise InvalidRunStatusException(abort_msg)
 
-        # Delete the message object
-        store.delete(request.message_object_id)
+        state.acknowledge_messages([request.message_object_id])
 
         return ConfirmMessageReceivedResponse()
     except InvalidRunStatusException as exc:

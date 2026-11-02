@@ -28,7 +28,6 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
@@ -124,7 +123,7 @@ def create_app(  # pylint: disable=too-many-statements
         database = get_ee_linkstate_db()
         superexec_auth_secret = None
         artifact_provider = None
-        fleet_api_type = TRANSPORT_TYPE_GRPC_RERE
+        fleet_api_type = "http"
         authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
@@ -151,7 +150,7 @@ def create_app(  # pylint: disable=too-many-statements
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
+    # Instantiate the lifespan for process-wide resources.
     superlink_lifespan = None
     if config:
         if superlink_lifespan_class is None:
@@ -167,8 +166,6 @@ def create_app(  # pylint: disable=too-many-statements
 
         try:
             if superlink_lifespan:
-                # Temporary compatibility path: start the existing gRPC APIs from
-                # FastAPI lifespan
                 superlink_lifespan.startup()
 
             lifespan_state: dict[str, object] = {}

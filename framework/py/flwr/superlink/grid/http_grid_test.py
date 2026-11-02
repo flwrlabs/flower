@@ -29,7 +29,7 @@ from parameterized import parameterized
 from flwr.app import RecordDict
 from flwr.app.error import Error
 from flwr.app.message import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
@@ -369,8 +369,8 @@ class TestHttpGrid(unittest.TestCase):
         # Assert
         self.assertIn(404, node_ids)
 
-    def test_missing_object_creates_message_with_error(self) -> None:
-        """Test that a missing object creates a message with an error."""
+    def test_missing_object_does_not_create_message(self) -> None:
+        """Missing objects do not create business replies or ACK receipt."""
         ins = self._prep_message(Message(RecordDict(), 123, "query"))
         reply = Message(RecordDict(), reply_to=ins)
         reply.metadata.__dict__["_message_id"] = reply.object_id
@@ -384,9 +384,7 @@ class TestHttpGrid(unittest.TestCase):
 
         messages = list(self.grid.pull_messages([ins.object_id]))
 
-        self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
-        self.assertEqual(messages[0].metadata.reply_to_message_id, ins.object_id)
+        self.assertEqual(messages, [])
         self.mock_client.ConfirmMessageReceived.assert_not_called()
 
     @parameterized.expand(  # type: ignore
@@ -405,11 +403,10 @@ class TestHttpGrid(unittest.TestCase):
             ),
         ]
     )
-    def test_timeout_pulling_object_creates_message_with_error(
+    def test_timeout_pulling_object_does_not_create_message(
         self, patcher: AbstractContextManager[Any]
     ) -> None:
-        """Test that pulling an object with a timeout creates a message with an
-        error."""
+        """A transport timeout does not create a business reply."""
         # Prepare: Create instruction message
         ins1 = self._prep_message(Message(RecordDict(), 123, "query"))
 
@@ -437,10 +434,8 @@ class TestHttpGrid(unittest.TestCase):
             # the limit of pulling attempts for a given object
             msgs = list(self.grid.pull_messages([ins1.object_id]))
 
-        # Assert: `msgs` should contain a single error message
-        self.assertEqual(len(msgs), 1)
-        self.assertEqual(msgs[0].has_content(), False)
-        self.assertEqual(msgs[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
+        self.assertEqual(msgs, [])
+        self.mock_client.ConfirmMessageReceived.assert_not_called()
         # Assert that PullObject was called PULL_MAX_TRIES_PER_OBJECT times for each
         # object at most. Note that because the message contains multiple objects,
         # we account for this in the assertion.

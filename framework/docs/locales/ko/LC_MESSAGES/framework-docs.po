@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 00:09+0000\n"
+"POT-Creation-Date: 2026-11-01 00:07+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -34328,31 +34328,11 @@ msgstr "오류가 발생했습니다."
 #: flwr.app.message.message.Message.create_error_reply:5
 #: flwr.app.message.message.Message.create_reply:9 of
 msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:  ttl = msg.meta.ttl - (reply.meta.created_at - "
-"msg.meta.created_at)"
+"Time-to-live for this reply in seconds, independent of the original "
+"message's TTL. If unset, defaults to 43,200 seconds (12 hours)."
 msgstr ""
-"이 메시지의 남은 시간(초)입니다. 설정하지 않으면 수신된 메시지가 만료되기 전까지 남은 시간을 기준으로 설정됩니다. 이는 다음과 "
-"같은 공식을 따릅니다: ttl = msg.meta.ttl - (reply.meta.created_at - "
-"msg.meta.created_at)"
 
-#: flwr.app.message.message.Message.create_error_reply:5
-#: flwr.app.message.message.Message.create_reply:9 of
-msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:"
-msgstr ""
-"이 메시지의 남은 시간(초)입니다. 설정하지 않으면 수신된 메시지가 만료되기 전까지 남은 시간을 기준으로 설정됩니다. 이는 다음 "
-"공식을 따릅니다:"
-
-#: flwr.app.message.message.Message.create_error_reply:9
-#: flwr.app.message.message.Message.create_reply:13 of
-msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
-msgstr "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
-
-#: flwr.app.message.message.Message.create_error_reply:12 of
+#: flwr.app.message.message.Message.create_error_reply:9 of
 msgid "**message** -- A Message containing only the relevant error and metadata."
 msgstr ""
 
@@ -34370,7 +34350,7 @@ msgstr ""
 msgid "The content for the reply message."
 msgstr "답장 메시지의 콘텐츠입니다."
 
-#: flwr.app.message.message.Message.create_reply:16 of
+#: flwr.app.message.message.Message.create_reply:13 of
 msgid "A new `Message` instance representing the reply."
 msgstr "답장을 나타내는 새로운 `메시지` 인스턴스입니다."
 
@@ -34475,19 +34455,6 @@ msgstr "이 메시지를 수신하는 노드의 식별자입니다."
 #, fuzzy
 msgid ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
 msgstr ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1 of
-#, fuzzy
-msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
-msgstr ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1
-#: flwr.app.Metadata.delivered_at:1
-#: flwr.common.Metadata.created_at:1:<autosummary>:1
-#: flwr.common.Metadata.delivered_at:1 of
-#, fuzzy
-msgid "Unix timestamp when the message was delivered."
-msgstr "메시지가 생성된 때의 Unix timestamp입니다."
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 #, fuzzy
@@ -37698,18 +37665,6 @@ msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
 msgid ""
-":py:obj:`FLWR_MODEL_RUN_ENTER "
-"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
-":py:obj:`FLWR_MODEL_RUN_LEAVE "
-"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_ENTER "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_ENTER>`\\"
 msgstr ""
@@ -37718,6 +37673,18 @@ msgstr ""
 msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_LEAVE "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_LEAVE>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_ENTER "
+"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_LEAVE "
+"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
 msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
@@ -38389,11 +38356,6 @@ msgstr ":py:obj:`TRAIN <flwr.common.MessageType.TRAIN>`\\"
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
-msgstr ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
-
-#: flwr.common.Metadata.created_at:1:<autosummary>:1 of
-#, fuzzy
-msgid ":py:obj:`delivered_at <flwr.common.Metadata.delivered_at>`\\"
 msgstr ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
 
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 of
@@ -45301,22 +45263,24 @@ msgid "Maximum number of federated learning rounds to execute."
 msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:13 of
-msgid "Timeout in seconds for waiting for node responses."
+msgid ""
+"Timeout in seconds for waiting for node responses. Outstanding responses "
+"from nodes that become unavailable are replaced with error replies."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:15 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:16 of
 msgid ""
 "Configuration to be sent to nodes during training rounds. If unset, an "
 "empty ConfigRecord will be used."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:18 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:19 of
 msgid ""
 "Configuration to be sent to nodes during evaluation rounds. If unset, an "
 "empty ConfigRecord will be used."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:21 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:22 of
 msgid ""
 "Optional function for centralized evaluation of the global model. Takes "
 "server round number and array record, returns a MetricRecord or None. If "
@@ -45324,7 +45288,7 @@ msgid ""
 "Defaults to None."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:26 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:27 of
 msgid ""
 "Optional predicate to determine whether to stop training early. Called at"
 " the end of each round with the round number and accumulated results. "
@@ -45333,7 +45297,7 @@ msgid ""
 " (no early stopping)."
 msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:33 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:34 of
 msgid ""
 "Results containing final model arrays and also training metrics, "
 "evaluation metrics and global evaluation metrics (if provided) from all "
@@ -89948,5 +89912,43 @@ msgstr ""
 #~ " every N rounds). Let's see what "
 #~ "the signature of this callback is "
 #~ "and how to use it:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:  ttl"
+#~ " = msg.meta.ttl - (reply.meta.created_at -"
+#~ " msg.meta.created_at)"
+#~ msgstr ""
+#~ "이 메시지의 남은 시간(초)입니다. 설정하지 않으면 수신된"
+#~ " 메시지가 만료되기 전까지 남은 시간을 기준으로 "
+#~ "설정됩니다. 이는 다음과 같은 공식을 따릅니다: ttl "
+#~ "= msg.meta.ttl - (reply.meta.created_at - "
+#~ "msg.meta.created_at)"
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:"
+#~ msgstr ""
+#~ "이 메시지의 남은 시간(초)입니다. 설정하지 않으면 수신된"
+#~ " 메시지가 만료되기 전까지 남은 시간을 기준으로 "
+#~ "설정됩니다. 이는 다음 공식을 따릅니다:"
+
+#~ msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+#~ msgstr "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+
+#~ msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
+#~ msgstr ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
+
+#~ msgid "Unix timestamp when the message was delivered."
+#~ msgstr "메시지가 생성된 때의 Unix timestamp입니다."
+
+#~ msgid "Timeout in seconds for waiting for node responses."
 #~ msgstr ""
 

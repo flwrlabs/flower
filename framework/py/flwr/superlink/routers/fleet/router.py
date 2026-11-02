@@ -191,6 +191,4 @@ def fleet_confirm_message_received(
     state: LinkStateDependency,
 ) -> ConfirmMessageReceivedResponse:
     """Handle Fleet confirm message received."""
-    return fleet_handlers.confirm_message_received(
-        request=request, state=state, store=state.object_store
-    )
+    return fleet_handlers.confirm_message_received(request=request, state=state)
