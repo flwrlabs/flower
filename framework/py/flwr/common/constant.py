@@ -117,13 +117,10 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
     "FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION"
 )
 
-# Internal API toggles
-FLWR_INTERNAL_GRPC_CONTROL_API = "FLWR_INTERNAL_GRPC_CONTROL_API"
-
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
-LOG_STREAM_INTERVAL = 0.5  # Log stream interval for `ControlServicer.StreamLogs`
+LOG_STREAM_INTERVAL = 0.5  # Control API log stream interval
 RUN_EVENTS_STREAM_INTERVAL = 0.5  # Event stream interval for `StreamRunEvents`
 LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 
