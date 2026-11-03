@@ -1201,23 +1201,59 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def create_conversation(self, *, flwr_aid: str) -> Conversation:
-        """Create a conversation and enroll its creator atomically."""
+    def create_conversation(
+        self,
+        *,
+        flwr_aid: str,
+        participants: Sequence[ConversationParticipant] = (),
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
+        members = [ConversationParticipant(flwr_aid=flwr_aid)]
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError(
+                    "Conversation participants must have a nonempty identity"
+                )
+            if participant not in members:
+                members.append(participant)
         with self.session() as session:
+            agent_ids = {
+                uint64_to_int64(member.agent_id)
+                for member in members
+                if member.agent_id
+            }
+            if agent_ids and agent_ids != set(
+                session.scalars(
+                    select(AgentModel.agent_id).where(
+                        AgentModel.agent_id.in_(agent_ids)
+                    )
+                )
+            ):
+                raise ValueError("Agent participant does not exist")
             model = session.scalars(
                 insert(ConversationModel)
                 .values(id=uuid4(), title="", created_at=now())
                 .returning(ConversationModel)
             ).one()
             session.execute(
-                insert(ConversationParticipantTable).values(
-                    conversation_id=model.id, flwr_aid=flwr_aid
-                )
+                insert(ConversationParticipantTable),
+                [
+                    {
+                        "conversation_id": model.id,
+                        "flwr_aid": member.flwr_aid or None,
+                        "agent_id": (
+                            uint64_to_int64(member.agent_id)
+                            if member.agent_id
+                            else None
+                        ),
+                    }
+                    for member in members
+                ],
             )
             conversation = _conversation_from_model(model)
-            conversation.participants.add(flwr_aid=flwr_aid)
+            conversation.participants.extend(members)
             return conversation
 
     def add_conversation_participant(

@@ -667,8 +667,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def create_conversation(self, *, flwr_aid: str) -> Conversation:
-        """Create an untitled conversation and enroll its creator atomically."""
+    def create_conversation(
+        self,
+        *,
+        flwr_aid: str,
+        participants: Sequence[ConversationParticipant] = (),
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
 
     @abstractmethod
     def add_conversation_participant(

@@ -965,10 +965,32 @@ class InMemoryCoreState(
             )
         return True
 
-    def create_conversation(self, *, flwr_aid: str) -> Conversation:
-        """Create a conversation and enroll its creator atomically."""
+    def create_conversation(
+        self,
+        *,
+        flwr_aid: str,
+        participants: Sequence[ConversationParticipant] = (),
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
+        members = [ConversationParticipant(flwr_aid=flwr_aid)]
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError(
+                    "Conversation participants must have a nonempty identity"
+                )
+            if participant not in members:
+                members.append(participant)
+        with self.lock_agent_store:
+            known_agent_ids = {
+                agent_id for agents in self.agent_store.values() for agent_id in agents
+            }
+            if any(
+                member.agent_id and member.agent_id not in known_agent_ids
+                for member in members
+            ):
+                raise ValueError("Agent participant does not exist")
         with self.lock_conversation_store:
             conversation_id = uuid4()
             if conversation_id in self.conversation_store:
@@ -976,7 +998,7 @@ class InMemoryCoreState(
             conversation = Conversation(
                 id=str(conversation_id),
                 created_at=now().isoformat(),
-                participants=[ConversationParticipant(flwr_aid=flwr_aid)],
+                participants=members,
             )
             self.conversation_store[conversation_id] = conversation
             return conversation

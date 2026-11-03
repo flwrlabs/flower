@@ -63,6 +63,51 @@ def test_create_conversation(state: LinkState) -> None:
     assert not state.get_tasks()
 
 
+def test_create_with_initial_participants(state: LinkState) -> None:
+    """Enroll requested users/agents and the creator once in the same operation."""
+    agent = state.create_agent(
+        flwr_aid="alice",
+        config=AgentConfig(name="Research", app_spec="@flower/research"),
+    )
+    assert agent is not None
+    alice = ConversationParticipant(flwr_aid="alice")
+    bob = ConversationParticipant(flwr_aid="bob")
+    agent_participant = ConversationParticipant(agent_id=agent.id)
+    conversation = state.create_conversation(
+        flwr_aid="alice",
+        participants=[bob, agent_participant, alice, bob, agent_participant],
+    )
+    assert len(conversation.participants) == 3
+    assert all(
+        member in conversation.participants
+        for member in [alice, bob, agent_participant]
+    )
+    assert state.get_conversations("bob")[0].id == conversation.id
+    assert state.get_conversation_messages(UUID(conversation.id), "bob") == []
+
+
+@pytest.mark.parametrize(
+    "participant",
+    [
+        ConversationParticipant(),
+        ConversationParticipant(flwr_aid=""),
+        ConversationParticipant(agent_id=0),
+        ConversationParticipant(agent_id=9999),
+    ],
+)
+def test_invalid_initial_participants_do_not_create_conversation(
+    state: LinkState, participant: ConversationParticipant
+) -> None:
+    """Invalid initial membership leaves no conversation or partial membership."""
+    with pytest.raises(ValueError):
+        state.create_conversation(
+            flwr_aid="alice",
+            participants=[ConversationParticipant(flwr_aid="bob"), participant],
+        )
+    assert not state.get_conversations("alice")
+    assert not state.get_conversations("bob")
+
+
 def test_list_participating_conversations(state: LinkState) -> None:
     """List only participating conversations, newest first."""
     first = state.create_conversation(flwr_aid="alice")
