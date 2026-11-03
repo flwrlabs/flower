@@ -20,7 +20,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from .kubernetes_executor import (
+from .kubernetes_resources import (
     create_incluster_kubernetes_client,
     create_incluster_kubernetes_clients,
 )
