@@ -14,10 +14,12 @@
 # ==============================================================================
 """Flower constants."""
 
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, TRANSPORT_TYPE_VCE
+from flwr.common.constant import TRANSPORT_TYPE_VCE
 
 GRPC_MAX_MESSAGE_LENGTH: int = 2_147_483_647  # 2GB - 1
+FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = "[::]:8080"
 TRANSPORT_TYPE_GRPC_BIDI = "grpc-bidi"
+TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPES_COMPAT = [
     TRANSPORT_TYPE_GRPC_BIDI,
     TRANSPORT_TYPE_GRPC_RERE,

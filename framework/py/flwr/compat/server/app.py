@@ -18,8 +18,10 @@
 import sys
 from logging import INFO
 
-from flwr.common.constant import FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS
-from flwr.compat.common.constant import GRPC_MAX_MESSAGE_LENGTH
+from flwr.compat.common.constant import (
+    FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS,
+    GRPC_MAX_MESSAGE_LENGTH,
+)
 from flwr.compat.server.grpc_bidi.grpc_server import start_grpc_server
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History

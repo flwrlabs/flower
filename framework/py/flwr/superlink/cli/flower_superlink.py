@@ -37,8 +37,6 @@ from flwr.common.constant import (
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
-    TRANSPORT_TYPE_GRPC_RERE,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore import log
@@ -617,11 +615,11 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
     # Fleet API transport layer type
     parser.add_argument(
         "--fleet-api-type",
-        default=TRANSPORT_TYPE_GRPC_RERE,
+        default="grpc-rere",
         type=str,
         choices=[
-            TRANSPORT_TYPE_GRPC_RERE,
-            TRANSPORT_TYPE_GRPC_ADAPTER,
+            "grpc-rere",
+            "grpc-adapter",
         ],
         help="Deprecated. The Fleet API now operates over HTTP.",
     )
