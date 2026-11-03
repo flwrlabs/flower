@@ -24,6 +24,7 @@ from flwr.app.typing import MetricRecordValues as MetricRecordValues
 
 from ..app.error import Error as Error
 from ..app.metadata import Metadata as Metadata
+from ..compat.common.constant import GRPC_MAX_MESSAGE_LENGTH as GRPC_MAX_MESSAGE_LENGTH
 from ..compat.common.parameter import bytes_to_ndarray as bytes_to_ndarray
 from ..compat.common.parameter import ndarray_to_bytes as ndarray_to_bytes
 from ..compat.common.parameter import ndarrays_to_parameters as ndarrays_to_parameters
@@ -54,7 +55,6 @@ from ..compat.common.typing import ServerMessage as ServerMessage
 from ..compat.common.typing import Status as Status
 from ..compat.common.typing import Value as Value
 from ..supercore.date import now as now
-from ..supercore.grpc import GRPC_MAX_MESSAGE_LENGTH as GRPC_MAX_MESSAGE_LENGTH
 from ..supercore.telemetry import EventType as EventType
 from ..supercore.telemetry import event as event
 from .constant import MessageTypeLegacy as MessageTypeLegacy

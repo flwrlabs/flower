@@ -18,15 +18,15 @@
 import time
 from threading import Thread
 
-from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
-    ClientMessage,
-    ServerMessage,
-)
-from flwr.server.superlink.fleet.grpc_bidi.grpc_bridge import (
+from flwr.compat.server.grpc_bidi.grpc_bridge import (
     GrpcBridge,
     GrpcBridgeClosed,
     InsWrapper,
     ResWrapper,
+)
+from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
+    ClientMessage,
+    ServerMessage,
 )
 
 
