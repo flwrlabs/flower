@@ -24,11 +24,12 @@ from .kubernetes_resources import (
     KubernetesClient,
     KubernetesExecutorConfig,
     KubernetesTaskResources,
-    KubernetesWarmExecutorPoolManager,
+    WarmExecutorResources,
     launch_result_from_exception,
 )
 from .types import ExecutionSpec, LaunchResult
-from .warm_executor_pool import WarmExecutorPoolKey
+from .warm_executor_maintenance import WarmExecutorPoolManager
+from .warm_executor_pool import WarmExecutorPoolKey, WarmExecutorPoolState
 
 
 class KubernetesExecutor:
@@ -45,13 +46,14 @@ class KubernetesExecutor:
         self._config = config
         self._last_completed_pod_sweep_at: float | None = None
         self._last_capacity_log_at: float | None = None
-        self._warm_executor_pool_manager = (
-            KubernetesWarmExecutorPoolManager(
-                client, config, self._active_pod_count, exec_client
+        self._warm_executor_pool_manager: WarmExecutorPoolManager | None = None
+        if config.warm_executor_owner:
+            state = WarmExecutorPoolState()
+            self._warm_executor_pool_manager = WarmExecutorPoolManager(
+                WarmExecutorResources(client, config, exec_client, state=state),
+                self._active_pod_count,
+                state=state,
             )
-            if config.warm_executor_owner
-            else None
-        )
 
     def wait_for_capacity(
         self,

@@ -48,21 +48,21 @@ from flwr.supercore.warm_executor_constants import (
 
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor import WARM_EXECUTOR_MODULE, WARM_EXECUTOR_READINESS_COMMAND
-from .warm_executor_dispatch import (
-    WARM_EXECUTOR_CONSUMED_ANNOTATION,
-    WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
-    WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
-    WarmExecutorPoolManager,
-)
 from .warm_executor_pool import (
+    WARM_EXECUTOR_ACK_TIMEOUT_SECONDS,
     WARM_EXECUTOR_CONFIGURATION_ANNOTATION,
+    WARM_EXECUTOR_CONSUMED_ANNOTATION,
     WARM_EXECUTOR_FAB_HASH_ANNOTATION,
     WARM_EXECUTOR_FAB_PATH_ANNOTATION,
     WARM_EXECUTOR_LABEL,
+    WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH,
+    WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH,
     WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION,
     WARM_EXECUTOR_TASK_TYPES,
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
+    WarmExecutorPoolState,
+    WarmExecutorUnavailable,
     is_compatible_warm_executor,
     is_warm_executor,
     new_warm_executor_id,
@@ -331,56 +331,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             raise ValueError(
                 "active_pod_budget must exceed the configured warm executor capacity."
             )
-
-
-class KubernetesWarmExecutorPoolManager(WarmExecutorPoolManager):
-    """Wire the warm executor pool lifecycle to Kubernetes executor helpers."""
-
-    def __init__(
-        self,
-        client: KubernetesClient,
-        config: KubernetesExecutorConfig,
-        active_pod_count: Callable[[], int],
-        exec_client: KubernetesClient | None = None,
-    ) -> None:
-        self._lifecycle_lock = threading.RLock()
-        super().__init__(
-            client,
-            config,
-            active_pod_count,
-            exec_client,
-            create_warm_executor=self._create_warm_executor_with_lifecycle_lock,
-            has_warm_executor_configuration=_has_warm_executor_configuration,
-            is_active_warm_executor=_is_active_warm_executor,
-            warm_executor_owner_label_selector=_warm_executor_owner_label_selector,
-        )
-
-    def _create_warm_executor_with_lifecycle_lock(
-        self,
-        client: KubernetesClient,
-        pool_key: WarmExecutorPoolKey,
-        config: KubernetesExecutorConfig,
-        executor_id: str,
-    ) -> None:
-        """Create a warm Pod without racing completed-Pod cleanup."""
-        with self._lifecycle_lock:
-            _create_warm_executor(client, pool_key, config, executor_id)
-
-    def sweep_completed_pods(self, sweep: Callable[[], None]) -> None:
-        """Run completed-Pod cleanup without racing warm Pod creation."""
-        with self._lifecycle_lock:
-            sweep()
-
-    def _delete_pod(self, pod_name: str) -> bool:
-        """Delete a warm Pod and its token-free Runtime API trust Secret."""
-        if not super()._delete_pod(pod_name):
-            return False
-        _delete_secret_best_effort(
-            self._client,
-            self._config.namespace,
-            _warm_executor_root_certificates_secret_name_from_pod_name(pod_name),
-        )
-        return True
 
 
 class CompletedPodSweeper:
@@ -1374,3 +1324,198 @@ class KubernetesTaskResources:
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return launch_result_from_exception(exc)
         return LaunchResult.accepted()
+
+
+# A surviving consumed Pod is safe to retire only after all task processes exit.
+# Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
+# probe can delay retirement, but cannot make a running task appear finished.
+_WARM_EXECUTOR_IDLE_CHECK = f"""\
+import os
+from pathlib import Path
+if Path({WARM_EXECUTOR_BUSY_FILE!r}).is_file():
+    raise SystemExit()
+for process in Path('/proc').iterdir():
+    if not process.name.isdigit() or int(process.name) in (1, os.getpid()):
+        continue
+    try:
+        state = (process / 'stat').read_text().rsplit(')', 1)[1].split()[0]
+    except FileNotFoundError:
+        break
+    if state != 'Z':
+        break
+else:
+    print('FLWR_WARM_EXECUTOR_IDLE')
+"""
+
+
+def _warm_object_field(value: object, field_name: str) -> object | None:
+    """Read a warm-pool field from a Mapping or Kubernetes model."""
+    if isinstance(value, Mapping):
+        return value.get(field_name)
+    return getattr(value, field_name, None)
+
+
+def _warm_object_name(value: object) -> str | None:
+    """Return a warm resource's metadata name."""
+    metadata = _warm_object_field(value, "metadata")
+    name = _warm_object_field(metadata, "name")
+    if isinstance(name, str) and name.strip():
+        return name
+    return None
+
+
+class WarmExecutorResources:
+    """Own Kubernetes resources and transports used by a warm worker pool."""
+
+    def __init__(
+        self,
+        client: KubernetesClient,
+        config: KubernetesExecutorConfig,
+        exec_client: KubernetesClient | None = None,
+        *,
+        state: WarmExecutorPoolState,
+    ) -> None:
+        self._client = client
+        self.config = config
+        self._exec_client = exec_client or client
+        self._exec_client_lock = state.lock
+        self._lifecycle_lock = threading.RLock()
+
+    def create(self, key: WarmExecutorPoolKey, executor_id: str) -> None:
+        """Create a warm Pod without racing completed-Pod cleanup."""
+        with self._lifecycle_lock:
+            _create_warm_executor(self._client, key, self.config, executor_id)
+
+    def sweep(self, sweep: Callable[[], None]) -> None:
+        """Coordinate completed-Pod cleanup with warm Pod creation."""
+        with self._lifecycle_lock:
+            sweep()
+
+    def is_active(self, pod: object, key: WarmExecutorPoolKey) -> bool:
+        """Return whether a compatible Pod still occupies a pool slot."""
+        return _is_active_warm_executor(pod, key, self.config)
+
+    def has_configuration(self, pod: object, key: WarmExecutorPoolKey) -> bool:
+        """Return whether the Pod matches the configured worker environment."""
+        return _has_warm_executor_configuration(pod, key, self.config)
+
+    def delete(self, pod_name: str) -> bool:
+        """Delete a warm Pod and its token-free Runtime API trust Secret."""
+        try:
+            self._client.delete_namespaced_pod(
+                name=pod_name, namespace=self.config.namespace, grace_period_seconds=0
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) != 404:
+                log(WARNING, "Failed to delete warm TaskExecutor Pod %s.", pod_name)
+                return False
+        _delete_secret_best_effort(
+            self._client,
+            self.config.namespace,
+            _warm_executor_root_certificates_secret_name_from_pod_name(pod_name),
+        )
+        return True
+
+    def list_owned(self) -> list[object] | None:
+        """List warm resources owned by the configured pool identity."""
+        try:
+            pod_list = self._client.list_namespaced_pod(
+                self.config.namespace,
+                label_selector=_warm_executor_owner_label_selector(self.config),
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(WARNING, "Failed to list warm TaskExecutor Pods.", exc_info=True)
+            return None
+        items = _warm_object_field(pod_list, "items")
+        if isinstance(items, Sequence) and not isinstance(items, str):
+            return list(items)
+        return []
+
+    def open_exec(
+        self,
+        *,
+        pod_name: str,
+        command: Callable[[], list[str]],
+    ) -> object:
+        """Build and open an exec command under the shared pool lock."""
+        try:
+            stream = importlib.import_module("kubernetes.stream").stream
+            # Kubernetes temporarily changes the exec client's transport during
+            # the handshake. Serialize it with orphan-process probes.
+            with self._exec_client_lock:
+                response = stream(
+                    self._exec_client.connect_get_namespaced_pod_exec,
+                    pod_name,
+                    self.config.namespace,
+                    container="taskexecutor",
+                    command=command(),
+                    stderr=True,
+                    stdin=True,
+                    stdout=True,
+                    tty=False,
+                    _preload_content=False,
+                    _request_timeout=WARM_EXECUTOR_ACK_TIMEOUT_SECONDS,
+                )
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise WarmExecutorUnavailable(
+                "Warm TaskExecutor Pod is unavailable for dispatch."
+            ) from err
+        return response
+
+    def consumed_has_finished(self, pod: object) -> bool:
+        """Preserve surviving tasks unless their exit can be established."""
+        if _warm_object_field(_warm_object_field(pod, "status"), "phase") in {
+            "Succeeded",
+            "Failed",
+        }:
+            return True
+        response = None
+        try:
+            stream = importlib.import_module("kubernetes.stream").stream
+            with self._exec_client_lock:
+                response = stream(
+                    self._exec_client.connect_get_namespaced_pod_exec,
+                    _warm_object_name(pod),
+                    self.config.namespace,
+                    container="taskexecutor",
+                    command=["python", "-c", _WARM_EXECUTOR_IDLE_CHECK],
+                    stdin=False,
+                    stdout=True,
+                    stderr=True,
+                    tty=False,
+                    _preload_content=False,
+                    _request_timeout=WARM_EXECUTOR_ACK_TIMEOUT_SECONDS,
+                )
+            response.run_forever(timeout=WARM_EXECUTOR_ACK_TIMEOUT_SECONDS)
+            output = response.read_all()
+            return (
+                isinstance(output, str) and output.strip() == "FLWR_WARM_EXECUTOR_IDLE"
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(WARNING, "Could not establish whether a consumed warm Pod is idle.")
+            return False
+        finally:
+            if response is not None:
+                close = getattr(response, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        log(WARNING, "Failed to close warm TaskExecutor exec stream.")
+
+    def mark_consumed(self, pod_name: str) -> None:
+        """Persist exclusive consumption before delivering a task token."""
+        try:
+            self._client.patch_namespaced_pod(
+                name=pod_name,
+                namespace=self.config.namespace,
+                body={
+                    "metadata": {
+                        "annotations": {WARM_EXECUTOR_CONSUMED_ANNOTATION: "true"}
+                    }
+                },
+            )
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise WarmExecutorUnavailable(
+                "Failed to persist warm TaskExecutor Pod consumption."
+            ) from err
