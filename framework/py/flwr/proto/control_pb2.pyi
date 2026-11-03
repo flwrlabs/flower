@@ -610,6 +610,122 @@ class ListConversationsResponse(google.protobuf.message.Message):
 global___ListConversationsResponse = ListConversationsResponse
 
 @typing.final
+class ConversationMessage(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    AUTHOR_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    CONTENT_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    conversation_id: builtins.str
+    created_at: builtins.str
+    content: builtins.str
+    @property
+    def author(self) -> global___ConversationParticipant: ...
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        conversation_id: builtins.str = ...,
+        author: global___ConversationParticipant | None = ...,
+        created_at: builtins.str = ...,
+        content: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["author", b"author"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "conversation_id", b"conversation_id", "created_at", b"created_at", "id", b"id"]) -> None: ...
+
+global___ConversationMessage = ConversationMessage
+
+@typing.final
+class GetConversationMessagesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    BEFORE_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    conversation_id: builtins.str
+    before_id: builtins.int
+    """Exclusive upper ID bound. Absent selects the newest page."""
+    limit: builtins.int
+    """Absent uses the server's default page size."""
+    def __init__(
+        self,
+        *,
+        conversation_id: builtins.str = ...,
+        before_id: builtins.int | None = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_before_id", b"_before_id", "_limit", b"_limit", "before_id", b"before_id", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_before_id", b"_before_id", "_limit", b"_limit", "before_id", b"before_id", "conversation_id", b"conversation_id", "limit", b"limit"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_before_id", b"_before_id"]) -> typing.Literal["before_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___GetConversationMessagesRequest = GetConversationMessagesRequest
+
+@typing.final
+class GetConversationMessagesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MESSAGES_FIELD_NUMBER: builtins.int
+    NEXT_BEFORE_ID_FIELD_NUMBER: builtins.int
+    next_before_id: builtins.int
+    """Use as before_id for the next page. Absent when no older messages remain."""
+    @property
+    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationMessage]:
+        """Messages in the selected page, ordered by ascending ID."""
+
+    def __init__(
+        self,
+        *,
+        messages: collections.abc.Iterable[global___ConversationMessage] | None = ...,
+        next_before_id: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_next_before_id", b"_next_before_id", "next_before_id", b"next_before_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_next_before_id", b"_next_before_id", "messages", b"messages", "next_before_id", b"next_before_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_next_before_id", b"_next_before_id"]) -> typing.Literal["next_before_id"] | None: ...
+
+global___GetConversationMessagesResponse = GetConversationMessagesResponse
+
+@typing.final
+class SendConversationMessageRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    CONTENT_FIELD_NUMBER: builtins.int
+    conversation_id: builtins.str
+    content: builtins.str
+    def __init__(
+        self,
+        *,
+        conversation_id: builtins.str = ...,
+        content: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["content", b"content", "conversation_id", b"conversation_id"]) -> None: ...
+
+global___SendConversationMessageRequest = SendConversationMessageRequest
+
+@typing.final
+class SendConversationMessageResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MESSAGE_FIELD_NUMBER: builtins.int
+    @property
+    def message(self) -> global___ConversationMessage: ...
+    def __init__(
+        self,
+        *,
+        message: global___ConversationMessage | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["message", b"message"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
+
+global___SendConversationMessageResponse = SendConversationMessageResponse
+
+@typing.final
 class ListRunSeriesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

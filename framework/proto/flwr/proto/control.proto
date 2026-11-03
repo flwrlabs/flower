@@ -131,6 +131,34 @@ message CreateConversationResponse { Conversation conversation = 1; }
 message ListConversationsRequest {}
 message ListConversationsResponse { repeated Conversation conversations = 1; }
 
+message ConversationMessage {
+  uint64 id = 1;
+  string conversation_id = 2;
+  ConversationParticipant author = 3;
+  string created_at = 4;
+  string content = 5;
+}
+
+message GetConversationMessagesRequest {
+  string conversation_id = 1;
+  // Exclusive upper ID bound. Absent selects the newest page.
+  optional uint64 before_id = 2;
+  // Absent uses the server's default page size.
+  optional uint32 limit = 3;
+}
+message GetConversationMessagesResponse {
+  // Messages in the selected page, ordered by ascending ID.
+  repeated ConversationMessage messages = 1;
+  // Use as before_id for the next page. Absent when no older messages remain.
+  optional uint64 next_before_id = 2;
+}
+
+message SendConversationMessageRequest {
+  string conversation_id = 1;
+  string content = 2;
+}
+message SendConversationMessageResponse { ConversationMessage message = 1; }
+
 message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;
