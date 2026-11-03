@@ -34,6 +34,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
@@ -47,6 +48,7 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 
 from . import CoreState
@@ -107,6 +109,173 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             sorted((msg.metadata for msg in actual), key=attrgetter("message_id")),
             sorted((msg.metadata for msg in expected), key=attrgetter("message_id")),
         )
+
+    def test_get_file_and_list_files_when_absent(self) -> None:
+        """An empty scope has no file content or metadata."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+
+    @parameterized.expand([(b"hello",), (b"",), (b"\x00\xff",)])  # type: ignore
+    def test_put_file_and_get_file(self, data: bytes) -> None:
+        """Creating a file preserves its bytes and returns matching metadata."""
+        state = self.state_factory()
+
+        revision = state.put_file("scope", "file", data, expected_revision=None)
+
+        self.assertIsInstance(revision, int)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=revision, size_bytes=len(data)
+                ),
+                data=data,
+            ),
+        )
+
+    def test_put_file_updates_matching_revision(self) -> None:
+        """Updating a live file replaces its content and changes its revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+
+        self.assertNotEqual(updated_revision, revision)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=updated_revision, size_bytes=7
+                ),
+                data=b"updated",
+            ),
+        )
+
+    def test_put_file_rejects_conflicting_revision(self) -> None:
+        """Create-only and mismatched updates leave an existing file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"original", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        for expected_revision in (None, revision + 1):
+            with self.subTest(expected_revision=expected_revision):
+                with self.assertRaises(FlowerError) as exc:
+                    state.put_file(
+                        "scope",
+                        "file",
+                        b"conflict",
+                        expected_revision=expected_revision,
+                    )
+                self.assertEqual(
+                    exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+                )
+                self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_put_file_update_requires_live_file(self, deleted: bool) -> None:
+        """An update cannot create a missing file or revive a deleted file."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"old", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.put_file("scope", "file", b"new", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_list_files_filters_and_orders_metadata(self) -> None:
+        """List by scope, prefix and exclusive cursor before applying the limit."""
+        state = self.state_factory()
+        metadata = {}
+        for key in ("dir/c", "other", "dir/a", "dir/b"):
+            revision = state.put_file("scope", key, b"data", expected_revision=None)
+            metadata[key] = FileMetadata(key=key, revision=revision, size_bytes=4)
+        state.put_file("other-scope", "dir/b", b"other", expected_revision=None)
+
+        for prefix, start_after, limit, keys in (
+            ("", "", None, ["dir/a", "dir/b", "dir/c", "other"]),
+            ("dir/", "", None, ["dir/a", "dir/b", "dir/c"]),
+            ("dir/", "dir/a", 1, ["dir/b"]),
+            ("dir/", "dir/c", None, []),
+            ("missing/", "", None, []),
+        ):
+            with self.subTest(prefix=prefix, start_after=start_after, limit=limit):
+                self.assertEqual(
+                    list(state.list_files("scope", prefix, start_after, limit)),
+                    [metadata[key] for key in keys],
+                )
+
+    def test_delete_file_and_recreate(self) -> None:
+        """Deletion hides a file and create-only can recreate it with a new revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+        recreated_revision = state.put_file(
+            "scope", "file", b"new", expected_revision=None
+        )
+        self.assertNotEqual(recreated_revision, revision)
+        file = state.get_file("scope", "file")
+        assert file is not None
+        self.assertEqual(file.data, b"new")
+        self.assertEqual(file.metadata.revision, recreated_revision)
+
+    def test_delete_file_rejects_mismatched_revision(self) -> None:
+        """A mismatched delete leaves the live file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"data", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision + 1)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_delete_file_requires_live_file(self, deleted: bool) -> None:
+        """Deleting a missing or already deleted file raises a revision conflict."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"data", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_files_are_isolated_by_scope(self) -> None:
+        """Writing and deleting a key in one scope leaves another scope unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"first", expected_revision=None)
+        state.put_file("other-scope", "file", b"second", expected_revision=None)
+        other = state.get_file("other-scope", "file")
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+        self.assertEqual(state.get_file("other-scope", "file"), other)
+        state.delete_file("scope", "file", expected_revision=updated_revision)
+        self.assertEqual(state.get_file("other-scope", "file"), other)
 
     def test_store_messages_returns_acceptance_results(self) -> None:
         """Return per-Message results and accept duplicates before body upload."""
@@ -1362,11 +1531,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
 
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
             fab_hash=None,
-            model_ref="model://test",
-            connector_ref=None,
+            connector_ref="web_search",
         )
         assert task_id is not None
         tasks = state.get_tasks(task_ids=[task_id])
@@ -1374,15 +1542,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
-        self.assertEqual(task.type, TaskType.MODEL)
+        self.assertEqual(task.type, TaskType.CONNECTOR)
         self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
         )
-        self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
-        self.assertFalse(task.HasField("connector_ref"))
+        self.assertEqual(task.connector_ref, "web_search")
         self.assertFalse(task.HasField("connector_id"))
         self.assertTrue(task.pending_at)
         self.assertEqual(task.starting_at, "")
@@ -1401,9 +1568,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
 
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
-            model_ref="model://test",
+            connector_ref="connector://test",
             requesting_task_id=requesting_task_id,
         )
 
@@ -1419,9 +1586,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id_1 = self.task_run_id(state)
         run_id_2 = self.other_task_run_id(state)
-        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
-        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
-        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
@@ -1435,7 +1602,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
@@ -1494,7 +1661,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
         )
         assert task_id is not None
@@ -1539,7 +1706,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Adding and retrieving task logs should preserve concatenation order."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1566,7 +1733,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Retrieving task logs after a specific timestamp should filter old logs."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1594,7 +1761,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Retrieving task logs after the last entry should return an empty result."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1614,7 +1781,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Polling with the last returned timestamp should not repeat old logs."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1638,7 +1805,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1664,8 +1831,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        finished_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        claimed_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        finished_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -1680,7 +1849,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1714,7 +1883,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1755,7 +1924,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -1781,14 +1950,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
     def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
         """Expired STARTING task claims should make tasks pending again."""
-        # Prepare: create and claim a model task.
+        # Prepare: create and claim a connector task.
         state = self.state_factory()
         fixed_now = now()
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
 
@@ -1835,7 +2004,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -1867,7 +2036,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -1889,7 +2058,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             assert (token := state.claim_task(task_id))
 
@@ -1913,7 +2082,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         if not hasattr(state, "session"):
             self.skipTest("SQL session test")
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert task_id is not None
 
         with state.session():
@@ -1937,7 +2106,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ) as on_expired:
             with patch("datetime.datetime") as mock_dt:
                 mock_dt.now.return_value = fixed_now
-                task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+                task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
                 assert task_id is not None
                 assert state.claim_task(task_id) is not None
 
@@ -1959,8 +2128,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        other_dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
         assert (
             src_task_id is not None
             and dst_task_id is not None
@@ -2015,15 +2186,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
         other_run_id = self.other_task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         other_run_task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=other_run_id
+            task_type=TaskType.CONNECTOR, run_id=other_run_id
         )
         finished_src_task_id = state.create_task(
             task_type=TaskType.AGENT_APP, run_id=run_id
         )
         finished_dst_task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id
         )
         assert (
             src_task_id is not None
@@ -2081,7 +2252,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
         msg_ttl = 60.0
@@ -2105,7 +2276,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2134,8 +2305,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A source-specific claim should not consume another task's message."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         assert (
             src_task_id_1 is not None

@@ -77,7 +77,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     )
 
     assert isinstance(executor, KubernetesExecutor)
-    assert executor._client is client  # pylint: disable=protected-access
+    assert executor._resources._client is client  # pylint: disable=protected-access
     config = executor._config  # pylint: disable=protected-access
     assert config.namespace == "flower-system"
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
@@ -314,22 +314,3 @@ def test_get_executor_wraps_kubernetes_client_construction_errors(
                 "image": "ghcr.io/flwrlabs/taskexecutor:dev",
             },
         )
-
-
-@pytest.mark.parametrize(
-    "legacy_pool",
-    [
-        {"task-type": "flwr-model", "size": 2},
-        {"task-type": "flwr-model", "size": "obsolete", "legacy-field": True},
-    ],
-)
-def test_warm_executor_pools_ignore_legacy_model_pool(
-    legacy_pool: dict[str, object], caplog: pytest.LogCaptureFixture
-) -> None:
-    """Skip stale Model pools before validating their obsolete settings."""
-    pools = factory_module._warm_executor_pools_from_config(  # pylint: disable=protected-access
-        [legacy_pool, {"task-type": "flwr-connector", "size": 1}], "runtime:dev"
-    )
-    assert len(pools) == 1
-    assert pools[0].key.task_type == TaskType.CONNECTOR
-    assert caplog.messages == ["Ignoring obsolete flwr-model warm executor pool."]

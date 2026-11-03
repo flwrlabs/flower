@@ -22,13 +22,13 @@ import numpy as np
 
 import flwr
 from flwr.common import Config, GetParametersIns
+from flwr.compat.server.grpc_bidi.grpc_bridge import ResWrapper
+from flwr.compat.server.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Parameters,
     Scalar,
 )
-from flwr.server.superlink.fleet.grpc_bidi.grpc_bridge import ResWrapper
-from flwr.server.superlink.fleet.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 
 MESSAGE_PARAMETERS = Parameters(tensors=[], tensor_type="np")
 MESSAGE_FIT_RES = ClientMessage(

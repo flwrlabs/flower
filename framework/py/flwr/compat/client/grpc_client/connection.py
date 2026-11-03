@@ -31,6 +31,8 @@ from flwr.app.message_type import MessageType
 from flwr.common import serde
 from flwr.common.constant import MessageTypeLegacy
 from flwr.compat.common import recorddict_compat as compat
+from flwr.compat.common.constant import GRPC_MAX_MESSAGE_LENGTH
+from flwr.compat.common.grpc import create_channel, on_channel_state_change
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Reason,
@@ -40,11 +42,6 @@ from flwr.proto.transport_pb2_grpc import FlowerServiceStub  # pylint: disable=E
 from flwr.supercore import log
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc import (
-    GRPC_MAX_MESSAGE_LENGTH,
-    create_channel,
-    on_channel_state_change,
-)
 from flwr.supercore.retry import RetryInvoker
 from flwr.supercore.run import Run
 

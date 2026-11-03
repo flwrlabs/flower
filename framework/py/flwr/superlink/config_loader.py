@@ -62,8 +62,6 @@ except ImportError:
 class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
-    control_address: str
-    health_server_address: str | None
     host: str
     port: int
     insecure: bool
@@ -76,7 +74,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     artifact_provider: ArtifactProvider | None
     enable_supernode_auth: bool
     fleet_api_type: str
-    fleet_api_address: str | None
     simulation: bool
     ssl_ca_certfile: str | None
     ssl_certfile: str | None

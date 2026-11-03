@@ -15,6 +15,7 @@
 """SQLAlchemy declarative model definitions for CoreState."""
 
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
@@ -33,6 +34,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    Uuid,
     column,
     text,
 )
@@ -66,6 +68,30 @@ class Fab(FlwrBase):
     fab_hash: Mapped[str] = mapped_column(String, primary_key=True)
     content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     verifications: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class File(FlwrBase):
+    """Represent the current head of a file, including deleted files."""
+
+    __tablename__ = "file"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    latest_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class FileRevision(FlwrBase):
+    """Represent immutable file contents at a particular revision."""
+
+    __tablename__ = "file_revision"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Message(FlwrBase):
@@ -181,6 +207,63 @@ class RunSeries(FlwrBase):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Conversation(FlwrBase):
+    """Represent a conversation."""
+
+    __tablename__ = "conversation"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+
+
+ConversationParticipantTable = Table(
+    "conversation_participant",
+    FlwrBase.metadata,
+    Column("conversation_id", Uuid, ForeignKey("conversation.id"), nullable=False),
+    Column("flwr_aid", String, nullable=True),
+    Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
+    CheckConstraint(
+        "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+        "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
+        name="ck_conversation_participant_identity",
+    ),
+    UniqueConstraint("conversation_id", "flwr_aid"),
+    UniqueConstraint("conversation_id", "agent_id"),
+    Index("idx_conversation_participant_flwr_aid", "flwr_aid"),
+)
+
+
+class ConversationMessage(FlwrBase):
+    """Represent a message authored by a user or agent in a conversation."""
+
+    __tablename__ = "conversation_message"
+    __table_args__ = (
+        CheckConstraint(
+            "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+            "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
+            name="ck_conversation_message_identity",
+        ),
+        Index("idx_conversation_message_conversation_id_id", "conversation_id", "id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    conversation_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("conversation.id"), nullable=False
+    )
+    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("agent.agent_id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class SeriesContext(FlwrBase):

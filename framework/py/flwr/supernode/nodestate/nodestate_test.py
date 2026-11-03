@@ -71,7 +71,7 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         node_id = 123
         self.state.set_node_id(node_id)
         src_task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=42)
-        dst_task_id = self.state.create_task(task_type=TaskType.MODEL, run_id=42)
+        dst_task_id = self.state.create_task(task_type=TaskType.CONNECTOR, run_id=42)
         assert src_task_id is not None and dst_task_id is not None
         message = create_task_message(
             src_task_id=src_task_id,
