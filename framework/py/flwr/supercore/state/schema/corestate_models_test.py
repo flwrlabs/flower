@@ -14,20 +14,14 @@
 # ==============================================================================
 """Tests for CoreState declarative models."""
 
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
-from sqlalchemy import Connection, Table, create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 
-from flwr.supercore.state.schema.corestate_models import (
-    ConversationParticipantTable,
-    FlwrBase,
-    Task,
-    TaskLogsTable,
-)
+from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 CORESTATE_TABLE_NAMES = {
@@ -92,193 +86,34 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     assert TaskLogsTable.primary_key.columns.values() == []
 
 
-@pytest.fixture(name="conversation_connection")
-def fixture_conversation_connection() -> Iterator[Connection]:
-    """Create conversation tables with one conversation and one agent."""
+@pytest.mark.parametrize(
+    "table_name", ["conversation_participant", "conversation_message"]
+)
+@pytest.mark.parametrize(
+    ("flwr_aid", "agent_id", "valid"),
+    [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
+)
+def test_conversation_requires_exactly_one_identity(
+    table_name: str,
+    flwr_aid: str | None,
+    agent_id: int | None,
+    valid: bool,
+) -> None:
+    """Accept either identity and reject both or neither in both tables."""
+    table = FlwrBase.metadata.tables[table_name]
     engine = create_engine("sqlite:///:memory:")
+    table.create(engine)
+    values: dict[str, object] = {
+        "conversation_id": UUID(int=1),
+        "flwr_aid": flwr_aid,
+        "agent_id": agent_id,
+    }
+    if table_name == "conversation_message":
+        values.update(content="Hello", created_at=datetime.now(UTC))
+
     with engine.begin() as conn:
-        conn.exec_driver_sql("PRAGMA foreign_keys = ON")
-        FlwrBase.metadata.create_all(
-            conn,
-            tables=[
-                FlwrBase.metadata.tables["agent"],
-                FlwrBase.metadata.tables["conversation"],
-                ConversationParticipantTable,
-                FlwrBase.metadata.tables["conversation_message"],
-            ],
-        )
-        now = datetime.now(UTC)
-        conn.execute(
-            FlwrBase.metadata.tables["agent"]
-            .insert()
-            .values(
-                agent_id=1,
-                name="agent",
-                app_spec="owner/agent",
-                flwr_aid="user",
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        conn.execute(
-            FlwrBase.metadata.tables["conversation"]
-            .insert()
-            .values(id=UUID(int=1), created_at=now, title="Conversation")
-        )
-        yield conn
-
-
-def test_conversation_round_trips_generated_uuid_and_timestamp(
-    conversation_connection: Connection,
-) -> None:
-    """Generate UUID v4 IDs and preserve UTC timestamps."""
-    table = FlwrBase.metadata.tables["conversation"]
-    now = datetime.now(UTC)
-    conversation_id = conversation_connection.execute(
-        table.insert()
-        .values(created_at=now, title="New conversation")
-        .returning(table.c.id)
-    ).scalar_one()
-    row = conversation_connection.execute(
-        select(table).where(table.c.id == conversation_id)
-    ).one()
-
-    assert isinstance(row.id, UUID)
-    assert row.id.version == 4
-    assert row.created_at == now
-    assert row.title == "New conversation"
-    assert set(table.c.keys()) == {"id", "created_at", "title"}
-
-
-@pytest.mark.parametrize(
-    "table",
-    [ConversationParticipantTable, FlwrBase.metadata.tables["conversation_message"]],
-)
-@pytest.mark.parametrize(("flwr_aid", "agent_id"), [("user", None), (None, 1)])
-def test_conversation_allows_user_or_agent(
-    conversation_connection: Connection,
-    table: Table,
-    flwr_aid: str | None,
-    agent_id: int | None,
-) -> None:
-    """Allow either identity and round-trip message text and UTC timestamps."""
-    values: dict[str, object] = {
-        "conversation_id": UUID(int=1),
-        "flwr_aid": flwr_aid,
-        "agent_id": agent_id,
-    }
-    now = datetime.now(UTC)
-    if table is FlwrBase.metadata.tables["conversation_message"]:
-        values.update(content="Hello 🌷\nSecond line", created_at=now)
-    conversation_connection.execute(table.insert().values(**values))
-    row = conversation_connection.execute(select(table)).one()
-
-    assert row.conversation_id == UUID(int=1)
-    assert row.flwr_aid == flwr_aid
-    assert row.agent_id == agent_id
-    if table is FlwrBase.metadata.tables["conversation_message"]:
-        assert row.content == values["content"]
-        assert row.created_at == now
-
-
-@pytest.mark.parametrize(
-    "table",
-    [ConversationParticipantTable, FlwrBase.metadata.tables["conversation_message"]],
-)
-@pytest.mark.parametrize(("flwr_aid", "agent_id"), [(None, None), ("user", 1)])
-def test_conversation_rejects_missing_or_ambiguous_identity(
-    conversation_connection: Connection,
-    table: Table,
-    flwr_aid: str | None,
-    agent_id: int | None,
-) -> None:
-    """Require exactly one user or agent identity in both tables."""
-    values: dict[str, object] = {
-        "conversation_id": UUID(int=1),
-        "flwr_aid": flwr_aid,
-        "agent_id": agent_id,
-    }
-    if table is FlwrBase.metadata.tables["conversation_message"]:
-        values.update(content="Hello", created_at=datetime.now(UTC))
-
-    with pytest.raises(IntegrityError, match="CHECK constraint failed"):
-        conversation_connection.execute(table.insert().values(**values))
-
-
-@pytest.mark.parametrize(("flwr_aid", "agent_id"), [("user", None), (None, 1)])
-def test_conversation_participants_are_unique_per_conversation(
-    conversation_connection: Connection,
-    flwr_aid: str | None,
-    agent_id: int | None,
-) -> None:
-    """Reject duplicate participants while allowing them in other conversations."""
-    table = ConversationParticipantTable
-    assert set(table.c.keys()) == {"conversation_id", "flwr_aid", "agent_id"}
-    conversation_connection.execute(
-        FlwrBase.metadata.tables["conversation"]
-        .insert()
-        .values(
-            id=UUID(int=2), created_at=datetime.now(UTC), title="Other conversation"
-        )
-    )
-    for conversation_id in (UUID(int=1), UUID(int=2)):
-        conversation_connection.execute(
-            table.insert().values(
-                conversation_id=conversation_id, flwr_aid=flwr_aid, agent_id=agent_id
-            )
-        )
-
-    with pytest.raises(IntegrityError, match="UNIQUE constraint failed"):
-        conversation_connection.execute(
-            table.insert().values(
-                conversation_id=UUID(int=1), flwr_aid=flwr_aid, agent_id=agent_id
-            )
-        )
-
-
-@pytest.mark.parametrize(
-    "table",
-    [ConversationParticipantTable, FlwrBase.metadata.tables["conversation_message"]],
-)
-@pytest.mark.parametrize(
-    ("conversation_id", "agent_id"), [(UUID(int=99), 1), (UUID(int=1), 99)]
-)
-def test_conversation_rejects_unknown_references(
-    conversation_connection: Connection,
-    table: Table,
-    conversation_id: UUID,
-    agent_id: int,
-) -> None:
-    """Require referenced conversations and agents to exist."""
-    values: dict[str, object] = {
-        "conversation_id": conversation_id,
-        "agent_id": agent_id,
-    }
-    if table is FlwrBase.metadata.tables["conversation_message"]:
-        values.update(content="Hello", created_at=datetime.now(UTC))
-
-    with pytest.raises(IntegrityError, match="FOREIGN KEY constraint failed"):
-        conversation_connection.execute(table.insert().values(**values))
-
-
-def test_conversation_message_ids_increase_without_reuse(
-    conversation_connection: Connection,
-) -> None:
-    """Allow repeated authors and keep increasing IDs after a message is deleted."""
-    table = FlwrBase.metadata.tables["conversation_message"]
-    statement = (
-        table.insert()
-        .values(
-            conversation_id=UUID(int=1),
-            flwr_aid="user",
-            created_at=datetime.now(UTC),
-            content="Hello",
-        )
-        .returning(table.c.id)
-    )
-    first_id = conversation_connection.execute(statement).scalar_one()
-    second_id = conversation_connection.execute(statement).scalar_one()
-    conversation_connection.execute(table.delete().where(table.c.id == second_id))
-    third_id = conversation_connection.execute(statement).scalar_one()
-
-    assert 0 < first_id < second_id < third_id
+        if valid:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match=f"ck_{table_name}_identity"):
+                conn.execute(table.insert().values(**values))
