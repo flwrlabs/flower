@@ -208,16 +208,14 @@ class RunSeries(FlwrBase):
 
 
 class Conversation(FlwrBase):
-    """Represent a conversation and its current backing series."""
+    """Represent a conversation in a federation."""
 
     __tablename__ = "conversation"
 
     conversation_id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, nullable=False
     )
-    series_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("run_series.series_id"), unique=True, nullable=False
-    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

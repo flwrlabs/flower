@@ -40,16 +40,11 @@ def upgrade() -> None:
     op.create_table(
         "conversation",
         sa.Column("conversation_id", sa.BigInteger(), nullable=False),
-        sa.Column("series_id", sa.BigInteger(), nullable=False),
+        sa.Column("federation_id", sa.String(), nullable=False),
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("created_at", UTCDateTime(), nullable=False),
         sa.Column("updated_at", UTCDateTime(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["series_id"],
-            ["run_series.series_id"],
-        ),
         sa.PrimaryKeyConstraint("conversation_id"),
-        sa.UniqueConstraint("series_id"),
     )
     op.create_table(
         "conversation_participant",
