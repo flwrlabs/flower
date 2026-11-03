@@ -25,18 +25,14 @@ from collections.abc import Callable, Iterator
 import grpc
 from iterators import TimeoutIterator
 
+from flwr.compat.server.grpc_bidi.grpc_bridge import GrpcBridge, InsWrapper, ResWrapper
+from flwr.compat.server.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 from flwr.proto import transport_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     ServerMessage,
 )
 from flwr.server.client_manager import ClientManager
-from flwr.server.superlink.fleet.grpc_bidi.grpc_bridge import (
-    GrpcBridge,
-    InsWrapper,
-    ResWrapper,
-)
-from flwr.server.superlink.fleet.grpc_bidi.grpc_client_proxy import GrpcClientProxy
 
 
 def default_bridge_factory() -> GrpcBridge:
