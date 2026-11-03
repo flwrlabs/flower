@@ -65,7 +65,6 @@ from .warm_executor_pool import (
     WarmExecutorPoolKey,
     is_compatible_warm_executor,
     is_warm_executor,
-    new_warm_executor_id,
 )
 
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
@@ -1077,11 +1076,6 @@ def _labels(
     return labels
 
 
-def _capacity_label_selector(config: KubernetesExecutorConfig) -> str:
-    """Return the label selector used for resource-pool capacity checks."""
-    return _taskexecutor_pool_label_selector(config)
-
-
 def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
     """Return the label selector for TaskExecutor pool-scoped operations."""
     return _label_selector(_taskexecutor_pool_labels(config))
@@ -1366,16 +1360,3 @@ class KubernetesTaskResources:
                 if _object_name(pod) not in pod_names
             )
         return sum(1 for pod in pods if _is_active_pod(pod))
-
-    def launch_warm(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
-        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
-        try:
-            _create_warm_executor(
-                self._client,
-                pool_key,
-                self._config,
-                new_warm_executor_id(),
-            )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            return launch_result_from_exception(exc)
-        return LaunchResult.accepted()

@@ -28,7 +28,6 @@ from .kubernetes_resources import (
     launch_result_from_exception,
 )
 from .types import ExecutionSpec, LaunchResult
-from .warm_executor_pool import WarmExecutorPoolKey
 
 
 class KubernetesExecutor:
@@ -286,10 +285,6 @@ class KubernetesExecutor:
             or self._config.runtime_root_certificates is not None
             or root_certificates_path is None
         )
-
-    def _launch_warm_executor(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
-        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
-        return self._resources.launch_warm(pool_key)
 
     def _active_pod_count(self) -> int:
         """Return the active TaskExecutor Pod count for the configured pool."""

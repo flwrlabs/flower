@@ -533,13 +533,15 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
     """Test a warm TaskExecutor is inert, reports readiness, and is swept."""
     client = Mock()
     monkeypatch.setattr(
-        kube,
+        warm_executor_dispatch,
         "new_warm_executor_id",
         Mock(side_effect=["executor123", "executor456"]),
     )
+    pool_key = _warm_executor_pool_key()
     config = _executor_config(
         labels={WARM_EXECUTOR_LABEL: "false"},
         warm_executor_owner="superexec-a",
+        warm_executor_pools=(WarmExecutorPoolConfig(key=pool_key, size=1),),
         annotations={
             "example.com/setting": "configured",
             _WARM_EXECUTOR_CONSUMED_ANNOTATION: "true",
@@ -549,13 +551,11 @@ def test_launch_warm_executor_is_inert_and_becomes_ready(
         container_security_context={"readOnlyRootFilesystem": True},
     )
     executor = KubernetesExecutor(client=client, config=config)
-    pool_key = _warm_executor_pool_key()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
 
-    result = executor._launch_warm_executor(  # pylint: disable=protected-access
-        pool_key
-    )
+    executor.reconcile()
 
-    assert result.status == LaunchResultStatus.ACCEPTED
     client.create_namespaced_pod.assert_called_once()
     client.create_namespaced_secret.assert_called_once()
     pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
