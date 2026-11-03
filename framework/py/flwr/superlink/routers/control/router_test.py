@@ -43,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
+    Conversation,
     ConversationParticipant,
     CreateAgentRequest,
     CreateAgentResponse,
@@ -81,7 +82,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
@@ -139,16 +140,13 @@ def test_conversation_create_and_list(
     assert response.status_code == 200
     conversation = CreateConversationResponse.FromString(response.content).conversation
     assert conversation.title == ""
-    assert conversation.federation_id == NOOP_FEDERATION_ID
     assert list(conversation.participants) == [
         ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
     ]
     assert not state.get_run_series()
     assert not state.get_tasks()
 
-    state.create_conversation(
-        flwr_aid="another-owner", federation_id=NOOP_FEDERATION_ID
-    )
+    state.create_conversation(flwr_aid="another-owner")
     listed = client.post(
         "/v1/control/list-conversations",
         content=ListConversationsRequest().SerializeToString(),
@@ -159,69 +157,74 @@ def test_conversation_create_and_list(
     ]
 
 
-def test_conversation_list_filters_current_federation_access(
+def test_conversations_do_not_access_federations(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Lists restrict metadata to the owner and currently accessible federations."""
+    """Create and list conversations without federation provisioning or checks."""
     client, state = conversation_client
-    state.create_conversation(
-        flwr_aid="another-owner", federation_id=NOOP_FEDERATION_ID
-    )
-    own = state.create_conversation(
-        flwr_aid=_ACCOUNT.flwr_aid, federation_id=NOOP_FEDERATION_ID
-    )
-    state.create_conversation(flwr_aid=_ACCOUNT.flwr_aid, federation_id="inaccessible")
-    response = client.post(
-        "/v1/control/list-conversations",
-        content=ListConversationsRequest(
-            federation_id=NOOP_FEDERATION_ID
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    assert list(
-        ListConversationsResponse.FromString(response.content).conversations
-    ) == [own]
-
-    with patch.object(state.federation_manager, "has_member", return_value=False):
-        response = client.post(
-            "/v1/control/list-conversations",
-            content=ListConversationsRequest(
-                federation_id=NOOP_FEDERATION_ID
-            ).SerializeToString(),
+    with (
+        patch.object(
+            state.federation_manager,
+            "ensure_default_federations_exist",
+            side_effect=AssertionError("Unexpected federation provisioning"),
+        ),
+        patch.object(
+            state.federation_manager,
+            "has_member",
+            side_effect=AssertionError("Unexpected federation membership check"),
+        ),
+        patch.object(
+            state.federation_manager,
+            "get_federations",
+            side_effect=AssertionError("Unexpected federation lookup"),
+        ),
+    ):
+        created = client.post(
+            "/v1/control/create-conversation",
+            content=CreateConversationRequest().SerializeToString(),
         )
-        assert response.status_code == 412
-        assert response.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
-
-    with patch.object(state.federation_manager, "get_federations", return_value=[]):
+        assert created.status_code == 200
+        conversation = CreateConversationResponse.FromString(
+            created.content
+        ).conversation
         response = client.post(
             "/v1/control/list-conversations",
             content=ListConversationsRequest().SerializeToString(),
         )
         assert response.status_code == 200
-        assert not ListConversationsResponse.FromString(response.content).conversations
+        assert list(
+            ListConversationsResponse.FromString(response.content).conversations
+        ) == [conversation]
 
 
-def test_conversation_starts_untitled_and_rejects_invalid_federation(
+def test_shared_conversation_requires_participation(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Creation leaves the title empty and rejects inaccessible federations."""
+    """Participants can read another user's conversation while access remains valid."""
     client, state = conversation_client
-    response = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest().SerializeToString(),
-    )
-    assert response.status_code == 200
-    assert (
-        CreateConversationResponse.FromString(response.content).conversation.title == ""
-    )
-    invalid = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest(federation="missing").SerializeToString(),
-    )
-    assert invalid.status_code == 412
-    assert invalid.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
-    assert len(state.get_conversations(_ACCOUNT.flwr_aid)) == 1
-    assert not state.get_run_series()
+    shared = state.create_conversation(flwr_aid="alice")
+    request = ListConversationsRequest()
+
+    def listed() -> list[Conversation]:
+        response = client.post(
+            "/v1/control/list-conversations", content=request.SerializeToString()
+        )
+        assert response.status_code == 200
+        return list(
+            ListConversationsResponse.FromString(response.content).conversations
+        )
+
+    assert not listed()
+    participant = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    assert state.add_conversation_participant(shared.conversation_id, participant)
+    assert listed() == [shared]
+    assert list(listed()[0].participants) == [
+        ConversationParticipant(flwr_aid="alice"),
+        participant,
+    ]
+
+    assert state.remove_conversation_participant(shared.conversation_id, participant)
+    assert not listed()
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
