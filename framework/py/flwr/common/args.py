@@ -39,7 +39,11 @@ def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
 
 
 def _warn_unused_health_server_address(_value: str) -> None:
-    log(WARN, "The `--health-server-address` argument is no longer used.")
+    log(
+        WARN,
+        "The `--health-server-address` argument is no longer used. "
+        "Use the `/health` HTTP endpoint instead.",
+    )
 
 
 def add_args_runtime_dependency_install(
