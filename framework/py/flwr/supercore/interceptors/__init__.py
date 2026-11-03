@@ -17,6 +17,7 @@
 from flwr.supercore.constant import TASK_TOKEN_HEADER
 
 from .http import (
+    FlowerErrorHttpInterceptor,
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
@@ -30,6 +31,7 @@ from .runtime_version_interceptor import (
 )
 
 __all__ = [
+    "FlowerErrorHttpInterceptor",
     "RpcErrorTranslationServerInterceptor",
     "RuntimeTokenHttpInterceptor",
     "RuntimeVersionClientInterceptor",

@@ -32,8 +32,13 @@ from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common.constant import RUN_ID_NUM_BYTES, SUPERLINK_NODE_ID, TASK_ID_NUM_BYTES
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.common.constant import (
+    RUN_ID_NUM_BYTES,
+    SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
+    Status,
+)
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
@@ -294,7 +299,9 @@ def _main_loop(
         state.run_ids[run.run_id] = RunRecord(run=run)
         primary_task_id = cast(int, run.primary_task_id)
         state.task_store[primary_task_id] = Task(
-            task_id=primary_task_id, run_id=run.run_id
+            task_id=primary_task_id,
+            run_id=run.run_id,
+            status=TaskStatus(status=Status.RUNNING),
         )
 
         # Initialize Grid

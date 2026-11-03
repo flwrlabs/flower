@@ -56,11 +56,14 @@ from flwr.common.constant import (
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
@@ -82,8 +85,10 @@ from flwr.supercore.constant import (
     AutomationStatus,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -95,6 +100,10 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
+)
+from flwr.supercore.state.schema.corestate_models import File as FileModel
+from flwr.supercore.state.schema.corestate_models import (
+    FileRevision as FileRevisionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
@@ -561,11 +570,172 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
 
-            # Delete expired object trees and their message metadata.
+            # Delete expired object trees and cancel their pending messages.
             if message_object_ids:
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
-                self._on_push_session_expired(message_object_ids)
+                self.cancel_messages(message_ids=message_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        with self.session() as session:
+            if expected_revision is None:
+                stmt = self.dialect_insert(FileModel).values(
+                    scope=scope,
+                    key=key,
+                    latest_revision=1,
+                    is_deleted=False,
+                    size_bytes=len(data),
+                )
+                revision = session.scalar(
+                    stmt.on_conflict_do_update(
+                        index_elements=[FileModel.scope, FileModel.key],
+                        set_={
+                            "latest_revision": FileModel.latest_revision + 1,
+                            "is_deleted": False,
+                            "size_bytes": len(data),
+                        },
+                        where=FileModel.is_deleted.is_(True),
+                    ).returning(FileModel.latest_revision)
+                )
+            else:
+                revision = session.scalar(
+                    update(FileModel)
+                    .where(
+                        FileModel.scope == scope,
+                        FileModel.key == key,
+                        FileModel.is_deleted.is_(False),
+                        FileModel.latest_revision == expected_revision,
+                    )
+                    .values(
+                        latest_revision=FileModel.latest_revision + 1,
+                        size_bytes=len(data),
+                    )
+                    .returning(FileModel.latest_revision)
+                )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            session.execute(
+                insert(FileRevisionModel).values(
+                    scope=scope, key=key, revision=revision, data=data, created_at=now()
+                )
+            )
+            return revision
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        with self.session() as session:
+            row = session.execute(
+                select(
+                    FileModel.latest_revision,
+                    FileModel.size_bytes,
+                    FileRevisionModel.data,
+                )
+                .join(
+                    FileRevisionModel,
+                    (FileRevisionModel.scope == FileModel.scope)
+                    & (FileRevisionModel.key == FileModel.key)
+                    & (FileRevisionModel.revision == FileModel.latest_revision),
+                )
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=row.latest_revision, size_bytes=row.size_bytes
+                ),
+                data=row.data,
+            )
+
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        stmt = select(
+            FileModel.key, FileModel.latest_revision, FileModel.size_bytes
+        ).where(FileModel.scope == scope, FileModel.is_deleted.is_(False))
+        if prefix:
+            # LIKE is case-insensitive on SQLite and interprets wildcard characters.
+            stmt = stmt.where(func.substr(FileModel.key, 1, len(prefix)) == prefix)
+        if start_after:
+            stmt = stmt.where(FileModel.key > start_after)
+        stmt = stmt.order_by(FileModel.key).limit(limit)
+        with self.session() as session:
+            return [
+                FileMetadata(
+                    key=row.key, revision=row.latest_revision, size_bytes=row.size_bytes
+                )
+                for row in session.execute(stmt)
+            ]
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        with self.session() as session:
+            revision = session.scalar(
+                update(FileModel)
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                    FileModel.latest_revision == expected_revision,
+                )
+                .values(is_deleted=True)
+                .returning(FileModel.latest_revision)
+            )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=config.name,
+            title=config.title if config.HasField("title") else None,
+            description=config.description if config.HasField("description") else None,
+            app_spec=config.app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            return _agent_from_model(model)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -2142,6 +2312,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(NonceStoreModel.nonce)
             )
             return session.scalar(stmt) is not None
+
+
+def _agent_from_model(model: AgentModel) -> Agent:
+    """Convert an agent ORM model to its protobuf message."""
+    return Agent(
+        id=model.agent_id,
+        config=AgentConfig(
+            name=model.name,
+            title=model.title,
+            description=model.description,
+            app_spec=model.app_spec,
+        ),
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+    )
 
 
 def _connector_oauth_session_from_model(

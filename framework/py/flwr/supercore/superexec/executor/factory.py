@@ -169,6 +169,9 @@ def _warm_executor_pools_from_config(
     for entry in value:
         if not isinstance(entry, dict):
             raise ValueError("Warm executor pool entries must be mappings.")
+        if entry.get("task-type") == "flwr-model":
+            log(WARNING, "Ignoring obsolete flwr-model warm executor pool.")
+            continue
         allowed_fields = {
             "fab-hash",
             "fab-path",
@@ -187,8 +190,8 @@ def _warm_executor_pools_from_config(
             task_type = None
         if task_type not in WARM_EXECUTOR_TASK_TYPES:
             raise ValueError(
-                "Warm executor pools support only task types 'flwr-agentapp', "
-                "'flwr-model', and 'flwr-connector'."
+                "Warm executor pools support only task types 'flwr-agentapp' "
+                "and 'flwr-connector'."
             )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):

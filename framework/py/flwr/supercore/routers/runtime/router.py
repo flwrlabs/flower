@@ -39,14 +39,20 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -63,6 +69,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -341,3 +349,43 @@ def get_nodes(
 ) -> GetNodesResponse:
     """Get available nodes."""
     return handlers.get_nodes(request, state, task)
+
+
+@router.post("/put-file")
+def put_file(
+    request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> PutFileResponse:
+    """Store a file."""
+    return core_runtime_handlers.put_file(request, state, task)
+
+
+@router.post("/get-file")
+def get_file(
+    request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> GetFileResponse:
+    """Get a file."""
+    return core_runtime_handlers.get_file(request, state, task)
+
+
+@router.post("/list-files")
+def list_files(
+    request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> ListFilesResponse:
+    """List file metadata."""
+    return core_runtime_handlers.list_files(request, state, task)
+
+
+@router.post("/delete-file")
+def delete_file(
+    request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> DeleteFileResponse:
+    """Delete a file."""
+    return core_runtime_handlers.delete_file(request, state, task)

@@ -64,6 +64,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
 
@@ -165,13 +166,22 @@ def pull_messages(
     state: NodeState,
     task: Task,
 ) -> PullAppMessagesResponse:
-    """Pull messages for ClientApp; currently returns exactly one message."""
+    """Pull messages for ClientApp; currently returns at most one message."""
     log(DEBUG, "Runtime.PullMessages")
 
     run_id = task.run_id
 
     # Retrieve message for this run
-    messages = state.get_messages_legacy(run_ids=[run_id], is_reply=False, limit=1)
+    messages = state.get_messages(
+        dst_node_id=state.get_node_id(),
+        run_id=run_id,
+        reply_to_message_ids=(
+            request.reply_to_message_ids.vals
+            if request.HasField("reply_to_message_ids")
+            else None
+        ),
+        limit=1,
+    )
     if not messages:
         return PullAppMessagesResponse()
     message = messages[0]
@@ -180,7 +190,11 @@ def pull_messages(
     state.record_message_processing_start(message_id=message.metadata.message_id)
 
     # Retrieve the object tree for the message
-    object_tree = state.object_store.get_object_tree(message.metadata.message_id)
+    try:
+        object_tree = state.object_store.get_object_tree(message.metadata.message_id)
+    except NoObjectInStoreError:
+        state.cancel_messages(message_ids=[message.metadata.message_id])
+        return PullAppMessagesResponse()
 
     return PullAppMessagesResponse(
         messages_list=[message_to_proto(message)],
@@ -210,15 +224,21 @@ def push_messages(
             "Run ID in message does not match authenticated task's run ID.",
         )
 
-    # Record message processing end time
     message = message_from_proto(request.messages_list[0])
-    state.record_message_processing_end(message_id=message.metadata.reply_to_message_id)
+    if message.metadata.src_node_id != state.get_node_id():
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected source node ID."
+        )
 
     # Save the message to the state and preregister its objects
     session_id = state.start_session(run_id)
     stored, objects_to_push = state.store_message_and_object_tree(
         message, request.message_object_trees[0], session_id
     )
+    if stored and message.metadata.reply_to_message_id:
+        state.record_message_processing_end(
+            message_id=message.metadata.reply_to_message_id
+        )
 
     return PushAppMessagesResponse(
         message_ids=[message.metadata.message_id if stored else ""],
@@ -371,7 +391,6 @@ def confirm_message_received(
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
 
-    # Delete the message object
-    state.object_store.delete(request.message_object_id)
+    state.acknowledge_messages([request.message_object_id])
 
     return ConfirmMessageReceivedResponse()

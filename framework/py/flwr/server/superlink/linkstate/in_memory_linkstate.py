@@ -20,14 +20,13 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from logging import ERROR, WARNING
+from logging import ERROR
 from typing import Literal, cast
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
-    MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
@@ -40,7 +39,6 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
-from flwr.server.utils import validate_message
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -51,13 +49,7 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
-from .utils import (
-    check_node_availability_for_in_message,
-    create_user_prompt_message,
-    generate_rand_int_from_bytes,
-    verify_found_message_replies,
-    verify_message_ids,
-)
+from .utils import create_user_prompt_message, generate_rand_int_from_bytes
 
 
 @dataclass
@@ -87,9 +79,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
-        self.message_ins_store: dict[str, Message] = {}
-        self.message_res_store: dict[str, Message] = {}
-        self.message_ins_id_to_message_res_id: dict[str, str] = {}
 
         # Map flwr_aid to run_ids for O(1) reverse index lookup
         self.flwr_aid_to_run_ids: dict[str, set[int]] = defaultdict(set)
@@ -129,341 +118,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
-    def _is_finished_run(self, run_id: int) -> bool:
-        """Return True if the run has finished."""
-        return self._get_run(run_id).status.status == Status.FINISHED
-
-    def store_message_ins(self, message: Message) -> str | None:
-        """Store one Message."""
-        # Validate message
-        errors = validate_message(message, is_reply_message=False)
-        if any(errors):
-            log(ERROR, errors)
-            return None
-        # Validate source node ID
-        if message.metadata.src_node_id != SUPERLINK_NODE_ID:
-            log(
-                ERROR,
-                "Invalid source node ID for Message: %s",
-                message.metadata.src_node_id,
-            )
-            return None
-
-        message_id = message.metadata.message_id
-        with self.lock:
-            if message_id in self.message_ins_store:
-                return message_id
-
-            # Validate run_id
-            if message.metadata.run_id not in self.run_ids or self._is_finished_run(
-                message.metadata.run_id
-            ):
-                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                return None
-
-            federation_id = self.run_ids[message.metadata.run_id].run.federation_id
-
-            # Validate destination node ID
-            dst_node_id = message.metadata.dst_node_id
-            dst_node = self.nodes.get(dst_node_id)
-            if dst_node_id != SUPERLINK_NODE_ID and (
-                # Node must exist
-                dst_node is None
-                # Node must be online or offline
-                or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
-                # Node must belong to the same federation
-                or not self.federation_manager.has_node(dst_node_id, federation_id)
-            ):
-                log(
-                    ERROR,
-                    "Invalid destination node ID for Message: %s",
-                    message.metadata.dst_node_id,
-                )
-                return None
-
-            self.message_ins_store[message_id] = message
-
-        return message_id
-
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
         """Store a Message and preregister its ObjectTree."""
-        with self.lock:
-            if message.metadata.reply_to_message_id:
-                stored = self.store_message_res(message) is not None
-            else:
-                stored = self.store_message_ins(message) is not None
-
-            if not stored:
+        # Policy lookups must precede these locks, including during run creation.
+        if not self._check_message_policy([message])[0]:
+            return False, []
+        with self._lock_object_push_sessions, self.lock_message_store:
+            if not InMemoryCoreState.store_messages(self, [message])[0]:
                 return False, []
+
+            if self.message_store[message.metadata.message_id].message is None:
+                return True, []
 
             missing_objects = self.preregister_object_tree(object_tree, session_id)
             return True, missing_objects
-
-    def _check_stored_messages(
-        self, message_ids: set[str], run_id: int | None = None
-    ) -> None:
-        """Check and delete the message if it's invalid."""
-        with self.lock:
-            invalid_msg_ids: set[str] = set()
-            current = now().timestamp()
-            for msg_id in message_ids:
-                if not (message := self.message_ins_store.get(msg_id)):
-                    continue
-                if run_id is not None and message.metadata.run_id != run_id:
-                    raise ValueError("`message_ids` contains invalid IDs")
-
-                # Check if the message has expired
-                available_until = message.metadata.created_at + message.metadata.ttl
-                if available_until <= current:
-                    invalid_msg_ids.add(msg_id)
-                    continue
-
-                # Check if the destination node and the source node are still in the
-                # same federation
-                src_node_id = message.metadata.src_node_id
-                dst_node_id = message.metadata.dst_node_id
-                federation_id = self.run_ids[message.metadata.run_id].run.federation_id
-                if src_node_id != dst_node_id:
-                    filtered = self.federation_manager.filter_nodes(
-                        {src_node_id, dst_node_id},
-                        federation_id,
-                    )
-                    if len(filtered) != 2:  # Not both nodes are in the federation
-                        invalid_msg_ids.add(msg_id)
-
-            # Delete all invalid messages
-            self.delete_messages(invalid_msg_ids)
-
-    def get_message_ins(
-        self,
-        node_id: int,
-        limit: int | None,
-        *,
-        run_id: int | None = None,
-    ) -> list[Message]:
-        """Get all Messages that have not been delivered yet."""
-        if limit is not None and limit < 1:
-            raise AssertionError("`limit` must be >= 1")
-
-        # Find Message for node_id that were not delivered yet
-        message_ins_list: list[Message] = []
-        with self.lock:
-            for msg_id in list(self.message_ins_store.keys()):
-                self._check_stored_messages({msg_id})
-
-                if (
-                    (msg_ins := self.message_ins_store.get(msg_id))
-                    and msg_ins.metadata.dst_node_id == node_id
-                    and (run_id is None or msg_ins.metadata.run_id == run_id)
-                    and msg_ins.metadata.delivered_at == ""
-                ):
-                    message_ins_list.append(msg_ins)
-                if limit and len(message_ins_list) == limit:
-                    break
-
-        # Mark all of them as delivered
-        delivered_at = now().isoformat()
-        for msg_ins in message_ins_list:
-            msg_ins.metadata.delivered_at = delivered_at
-
-        # Return list of messages
-        return message_ins_list
-
-    # pylint: disable=R0911
-    def store_message_res(self, message: Message) -> str | None:
-        """Store one Message."""
-        # Validate message
-        errors = validate_message(message, is_reply_message=True)
-        if any(errors):
-            log(ERROR, errors)
-            return None
-
-        res_metadata = message.metadata
-        with self.lock:
-            message_id = res_metadata.message_id
-            # Check if the Message it is replying to exists and is valid
-            msg_ins_id = res_metadata.reply_to_message_id
-            msg_ins = self.message_ins_store.get(msg_ins_id)
-            if msg_ins and msg_ins.metadata.run_id != res_metadata.run_id:
-                log(ERROR, "`metadata.run_id` is invalid")
-                return None
-            self._check_stored_messages({msg_ins_id})
-            msg_ins = self.message_ins_store.get(msg_ins_id)
-
-            # Ensure that dst_node_id of original Message matches the src_node_id of
-            # reply Message.
-            if (
-                msg_ins
-                and message
-                and msg_ins.metadata.dst_node_id != res_metadata.src_node_id
-            ):
-                return None
-
-            if msg_ins is None:
-                log(
-                    ERROR,
-                    "Message with ID %s does not exist.",
-                    msg_ins_id,
-                )
-                return None
-
-            # Fail if the Message TTL exceeds the
-            # expiration time of the Message it replies to.
-            # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
-            #            res_metadata.created_at + res_metadata.ttl
-            # A small tolerance is introduced to account
-            # for floating-point precision issues.
-            ins_metadata = msg_ins.metadata
-            max_allowed_ttl = (
-                ins_metadata.created_at + ins_metadata.ttl - res_metadata.created_at
-            )
-            if res_metadata.ttl and (
-                res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
-            ):
-                log(
-                    WARNING,
-                    "Received Message with TTL %.2f exceeding the allowed maximum "
-                    "TTL %.2f.",
-                    res_metadata.ttl,
-                    max_allowed_ttl,
-                )
-                return None
-
-            # Validate run_id
-            if res_metadata.run_id != ins_metadata.run_id:
-                log(ERROR, "`metadata.run_id` is invalid")
-                return None
-            if self._is_finished_run(res_metadata.run_id):
-                log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
-                return None
-
-            if message_id in self.message_res_store:
-                return message_id
-
-            if msg_ins_id in self.message_ins_id_to_message_res_id:
-                log(
-                    ERROR,
-                    "Failed to store Message reply: duplicate reply for "
-                    "reply_to_message_id %s.",
-                    msg_ins_id,
-                )
-                return None
-
-            self.message_res_store[message_id] = message
-            self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
-
-        # Return the new message_id
-        return message_id
-
-    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
-        """Get reply Messages for the given Message IDs."""
-        ret: dict[str, Message] = {}
-
-        with self.lock:
-            self._check_stored_messages(message_ids, run_id)
-            current = now().timestamp()
-            found_message_ins_dict = {
-                message_id: self.message_ins_store[message_id]
-                for message_id in message_ids
-                if message_id in self.message_ins_store
-            }
-            # Verify Message IDs
-            ret = verify_message_ids(
-                inquired_message_ids=message_ids,
-                found_message_ins_dict=found_message_ins_dict,
-                run_id=run_id,
-                current_time=current,
-            )
-
-            # Check node availability
-            dst_node_ids = {
-                self.message_ins_store[message_id].metadata.dst_node_id
-                for message_id in message_ids
-            }
-            tmp_ret_dict = check_node_availability_for_in_message(
-                inquired_in_message_ids=message_ids,
-                found_in_message_dict=found_message_ins_dict,
-                node_id_to_online_until={
-                    node_id: self.nodes[node_id].online_until
-                    for node_id in dst_node_ids
-                    if node_id in self.nodes
-                    and self.nodes[node_id].status != NodeStatus.UNREGISTERED
-                },
-                current_time=current,
-            )
-            ret.update(tmp_ret_dict)
-
-            # Find all reply Messages
-            message_res_found: list[Message] = []
-            for message_id in message_ids:
-                # If Message exists and is not delivered, add it to the list
-                if message_res_id := self.message_ins_id_to_message_res_id.get(
-                    message_id
-                ):
-                    message_res = self.message_res_store[message_res_id]
-                    if message_res.metadata.delivered_at == "":
-                        message_res_found.append(message_res)
-            found_message_res_ids = {
-                message.metadata.message_id for message in message_res_found
-            }
-            tmp_ret_dict = verify_found_message_replies(
-                inquired_message_ids=message_ids,
-                found_message_ins_dict=found_message_ins_dict,
-                found_message_res_list=message_res_found,
-                current_time=current,
-            )
-            ret.update(tmp_ret_dict)
-
-            # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
-            for message_res in message_res_found:
-                message_res.metadata.delivered_at = delivered_at
-
-            for message in ret.values():
-                if message.metadata.message_id not in found_message_res_ids:
-                    self._store_generated_message(message)
-
-        return list(ret.values())
-
-    def delete_messages(self, message_ins_ids: set[str]) -> None:
-        """Delete a Message and its reply based on provided Message IDs."""
-        if not message_ins_ids:
-            return
-
-        with self.lock:
-            for message_id in message_ins_ids:
-                # Delete Messages
-                if message_id in self.message_ins_store:
-                    del self.message_ins_store[message_id]
-                # Delete Message replies
-                if message_id in self.message_ins_id_to_message_res_id:
-                    message_res_id = self.message_ins_id_to_message_res_id.pop(
-                        message_id
-                    )
-                    del self.message_res_store[message_res_id]
-
-    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Delete Messages belonging to an expired push session."""
-        with self.lock:
-            self.delete_messages(message_object_ids)
-            for message_id in message_object_ids:
-                message_res = self.message_res_store.pop(message_id, None)
-                if message_res is not None:
-                    self.message_ins_id_to_message_res_id.pop(
-                        message_res.metadata.reply_to_message_id, None
-                    )
-
-    def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
-        """Get all instruction Message IDs for the given run_id."""
-        message_id_list: set[str] = set()
-        with self.lock:
-            for message_id, message in self.message_ins_store.items():
-                if message.metadata.run_id == run_id:
-                    message_id_list.add(message_id)
-
-        return message_id_list
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up its messages and objects."""
@@ -479,20 +149,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         self.cleanup_run(run_id)
         return True
-
-    def num_message_ins(self) -> int:
-        """Calculate the number of instruction Messages in store.
-
-        This includes delivered but not yet deleted.
-        """
-        return len(self.message_ins_store)
-
-    def num_message_res(self) -> int:
-        """Calculate the number of reply Messages in store.
-
-        This includes delivered but not yet deleted.
-        """
-        return len(self.message_res_store)
 
     def create_node(  # pylint: disable=too-many-arguments
         self,
@@ -759,7 +415,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
             if primary_task_type == TaskType.AGENT_APP and user_prompt is not None:
                 message = create_user_prompt_message(run_id, user_prompt)
-                self.store_message_ins(message)
+                self.store_messages([message])
                 self._store_generated_message(message)
             if initial_task_event is not None:
                 initial_task_event.id = self._next_task_event_id

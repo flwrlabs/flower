@@ -21,7 +21,7 @@ import signal
 import threading
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from logging import DEBUG, ERROR
 from types import FrameType
 from typing import Any
@@ -55,6 +55,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 
 from .task import handle_task
 
@@ -69,6 +70,7 @@ class _ConnectorTaskLifecycle:  # pylint: disable=too-many-instance-attributes
         insecure: bool,
         certificates: bytes | None,
     ) -> None:
+        self.timings = PhaseTimings()
         self._runtime_api_address = runtime_api_address
         self._token = token
         self._insecure = insecure
@@ -82,6 +84,7 @@ class _ConnectorTaskLifecycle:  # pylint: disable=too-many-instance-attributes
         self._finalized = False
         self._task_finished = False
         self._leave_event_started = False
+        self._trace_attributes = {"flwr.component": "connector"}
 
     def run(self) -> int:
         """Execute the task and return its Flower exit code."""
@@ -95,15 +98,24 @@ class _ConnectorTaskLifecycle:  # pylint: disable=too-many-instance-attributes
             self._heartbeat_sender.start()
 
             log(DEBUG, "[flwr-connector] Pull task input")
-            task_input: PullTaskInputResponse = self._client.PullTaskInput(
-                PullTaskInputRequest()
-            )
+            with self.timings.measure("task.input"):
+                task_input: PullTaskInputResponse = self._client.PullTaskInput(
+                    PullTaskInputRequest()
+                )
             TaskIdentity.task_id = task_input.task_id
             TaskIdentity.run_id = task_input.run.run_id
             TaskIdentity.node_id = task_input.context.node_id
+            attributes = {
+                "flwr.component": "connector",
+                "flwr.task_id": str(task_input.task_id),
+                "flwr.run_id": str(task_input.run.run_id),
+            }
+            self._trace_attributes.update(attributes)
+            self.timings.publish("task.bootstrap", attributes)
 
             event(EventType.FLWR_CONNECTOR_RUN_ENTER)
-            handle_task(client=self._client)
+            with trace_span("connector.execute", attributes=attributes):
+                handle_task(client=self._client)
 
             with self._lock:
                 self._sub_status = SubStatus.COMPLETED
@@ -143,10 +155,14 @@ class _ConnectorTaskLifecycle:  # pylint: disable=too-many-instance-attributes
 
     def finalize(self) -> None:
         """Push final status and release task state exactly once."""
-        with _ignore_graceful_signals(), self._lock:
+        with _ignore_graceful_signals(), self._lock, ExitStack() as tracing:
             if self._finalized:
                 return
             self._finalized = True
+            tracing.callback(flush_traces)
+            tracing.enter_context(
+                trace_span("task.finalize", attributes=self._trace_attributes)
+            )
 
             log(DEBUG, "[flwr-connector] Will push Connector task output")
             if self._client is None or self._retry_invoker is None:
@@ -222,7 +238,8 @@ def _run_connector_task(  # pylint: disable=too-many-arguments
         insecure,
         certificates,
     )
-    lifecycle.initialize()
+    with lifecycle.timings.measure("task.runtime_client"):
+        lifecycle.initialize()
     if resident:
         _register_resident_signal_handlers(lifecycle)
     else:
@@ -235,7 +252,8 @@ def _run_connector_task(  # pylint: disable=too-many-arguments
         )
     # Transfer task authority only after Runtime state and signal ownership exist.
     if on_started is not None:
-        on_started()
+        with lifecycle.timings.measure("task.accept"):
+            on_started()
     return lifecycle, lifecycle.run()
 
 

@@ -33,6 +33,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from functools import lru_cache
 from importlib import import_module
+from time import monotonic_ns, time_ns
 from types import ModuleType
 from typing import Any
 
@@ -62,6 +63,16 @@ def _backend() -> ModuleType | None:
     return _load_backend() if os.getenv("FLWR_TRACING_ENABLED") == "1" else None
 
 
+def initialize_tracing(component: str) -> None:
+    """Prepare optional tracing before worker readiness, without creating a span."""
+    backend = _backend()
+    if backend is not None:
+        try:
+            backend.initialize_tracing(component)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+
 class TraceSpan:
     """Isolate optional tracing failures from application work."""
 
@@ -81,6 +92,41 @@ class TraceSpan:
         if self._span is not None:
             try:
                 self._span.add_event(name)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+
+class PhaseTimings:
+    """Retain measured phases until their run/task identity is available."""
+
+    def __init__(self) -> None:
+        self._enabled = os.getenv("FLWR_TRACING_ENABLED") == "1"
+        self._wall = time_ns() if self._enabled else 0
+        self._clock = monotonic_ns() if self._enabled else 0
+        self._phases: list[tuple[str, int, int]] = []
+
+    @contextmanager
+    def measure(self, name: str) -> Iterator[None]:
+        """Measure elapsed time without importing or invoking a tracing SDK."""
+        if not self._enabled:
+            yield
+            return
+        start = self._wall + monotonic_ns() - self._clock
+        try:
+            yield
+        finally:
+            end = self._wall + monotonic_ns() - self._clock
+            self._phases.append((name, start, end))
+
+    def publish(self, name: str, attributes: Mapping[str, TraceScalar]) -> None:
+        """Export the completed group once, with original measured timestamps."""
+        phases, self._phases = self._phases, []
+        if not phases:
+            return
+        backend = _backend()
+        if backend is not None:
+            try:
+                backend.record_phase_spans(name, phases, dict(attributes))
             except Exception:  # pylint: disable=broad-exception-caught
                 pass
 

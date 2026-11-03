@@ -32,6 +32,7 @@ from flwr.supercore import log
 from flwr.supercore.typing import JSONObject
 
 from . import task_worker_protocol as protocol
+from .tracing import initialize_tracing
 
 # Bound each socket write so a lost reader cannot stall accepted-task cleanup.
 _OUTPUT_SEND_TIMEOUT_SECONDS = 0.1
@@ -127,6 +128,8 @@ def serve_prestarted_worker(  # pylint: disable=too-many-arguments,too-many-posi
     busy_file.unlink(missing_ok=True)
 
     try:
+        # Pay tracing setup before readiness, not after accepting task authority.
+        initialize_tracing(task_name.lower())
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
             server.bind(str(socket_path))
             socket_path.chmod(0o600)

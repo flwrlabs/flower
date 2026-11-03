@@ -34,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -46,6 +48,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListAppAssociationsRequest,
     ListAppAssociationsResponse,
     ListAppsRequest,
@@ -147,6 +151,26 @@ ProtobufStreamContextDependency = Annotated[
 ArtifactProviderDependency = Annotated[
     ArtifactProvider | None, Depends(get_artifact_provider)
 ]
+
+
+@router.post("/create-agent")
+def create_agent(
+    request: Annotated[CreateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateAgentResponse:
+    """Create an agent."""
+    return control_handlers.create_agent(request, account, linkstate)
+
+
+@router.post("/list-agents")
+def list_agents(
+    request: Annotated[ListAgentsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAgentsResponse:
+    """List agents."""
+    return control_handlers.list_agents(request, account, linkstate)
 
 
 @router.post("/start-run")

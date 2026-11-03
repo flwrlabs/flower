@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-21 00:09+0000\n"
+"POT-Creation-Date: 2026-11-01 00:07+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -48,8 +48,8 @@ msgstr ""
 msgid "Changelog"
 msgstr ""
 
-#: ../../source/changelog/v1.41.0.md:2
-msgid "v1.41.0 (2026-10-20)"
+#: ../../source/changelog/v1.42.0.md:2
+msgid "v1.42.0 (2026-10-22)"
 msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
@@ -73,9 +73,10 @@ msgstr ""
 #: ../../source/changelog/v1.36.0.md:4 ../../source/changelog/v1.37.0.md:4
 #: ../../source/changelog/v1.38.0.md:4 ../../source/changelog/v1.39.0.md:4
 #: ../../source/changelog/v1.4.0.md:4 ../../source/changelog/v1.40.0.md:4
-#: ../../source/changelog/v1.41.0.md:4 ../../source/changelog/v1.5.0.md:4
-#: ../../source/changelog/v1.6.0.md:4 ../../source/changelog/v1.7.0.md:4
-#: ../../source/changelog/v1.8.0.md:4 ../../source/changelog/v1.9.0.md:4
+#: ../../source/changelog/v1.41.0.md:4 ../../source/changelog/v1.42.0.md:4
+#: ../../source/changelog/v1.5.0.md:4 ../../source/changelog/v1.6.0.md:4
+#: ../../source/changelog/v1.7.0.md:4 ../../source/changelog/v1.8.0.md:4
+#: ../../source/changelog/v1.9.0.md:4
 msgid "Thanks to our contributors"
 msgstr "Merci à nos contributeurs"
 
@@ -99,9 +100,10 @@ msgstr "Merci à nos contributeurs"
 #: ../../source/changelog/v1.36.0.md:6 ../../source/changelog/v1.37.0.md:6
 #: ../../source/changelog/v1.38.0.md:6 ../../source/changelog/v1.39.0.md:6
 #: ../../source/changelog/v1.4.0.md:6 ../../source/changelog/v1.40.0.md:6
-#: ../../source/changelog/v1.41.0.md:6 ../../source/changelog/v1.5.0.md:6
-#: ../../source/changelog/v1.6.0.md:6 ../../source/changelog/v1.7.0.md:6
-#: ../../source/changelog/v1.8.0.md:6 ../../source/changelog/v1.9.0.md:6
+#: ../../source/changelog/v1.41.0.md:6 ../../source/changelog/v1.42.0.md:6
+#: ../../source/changelog/v1.5.0.md:6 ../../source/changelog/v1.6.0.md:6
+#: ../../source/changelog/v1.7.0.md:6 ../../source/changelog/v1.8.0.md:6
+#: ../../source/changelog/v1.9.0.md:6
 msgid ""
 "We would like to give our special thanks to all the contributors who made"
 " the new version of Flower possible (in `git shortlog` order):"
@@ -110,11 +112,9 @@ msgstr ""
 "ont rendu possible la nouvelle version de Flower (dans l'ordre `git "
 "shortlog`) :"
 
-#: ../../source/changelog/v1.41.0.md:8
+#: ../../source/changelog/v1.42.0.md:8
 #, fuzzy
-msgid ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, "
-"`Javier`, `Taner Topal`"
+msgid "`Charles Beauville`, `Chong Shen Ng`, `Heng Pan`, `Javier`, `Taner Topal`"
 msgstr ""
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
@@ -141,11 +141,107 @@ msgstr ""
 #: ../../source/changelog/v1.36.0.md:10 ../../source/changelog/v1.37.0.md:10
 #: ../../source/changelog/v1.38.0.md:10 ../../source/changelog/v1.39.0.md:10
 #: ../../source/changelog/v1.4.0.md:10 ../../source/changelog/v1.40.0.md:10
-#: ../../source/changelog/v1.41.0.md:10 ../../source/changelog/v1.5.0.md:10
-#: ../../source/changelog/v1.6.0.md:10 ../../source/changelog/v1.7.0.md:10
-#: ../../source/changelog/v1.8.0.md:10 ../../source/changelog/v1.9.0.md:10
+#: ../../source/changelog/v1.41.0.md:10 ../../source/changelog/v1.42.0.md:10
+#: ../../source/changelog/v1.5.0.md:10 ../../source/changelog/v1.6.0.md:10
+#: ../../source/changelog/v1.7.0.md:10 ../../source/changelog/v1.8.0.md:10
+#: ../../source/changelog/v1.9.0.md:10
 msgid "What's new?"
 msgstr "Quoi de neuf ?"
+
+#: ../../source/changelog/v1.42.0.md:12
+#, fuzzy
+msgid ""
+"**Reduce Agent response latency with faster warm-pool handoff** "
+"([#8280](https://github.com/flwrlabs/flower/pull/8280))"
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:14
+msgid ""
+"Ready warm Pods are now handed off before Kubernetes replenishes the "
+"pool. Reconciliation creates replacements while tasks run, avoiding "
+"Kubernetes list and Pod-creation requests during successful warm token "
+"handoff."
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:16
+#, fuzzy
+msgid ""
+"**Train the vertical FL example reliably** "
+"([#8396](https://github.com/flwrlabs/flower/pull/8396))"
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:18
+msgid ""
+"The vertical FL example now aligns shuffled features and labels, reuses "
+"the model state that produced each embedding, requires complete feature "
+"and gradient exchanges, and reports training loss and accuracy from the "
+"same model state."
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:20
+#, fuzzy
+msgid ""
+"**Improve Python TLS security following the eMudhra CA incident** "
+"([#8400](https://github.com/flwrlabs/flower/pull/8400))"
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:22
+msgid ""
+"Following the eMudhra CA compromise, Flower now requires "
+"`certifi>=2026.10.19` and `uv>=0.13.5,<0.14.0` to mitigate risks from "
+"compromised CA certificates. CI, container, and baseline bootstraps also "
+"use updated, pinned build tools. Existing installations and images must "
+"be updated or rebuilt to receive these security improvements."
+msgstr ""
+
+#: ../../source/changelog/v1.42.0.md:24
+#, fuzzy
+msgid ""
+"**General improvements** "
+"([#8369](https://github.com/flwrlabs/flower/pull/8369), "
+"[#8391](https://github.com/flwrlabs/flower/pull/8391), "
+"[#8392](https://github.com/flwrlabs/flower/pull/8392), "
+"[#8393](https://github.com/flwrlabs/flower/pull/8393), "
+"[#8398](https://github.com/flwrlabs/flower/pull/8398), "
+"[#8399](https://github.com/flwrlabs/flower/pull/8399), "
+"[#8403](https://github.com/flwrlabs/flower/pull/8403), "
+"[#8405](https://github.com/flwrlabs/flower/pull/8405))"
+msgstr ""
+
+#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
+#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
+#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
+#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
+#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
+#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
+#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
+#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
+#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
+#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
+#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
+#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
+#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
+#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
+#: ../../source/changelog/v1.37.0.md:40 ../../source/changelog/v1.38.0.md:36
+#: ../../source/changelog/v1.39.0.md:28 ../../source/changelog/v1.40.0.md:38
+#: ../../source/changelog/v1.41.0.md:24 ../../source/changelog/v1.42.0.md:26
+msgid ""
+"As always, many parts of the Flower framework and quality infrastructure "
+"were improved and updated."
+msgstr ""
+"Comme toujours, de nombreuses parties du cadre Flower et de "
+"l'infrastructure qualité ont été améliorées et mises à jour."
+
+#: ../../source/changelog/v1.41.0.md:2
+msgid "v1.41.0 (2026-10-20)"
+msgstr ""
+
+#: ../../source/changelog/v1.41.0.md:8
+#, fuzzy
+msgid ""
+"`Charles Beauville`, `Chong Shen Ng`, `Daniel Nata Nugraha`, `Heng Pan`, "
+"`Javier`, `Taner Topal`"
+msgstr ""
 
 #: ../../source/changelog/v1.41.0.md:12
 #, fuzzy
@@ -221,30 +317,6 @@ msgid ""
 "[#8389](https://github.com/flwrlabs/flower/pull/8389), "
 "[#8394](https://github.com/flwrlabs/flower/pull/8394))"
 msgstr ""
-
-#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
-#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
-#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
-#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
-#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
-#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
-#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
-#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
-#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
-#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
-#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
-#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
-#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
-#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
-#: ../../source/changelog/v1.37.0.md:40 ../../source/changelog/v1.38.0.md:36
-#: ../../source/changelog/v1.39.0.md:28 ../../source/changelog/v1.40.0.md:38
-#: ../../source/changelog/v1.41.0.md:24
-msgid ""
-"As always, many parts of the Flower framework and quality infrastructure "
-"were improved and updated."
-msgstr ""
-"Comme toujours, de nombreuses parties du cadre Flower et de "
-"l'infrastructure qualité ont été améliorées et mises à jour."
 
 #: ../../source/changelog/v1.40.0.md:2
 msgid "v1.40.0 (2026-10-14)"
@@ -25360,11 +25432,11 @@ msgstr ""
 "La classe de base ``Strategy`` définit une méthode ``start`` et exige que"
 " les sous-classes implémentent plusieurs méthodes abstraites :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:97
+#: ../../source/explanation-flower-strategy-abstraction.rst:98
 msgid "Creating a new strategy"
 msgstr "Créer une nouvelle stratégie"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:99
+#: ../../source/explanation-flower-strategy-abstraction.rst:100
 msgid ""
 "You can customize an existing strategy (e.g., |fedavg_link|_) by "
 "overriding one or several of its methods. For full flexibility, you can "
@@ -25379,7 +25451,7 @@ msgstr ""
 "définez simplement une classe qui dérive de ``Strategy`` et implémentez "
 "les méthodes abstraites :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:127
+#: ../../source/explanation-flower-strategy-abstraction.rst:128
 msgid ""
 "The ``start`` method is already implemented in the base class and "
 "typically does not need to be overridden. It orchestrates the federated "
@@ -25390,15 +25462,15 @@ msgstr ""
 " d'apprentissage fédéré en invoquant les méthodes abstraites dans une "
 "séquence."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:133
+#: ../../source/explanation-flower-strategy-abstraction.rst:134
 msgid "Understand ``start`` method"
 msgstr "Comprenez la méthode ``start``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:135
+#: ../../source/explanation-flower-strategy-abstraction.rst:136
 msgid "The ``start`` method of the ``Strategy`` base class follows this workflow:"
 msgstr "La méthode ``start`` de la classe de base ``Strategy`` suit ce workflow :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:137
+#: ../../source/explanation-flower-strategy-abstraction.rst:138
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the initial model on the "
 "ServerApp side."
@@ -25406,17 +25478,17 @@ msgstr ""
 "Appelez ``evaluate_fn`` (si fourni) pour évaluer le modèle initial sur le"
 " côté ServerApp. "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:139
+#: ../../source/explanation-flower-strategy-abstraction.rst:140
 msgid "Call ``configure_train`` to generate training messages for ClientApps."
 msgstr ""
 "Appelez ``configure_train`` pour générer des messages d'entraînement pour"
 " les applications Client."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:140
+#: ../../source/explanation-flower-strategy-abstraction.rst:141
 msgid "Send training messages to ClientApps."
 msgstr "Envoyer des messages d'entraînement aux ClientApps."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:141
+#: ../../source/explanation-flower-strategy-abstraction.rst:142
 msgid ""
 "ClientApps run their ``@app.train()`` function and return training "
 "replies."
@@ -25424,11 +25496,11 @@ msgstr ""
 "Les ClientApps exécutent leur fonction ``@app.train()`` et retournent les"
 " réponses d'entraînement."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:142
+#: ../../source/explanation-flower-strategy-abstraction.rst:143
 msgid "Call ``aggregate_train`` to aggregate the training replies."
 msgstr "Appelez ``aggregate_train`` pour agréger les réponses d'entraînement."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:143
+#: ../../source/explanation-flower-strategy-abstraction.rst:144
 msgid ""
 "Call ``configure_evaluate`` to generate evaluation messages for "
 "ClientApps."
@@ -25436,11 +25508,11 @@ msgstr ""
 "Appelez ``configure_evaluate`` pour générer des messages d'évaluation "
 "pour les applications Client."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:144
+#: ../../source/explanation-flower-strategy-abstraction.rst:145
 msgid "Send evaluation messages to ClientApps."
 msgstr "Envoyer des messages d'évaluation aux ClientApps."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:145
+#: ../../source/explanation-flower-strategy-abstraction.rst:146
 msgid ""
 "ClientApps run their ``@app.evaluate()`` function and return evaluation "
 "replies."
@@ -25448,11 +25520,11 @@ msgstr ""
 "Les ClientApps exécutent leur fonction ``@app.evaluate()`` et retournent "
 "les réponses d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:146
+#: ../../source/explanation-flower-strategy-abstraction.rst:147
 msgid "Call ``aggregate_evaluate`` to aggregate the evaluation replies."
 msgstr "Appelez ``aggregate_evaluate`` pour agréger les réponses d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:147
+#: ../../source/explanation-flower-strategy-abstraction.rst:148
 msgid ""
 "Call ``evaluate_fn`` (if provided) to evaluate the aggregated model on "
 "the ServerApp side."
@@ -25460,23 +25532,28 @@ msgstr ""
 "Appelez ``evaluate_fn`` (si fourni) pour évaluer le modèle agrégé sur le "
 "côté ServerApp. "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:149
-msgid "Repeat steps 2-10 for the specified number of rounds."
-msgstr "Répétez les étapes 2-10 pour le nombre spécifié de tours."
-
 #: ../../source/explanation-flower-strategy-abstraction.rst:150
 msgid ""
-"Return the final ``Result``, which contains the final model and metrics "
-"history."
+"Call ``should_stop`` (if provided) with the completed round number and "
+"accumulated ``Result``. If it returns ``True``, stop executing rounds"
 msgstr ""
-"Retournez le modèle final, qui contient le modèle final et l'historique "
-"des métriques."
 
 #: ../../source/explanation-flower-strategy-abstraction.rst:152
+msgid "Otherwise, repeat steps 2-11 up to ``num_rounds`` times"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:153
+#, fuzzy
+msgid ""
+"Return the final ``Result``, which contains the final model and metrics "
+"history"
+msgstr ""
+
+#: ../../source/explanation-flower-strategy-abstraction.rst:155
 msgid "The following diagram illustrates the flow."
 msgstr "Le diagramme suivant illustre le flux."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:156
+#: ../../source/explanation-flower-strategy-abstraction.rst:159
 msgid ""
 "The sequence diagram below shows the interaction between ``ServerApp``, "
 "``Strategy`` (inside ``ServerApp``), and ``ClientApp``. In reality, they "
@@ -25493,11 +25570,11 @@ msgstr ""
 "ce sujet dans le guide :doc:`Flower Network Communication <ref-flower-"
 "network-communication>`."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:201
+#: ../../source/explanation-flower-strategy-abstraction.rst:204
 msgid "The ``configure_train`` method"
 msgstr "La méthode ``configure_train``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:203
+#: ../../source/explanation-flower-strategy-abstraction.rst:206
 msgid ""
 "The ``configure_train`` method is responsible for preparing the next "
 "round of training. But what does *configure* mean in this context? It "
@@ -25510,40 +25587,40 @@ msgstr ""
 "participer à le tour et décider quelles instructions ils devraient "
 "recevoir."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:207
-#: ../../source/explanation-flower-strategy-abstraction.rst:249
-#: ../../source/explanation-flower-strategy-abstraction.rst:287
-#: ../../source/explanation-flower-strategy-abstraction.rst:330
+#: ../../source/explanation-flower-strategy-abstraction.rst:210
+#: ../../source/explanation-flower-strategy-abstraction.rst:252
+#: ../../source/explanation-flower-strategy-abstraction.rst:290
+#: ../../source/explanation-flower-strategy-abstraction.rst:333
 msgid "Here is the method signature:"
 msgstr "Voici l'énoncé de la méthode :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:217
-#: ../../source/explanation-flower-strategy-abstraction.rst:297
+#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:300
 msgid "This method takes four arguments:"
 msgstr "Cette méthode prend quatre arguments :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:219
-#: ../../source/explanation-flower-strategy-abstraction.rst:263
-#: ../../source/explanation-flower-strategy-abstraction.rst:299
-#: ../../source/explanation-flower-strategy-abstraction.rst:344
+#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:347
 msgid "``server_round``: The current round number"
 msgstr "``server_round``: Le numéro actuel de tour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:220
+#: ../../source/explanation-flower-strategy-abstraction.rst:223
 msgid "``arrays``: The current global model parameters"
 msgstr "``arrays``: Les paramètres du modèle global actuels"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:221
+#: ../../source/explanation-flower-strategy-abstraction.rst:224
 msgid "``config``: A configuration dictionary for the round"
 msgstr "``config``: Un dictionnaire de configuration pour le tour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:222
+#: ../../source/explanation-flower-strategy-abstraction.rst:225
 msgid "``grid``: The object responsible for managing communication with clients"
 msgstr ""
 "``grid``: L'objet responsable de la gestion de la communication avec les "
 "clients"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:224
+#: ../../source/explanation-flower-strategy-abstraction.rst:227
 msgid ""
 "The return value is an iterable of ``Message`` objects, where each "
 "message contains the instructions to be sent to a specific client. A "
@@ -25553,7 +25630,7 @@ msgstr ""
 "message contient les instructions à envoyer à un client spécifique. Une "
 "mise en œuvre typique de ``configure_train`` sera : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:228
+#: ../../source/explanation-flower-strategy-abstraction.rst:231
 msgid ""
 "Use the ``grid`` to randomly sample a subset (or all) of the available "
 "clients"
@@ -25561,7 +25638,7 @@ msgstr ""
 "Utilisez le ``grid`` pour échantillonner aléatoirement un sous-ensemble "
 "(ou tous) des clients disponibles"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:229
+#: ../../source/explanation-flower-strategy-abstraction.rst:232
 msgid ""
 "Create one ``Message`` per selected client, containing the global model "
 "parameters and configuration values"
@@ -25569,7 +25646,7 @@ msgstr ""
 "Créez un ``Message`` par client sélectionné, contenant les paramètres du "
 "modèle global et les valeurs de configuration"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:232
+#: ../../source/explanation-flower-strategy-abstraction.rst:235
 msgid ""
 "More advanced strategies can implement custom client selection logic by "
 "using the capabilities of ``grid``. A client only participates in a round"
@@ -25580,7 +25657,7 @@ msgstr ""
 " Un client ne participe qu'à un tour si ``configure_train`` génère un "
 "message pour son ID de nœud."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:238
+#: ../../source/explanation-flower-strategy-abstraction.rst:241
 msgid ""
 "Because the return value is defined per client, strategies can easily "
 "implement heterogeneous configurations. For example, different clients "
@@ -25593,11 +25670,11 @@ msgstr ""
 "hyperparamètres différents, permettant des comportements d'entraînement "
 "hautement personnalisés."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:244
+#: ../../source/explanation-flower-strategy-abstraction.rst:247
 msgid "The ``aggregate_train`` method"
 msgstr "La méthode ``aggregate_train``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:246
+#: ../../source/explanation-flower-strategy-abstraction.rst:249
 msgid ""
 "The ``aggregate_train`` method is responsible for aggregating the "
 "training results received from the clients selected in "
@@ -25607,12 +25684,12 @@ msgstr ""
 "résultats d'entraînement reçus des clients sélectionnés dans "
 "``configure_train``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:261
-#: ../../source/explanation-flower-strategy-abstraction.rst:342
+#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:345
 msgid "This method takes two arguments:"
 msgstr "Cette méthode prend deux arguments :"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:264
+#: ../../source/explanation-flower-strategy-abstraction.rst:267
 msgid ""
 "``replies``: An iterable of ``Message`` objects from the participating "
 "clients"
@@ -25620,21 +25697,21 @@ msgstr ""
 "``replies``: Un itérateur de ``Message`` objets provenant des clients "
 "participants"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:266
+#: ../../source/explanation-flower-strategy-abstraction.rst:269
 msgid "It returns a tuple consisting of:"
 msgstr "Elle retourne un tuple composé de : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:268
+#: ../../source/explanation-flower-strategy-abstraction.rst:271
 msgid "``ArrayRecord``: The updated global model parameters"
 msgstr "``ArrayRecord``: Les paramètres du modèle global mis à jour"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:269
+#: ../../source/explanation-flower-strategy-abstraction.rst:272
 msgid "``MetricRecord``: Aggregated training metrics (such as loss or accuracy)"
 msgstr ""
 "``MetricRecord``: Les métriques d'entraînement agrégées (telles que la "
 "perte ou l'exactitude)"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:271
+#: ../../source/explanation-flower-strategy-abstraction.rst:274
 msgid ""
 "If aggregation cannot be performed (e.g., if too many clients failed "
 "during the round), the method may decide to return ``(None, None)`` "
@@ -25644,7 +25721,7 @@ msgstr ""
 "clients ont échoué pendant le tour), la méthode peut décider de retourner"
 " ``(None, None)`` au lieu."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:276
+#: ../../source/explanation-flower-strategy-abstraction.rst:279
 msgid ""
 "You can use ``Message.has_error()`` to check if a reply contains an error"
 " and decide how to handle it during aggregation."
@@ -25652,11 +25729,11 @@ msgstr ""
 "Vous pouvez utiliser ``Message.has_error()`` pour vérifier si une réponse"
 " contient une erreur et décider comment y réagir lors de l'agrégation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:281
+#: ../../source/explanation-flower-strategy-abstraction.rst:284
 msgid "The ``configure_evaluate`` method"
 msgstr "La méthode ``configure_evaluate``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:283
+#: ../../source/explanation-flower-strategy-abstraction.rst:286
 msgid ""
 "The ``configure_evaluate`` method is responsible for preparing the next "
 "round of evaluation. Similar to ``configure_train``, this involves "
@@ -25668,19 +25745,19 @@ msgstr ""
 "implique la sélection des clients qui devraient participer et la décision"
 " de ce qu'ils devraient recevoir en instructions pour l'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:300
+#: ../../source/explanation-flower-strategy-abstraction.rst:303
 msgid "``arrays``: The current global model parameters to be evaluated"
 msgstr "``arrays``: Les paramètres du modèle global actuels à évaluer"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:301
+#: ../../source/explanation-flower-strategy-abstraction.rst:304
 msgid "``config``: A configuration dictionary for evaluation"
 msgstr "``config``: Un dictionnaire de configuration pour l'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:302
+#: ../../source/explanation-flower-strategy-abstraction.rst:305
 msgid "``grid``: The object that manages communication with clients"
 msgstr "``grid``: L'objet qui gère la communication avec les clients"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:304
+#: ../../source/explanation-flower-strategy-abstraction.rst:307
 msgid ""
 "The return value is an iterable of ``Message`` objects, one for each "
 "selected client. Each message typically contains the current global model"
@@ -25690,17 +25767,17 @@ msgstr ""
 " sélectionné. Chaque message contient généralement les paramètres du "
 "modèle global actuels et toute configuration d'évaluation."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:308
+#: ../../source/explanation-flower-strategy-abstraction.rst:311
 msgid "A typical implementation of ``configure_evaluate`` will:"
 msgstr "Une mise en œuvre typique de ``configure_evaluate`` sera : "
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:310
+#: ../../source/explanation-flower-strategy-abstraction.rst:313
 msgid "Use ``grid`` to select a subset (or all) of the available clients"
 msgstr ""
 "Utilisez ``grid`` pour sélectionner un sous-ensemble (ou tous) des "
 "clients disponibles"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:311
+#: ../../source/explanation-flower-strategy-abstraction.rst:314
 msgid ""
 "Create one ``Message`` per selected client containing the global model "
 "and evaluation configuration"
@@ -25708,7 +25785,7 @@ msgstr ""
 "Créez un ``Message`` par client sélectionné contenant le modèle global et"
 " la configuration d'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:314
+#: ../../source/explanation-flower-strategy-abstraction.rst:317
 msgid ""
 "As with training, more advanced strategies may apply custom client "
 "selection logic or send different evaluation configurations to different "
@@ -25718,7 +25795,7 @@ msgstr ""
 " une logique de sélection de client personnalisée ou envoyer différentes "
 "configurations d'évaluation à différents clients."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:319
+#: ../../source/explanation-flower-strategy-abstraction.rst:322
 msgid ""
 "Because each client receives its own message, strategies can implement "
 "heterogeneous evaluation setups. For example, some clients might evaluate"
@@ -25729,11 +25806,11 @@ msgstr ""
 "certains clients pourraient évaluer sur des jeux de test plus grands, "
 "tandis que d'autres utiliseraient des métriques spécialisées."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:325
+#: ../../source/explanation-flower-strategy-abstraction.rst:328
 msgid "The ``aggregate_evaluate`` method"
 msgstr "La méthode ``aggregate_evaluate``"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:327
+#: ../../source/explanation-flower-strategy-abstraction.rst:330
 msgid ""
 "The ``aggregate_evaluate`` method is responsible for aggregating the "
 "evaluation results received from the clients selected in "
@@ -25743,7 +25820,7 @@ msgstr ""
 "résultats d'évaluation reçus des clients sélectionnés dans "
 "``configure_evaluate``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:345
+#: ../../source/explanation-flower-strategy-abstraction.rst:348
 msgid ""
 "``replies``: An iterable of ``Message`` objects returned by the clients "
 "after they executed evaluation"
@@ -25751,7 +25828,7 @@ msgstr ""
 "``replies``: Une itérable de ``Message`` objets retournés par les clients"
 " après qu'ils ont exécuté l'évaluation"
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:348
+#: ../../source/explanation-flower-strategy-abstraction.rst:351
 msgid ""
 "It returns a single ``MetricRecord`` that represents the aggregated "
 "evaluation metrics across all participating clients. If aggregation "
@@ -25764,7 +25841,7 @@ msgstr ""
 "échecs des clients ou de métriques manquantes), la méthode peut retourner"
 " ``None``."
 
-#: ../../source/explanation-flower-strategy-abstraction.rst:354
+#: ../../source/explanation-flower-strategy-abstraction.rst:357
 msgid ""
 "As with training, ``Message.has_error()`` can be used to detect and "
 "handle client errors during aggregation."
@@ -41296,22 +41373,16 @@ msgstr ""
 "durée d'attente à 2 heures, nous ferions:"
 
 #: ../../source/how-to-use-strategies.rst:281
+#, fuzzy
 msgid ""
-"Finally, the last argument in ``start`` is named ``evaluate_fn`` and it "
-"allows passing to it a callback function to evaluate the aggregated model"
-" on some local data that the ``ServerApp`` might have access to. This "
-"callback is also useful if you want to save the global model at the end "
-"of every round (or every N rounds). Let's see what the signature of this "
-"callback is and how to use it:"
+"The ``evaluate_fn`` argument allows passing a callback function to "
+"evaluate the aggregated model on some local data that the ``ServerApp`` "
+"might have access to. This callback is also useful if you want to save "
+"the global model at the end of every round (or every N rounds). Let's see"
+" what the signature of this callback is and how to use it:"
 msgstr ""
-"Enfin, l'argument final dans ``start`` est nommé ``evaluate_fn`` et "
-"permet de passer une fonction callback pour évaluer le modèle agrégé sur "
-"des données locales que le ``ServerApp`` pourrait avoir accès. Cette "
-"fonctionnalité est également utile si vous souhaitez sauvegarder le "
-"modèle global à la fin de chaque tour (ou tous les N tours). Voyons ce "
-"que est la signature de cette fonction callback et comment l'utiliser :"
 
-#: ../../source/how-to-use-strategies.rst:312
+#: ../../source/how-to-use-strategies.rst:311
 msgid ""
 "Take a look at the `quickstart-pytorch "
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
@@ -41322,6 +41393,39 @@ msgstr ""
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
 "pytorch>`_ sur GitHub pour un exemple complet utilisant plusieurs des "
 "concepts présentés dans ce guide."
+
+#: ../../source/how-to-use-strategies.rst:318
+msgid "Stop a strategy run early"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:320
+msgid ""
+"Pass a ``should_stop`` callback to ``start`` to stop before reaching "
+"``num_rounds``. The callback receives the completed round number and "
+"accumulated :class:`~flwr.serverapp.strategy.Result`. For example, stop "
+"when aggregated federated evaluation accuracy reaches 90%:"
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:345
+msgid ""
+"The predicate runs once after each full round, including federated "
+"evaluation and any centralized evaluation. It does not run after the "
+"initial evaluation at round zero. Return ``True`` to stop and ``False`` "
+"to continue, and treat the results as read-only. When the predicate "
+"returns ``True``, no further round is dispatched. The returned ``Result``"
+" contains the current global model and all metrics collected so far, so "
+"the ServerApp can continue with saving the model or other application "
+"logic."
+msgstr ""
+
+#: ../../source/how-to-use-strategies.rst:352
+msgid ""
+"``num_rounds`` remains the maximum number of rounds. Without "
+"``should_stop``, all configured rounds run as before. Errors raised by "
+"the predicate propagate normally. Custom strategies that override "
+"``start`` must forward ``should_stop`` to the base implementation or "
+"invoke it in their own round loop."
+msgstr ""
 
 #: ../../source/index.rst:37
 msgid "Tutorial"
@@ -42664,7 +42768,7 @@ msgstr ""
 msgid ""
 ":py:obj:`put_compacted_context "
 "<flwr.agentapp.AgentEvents.put_compacted_context>`\\ \\(\\*\\, "
-"through\\_event\\_id\\, text\\)"
+"through\\_event\\_id\\, ...\\)"
 msgstr ""
 
 #: flwr.agentapp.base.AgentEvents.emit:1:<autosummary>:1
@@ -44241,34 +44345,13 @@ msgstr "L'erreur qui a été rencontrée."
 
 #: flwr.app.message.message.Message.create_error_reply:5
 #: flwr.app.message.message.Message.create_reply:9 of
+#, fuzzy
 msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:  ttl = msg.meta.ttl - (reply.meta.created_at - "
-"msg.meta.created_at)"
-msgstr ""
-"Durée de vie pour ce message en secondes. Si non défini, il sera "
-"déterminé en fonction du temps restant avant l'expiration du message "
-"reçu. Cela suit l'équation :  ttl = msg.meta.ttl - (reply.meta.created_at"
-" - msg.meta.created_at)"
-
-#: flwr.app.message.message.Message.create_error_reply:5
-#: flwr.app.message.message.Message.create_reply:9 of
-msgid ""
-"Time-to-live for this message in seconds. If unset, it will be set based "
-"on the remaining time for the received message before it expires. This "
-"follows the equation:"
-msgstr ""
-"Durée de vie pour ce message en secondes. Si non défini, il sera "
-"déterminé en fonction du temps restant avant l'expiration du message "
-"reçu. Cela suit l'équation :"
-
-#: flwr.app.message.message.Message.create_error_reply:9
-#: flwr.app.message.message.Message.create_reply:13 of
-msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+"Time-to-live for this reply in seconds, independent of the original "
+"message's TTL. If unset, defaults to 43,200 seconds (12 hours)."
 msgstr ""
 
-#: flwr.app.message.message.Message.create_error_reply:12 of
+#: flwr.app.message.message.Message.create_error_reply:9 of
 msgid "**message** -- A Message containing only the relevant error and metadata."
 msgstr ""
 "**message** -- Un Message contenant uniquement l'erreur et les "
@@ -44288,7 +44371,7 @@ msgstr ""
 msgid "The content for the reply message."
 msgstr "Le contenu pour le message de réponse."
 
-#: flwr.app.message.message.Message.create_reply:16 of
+#: flwr.app.message.message.Message.create_reply:13 of
 msgid "A new `Message` instance representing the reply."
 msgstr "Un nouveau `Message` instance représentant la réponse."
 
@@ -44386,17 +44469,6 @@ msgstr "Un identifiant pour la tâche destination qui reçoit ce message."
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
 msgstr ""
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1 of
-msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
-msgstr ""
-
-#: flwr.app.Metadata.created_at:1:<autosummary>:1
-#: flwr.app.Metadata.delivered_at:1
-#: flwr.common.Metadata.created_at:1:<autosummary>:1
-#: flwr.common.Metadata.delivered_at:1 of
-msgid "Unix timestamp when the message was delivered."
-msgstr "Heure Unix à laquelle le message a été transmis."
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1 of
 msgid ":py:obj:`dst_node_id <flwr.app.Metadata.dst_node_id>`\\"
@@ -47678,18 +47750,6 @@ msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
 msgid ""
-":py:obj:`FLWR_MODEL_RUN_ENTER "
-"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
-":py:obj:`FLWR_MODEL_RUN_LEAVE "
-"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
-msgstr ""
-
-#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
-msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_ENTER "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_ENTER>`\\"
 msgstr ""
@@ -47698,6 +47758,18 @@ msgstr ""
 msgid ""
 ":py:obj:`FLWR_CONNECTOR_RUN_LEAVE "
 "<flwr.common.EventType.FLWR_CONNECTOR_RUN_LEAVE>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_ENTER "
+"<flwr.common.EventType.FLWR_MODEL_RUN_ENTER>`\\"
+msgstr ""
+
+#: flwr.common.EventType.capitalize:1:<autosummary>:1 of
+msgid ""
+":py:obj:`FLWR_MODEL_RUN_LEAVE "
+"<flwr.common.EventType.FLWR_MODEL_RUN_LEAVE>`\\"
 msgstr ""
 
 #: flwr.common.EventType.capitalize:1:<autosummary>:1 of
@@ -48373,11 +48445,6 @@ msgstr ":py:obj:`TRAIN <flwr.app.MessageType.TRAIN>`\\"
 #, fuzzy
 msgid ":py:obj:`created_at <flwr.common.Metadata.created_at>`\\"
 msgstr ":py:obj:`created_at <flwr.app.Metadata.created_at>`\\"
-
-#: flwr.common.Metadata.created_at:1:<autosummary>:1 of
-#, fuzzy
-msgid ":py:obj:`delivered_at <flwr.common.Metadata.delivered_at>`\\"
-msgstr ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
 
 #: flwr.common.Metadata.created_at:1:<autosummary>:1 of
 #, fuzzy
@@ -49470,17 +49537,15 @@ msgstr ""
 #, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.server.Driver.pull_messages>`\\ "
-"\\(message\\_ids\\)"
+"\\(\\[reply\\_to\\_message\\_ids\\, ...\\]\\)"
 msgstr ""
-":py:obj:`pull_messages <flwr.serverapp.Grid.pull_messages>`\\ "
-"\\(message\\_ids\\)"
 
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 #: flwr.serverapp.grid.grid.Grid.pull_messages:1 of
-msgid "Pull messages based on message IDs."
-msgstr "Tirez des messages en fonction des IDs de message."
+msgid "Pull messages with an optional correlation filter."
+msgstr ""
 
 #: ../../source/ref-api/flwr.server.Driver.rst:44:<autosummary>:1
 #, fuzzy
@@ -49596,20 +49661,22 @@ msgstr ""
 "métadonnées spécifiés."
 
 #: flwr.serverapp.grid.grid.Grid.pull_messages:3 of
+msgid "Messages are addressed to this Grid's node and belong to its run."
+msgstr ""
+
+#: flwr.serverapp.grid.grid.Grid.pull_messages:5 of
 msgid ""
-"This method is used to collect messages from the SuperLink that "
-"correspond to a set of given message IDs."
+"Message IDs to filter ``reply_to_message_id`` by. If ``None``, no "
+"correlation filter is applied. An empty iterable matches no messages."
 msgstr ""
-"Cette méthode est utilisée pour collecter des messages à partir de "
-"SuperLink qui correspondent à un ensemble donné d'IDs de message."
 
-#: flwr.serverapp.grid.grid.Grid.pull_messages:6 of
-msgid "An iterable of message IDs for which reply messages are to be retrieved."
+#: flwr.serverapp.grid.grid.Grid.pull_messages:8 of
+msgid ""
+"Deprecated alias for ``reply_to_message_ids``. Only one of the two "
+"parameters may be non-``None``."
 msgstr ""
-"Une itérable d'IDs de message pour lesquels les réponses doivent être "
-"récupérées."
 
-#: flwr.serverapp.grid.grid.Grid.pull_messages:9 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:12 of
 msgid "**messages** -- An iterable of messages received."
 msgstr "**messages** -- Une itération de messages reçus."
 
@@ -49705,10 +49772,8 @@ msgstr ""
 #, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.server.Grid.pull_messages>`\\ "
-"\\(message\\_ids\\)"
+"\\(\\[reply\\_to\\_message\\_ids\\, ...\\]\\)"
 msgstr ""
-":py:obj:`pull_messages <flwr.serverapp.Grid.pull_messages>`\\ "
-"\\(message\\_ids\\)"
 
 #: ../../source/ref-api/flwr.server.Grid.rst:44:<autosummary>:1
 #, fuzzy
@@ -54255,12 +54320,11 @@ msgid ":py:obj:`get_nodes <flwr.serverapp.Grid.get_nodes>`\\ \\(\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
+#, fuzzy
 msgid ""
 ":py:obj:`pull_messages <flwr.serverapp.Grid.pull_messages>`\\ "
-"\\(message\\_ids\\)"
+"\\(\\[reply\\_to\\_message\\_ids\\, ...\\]\\)"
 msgstr ""
-":py:obj:`pull_messages <flwr.serverapp.Grid.pull_messages>`\\ "
-"\\(message\\_ids\\)"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:44:<autosummary>:1
 msgid ""
@@ -55920,14 +55984,17 @@ msgstr ""
 "fédéré."
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:11 of
-msgid "Number of federated learning rounds to execute."
-msgstr "Nombre de tours d'apprentissage fédéré à exécuter."
+#, fuzzy
+msgid "Maximum number of federated learning rounds to execute."
+msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:13 of
-msgid "Timeout in seconds for waiting for node responses."
-msgstr "Délai en secondes pour attendre les réponses des nœuds."
+msgid ""
+"Timeout in seconds for waiting for node responses. Outstanding responses "
+"from nodes that become unavailable are replaced with error replies."
+msgstr ""
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:15 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:16 of
 msgid ""
 "Configuration to be sent to nodes during training rounds. If unset, an "
 "empty ConfigRecord will be used."
@@ -55935,7 +56002,7 @@ msgstr ""
 "Configuration à envoyer aux nœuds pendant les tours d'entraînement. Si "
 "non défini, un ConfigRecord vide sera utilisé."
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:18 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:19 of
 msgid ""
 "Configuration to be sent to nodes during evaluation rounds. If unset, an "
 "empty ConfigRecord will be used."
@@ -55943,7 +56010,7 @@ msgstr ""
 "Configuration à envoyer aux nœuds pendant les tours d'évaluation. Si non "
 "défini, un ConfigRecord vide sera utilisé."
 
-#: flwr.serverapp.strategy.strategy.Strategy.start:21 of
+#: flwr.serverapp.strategy.strategy.Strategy.start:22 of
 msgid ""
 "Optional function for centralized evaluation of the global model. Takes "
 "server round number and array record, returns a MetricRecord or None. If "
@@ -55956,6 +56023,15 @@ msgstr ""
 "après chaque ronde. Par défaut à None."
 
 #: flwr.serverapp.strategy.strategy.Strategy.start:27 of
+msgid ""
+"Optional predicate to determine whether to stop training early. Called at"
+" the end of each round with the round number and accumulated results. "
+"Return True to stop and return the model and metrics collected so far. "
+"Not called for round zero. Results must not be modified. Defaults to None"
+" (no early stopping)."
+msgstr ""
+
+#: flwr.serverapp.strategy.strategy.Strategy.start:34 of
 msgid ""
 "Results containing final model arrays and also training metrics, "
 "evaluation metrics and global evaluation metrics (if provided) from all "
@@ -67429,4 +67505,81 @@ msgstr ""
 #~ msgstr ""
 #~ "URL (par exemple, ``https://127.0.0.1:8080`` "
 #~ "ou ``https://example.com:8080``)"
+
+#~ msgid ""
+#~ ":py:obj:`put_compacted_context "
+#~ "<flwr.agentapp.AgentEvents.put_compacted_context>`\\ \\(\\*\\,"
+#~ " through\\_event\\_id\\, text\\)"
+#~ msgstr ""
+
+#~ msgid "Pull messages based on message IDs."
+#~ msgstr "Tirez des messages en fonction des IDs de message."
+
+#~ msgid ""
+#~ "This method is used to collect "
+#~ "messages from the SuperLink that "
+#~ "correspond to a set of given "
+#~ "message IDs."
+#~ msgstr ""
+#~ "Cette méthode est utilisée pour "
+#~ "collecter des messages à partir de "
+#~ "SuperLink qui correspondent à un "
+#~ "ensemble donné d'IDs de message."
+
+#~ msgid ""
+#~ "An iterable of message IDs for "
+#~ "which reply messages are to be "
+#~ "retrieved."
+#~ msgstr ""
+#~ "Une itérable d'IDs de message pour "
+#~ "lesquels les réponses doivent être "
+#~ "récupérées."
+
+#~ msgid "Repeat steps 2-10 for the specified number of rounds."
+#~ msgstr "Répétez les étapes 2-10 pour le nombre spécifié de tours."
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:  ttl"
+#~ " = msg.meta.ttl - (reply.meta.created_at -"
+#~ " msg.meta.created_at)"
+#~ msgstr ""
+#~ "Durée de vie pour ce message en"
+#~ " secondes. Si non défini, il sera "
+#~ "déterminé en fonction du temps restant"
+#~ " avant l'expiration du message reçu. "
+#~ "Cela suit l'équation :  ttl = "
+#~ "msg.meta.ttl - (reply.meta.created_at - "
+#~ "msg.meta.created_at)"
+
+#~ msgid ""
+#~ "Time-to-live for this message in"
+#~ " seconds. If unset, it will be "
+#~ "set based on the remaining time "
+#~ "for the received message before it "
+#~ "expires. This follows the equation:"
+#~ msgstr ""
+#~ "Durée de vie pour ce message en"
+#~ " secondes. Si non défini, il sera "
+#~ "déterminé en fonction du temps restant"
+#~ " avant l'expiration du message reçu. "
+#~ "Cela suit l'équation :"
+
+#~ msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
+#~ msgstr ""
+
+#~ msgid "Unix timestamp when the message was delivered."
+#~ msgstr "Heure Unix à laquelle le message a été transmis."
+
+#~ msgid ":py:obj:`delivered_at <flwr.common.Metadata.delivered_at>`\\"
+#~ msgstr ":py:obj:`delivered_at <flwr.app.Metadata.delivered_at>`\\"
+
+#~ msgid "Timeout in seconds for waiting for node responses."
+#~ msgstr "Délai en secondes pour attendre les réponses des nœuds."
 

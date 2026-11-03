@@ -14,16 +14,7 @@
 # ==============================================================================
 """SQLAlchemy declarative model definitions for LinkState."""
 
-from sqlalchemy import (
-    BigInteger,
-    Float,
-    ForeignKey,
-    Index,
-    LargeBinary,
-    MetaData,
-    String,
-    text,
-)
+from sqlalchemy import BigInteger, Float, Index, LargeBinary, MetaData, String, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -86,56 +77,3 @@ class Run(LinkStateBase):
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")
 
     __mapper_args__ = {"primary_key": [run_id]}
-
-
-class MessageIns(LinkStateBase):
-    """Represent an instruction message."""
-
-    __tablename__ = "message_ins"
-
-    message_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
-    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("run.run_id"), nullable=True
-    )
-    src_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    dst_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    delivered_at: Mapped[str | None] = mapped_column(String, nullable=True)
-    ttl: Mapped[float | None] = mapped_column(Float, nullable=True)
-    message_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
-    __mapper_args__ = {"primary_key": [message_id]}
-
-
-class MessageRes(LinkStateBase):
-    """Represent a reply message."""
-
-    __tablename__ = "message_res"
-    __table_args__ = (
-        Index(
-            "idx_message_res_reply_to_message_id_unique",
-            "reply_to_message_id",
-            unique=True,
-        ),
-    )
-
-    message_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
-    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("run.run_id"), nullable=True
-    )
-    src_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    dst_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    delivered_at: Mapped[str | None] = mapped_column(String, nullable=True)
-    ttl: Mapped[float | None] = mapped_column(Float, nullable=True)
-    message_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
-    __mapper_args__ = {"primary_key": [message_id]}
