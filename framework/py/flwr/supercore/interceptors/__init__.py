@@ -17,12 +17,14 @@
 from flwr.supercore.constant import TASK_TOKEN_HEADER
 
 from .http import (
+    FlowerErrorHttpInterceptor,
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
 )
 
 __all__ = [
+    "FlowerErrorHttpInterceptor",
     "RuntimeTokenHttpInterceptor",
     "RuntimeVersionHttpInterceptor",
     "SuperExecAuthHttpInterceptor",
