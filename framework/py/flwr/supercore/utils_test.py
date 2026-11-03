@@ -28,7 +28,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from .utils import (
     MetadataLookupError,
     build_sql_in_params,
-    find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
     get_metadata_str_checked,
@@ -75,18 +74,6 @@ def test_build_sql_in_params_from_set() -> None:
 
     assert placeholders == ",".join(f":{key}" for key in params)
     assert set(params.values()) == {10, 20, 30}
-
-
-def test_find_metadata_keys() -> None:
-    """Return the subset of requested keys present in metadata."""
-    assert find_metadata_keys(
-        [
-            ("x-token", "value"),
-            ("x-trace-id", "abc"),
-            ("x-token", "other"),
-        ],
-        ("x-token", "missing"),
-    ) == {"x-token"}
 
 
 def test_mask_string() -> None:

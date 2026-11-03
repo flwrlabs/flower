@@ -28,11 +28,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.utils import (
-    MetadataLookupError,
-    find_metadata_keys,
-    get_metadata_str_checked,
-)
+from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -108,28 +104,6 @@ class RuntimeVersionMetadata:
 
         except MetadataLookupError as e:
             return None, f"Invalid Flower runtime metadata: {str(e)}"
-
-    @classmethod
-    def from_grpc_metadata(
-        cls,
-        grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
-    ) -> tuple[RuntimeVersionMetadata | None, str | None]:
-        """Parse runtime version metadata from a gRPC metadata sequence."""
-        return cls.from_metadata(grpc_metadata)
-
-    def append_to_grpc_metadata(
-        self,
-        grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
-    ) -> tuple[tuple[str, str | bytes], ...]:
-        """Return gRPC metadata with runtime version values added."""
-        metadata = tuple(grpc_metadata or ())
-        existing_runtime_keys = find_metadata_keys(metadata, _RUNTIME_METADATA_KEYS)
-        if existing_runtime_keys:
-            raise RuntimeError(
-                "gRPC metadata already contains runtime version keys: "
-                f"{', '.join(sorted(existing_runtime_keys))}"
-            )
-        return metadata + self.as_metadata()
 
     def as_metadata(self) -> tuple[tuple[str, str], ...]:
         """Return runtime-version values as transport-neutral metadata."""
@@ -212,7 +186,7 @@ def get_runtime_version_incompatibility_exit_message(
 def _metadata_is_missing(
     metadata: Sequence[tuple[str, str | bytes]] | None,
 ) -> bool:
-    """Return `True` if all runtime metadata keys are missing from the gRPC metadata.
+    """Return `True` if all runtime metadata keys are missing.
 
     This is a TEMPORARY helper to allow older clients without runtime metadata to
     continue working rather than being rejected for missing metadata. It is safe to

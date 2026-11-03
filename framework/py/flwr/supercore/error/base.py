@@ -70,11 +70,10 @@ class FlowerError(Exception):
 
     @staticmethod
     def from_json(value: str | None) -> FlowerError | None:
-        """Deserialize a client-visible gRPC or HTTP error payload.
+        """Deserialize a client-visible HTTP error payload.
 
         The internal diagnostic message is not transmitted over the wire. The returned
-        error therefore uses the public message (``public_message`` for gRPC or
-        ``detail`` for HTTP) as its ``message`` value.
+        error therefore uses the public ``detail`` as its ``message`` value.
         """
         if value is None:
             return None
@@ -88,12 +87,8 @@ class FlowerError(Exception):
             return None
 
         code = payload.get("code")
-        if "public_message" in payload:
-            public_message = payload.get("public_message")
-            public_details = payload.get("public_details")
-        else:
-            public_message = payload.get("detail")
-            public_details = payload.get("extra")
+        public_message = payload.get("detail")
+        public_details = payload.get("extra")
 
         if (
             not isinstance(code, int)

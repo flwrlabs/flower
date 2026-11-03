@@ -1,21 +1,22 @@
-Run Lizzy
-=========
+###########
+ Run Lizzy
+###########
 
-This guide shows the most common ways to run Lizzy 7B from Hugging Face.
-Use the BF16 checkpoint when you want full precision, Transformers/vLLM
-serving, tensor parallelism, or fine-tuning. Use GGUF when you have a local
-runtime that supports the Lizzy GGUF architecture and want smaller files or
-local inference.
+This guide shows the most common ways to run Lizzy 7B from Hugging Face. Use the BF16
+checkpoint when you want full precision, Transformers/vLLM serving, tensor parallelism,
+or fine-tuning. Use GGUF when you have a local runtime that supports the Lizzy GGUF
+architecture and want smaller files or local inference.
 
-Before choosing a runtime, check :doc:`hardware-requirements` for memory,
-disk, and long-context planning guidance.
+Before choosing a runtime, check :doc:`hardware-requirements` for memory, disk, and
+long-context planning guidance.
 
-Run with Transformers
----------------------
+***********************
+ Run with Transformers
+***********************
 
-Use Python 3.10 or later and install PyTorch, Transformers 5.x, ``jinja2``,
-and ``protobuf``. Transformers 5.x includes the ``TokenizersBackend`` tokenizer
-class used by the Lizzy tokenizer metadata:
+Use Python 3.10 or later and install PyTorch, Transformers 5.x, ``jinja2``, and
+``protobuf``. Transformers 5.x includes the ``TokenizersBackend`` tokenizer class used
+by the Lizzy tokenizer metadata:
 
 .. code-block:: bash
 
@@ -60,15 +61,15 @@ Then load the base checkpoint with ``trust_remote_code=True``:
     print(response)
 
 This path was tested on macOS with Python 3.13, ``torch==2.12.0``,
-``transformers==5.9.0``, and the BF16 checkpoint. ``AutoTokenizer``,
-chat-template rendering, and default cached generation returned the expected
-short response.
+``transformers==5.9.0``, and the BF16 checkpoint. ``AutoTokenizer``, chat-template
+rendering, and default cached generation returned the expected short response.
 
-Run with vLLM
--------------
+***************
+ Run with vLLM
+***************
 
-vLLM exposes an OpenAI-compatible API for GPU serving. Use this path on a
-Linux GPU server or another environment supported by your vLLM version:
+vLLM exposes an OpenAI-compatible API for GPU serving. Use this path on a Linux GPU
+server or another environment supported by your vLLM version:
 
 .. code-block:: bash
 
@@ -97,29 +98,28 @@ Then call the server:
       -H "Content-Type: application/json" \
       --data @request.json
 
-This path was smoke-tested with ``vllm==0.21.0`` and
-``torch==2.11.0+cu130`` on single NVIDIA A40 and H100 GPUs. The
-OpenAI-compatible server responded on H100, and in-process generation worked
-on H100 up to ``max_model_len=32768`` in short tests.
+This path was smoke-tested with ``vllm==0.21.0`` and ``torch==2.11.0+cu130`` on single
+NVIDIA A40 and H100 GPUs. The OpenAI-compatible server responded on H100, and in-process
+generation worked on H100 up to ``max_model_len=32768`` in short tests.
 
-Tensor-parallel in-process generation also passed with ``tensor_parallel_size=2``
-on two H100 GPUs and ``tensor_parallel_size=4`` on four A40 GPUs after Lizzy's
-attention reshape logic was updated to use local tensor-parallel head counts.
-``tensor_parallel_size=8`` and OpenAI-compatible serving with tensor
-parallelism were not completed in this test pass, so validate the exact vLLM
-server configuration before relying on multi-GPU serving in production. Runtime
-support can vary by vLLM version, GPU generation, and backend.
+Tensor-parallel in-process generation also passed with ``tensor_parallel_size=2`` on two
+H100 GPUs and ``tensor_parallel_size=4`` on four A40 GPUs after Lizzy's attention
+reshape logic was updated to use local tensor-parallel head counts.
+``tensor_parallel_size=8`` and OpenAI-compatible serving with tensor parallelism were
+not completed in this test pass, so validate the exact vLLM server configuration before
+relying on multi-GPU serving in production. Runtime support can vary by vLLM version,
+GPU generation, and backend.
 
-Run the GGUF model with llama.cpp
----------------------------------
+***********************************
+ Run the GGUF model with llama.cpp
+***********************************
 
-The GGUF release provides quantized files for local runtimes that support the
-Lizzy GGUF architecture. The Hugging Face quick start uses the ``Q4_K_M``
-variant:
+The GGUF release provides quantized files for local runtimes that support the Lizzy GGUF
+architecture. The Hugging Face quick start uses the ``Q4_K_M`` variant:
 
-The command below uses the currently tested Lizzy-compatible llama.cpp fork and
-branch. Use upstream llama.cpp or a packaged runtime instead once it includes
-support for ``general.architecture = lizzy``.
+The command below uses the currently tested Lizzy-compatible llama.cpp fork and branch.
+Use upstream llama.cpp or a packaged runtime instead once it includes support for
+``general.architecture = lizzy``.
 
 .. code-block:: bash
 
@@ -131,10 +131,9 @@ support for ``general.architecture = lizzy``.
       -hf flwrlabs/Lizzy-7B-GGUF:Q4_K_M \
       -c 1024
 
-If your runtime reports ``unknown model architecture: 'lizzy'``, it does not
-include Lizzy GGUF support. Use a Lizzy-compatible build or run the BF16
-checkpoint with Transformers instead. See :doc:`troubleshooting` for details
-from smoke tests.
+If your runtime reports ``unknown model architecture: 'lizzy'``, it does not include
+Lizzy GGUF support. Use a Lizzy-compatible build or run the BF16 checkpoint with
+Transformers instead. See :doc:`troubleshooting` for details from smoke tests.
 
 For direct terminal completion:
 
@@ -161,14 +160,14 @@ initialization can fail. To force a small CPU-only smoke test, use:
       -ngl 0 \
       --no-op-offload
 
-Run the GGUF model with llama-cpp-python
-----------------------------------------
+******************************************
+ Run the GGUF model with llama-cpp-python
+******************************************
 
-This path requires a llama-cpp-python build linked against a llama.cpp version
-that supports the Lizzy GGUF architecture. It may also require
-llama-cpp-python support for Lizzy's embedded chat template. If initialization
-fails with an unknown Jinja ``generation`` tag, use the llama.cpp server path
-or see :doc:`troubleshooting`.
+This path requires a llama-cpp-python build linked against a llama.cpp version that
+supports the Lizzy GGUF architecture. It may also require llama-cpp-python support for
+Lizzy's embedded chat template. If initialization fails with an unknown Jinja
+``generation`` tag, use the llama.cpp server path or see :doc:`troubleshooting`.
 
 .. code-block:: python
 
@@ -176,6 +175,7 @@ or see :doc:`troubleshooting`.
     from llama_cpp import Llama
 
     original_init = chat_format.Jinja2ChatFormatter.__init__
+
 
     def lizzy_chat_template_init(
         self,
@@ -196,6 +196,7 @@ or see :doc:`troubleshooting`.
             stop_token_ids,
         )
 
+
     chat_format.Jinja2ChatFormatter.__init__ = lizzy_chat_template_init
 
     llm = Llama(
@@ -214,50 +215,51 @@ or see :doc:`troubleshooting`.
     )
     print(output["choices"][0]["message"]["content"])
 
-Run the GGUF model with Ollama
-------------------------------
+********************************
+ Run the GGUF model with Ollama
+********************************
 
-Ollama support is work in progress. Current public Ollama builds may not yet
-include backend support for the Lizzy GGUF architecture. Until that support is
-available, prefer the Lizzy-compatible llama.cpp path above.
+Ollama support is work in progress. Current public Ollama builds may not yet include
+backend support for the Lizzy GGUF architecture. Until that support is available, prefer
+the Lizzy-compatible llama.cpp path above.
 
 .. code-block:: bash
 
     ollama run hf.co/flwrlabs/Lizzy-7B-GGUF:Q4_K_M
 
-Desktop GGUF apps such as LM Studio and Jan are also work in progress for
-Lizzy. To use Lizzy in a desktop app, first confirm that the app version ships
-with a llama.cpp backend that recognizes ``general.architecture = lizzy``. If
-the app lets you choose a custom backend, point it at a Lizzy-compatible
-llama.cpp build and import one of the ``flwrlabs/Lizzy-7B-GGUF``
-quantizations. If it reports ``unknown model architecture: 'lizzy'``, update
-the app backend or use llama.cpp directly.
+Desktop GGUF apps such as LM Studio and Jan are also work in progress for Lizzy. To use
+Lizzy in a desktop app, first confirm that the app version ships with a llama.cpp
+backend that recognizes ``general.architecture = lizzy``. If the app lets you choose a
+custom backend, point it at a Lizzy-compatible llama.cpp build and import one of the
+``flwrlabs/Lizzy-7B-GGUF`` quantizations. If it reports ``unknown model architecture:
+'lizzy'``, update the app backend or use llama.cpp directly.
 
-Choose a runtime
-----------------
+******************
+ Choose a runtime
+******************
 
 .. list-table::
-   :header-rows: 1
+    :header-rows: 1
 
-   * - Runtime
-     - Use it when
-   * - Transformers
-     - You need Python integration, full precision, custom model code, or
-       fine-tuning workflows.
-   * - vLLM
-     - You need GPU serving, OpenAI-compatible APIs, batching, or tensor
-       parallelism.
-   * - llama.cpp
-     - You have a build that supports Lizzy GGUF and need local inference, CPU
-       support, flexible GPU offload, or a small deployment footprint.
-   * - Ollama, LM Studio, Jan
-     - Work in progress. Use only after verifying that the app backend includes
-       Lizzy GGUF support.
+    - - Runtime
+      - Use it when
+    - - Transformers
+      - You need Python integration, full precision, custom model code, or fine-tuning
+        workflows.
+    - - vLLM
+      - You need GPU serving, OpenAI-compatible APIs, batching, or tensor parallelism.
+    - - llama.cpp
+      - You have a build that supports Lizzy GGUF and need local inference, CPU support,
+        flexible GPU offload, or a small deployment footprint.
+    - - Ollama, LM Studio, Jan
+      - Work in progress. Use only after verifying that the app backend includes Lizzy
+        GGUF support.
 
-Generation settings
--------------------
+*********************
+ Generation settings
+*********************
 
-The GGUF examples use ``temperature=0.6`` and ``top_p=0.95``.
-For deterministic documentation, coding, or extraction tasks, start with a
-lower temperature such as ``0.2``. For more conversational output, increase the
-temperature gradually and evaluate outputs for factuality and style.
+The GGUF examples use ``temperature=0.6`` and ``top_p=0.95``. For deterministic
+documentation, coding, or extraction tasks, start with a lower temperature such as
+``0.2``. For more conversational output, increase the temperature gradually and evaluate
+outputs for factuality and style.
