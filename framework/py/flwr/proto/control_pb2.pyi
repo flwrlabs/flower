@@ -509,29 +509,50 @@ class ListRunsResponse(google.protobuf.message.Message):
 global___ListRunsResponse = ListRunsResponse
 
 @typing.final
+class ConversationParticipant(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FLWR_AID_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
+    flwr_aid: builtins.str
+    agent_id: builtins.int
+    def __init__(
+        self,
+        *,
+        flwr_aid: builtins.str = ...,
+        agent_id: builtins.int = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["agent_id", b"agent_id", "flwr_aid", b"flwr_aid", "participant", b"participant"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "flwr_aid", b"flwr_aid", "participant", b"participant"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["participant", b"participant"]) -> typing.Literal["flwr_aid", "agent_id"] | None: ...
+
+global___ConversationParticipant = ConversationParticipant
+
+@typing.final
 class Conversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONVERSATION_ID_FIELD_NUMBER: builtins.int
-    FEDERATION_ID_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
+    PARTICIPANTS_FIELD_NUMBER: builtins.int
     conversation_id: builtins.int
-    federation_id: builtins.str
     title: builtins.str
     created_at: builtins.str
     updated_at: builtins.str
+    @property
+    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationParticipant]: ...
     def __init__(
         self,
         *,
         conversation_id: builtins.int = ...,
-        federation_id: builtins.str = ...,
         title: builtins.str = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
+        participants: collections.abc.Iterable[global___ConversationParticipant] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "created_at", b"created_at", "federation_id", b"federation_id", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "created_at", b"created_at", "participants", b"participants", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
 
 global___Conversation = Conversation
 
@@ -539,14 +560,9 @@ global___Conversation = Conversation
 class CreateConversationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FEDERATION_FIELD_NUMBER: builtins.int
-    federation: builtins.str
     def __init__(
         self,
-        *,
-        federation: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
 
 global___CreateConversationRequest = CreateConversationRequest
 
@@ -571,16 +587,9 @@ global___CreateConversationResponse = CreateConversationResponse
 class ListConversationsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    FEDERATION_ID_FIELD_NUMBER: builtins.int
-    federation_id: builtins.str
     def __init__(
         self,
-        *,
-        federation_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "federation_id", b"federation_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_federation_id", b"_federation_id", "federation_id", b"federation_id"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_federation_id", b"_federation_id"]) -> typing.Literal["federation_id"] | None: ...
 
 global___ListConversationsRequest = ListConversationsRequest
 
