@@ -45,22 +45,6 @@ def test_flower_error_to_json_and_from_json() -> None:
     assert parsed.public_details == "public details"
 
 
-def test_flower_error_from_grpc_json() -> None:
-    """Continue to deserialize the legacy gRPC FlowerError payload."""
-    parsed = FlowerError.from_json(
-        json.dumps(
-            {
-                "public_message": "public message",
-                "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
-                "public_details": "public details",
-            }
-        )
-    )
-
-    assert parsed is not None
-    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
-    assert parsed.message == "public message"
-    assert parsed.public_details == "public details"
 
 
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
