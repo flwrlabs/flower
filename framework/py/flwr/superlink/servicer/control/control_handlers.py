@@ -45,7 +45,6 @@ from flwr.common.constant import (
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
 from flwr.common.serde import (
@@ -2253,7 +2252,7 @@ def _get_remote_fab(
     app_spec: str,
 ) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
-    if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
+    if fleet_api_type == "grpc-adapter":
         raise FlowerError(
             ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT,
             "The selected SuperLink transport type is not "
