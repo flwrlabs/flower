@@ -1033,11 +1033,6 @@ def _labels(
     return labels
 
 
-def _capacity_label_selector(config: KubernetesExecutorConfig) -> str:
-    """Return the label selector used for resource-pool capacity checks."""
-    return _taskexecutor_pool_label_selector(config)
-
-
 def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
     """Return the label selector for TaskExecutor pool-scoped operations."""
     return _label_selector(_taskexecutor_pool_labels(config))
