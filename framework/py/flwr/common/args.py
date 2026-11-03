@@ -42,8 +42,7 @@ def _warn_unused_health_server_address(_value: str) -> None:
     log(
         WARN,
         "The `--health-server-address` argument is no longer used. "
-        "Use the `/health` endpoint on the SuperLink HTTP API host and port "
-        "configured with `--host` and `--port`.",
+        "Use the `/health` HTTP endpoint instead.",
     )
 
 
