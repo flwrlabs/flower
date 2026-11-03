@@ -25,10 +25,10 @@ from logging import INFO, WARN
 from pathlib import Path
 from time import sleep
 
-import grpc
 import uvicorn
 
 from flwr.common.args import (
+    add_args_removed_health_server,
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
 )
@@ -37,8 +37,6 @@ from flwr.common.constant import (
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
-    TRANSPORT_TYPE_GRPC_RERE,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore import log
@@ -53,7 +51,6 @@ from flwr.supercore.constant import (
     UVICORN_DEFAULT_HOST,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
-from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.http_logging import get_uvicorn_log_config
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
 from flwr.supercore.telemetry import EventType, event
@@ -82,7 +79,7 @@ except ImportError:
         raise NotImplementedError("No artifact provider is currently supported.")
 
 
-class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
+class SuperLinkLifespan:
     """Own the shared SuperLink lifespan state and network services."""
 
     def __init__(
@@ -91,14 +88,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         state_factory: LinkStateFactory,
     ) -> None:
         self.config = config
-        self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
         self.state_factory = state_factory
         self._started = False
 
     def startup(self) -> None:
-        """Start shared lifespan resources and the optional health server."""
+        """Start shared lifespan resources."""
         log(INFO, "SuperLinkLifespan: start")
         if self._started:
             return
@@ -107,23 +103,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         self.state_factory.state()
 
         self._start_superexec_if_needed()
-        self._start_health_server_if_needed()
         self._started = True
 
     def shutdown(self) -> None:
         """Stop services started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
-        if (
-            not self._started
-            and not self.grpc_servers
-            and self.superexec_process is None
-        ):
+        if not self._started and self.superexec_process is None:
             return
-
-        # Stop in reverse startup order so dependent services disappear before
-        # their backing state is considered unavailable.
-        for grpc_server in reversed(self.grpc_servers):
-            grpc_server.stop(grace=1)
 
         if self.superexec_process is not None:
             self.superexec_process.terminate()
@@ -132,7 +118,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             except subprocess.TimeoutExpired:
                 log(WARN, "SuperExec subprocess did not terminate within 1 second.")
 
-        self.grpc_servers.clear()
         self.superexec_process = None
         self._started = False
 
@@ -161,13 +146,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         )
         # pylint: disable-next=consider-using-with
         self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
-
-    def _start_health_server_if_needed(self) -> None:
-        if self.config.health_server_address is None:
-            return
-
-        health_server = run_health_server_grpc_no_tls(self.config.health_server_address)
-        self.grpc_servers.append(health_server)
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -214,11 +192,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             "The `--fleet-api-address` argument is deprecated. The Fleet API "
             "now operates over HTTP. Use `--host` and `--port` instead.",
         )
-
-    # Parse IP addresses
-    health_server_address = None
-    if args.health_server_address is not None:
-        health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
     certificates = _obtain_superlink_certificates(args)
@@ -310,7 +283,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         )
 
     return SuperLinkLifespanConfig(
-        health_server_address=health_server_address,
         host=args.host,
         port=args.port,
         insecure=args.insecure,
@@ -355,8 +327,7 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
-    # owns the gRPC Fleet and Control API servers when enabled.
+    # Blocking: FastAPI serves the Runtime, Control, and Fleet HTTP APIs.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -398,9 +369,6 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         lifespan_config.port,
     )
 
-    # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
-    # multiple workers, every worker process would try to bind the same enabled
-    # gRPC API and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
@@ -473,7 +441,7 @@ def _parse_args_run_superlink() -> argparse.ArgumentParser:
     _add_args_runtime_api(parser=parser)
     _add_args_fleet_api(parser=parser)
     _add_args_control_api(parser=parser)
-    add_args_health(parser=parser)
+    add_args_removed_health_server(parser)
 
     return parser
 
@@ -647,11 +615,11 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
     # Fleet API transport layer type
     parser.add_argument(
         "--fleet-api-type",
-        default=TRANSPORT_TYPE_GRPC_RERE,
+        default="grpc-rere",
         type=str,
         choices=[
-            TRANSPORT_TYPE_GRPC_RERE,
-            TRANSPORT_TYPE_GRPC_ADAPTER,
+            "grpc-rere",
+            "grpc-adapter",
         ],
         help="Deprecated. The Fleet API now operates over HTTP.",
     )

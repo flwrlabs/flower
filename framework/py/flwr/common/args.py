@@ -27,6 +27,25 @@ from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INST
 from flwr.supercore import log
 
 
+def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
+    """Warn about the unused gRPC health server option without showing it in help."""
+    parser.add_argument(
+        "--health-server-address",
+        type=_warn_unused_health_server_address,
+        nargs="?",
+        const="",
+        help=argparse.SUPPRESS,
+    )
+
+
+def _warn_unused_health_server_address(_value: str) -> None:
+    log(
+        WARN,
+        "The `--health-server-address` argument is no longer used. "
+        "Use the `/health` HTTP endpoint instead.",
+    )
+
+
 def add_args_runtime_dependency_install(
     parser: argparse.ArgumentParser,
     default: bool = RUNTIME_DEPENDENCY_INSTALL,

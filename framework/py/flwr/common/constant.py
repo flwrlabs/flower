@@ -19,13 +19,7 @@ from __future__ import annotations
 import os
 from typing import Final
 
-TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
-TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
 TRANSPORT_TYPE_VCE = "vce"
-TRANSPORT_TYPES = [
-    TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_VCE,
-]
 
 # Addresses
 # Ports
@@ -33,9 +27,6 @@ CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
-FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
-    "[::]:8080"  # IPv6 to keep start_server compatible
-)
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
 
 # Constants for heartbeat

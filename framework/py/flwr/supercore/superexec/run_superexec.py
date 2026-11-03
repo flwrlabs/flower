@@ -28,7 +28,6 @@ from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
@@ -134,7 +133,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
-    health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
     executor_type: ExecutorType = ExecutorType.SUBPROCESS,
     executor_config: ExecutorConfig | None = None,
@@ -158,9 +156,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     parent_pid : Optional[int] (default: None)
         The PID of the parent process. If provided, the SuperExec will terminate
         when the parent process exits.
-    health_server_address : Optional[str] (default: None)
-        The address of the health server. If `None` is provided, the health server will
-        NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
@@ -197,13 +192,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Launch gRPC health server
-    grpc_servers = []
     try:
-        if health_server_address is not None:
-            health_server = run_health_server_grpc_no_tls(health_server_address)
-            grpc_servers.append(health_server)
-
         client = RuntimeHttpClient.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
@@ -221,7 +210,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
-        grpc_servers=grpc_servers,
         exit_handlers=[client.close, executor.close],
     )
 
