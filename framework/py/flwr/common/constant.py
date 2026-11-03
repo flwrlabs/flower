@@ -22,10 +22,6 @@ from typing import Final
 TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
 TRANSPORT_TYPE_VCE = "vce"
-TRANSPORT_TYPES = [
-    TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_VCE,
-]
 
 # Addresses
 # Ports

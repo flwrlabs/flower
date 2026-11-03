@@ -16,7 +16,7 @@
 
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import grpc
 
@@ -49,7 +49,7 @@ def test_valid_certificates_when_wrong() -> None:
     assert not is_valid
 
 
-class TestCreateChannel(unittest.TestCase):  # pylint: disable=R0902
+class TestCreateChannel(unittest.TestCase):
     """Test the `create_channel` function."""
 
     def setUp(self) -> None:
@@ -63,15 +63,11 @@ class TestCreateChannel(unittest.TestCase):  # pylint: disable=R0902
         self.ssl_patcher = patch.object(grpc, "ssl_channel_credentials")
         self.mock_ssl_channel_credentials = self.ssl_patcher.start()
 
-        self.intercept_patcher = patch.object(grpc, "intercept_channel")
-        self.mock_intercept_channel = self.intercept_patcher.start()
-
     def tearDown(self) -> None:
         """Cleanup."""
         self.insecure_patcher.stop()
         self.secure_patcher.stop()
         self.ssl_patcher.stop()
-        self.intercept_patcher.stop()
 
     def test_insecure_channel_creation(self) -> None:
         """Test insecure channel created successfully."""
@@ -94,7 +90,6 @@ class TestCreateChannel(unittest.TestCase):  # pylint: disable=R0902
         # Assert that secure-related functions were not called
         self.mock_ssl_channel_credentials.assert_not_called()
         self.mock_secure_channel.assert_not_called()
-        self.mock_intercept_channel.assert_not_called()
 
         # Assert the returned channel is our dummy insecure channel
         self.assertEqual(channel, "fake_insecure_channel")
@@ -128,48 +123,9 @@ class TestCreateChannel(unittest.TestCase):  # pylint: disable=R0902
                 ("grpc.max_receive_message_length", GRPC_MAX_MESSAGE_LENGTH),
             ],
         )
-        self.mock_intercept_channel.assert_not_called()
 
         # Assert that the returned channel is what secure_channel returned
         self.assertEqual(channel, "fake_secure_channel")
-
-    def test_secure_channel_creation_with_interceptors(self) -> None:
-        """Test secure channel created successfully with interceptors."""
-        # Setup
-        server_address = "localhost:50051"
-        dummy_root_cert = b"dummy_root_cert"
-        dummy_interceptor = MagicMock(name="dummy_interceptor")
-
-        # Set return values for secure creation
-        self.mock_ssl_channel_credentials.return_value = "dummy_credentials"
-        self.mock_secure_channel.return_value = "fake_secure_channel"
-        self.mock_intercept_channel.return_value = "intercepted_channel"
-
-        # Execute - Call create_channel with an interceptor
-        channel = create_channel(
-            server_address,
-            insecure=False,
-            root_certificates=dummy_root_cert,
-            interceptors=[dummy_interceptor],
-        )
-
-        # Assert - Verify that ssl_channel_credentials was called correctly
-        self.mock_ssl_channel_credentials.assert_called_once_with(dummy_root_cert)
-        # Verify that secure_channel was invoked with the expected options
-        self.mock_secure_channel.assert_called_once_with(
-            server_address,
-            "dummy_credentials",
-            options=[
-                ("grpc.max_send_message_length", GRPC_MAX_MESSAGE_LENGTH),
-                ("grpc.max_receive_message_length", GRPC_MAX_MESSAGE_LENGTH),
-            ],
-        )
-        # Verify that intercept_channel wrapped the channel
-        self.mock_intercept_channel.assert_called_once_with(
-            "fake_secure_channel", dummy_interceptor
-        )
-        # Assert that the returned channel is the one returned by intercept_channel
-        self.assertEqual(channel, "intercepted_channel")
 
     def test_secure_channel_credentials_failure(self) -> None:
         """Test misconfigured secure channel raises ValueError."""
