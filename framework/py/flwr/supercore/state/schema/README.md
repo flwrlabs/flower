@@ -71,16 +71,23 @@ erDiagram
   }
 
   conversation {
-    BIGINT conversation_id PK
+    CHAR(32) id PK
     TIMESTAMP created_at
     VARCHAR title
-    TIMESTAMP updated_at
+  }
+
+  conversation_message {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) conversation_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
   }
 
   conversation_participant {
-    BIGINT id PK
     BIGINT agent_id FK "nullable"
-    BIGINT conversation_id FK
+    CHAR(32) conversation_id FK
     VARCHAR flwr_aid "nullable"
   }
 
@@ -300,6 +307,8 @@ erDiagram
     VARCHAR usage_type
   }
 
+  conversation ||--o{ conversation_message : conversation_id
+  agent ||--o{ conversation_message : agent_id
   conversation ||--o{ conversation_participant : conversation_id
   agent ||--o{ conversation_participant : agent_id
   message ||--o{ message : reply_to_message_id
