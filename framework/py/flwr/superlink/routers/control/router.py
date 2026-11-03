@@ -46,6 +46,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
+    GetConversationMessagesRequest,
+    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
@@ -90,6 +92,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SendConversationMessageRequest,
+    SendConversationMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -111,6 +115,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
+from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
@@ -207,7 +212,7 @@ def create_conversation(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateConversationResponse:
-    """Create an owned conversation."""
+    """Create conversation."""
     return control_handlers.create_conversation(request, account, linkstate)
 
 
@@ -217,8 +222,28 @@ def list_conversations(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> ListConversationsResponse:
-    """List owned conversations."""
+    """List conversations."""
     return control_handlers.list_conversations(request, account, linkstate)
+
+
+@router.post("/get-conversation-messages")
+def get_conversation_messages(
+    request: Annotated[GetConversationMessagesRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> GetConversationMessagesResponse:
+    """Get conversation messages."""
+    return control_handlers.get_conversation_messages(request, account, linkstate)
+
+
+@router.post("/send-conversation-message")
+def send_conversation_message(
+    request: Annotated[SendConversationMessageRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SendConversationMessageResponse:
+    """Send conversation message."""
+    return control_handlers.send_conversation_message(request, account, linkstate)
 
 
 @router.post("/list-run-series")

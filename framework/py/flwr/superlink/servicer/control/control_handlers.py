@@ -26,6 +26,7 @@ from datetime import UTC, datetime, timedelta
 from logging import ERROR, WARNING
 from threading import Thread
 from typing import Any, cast
+from uuid import UUID
 
 import requests
 
@@ -70,6 +71,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     Connector,
+    ConversationParticipant,
     CreateAgentRequest,
     CreateAgentResponse,
     CreateConversationRequest,
@@ -82,6 +84,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
+    GetConversationMessagesRequest,
+    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
@@ -126,6 +130,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SendConversationMessageRequest,
+    SendConversationMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -151,6 +157,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
@@ -1295,12 +1302,45 @@ def list_runs(
     )
 
 
+class InvalidConversationRequestError(FlowerError):
+    """Exception raised when a conversation request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_CONVERSATION_REQUEST, reason, public_details=reason
+        )
+
+
+def _parse_conversation_id(value: str) -> UUID:
+    try:
+        return UUID(value)
+    except ValueError as exc:
+        raise InvalidConversationRequestError(
+            "conversation_id must be a UUID."
+        ) from exc
+
+
 def create_conversation(
     request: CreateConversationRequest, account: AccountInfo, state: LinkState
 ) -> CreateConversationResponse:
-    """Create a conversation and enroll its creator without starting a run."""
-    _ = request
-    conversation = state.create_conversation(flwr_aid=account.flwr_aid)
+    """Create an untitled conversation and enroll the authenticated account."""
+    agent_ids = {
+        participant.agent_id
+        for participant in request.participants
+        if participant.HasField("agent_id")
+    }
+    if agent_ids and not agent_ids.issubset(
+        {agent.id for agent in state.list_agents(account.flwr_aid)}
+    ):
+        raise InvalidConversationRequestError(
+            "Agent participants must belong to your account."
+        )
+    try:
+        conversation = state.create_conversation(
+            flwr_aid=account.flwr_aid, participants=request.participants
+        )
+    except ValueError as exc:
+        raise InvalidConversationRequestError(str(exc)) from exc
     return CreateConversationResponse(conversation=conversation)
 
 
@@ -1312,6 +1352,48 @@ def list_conversations(
     return ListConversationsResponse(
         conversations=state.get_conversations(account.flwr_aid)
     )
+
+
+def get_conversation_messages(
+    request: GetConversationMessagesRequest, account: AccountInfo, state: LinkState
+) -> GetConversationMessagesResponse:
+    """Read a participating user's message history with an exclusive ID cursor."""
+    conversation_id = _parse_conversation_id(request.conversation_id)
+    limit = request.limit if request.HasField("limit") else 50
+    if not 1 <= limit <= 100:
+        raise InvalidConversationRequestError("limit must be between 1 and 100.")
+    messages = state.get_conversation_messages(
+        conversation_id,
+        account.flwr_aid,
+        limit=limit,
+        before_id=request.before_id if request.HasField("before_id") else None,
+    )
+    if messages is None:
+        raise FlowerError(
+            ApiErrorCode.CONVERSATION_NOT_FOUND,
+            "Conversation not found or account is not a participant.",
+        )
+    return GetConversationMessagesResponse(messages=messages)
+
+
+def send_conversation_message(
+    request: SendConversationMessageRequest, account: AccountInfo, state: LinkState
+) -> SendConversationMessageResponse:
+    """Persist a message authored by the authenticated account."""
+    conversation_id = _parse_conversation_id(request.conversation_id)
+    if not request.content.strip():
+        raise InvalidConversationRequestError("Message content must be nonempty.")
+    message = state.create_conversation_message(
+        conversation_id,
+        ConversationParticipant(flwr_aid=account.flwr_aid),
+        request.content,
+    )
+    if message is None:
+        raise FlowerError(
+            ApiErrorCode.CONVERSATION_NOT_FOUND,
+            "Conversation not found or account is not a participant.",
+        )
+    return SendConversationMessageResponse(message=message)
 
 
 def list_run_series(

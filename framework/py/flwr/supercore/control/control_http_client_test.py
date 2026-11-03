@@ -33,6 +33,8 @@ _UNARY_UNARY_ENDPOINTS = (
     "list-run-series",
     "create-conversation",
     "list-conversations",
+    "get-conversation-messages",
+    "send-conversation-message",
     "get-run-series",
     "update-run-series-description",
     "list-run-series-events",

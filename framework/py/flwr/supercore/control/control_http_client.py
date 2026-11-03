@@ -43,6 +43,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
+    GetConversationMessagesRequest,
+    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
@@ -87,6 +89,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SendConversationMessageRequest,
+    SendConversationMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -206,7 +210,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     def CreateConversation(
         self, request: CreateConversationRequest
     ) -> CreateConversationResponse:
-        """Create an owned conversation."""
+        """Create conversation."""
         return self._unary_unary(
             path="/v1/control/create-conversation",
             rpc_method="/flwr.proto.Control/CreateConversation",
@@ -217,12 +221,34 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     def ListConversations(
         self, request: ListConversationsRequest
     ) -> ListConversationsResponse:
-        """List owned conversations."""
+        """List conversations."""
         return self._unary_unary(
             path="/v1/control/list-conversations",
             rpc_method="/flwr.proto.Control/ListConversations",
             request=request,
             response_type=ListConversationsResponse,
+        )
+
+    def GetConversationMessages(
+        self, request: GetConversationMessagesRequest
+    ) -> GetConversationMessagesResponse:
+        """Get conversation messages."""
+        return self._unary_unary(
+            path="/v1/control/get-conversation-messages",
+            rpc_method="/flwr.proto.Control/GetConversationMessages",
+            request=request,
+            response_type=GetConversationMessagesResponse,
+        )
+
+    def SendConversationMessage(
+        self, request: SendConversationMessageRequest
+    ) -> SendConversationMessageResponse:
+        """Send conversation message."""
+        return self._unary_unary(
+            path="/v1/control/send-conversation-message",
+            rpc_method="/flwr.proto.Control/SendConversationMessage",
+            request=request,
+            response_type=SendConversationMessageResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:
