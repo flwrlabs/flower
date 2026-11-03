@@ -16,13 +16,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import threading
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from uuid import uuid4
 
 from flwr.supercore.constant import TaskType
 
+WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
+WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
+WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
+WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH = (
+    f"{WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
+)
 WARM_EXECUTOR_LABEL = "flower.ai/warm-executor"
 WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION = "flower.ai/warm-executor-runtime-image"
 WARM_EXECUTOR_CONFIGURATION_ANNOTATION = "flower.ai/warm-executor-config-sha256"
@@ -167,3 +174,37 @@ def _object_field(value: object, field_name: str) -> object | None:
     if isinstance(value, dict):
         return value.get(field_name)
     return getattr(value, field_name, None)
+
+
+class WarmExecutorUnavailable(RuntimeError):
+    """Raised before a task token is sent to a warm executor Pod."""
+
+
+@dataclass
+class WarmExecutorPoolState:
+    """Coordinate dispatch reservations with maintenance and shutdown."""
+
+    busy_pods: set[str] = field(default_factory=set)
+    retiring_pods: dict[str, WarmExecutorPoolKey | None] = field(default_factory=dict)
+    closed: bool = False
+    lock: threading.RLock = field(default_factory=threading.RLock)
+
+
+def is_consumed_warm_executor(pod: object) -> bool:
+    """Return true when a Pod was reserved for a task before this process started."""
+    metadata = (
+        pod.get("metadata")
+        if isinstance(pod, Mapping)
+        else getattr(pod, "metadata", None)
+    )
+    annotations = (
+        metadata.get("annotations")
+        if isinstance(metadata, Mapping)
+        else getattr(metadata, "annotations", None)
+    )
+    consumed = (
+        annotations.get(WARM_EXECUTOR_CONSUMED_ANNOTATION)
+        if isinstance(annotations, Mapping)
+        else getattr(annotations, WARM_EXECUTOR_CONSUMED_ANNOTATION, None)
+    )
+    return consumed == "true"
