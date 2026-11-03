@@ -118,14 +118,15 @@ message ConversationParticipant {
 }
 
 message Conversation {
-  uint64 conversation_id = 1;
+  string id = 1;
   string title = 2;
   string created_at = 3;
-  string updated_at = 4;
-  repeated ConversationParticipant participants = 5;
+  repeated ConversationParticipant participants = 4;
 }
 
-message CreateConversationRequest {}
+message CreateConversationRequest {
+  repeated ConversationParticipant participants = 1;
+}
 message CreateConversationResponse { Conversation conversation = 1; }
 
 message ListConversationsRequest {}
@@ -149,8 +150,6 @@ message GetConversationMessagesRequest {
 message GetConversationMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.
   repeated ConversationMessage messages = 1;
-  // Use as before_id for the next page. Absent when no older messages remain.
-  optional uint64 next_before_id = 2;
 }
 
 message SendConversationMessageRequest {

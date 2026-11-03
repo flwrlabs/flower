@@ -532,27 +532,24 @@ global___ConversationParticipant = ConversationParticipant
 class Conversation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
-    UPDATED_AT_FIELD_NUMBER: builtins.int
     PARTICIPANTS_FIELD_NUMBER: builtins.int
-    conversation_id: builtins.int
+    id: builtins.str
     title: builtins.str
     created_at: builtins.str
-    updated_at: builtins.str
     @property
     def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationParticipant]: ...
     def __init__(
         self,
         *,
-        conversation_id: builtins.int = ...,
+        id: builtins.str = ...,
         title: builtins.str = ...,
         created_at: builtins.str = ...,
-        updated_at: builtins.str = ...,
         participants: collections.abc.Iterable[global___ConversationParticipant] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "created_at", b"created_at", "participants", b"participants", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "participants", b"participants", "title", b"title"]) -> None: ...
 
 global___Conversation = Conversation
 
@@ -560,9 +557,15 @@ global___Conversation = Conversation
 class CreateConversationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    PARTICIPANTS_FIELD_NUMBER: builtins.int
+    @property
+    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationParticipant]: ...
     def __init__(
         self,
+        *,
+        participants: collections.abc.Iterable[global___ConversationParticipant] | None = ...,
     ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["participants", b"participants"]) -> None: ...
 
 global___CreateConversationRequest = CreateConversationRequest
 
@@ -671,9 +674,6 @@ class GetConversationMessagesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MESSAGES_FIELD_NUMBER: builtins.int
-    NEXT_BEFORE_ID_FIELD_NUMBER: builtins.int
-    next_before_id: builtins.int
-    """Use as before_id for the next page. Absent when no older messages remain."""
     @property
     def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationMessage]:
         """Messages in the selected page, ordered by ascending ID."""
@@ -682,11 +682,8 @@ class GetConversationMessagesResponse(google.protobuf.message.Message):
         self,
         *,
         messages: collections.abc.Iterable[global___ConversationMessage] | None = ...,
-        next_before_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_next_before_id", b"_next_before_id", "next_before_id", b"next_before_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_next_before_id", b"_next_before_id", "messages", b"messages", "next_before_id", b"next_before_id"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_next_before_id", b"_next_before_id"]) -> typing.Literal["next_before_id"] | None: ...
+    def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
 
 global___GetConversationMessagesResponse = GetConversationMessagesResponse
 
