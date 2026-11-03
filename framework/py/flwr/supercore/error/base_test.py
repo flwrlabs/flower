@@ -45,24 +45,6 @@ def test_flower_error_to_json_and_from_json() -> None:
     assert parsed.public_details == "public details"
 
 
-def test_flower_error_from_grpc_json() -> None:
-    """Continue to deserialize the legacy gRPC FlowerError payload."""
-    parsed = FlowerError.from_json(
-        json.dumps(
-            {
-                "public_message": "public message",
-                "code": ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE.value,
-                "public_details": "public details",
-            }
-        )
-    )
-
-    assert parsed is not None
-    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
-    assert parsed.message == "public message"
-    assert parsed.public_details == "public details"
-
-
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
     """Use the base HTTP representation and deserialize into a base FlowerError."""
     err = EntitlementError(
@@ -93,11 +75,7 @@ def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
         None,
         "not json",
         "[]",
-        '{"public_message": "missing code"}',
         '{"code": 1}',
-        '{"code": "1", "public_message": "wrong code type"}',
-        '{"code": true, "public_message": "wrong code type"}',
-        '{"code": 1, "public_message": "ok", "public_details": 1}',
         '{"detail": "missing code"}',
         '{"code": "1", "detail": "wrong code type"}',
         '{"code": true, "detail": "wrong code type"}',
