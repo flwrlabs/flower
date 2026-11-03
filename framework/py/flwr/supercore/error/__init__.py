@@ -17,7 +17,6 @@
 
 from .base import ApiErrorCode, FlowerError
 from .exceptions import EntitlementError
-from .grpc import rpc_error_translator
 from .http import BearerAuthenticationError, http_error_translator
 
 __all__ = [
@@ -26,5 +25,4 @@ __all__ = [
     "EntitlementError",
     "FlowerError",
     "http_error_translator",
-    "rpc_error_translator",
 ]
