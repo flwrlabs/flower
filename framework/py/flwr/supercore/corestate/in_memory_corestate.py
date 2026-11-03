@@ -25,12 +25,11 @@ from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from threading import Lock, RLock
 from typing import Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
-    CONVERSATION_ID_NUM_BYTES,
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -45,6 +44,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationMessage,
     ConversationParticipant,
     StartRunRequest,
 )
@@ -197,7 +197,9 @@ class InMemoryCoreState(
         self.run_series_store: dict[int, RunSeries] = {}
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
-        self.conversation_store: dict[int, Conversation] = {}
+        self.conversation_store: dict[UUID, Conversation] = {}
+        self.conversation_message_store: dict[int, ConversationMessage] = {}
+        self.conversation_message_id_counter = 0
         self.lock_conversation_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
@@ -968,24 +970,26 @@ class InMemoryCoreState(
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
         with self.lock_conversation_store:
-            conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
+            conversation_id = uuid4()
             if conversation_id in self.conversation_store:
                 raise ValueError("Conversation ID already exists")
-            timestamp = now().isoformat()
             conversation = Conversation(
-                conversation_id=conversation_id,
-                created_at=timestamp,
-                updated_at=timestamp,
+                id=str(conversation_id),
+                created_at=now().isoformat(),
                 participants=[ConversationParticipant(flwr_aid=flwr_aid)],
             )
             self.conversation_store[conversation_id] = conversation
             return conversation
 
     def add_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
         """Enroll a participant without duplicating existing membership."""
         if not (participant.flwr_aid or participant.agent_id):
+            return False
+        if participant.agent_id and not any(
+            participant.agent_id in agents for agents in self.agent_store.values()
+        ):
             return False
         with self.lock_conversation_store:
             conversation = self.conversation_store.get(conversation_id)
@@ -993,23 +997,21 @@ class InMemoryCoreState(
                 return False
             if participant not in conversation.participants:
                 conversation.participants.append(participant)
-                conversation.updated_at = now().isoformat()
             return True
 
     def remove_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
-        """Remove a participant and update conversation metadata on a change."""
+        """Remove a participant, returning whether membership existed."""
         with self.lock_conversation_store:
             conversation = self.conversation_store.get(conversation_id)
             if conversation is None or participant not in conversation.participants:
                 return False
             conversation.participants.remove(participant)
-            conversation.updated_at = now().isoformat()
             return True
 
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
-        """Return participating conversations, newest metadata update first."""
+        """Return participating conversations, newest first."""
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
         with self.lock_conversation_store:
             conversations = [
@@ -1017,8 +1019,54 @@ class InMemoryCoreState(
                 for conversation in self.conversation_store.values()
                 if viewer in conversation.participants
             ]
-            conversations.sort(key=lambda item: item.updated_at, reverse=True)
+            conversations.sort(key=lambda item: item.created_at, reverse=True)
             return conversations
+
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Store a participant's message atomically with its membership check."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        with self.lock_conversation_store:
+            conversation = self.conversation_store.get(conversation_id)
+            if conversation is None or author not in conversation.participants:
+                return None
+            self.conversation_message_id_counter += 1
+            message = ConversationMessage(
+                id=self.conversation_message_id_counter,
+                conversation_id=str(conversation_id),
+                author=author,
+                created_at=now().isoformat(),
+                content=content,
+            )
+            self.conversation_message_store[message.id] = message
+            return message
+
+    def get_conversation_messages(
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return a participating user's history page in ascending ID order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        viewer = ConversationParticipant(flwr_aid=flwr_aid)
+        with self.lock_conversation_store:
+            conversation = self.conversation_store.get(conversation_id)
+            if conversation is None or viewer not in conversation.participants:
+                return None
+            messages = [
+                message
+                for message in self.conversation_message_store.values()
+                if message.conversation_id == str(conversation_id)
+                and (before_id is None or message.id < before_id)
+            ]
+            messages.sort(key=lambda message: message.id, reverse=True)
+            return list(reversed(messages[:limit]))
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,

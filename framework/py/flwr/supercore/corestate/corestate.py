@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -28,6 +29,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationMessage,
     ConversationParticipant,
     StartRunRequest,
 )
@@ -670,7 +672,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def add_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
         """Enroll a user or agent in an existing conversation.
 
@@ -681,13 +683,34 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def remove_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
         """Remove a participant, returning whether membership existed."""
 
     @abstractmethod
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """List conversations the user participates in."""
+
+    @abstractmethod
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def get_conversation_messages(
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return the newest matching page in ascending ID order.
+
+        The ID bound is exclusive. Return None when the conversation is missing
+        or the user is not a participant. Raise ValueError for a nonpositive limit.
+        """
 
     @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments

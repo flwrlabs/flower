@@ -22,7 +22,7 @@ from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     MetaData,
@@ -45,7 +45,6 @@ from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
-    CONVERSATION_ID_NUM_BYTES,
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -62,6 +61,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     Conversation,
+    ConversationMessage,
     ConversationParticipant,
     StartRunRequest,
 )
@@ -104,8 +104,9 @@ from flwr.supercore.state.schema.corestate_models import (
     Conversation as ConversationModel,
 )
 from flwr.supercore.state.schema.corestate_models import (
-    ConversationParticipant as ConversationParticipantModel,
+    ConversationMessage as ConversationMessageModel,
 )
+from flwr.supercore.state.schema.corestate_models import ConversationParticipantTable
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -139,6 +140,7 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -1203,22 +1205,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Create a conversation and enroll its creator atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
-        conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
-        created_at = now()
         with self.session() as session:
             model = session.scalars(
                 insert(ConversationModel)
-                .values(
-                    conversation_id=uint64_to_int64(conversation_id),
-                    title="",
-                    created_at=created_at,
-                    updated_at=created_at,
-                )
+                .values(id=uuid4(), title="", created_at=now())
                 .returning(ConversationModel)
             ).one()
             session.execute(
-                insert(ConversationParticipantModel).values(
-                    conversation_id=model.conversation_id, flwr_aid=flwr_aid
+                insert(ConversationParticipantTable).values(
+                    conversation_id=model.id, flwr_aid=flwr_aid
                 )
             )
             conversation = _conversation_from_model(model)
@@ -1226,7 +1221,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return conversation
 
     def add_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
         """Enroll a participant without duplicating existing membership."""
         if not (participant.flwr_aid or participant.agent_id):
@@ -1235,96 +1230,146 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
         try:
             with self.session() as session:
-                model = session.get(ConversationModel, uint64_to_int64(conversation_id))
-                if model is None:
+                if session.get(ConversationModel, conversation_id) is None:
                     return False
-                stmt = (
-                    self.dialect_insert(ConversationParticipantModel)
-                    .values(conversation_id=model.conversation_id, **{field: identity})
+                session.execute(
+                    self.dialect_insert(ConversationParticipantTable)
+                    .values(conversation_id=conversation_id, **{field: identity})
                     .on_conflict_do_nothing(index_elements=["conversation_id", field])
-                    .returning(ConversationParticipantModel.id)
                 )
-                if session.scalar(stmt) is not None:
-                    session.execute(
-                        update(ConversationModel)
-                        .where(
-                            ConversationModel.conversation_id == model.conversation_id
-                        )
-                        .values(updated_at=now())
-                    )
                 return True
         except IntegrityError:
             return False
 
     def remove_conversation_participant(
-        self, conversation_id: int, participant: ConversationParticipant
+        self, conversation_id: UUID, participant: ConversationParticipant
     ) -> bool:
-        """Remove a participant and update conversation metadata on a change."""
+        """Remove a participant, returning whether membership existed."""
         if not (participant.flwr_aid or participant.agent_id):
             return False
         field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
         identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
         with self.session() as session:
             removed = session.scalar(
-                delete(ConversationParticipantModel)
+                delete(ConversationParticipantTable)
                 .where(
-                    ConversationParticipantModel.conversation_id
-                    == uint64_to_int64(conversation_id),
-                    getattr(ConversationParticipantModel, field) == identity,
+                    ConversationParticipantTable.c.conversation_id == conversation_id,
+                    ConversationParticipantTable.c[field] == identity,
                 )
-                .returning(ConversationParticipantModel.id)
+                .returning(ConversationParticipantTable.c.conversation_id)
             )
-            if removed is None:
-                return False
-            session.execute(
-                update(ConversationModel)
-                .where(
-                    ConversationModel.conversation_id
-                    == uint64_to_int64(conversation_id)
-                )
-                .values(updated_at=now())
-            )
-            return True
+            return removed is not None
 
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
-        """Return participating conversations, newest metadata update first."""
+        """Return participating conversations, newest first."""
         query = (
             select(ConversationModel)
             .where(
-                ConversationModel.conversation_id.in_(
-                    select(ConversationParticipantModel.conversation_id).where(
-                        ConversationParticipantModel.flwr_aid == flwr_aid
+                ConversationModel.id.in_(
+                    select(ConversationParticipantTable.c.conversation_id).where(
+                        ConversationParticipantTable.c.flwr_aid == flwr_aid
                     )
                 )
             )
-            .order_by(ConversationModel.updated_at.desc())
+            .order_by(ConversationModel.created_at.desc())
             .execution_options(populate_existing=True)
         )
         with self.session() as session:
             conversations = {
-                model.conversation_id: _conversation_from_model(model)
+                model.id: _conversation_from_model(model)
                 for model in session.scalars(query)
             }
             if not conversations:
                 return []
-            participants = session.scalars(
-                select(ConversationParticipantModel)
-                .where(
-                    ConversationParticipantModel.conversation_id.in_(
+            participants = session.execute(
+                select(ConversationParticipantTable).where(
+                    ConversationParticipantTable.c.conversation_id.in_(
                         list(conversations)
                     )
                 )
-                .order_by(ConversationParticipantModel.id)
-            )
+            ).mappings()
             for participant in participants:
-                conversation = conversations[participant.conversation_id]
-                if participant.flwr_aid is not None:
-                    conversation.participants.add(flwr_aid=participant.flwr_aid)
+                conversation = conversations[participant["conversation_id"]]
+                if participant["flwr_aid"] is not None:
+                    conversation.participants.add(flwr_aid=participant["flwr_aid"])
                 else:
-                    conversation.participants.add(
-                        agent_id=int64_to_uint64(cast(int, participant.agent_id))
-                    )
+                    conversation.participants.add(agent_id=participant["agent_id"])
             return list(conversations.values())
+
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Authorize membership in the message insert itself."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        if not (author.flwr_aid or author.agent_id):
+            return None
+        field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+        identity = author.flwr_aid or uint64_to_int64(author.agent_id)
+        source = select(
+            ConversationParticipantTable.c.conversation_id,
+            ConversationParticipantTable.c.flwr_aid,
+            ConversationParticipantTable.c.agent_id,
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(
+            ConversationParticipantTable.c.conversation_id == conversation_id,
+            ConversationParticipantTable.c[field] == identity,
+        )
+        with self.session() as session:
+            model = session.scalars(
+                insert(ConversationMessageModel)
+                .from_select(
+                    [
+                        "conversation_id",
+                        "flwr_aid",
+                        "agent_id",
+                        "created_at",
+                        "content",
+                    ],
+                    source,
+                )
+                .returning(ConversationMessageModel)
+            ).one_or_none()
+            return None if model is None else _conversation_message_from_model(model)
+
+    def get_conversation_messages(
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return a participating user's history page in ascending ID order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        query = (
+            select(ConversationMessageModel)
+            .where(ConversationMessageModel.conversation_id == conversation_id)
+            .order_by(ConversationMessageModel.id.desc())
+            .limit(limit)
+        )
+        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
+        if before_id is not None and before_id <= 2**63 - 1:
+            query = query.where(ConversationMessageModel.id < before_id)
+        with self.session() as session:
+            authorized = session.scalar(
+                select(
+                    exists().where(
+                        ConversationParticipantTable.c.conversation_id
+                        == conversation_id,
+                        ConversationParticipantTable.c.flwr_aid == flwr_aid,
+                    )
+                )
+            )
+            if not authorized:
+                return None
+            messages = [
+                _conversation_message_from_model(model)
+                for model in session.scalars(query)
+            ]
+            return list(reversed(messages))
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2604,10 +2649,27 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
 def _conversation_from_model(model: ConversationModel) -> Conversation:
     """Convert conversation metadata to its API representation."""
     return Conversation(
-        conversation_id=int64_to_uint64(model.conversation_id),
+        id=str(model.id),
         title=model.title,
         created_at=model.created_at.isoformat(),
-        updated_at=model.updated_at.isoformat(),
+    )
+
+
+def _conversation_message_from_model(
+    model: ConversationMessageModel,
+) -> ConversationMessage:
+    """Convert a persisted user or agent message to its API representation."""
+    author = ConversationParticipant()
+    if model.flwr_aid is not None:
+        author.flwr_aid = model.flwr_aid
+    else:
+        author.agent_id = cast(int, model.agent_id)
+    return ConversationMessage(
+        id=model.id,
+        conversation_id=str(model.conversation_id),
+        author=author,
+        created_at=model.created_at.isoformat(),
+        content=model.content,
     )
 
 
