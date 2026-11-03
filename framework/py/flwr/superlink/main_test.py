@@ -34,6 +34,7 @@ from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.health.router import health
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.routers.control import middlewares
 from flwr.superlink.routers.control.middlewares import (
     ControlAuthenticationMiddleware,
     ControlEventLogMiddleware,
@@ -63,6 +64,7 @@ def _create_app(
     """Create an app without routes or state contributed by an installed extension."""
     monkeypatch.setattr(extensions, "get_middleware", lambda: extension_middleware)
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
+    monkeypatch.setattr(middlewares, "get_license_plugin", lambda: None)
     return main.create_app()
 
 
