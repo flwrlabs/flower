@@ -142,17 +142,15 @@ jobs:
             -n 4 \
             --dist=loadscope \
             --durations=50
-          # Isolate process-wide telemetry mocks from other tests' background threads.
-          RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
-            --cov=py/flwr --cov-report= --cov-append \
-            py/flwr/supercore/telemetry_test.py
       - name: Test serial scopes
         if: ${{ matrix.task == 'pytest_serial' && needs.changes.outputs.framework == 'true' }}
         run: |
           cd framework
+          # Run telemetry first, before other tests can leave background events.
           RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 uv run --no-sync python -m pytest \
             --cov=py/flwr \
             --cov-report= \
+            py/flwr/supercore/telemetry_test.py \
             py/flwr/simulation/ray_transport/ray_client_proxy_test.py \
             py/flwr/server/superlink/fleet/vce/vce_api_test.py \
             py/flwr/server/superlink/fleet/vce/backend/raybackend_test.py \
