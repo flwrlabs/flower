@@ -282,11 +282,11 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
             or root_certificates_path is None
         )
 
-    def _active_pod_count(self, *, include_pending: bool = True) -> int:
+    def _active_pod_count(self) -> int:
         """Count observed Pods and any unobserved warm creation reservations."""
         pending = (
             self._warm_executor_pool_manager.pending_pod_names()
-            if include_pending and self._warm_executor_pool_manager is not None
+            if self._warm_executor_pool_manager is not None
             else set()
         )
         return self._resources.active_pod_count(pending)

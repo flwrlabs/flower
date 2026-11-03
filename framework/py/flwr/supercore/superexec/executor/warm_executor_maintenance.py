@@ -68,7 +68,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         self._retiring_pods = self._state.retiring_pods
         self._pool_creation_not_before: dict[WarmExecutorPoolKey, float] = {}
         self._pending_creations = self._state.pending_creations
-        self._cleanup_started = False
         self._maintenance_started_at = config.monotonic()
         self._maintenance_lock = threading.Lock()
         self._capacity_generation = 0
@@ -117,7 +116,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         """Coordinate resource cleanup with in-flight creation."""
         self._resources.sweep(sweep)
 
-    def ensure_capacity(self, reserved_pod_capacity: int = 0) -> None:
+    def ensure_capacity(self) -> None:
         """Create missing idle Pods for every configured compatible pool."""
         with self._maintenance_lock:
             with self._lock:
@@ -127,7 +126,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             if not self._reconcile_owned_pods():
                 return
             for pool in self._pools.values():
-                self._ensure_pool_capacity(pool, reserved_pod_capacity)
+                self._ensure_pool_capacity(pool)
 
     def next_maintenance_delay(self, maximum: float) -> float:
         """Wake for creation pacing and retries without polling idle pools faster."""
@@ -158,10 +157,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
     def _close_idle_pods(self) -> None:
         """Stop dispatch and delete only idle Pods owned by this SuperExec."""
         with self._lock:
-            if self._cleanup_started:
-                return
             self._state.closed = True
-            self._cleanup_started = True
             busy_pods = self._busy_pods.copy()
             consumed_pods = self._state.consumed_pods.copy()
         with self._maintenance_lock:
@@ -190,7 +186,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             self._resources.delete(pod_name)
 
     def _ensure_pool_capacity(  # pylint: disable=too-many-branches,too-many-return-statements
-        self, pool: WarmExecutorPoolConfig, reserved_pod_capacity: int = 0
+        self, pool: WarmExecutorPoolConfig
     ) -> None:
         with self._lock:
             if self._state.closed or pool.key in self._retiring_pods.values():
@@ -216,9 +212,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             ]
         for pod_name, creation in pending:
             if self._config.monotonic() >= creation.retry_at:
-                if not self._reserve_creation_capacity(
-                    reserved_pod_capacity, reusing_pending=True
-                ):
+                if not self._reserve_creation_capacity(reusing_pending=True):
                     continue
                 self._create_pending_pod(pod_name)
         with self._lock:
@@ -250,9 +244,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                     self._delay_pool_creation(pool.key)
                 self._pending_creations[name] = pending
 
-            if not self._reserve_creation_capacity(
-                reserved_pod_capacity, reserve=reserve_warm
-            ):
+            if not self._reserve_creation_capacity(reserve=reserve_warm):
                 return
             if not self._create_pending_pod(pod_name):
                 return
@@ -269,7 +261,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             self._cold_launches += 1
 
         if not self._reserve_creation_capacity(
-            0, reserve=reserve_cold, allow_capacity_error=True
+            reserve=reserve_cold, allow_capacity_error=True
         ):
             return None
         try:
@@ -282,7 +274,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
 
     def _reserve_creation_capacity(
         self,
-        reserved_pod_capacity: int,
         *,
         reusing_pending: bool = False,
         reserve: Callable[[], None] | None = None,
@@ -320,12 +311,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                     self._pending_creations
                 ):
                     return False
-                required = (
-                    active_count
-                    + cold_launches
-                    + reserved_pod_capacity
-                    + int(not reusing_pending)
-                )
+                required = active_count + cold_launches + int(not reusing_pending)
                 if required > self._config.active_pod_budget:
                     return False
             if reserve is not None:
@@ -493,9 +479,14 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
 
     def request_maintenance(self) -> None:
         """Coalesce warm-pool maintenance requests onto one worker."""
+        if self._maintenance_stopped.is_set():
+            return
+        self._start_maintenance()
+        self._maintenance_requested.set()
+
+    def _start_maintenance(self) -> threading.Thread:
+        """Start one worker for maintenance or shutdown cleanup."""
         with self._maintenance_start_lock:
-            if self._maintenance_stopped.is_set():
-                return
             if self._maintenance_thread is None:
                 self._maintenance_thread = threading.Thread(
                     target=self._maintain_pools,
@@ -503,7 +494,7 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
                     daemon=True,
                 )
                 self._maintenance_thread.start()
-        self._maintenance_requested.set()
+            return self._maintenance_thread
 
     def _maintain_pools(self) -> None:
         """Fill and clean warm pools on wakeups and during idle periods."""
@@ -541,14 +532,11 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
         self._maintenance_stopped.set()
         self.stop()
         self._maintenance_requested.set()
-        with self._maintenance_start_lock:
-            thread = self._maintenance_thread
-        if thread is not None and thread is not threading.current_thread():
+        thread = self._start_maintenance()
+        if thread is not threading.current_thread():
             thread.join(timeout=_WARM_MAINTENANCE_STOP_TIMEOUT_SECONDS)
             if thread.is_alive():
                 log(WARNING, "Warm pool maintenance is still stopping.")
-                return
-        self._close_idle_pods()
 
 
 def _object_name(value: object) -> str | None:

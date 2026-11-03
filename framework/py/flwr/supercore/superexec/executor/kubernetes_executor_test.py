@@ -1464,13 +1464,13 @@ def test_rejected_warm_creation_does_not_reserve_capacity(status: int) -> None:
         _warm_resources(client, config),
         kube_resources.KubernetesTaskResources(client, config).active_pod_count,
     )
-    pool.ensure_capacity(reserved_pod_capacity=1)
+    pool.ensure_capacity()
     assert len(pool.pending_pod_names()) == int(status == 503)
     if status == 503:
         # A later rejection cannot disprove an earlier possibly accepted create.
         now[0] = 5.0
         client.create_namespaced_pod.side_effect = _KubernetesApiError(403, "rejected")
-        pool.ensure_capacity(reserved_pod_capacity=1)
+        pool.ensure_capacity()
         assert len(pool.pending_pod_names()) == 1
 
 
@@ -1668,7 +1668,7 @@ def test_warm_pool_retirement_does_not_block_other_pools() -> None:
     assert "consumed" not in pool._retiring_pods  # pylint: disable=protected-access
 
 
-def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
+def test_warm_pool_reserves_capacity_during_cold_submission() -> None:
     """Replacing a missing warm Pod leaves room for the cold task Pod."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
@@ -1686,9 +1686,11 @@ def test_warm_pool_reserves_capacity_for_cold_fallback() -> None:
     )
     client.reset_mock()
 
-    pool._ensure_pool_capacity(  # pylint: disable=protected-access
-        WarmExecutorPoolConfig(key=pool_key, size=1), reserved_pod_capacity=1
-    )
+    def launch_cold() -> LaunchResult:
+        pool.ensure_capacity()
+        return LaunchResult.accepted()
+
+    pool.launch_cold(launch_cold)
 
     client.create_namespaced_pod.assert_not_called()
 
@@ -1724,9 +1726,11 @@ def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity(
     )
     client.reset_mock()
 
-    pool._ensure_pool_capacity(  # pylint: disable=protected-access
-        WarmExecutorPoolConfig(key=pool_key, size=2), reserved_pod_capacity=1
-    )
+    def launch_cold() -> LaunchResult:
+        pool.ensure_capacity()
+        return LaunchResult.accepted()
+
+    pool.launch_cold(launch_cold)
 
     assert client.create_namespaced_pod.call_count == (
         1 if active_after_creation else 2
@@ -2089,6 +2093,36 @@ def test_slow_warm_creation_does_not_block_ready_dispatch(
             acquisition.join(timeout=2)
 
 
+def test_close_before_maintenance_starts_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Startup failure must not wait indefinitely for Kubernetes cleanup."""
+    executor = _executor(
+        client=Mock(), config=_executor_config(warm_executor_owner="superexec-a")
+    )
+    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
+    assert manager is not None
+    cleaning = threading.Event()
+    release_cleanup = threading.Event()
+    monkeypatch.setattr(maintenance, "_WARM_MAINTENANCE_STOP_TIMEOUT_SECONDS", 0.01)
+
+    def cleanup() -> None:
+        cleaning.set()
+        release_cleanup.wait(2)
+
+    monkeypatch.setattr(manager, "_close_idle_pods", cleanup)
+    closing = threading.Thread(target=executor.close)
+    try:
+        closing.start()
+        assert cleaning.wait(1)
+        closing.join(1)
+        assert not closing.is_alive()
+    finally:
+        release_cleanup.set()
+        closing.join(1)
+        executor.close()
+
+
 @pytest.mark.parametrize("budget", [None, 1])
 def test_cold_fallback_does_not_reconcile_while_waiting_for_capacity(
     budget: int | None,
@@ -2298,14 +2332,16 @@ def test_sweeper_cleans_orphaned_warm_secret_after_labels_change() -> None:
 
 
 # pylint: disable=too-many-locals
-@pytest.mark.parametrize("warm", [False, True])
-def test_sweeper_waits_for_pod_creation(warm: bool) -> None:
-    """Completed-Pod cleanup must not observe half-created cold or warm resources."""
+@pytest.mark.parametrize("blocked", ["warm_creation", "cold_creation", "cold_sweep"])
+def test_sweeper_protects_concurrent_creation(blocked: str) -> None:
+    """Cold creation and cleanup overlap without deleting a new task Secret."""
+    warm = blocked == "warm_creation"
     client = Mock()
     objects: dict[str, list[dict[str, Any]]] = {"pods": [], "secrets": []}
     creation_started = threading.Event()
     release_creation = threading.Event()
     sweep_started = threading.Event()
+    release_sweep = threading.Event()
     pool_key = _warm_executor_pool_key(
         runtime_image="ghcr.io/flwrlabs/taskexecutor:dev"
     )
@@ -2316,17 +2352,27 @@ def test_sweeper_waits_for_pod_creation(warm: bool) -> None:
         ),
     )
 
-    def _list_pods(_namespace: str, **_kwargs: object) -> dict[str, object]:
-        return {"items": objects["pods"]}
+    def _list_pods(_namespace: str, **kwargs: object) -> dict[str, object]:
+        return {
+            "items": [
+                pod
+                for pod in objects["pods"]
+                if "warm-executor-owner" not in str(kwargs["label_selector"])
+                or pod["metadata"]["labels"].get(WARM_EXECUTOR_LABEL) == "true"
+            ]
+        }
 
     def _list_secrets(_namespace: str, **_kwargs: object) -> dict[str, object]:
         sweep_started.set()
+        if blocked == "cold_sweep":
+            assert release_sweep.wait(timeout=3.0)
         return {"items": objects["secrets"]}
 
     def _create_secret(_namespace: str, secret: object) -> None:
         objects["secrets"].append(_as_dict(secret))
         creation_started.set()
-        assert release_creation.wait(timeout=1.0)
+        if blocked != "cold_sweep":
+            assert release_creation.wait(timeout=3.0)
 
     def _create_pod(_namespace: str, pod: object) -> None:
         objects["pods"].append(_as_dict(pod))
@@ -2349,20 +2395,31 @@ def test_sweeper_waits_for_pod_creation(warm: bool) -> None:
         target=executor._sweep_completed_pods  # pylint: disable=protected-access
     )
 
-    creator.start()
     try:
-        assert creation_started.wait(timeout=1.0)
-        sweeper.start()
-        assert not sweep_started.wait(timeout=0.1)
+        if blocked == "cold_sweep":
+            sweeper.start()
+            assert sweep_started.wait(timeout=1.0)
+            creator.start()
+            creator.join(timeout=1.0)
+            assert not creator.is_alive()
+        else:
+            creator.start()
+            assert creation_started.wait(timeout=1.0)
+            sweeper.start()
+            if warm:
+                assert not sweep_started.wait(timeout=0.1)
+            else:
+                sweeper.join(timeout=1.0)
+                assert not sweeper.is_alive()
     finally:
         release_creation.set()
-        creator.join(timeout=1.0)
-        if sweeper.ident is not None:
-            sweeper.join(timeout=1.0)
+        release_sweep.set()
+        for thread in (creator, sweeper):
+            if thread.ident is not None:
+                thread.join(timeout=1.0)
 
     assert not creator.is_alive()
     assert not sweeper.is_alive()
-    assert sweep_started.is_set()
     client.delete_namespaced_secret.assert_not_called()
 
 

@@ -345,8 +345,8 @@ class CompletedPodSweeper:
         self._client = client
         self._config = config
 
-    def sweep(self) -> None:
-        """Delete terminal Pods and orphaned credential or warm trust Secrets."""
+    def sweep(self, can_delete_orphans: Callable[[], bool] | None = None) -> None:
+        """Delete terminal resources, skipping orphan cleanup during cold creation."""
         selector = _taskexecutor_pool_label_selector(self._config)
         pods = _pod_items(
             self._client.list_namespaced_pod(
@@ -407,15 +407,15 @@ class CompletedPodSweeper:
             credential_secret_name = _credential_secret_name_from_pod_name(pod_name)
             if credential_secret_name in task_secret_names:
                 self._delete_secret(credential_secret_name)
-            warm_root_certificates_secret_name = (
+            secret_name: str | None = (
                 _warm_executor_root_certificates_secret_name_from_pod_name(pod_name)
             )
-            if (
-                warm_root_certificates_secret_name
-                in warm_root_certificates_secret_names
-            ):
-                self._delete_secret(warm_root_certificates_secret_name)
+            if secret_name in warm_root_certificates_secret_names:
+                self._delete_secret(secret_name)
 
+        # A concurrent creation can make a listed Secret look orphaned.
+        if can_delete_orphans is not None and not can_delete_orphans():
+            return
         # Delete Secrets whose owner Pod is no longer listed.
         for secret in secrets:
             secret_name = _object_name(secret)
@@ -1453,7 +1453,9 @@ class KubernetesTaskResources:
     ) -> None:
         self._client = client
         self._config = config
-        self._lifecycle_lock = threading.RLock()
+        self._creation_lock = threading.Lock()
+        self._creation_generation = 0
+        self._creations_in_flight = 0
         self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
 
     @property
@@ -1469,18 +1471,35 @@ class KubernetesTaskResources:
         self, spec: ExecutionSpec, runtime_root_certificates: str | None
     ) -> LaunchResult:
         """Create one cold task, preserving uncertain submission and its Secret."""
-        with self._lifecycle_lock:
+        with self._creation_lock:
+            self._creation_generation += 1
+            self._creations_in_flight += 1
+        try:
             return self._launch_cold(spec, runtime_root_certificates)
+        finally:
+            with self._creation_lock:
+                self._creations_in_flight -= 1
+                self._creation_generation += 1
 
     def sweep_completed_pods(self) -> None:
-        """Keep orphan cleanup from observing a Secret before its Pod exists."""
-        with self._lifecycle_lock:
-            self._completed_pod_sweeper.sweep()
+        """Skip orphan cleanup when a cold creation overlaps the resource listings."""
+        with self._creation_lock:
+            generation = self._creation_generation
+
+        def can_delete_orphans() -> bool:
+            with self._creation_lock:
+                return (
+                    self._creations_in_flight == 0
+                    and self._creation_generation == generation
+                )
+
+        # Later launches use new names, absent from this sweep's Secret snapshot.
+        self._completed_pod_sweeper.sweep(can_delete_orphans)
 
     def _launch_cold(
         self, spec: ExecutionSpec, runtime_root_certificates: str | None
     ) -> LaunchResult:
-        """Submit the Secret and Pod while holding the cold lifecycle lock."""
+        """Submit the Secret and Pod while tracking concurrent cleanup."""
         try:
             launch_attempt_id = _new_launch_attempt_id()
             secret_name = _credential_secret_name(spec, launch_attempt_id)
