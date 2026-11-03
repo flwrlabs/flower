@@ -28,18 +28,18 @@ from flwr.supercore import log
 
 
 def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
-    """Reject the removed gRPC health server option without showing it in help."""
+    """Warn about the unused gRPC health server option without showing it in help."""
     parser.add_argument(
         "--health-server-address",
-        type=_removed_health_server_address,
+        type=_warn_unused_health_server_address,
         nargs="?",
         const="",
         help=argparse.SUPPRESS,
     )
 
 
-def _removed_health_server_address(_value: str) -> str:
-    raise argparse.ArgumentTypeError("this argument has been removed")
+def _warn_unused_health_server_address(_value: str) -> None:
+    log(WARN, "The `--health-server-address` argument is no longer used.")
 
 
 def add_args_runtime_dependency_install(
