@@ -51,7 +51,7 @@ from .warm_executor_pool import (
 )
 
 if TYPE_CHECKING:
-    from .kubernetes_executor import KubernetesClient, KubernetesExecutorConfig
+    from .kubernetes_resources import KubernetesClient, KubernetesExecutorConfig
 
 _TOKEN_STDIN_ACKNOWLEDGEMENTS = (
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
