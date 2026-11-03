@@ -1199,7 +1199,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+    def create_conversation(self, *, flwr_aid: str) -> Conversation:
         """Create a conversation and enroll its creator atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
@@ -1210,7 +1210,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 insert(ConversationModel)
                 .values(
                     conversation_id=uint64_to_int64(conversation_id),
-                    federation_id=federation_id,
                     title="",
                     created_at=created_at,
                     updated_at=created_at,
@@ -1287,9 +1286,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return True
 
-    def get_conversations(
-        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
-    ) -> Sequence[Conversation]:
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """Return participating conversations, newest metadata update first."""
         query = (
             select(ConversationModel)
@@ -1303,8 +1300,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .order_by(ConversationModel.updated_at.desc())
             .execution_options(populate_existing=True)
         )
-        if federation_ids is not None:
-            query = query.where(ConversationModel.federation_id.in_(federation_ids))
         with self.session() as session:
             conversations = {
                 model.conversation_id: _conversation_from_model(model)
@@ -2610,7 +2605,6 @@ def _conversation_from_model(model: ConversationModel) -> Conversation:
     """Convert conversation metadata to its API representation."""
     return Conversation(
         conversation_id=int64_to_uint64(model.conversation_id),
-        federation_id=model.federation_id,
         title=model.title,
         created_at=model.created_at.isoformat(),
         updated_at=model.updated_at.isoformat(),

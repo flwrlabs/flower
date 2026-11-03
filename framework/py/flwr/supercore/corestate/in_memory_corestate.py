@@ -963,7 +963,7 @@ class InMemoryCoreState(
             )
         return True
 
-    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+    def create_conversation(self, *, flwr_aid: str) -> Conversation:
         """Create a conversation and enroll its creator atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
@@ -974,7 +974,6 @@ class InMemoryCoreState(
             timestamp = now().isoformat()
             conversation = Conversation(
                 conversation_id=conversation_id,
-                federation_id=federation_id,
                 created_at=timestamp,
                 updated_at=timestamp,
                 participants=[ConversationParticipant(flwr_aid=flwr_aid)],
@@ -1009,9 +1008,7 @@ class InMemoryCoreState(
             conversation.updated_at = now().isoformat()
             return True
 
-    def get_conversations(
-        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
-    ) -> Sequence[Conversation]:
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """Return participating conversations, newest metadata update first."""
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
         with self.lock_conversation_store:
@@ -1019,10 +1016,6 @@ class InMemoryCoreState(
                 conversation
                 for conversation in self.conversation_store.values()
                 if viewer in conversation.participants
-                and (
-                    federation_ids is None
-                    or conversation.federation_id in federation_ids
-                )
             ]
             conversations.sort(key=lambda item: item.updated_at, reverse=True)
             return conversations

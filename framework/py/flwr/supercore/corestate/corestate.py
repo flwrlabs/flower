@@ -665,7 +665,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
+    def create_conversation(self, *, flwr_aid: str) -> Conversation:
         """Create an untitled conversation and enroll its creator atomically."""
 
     @abstractmethod
@@ -686,10 +686,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Remove a participant, returning whether membership existed."""
 
     @abstractmethod
-    def get_conversations(
-        self, flwr_aid: str, federation_ids: Sequence[str] | None = None
-    ) -> Sequence[Conversation]:
-        """List a user's conversations, optionally filtered by federation."""
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
+        """List conversations the user participates in."""
 
     @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments
