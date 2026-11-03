@@ -140,14 +140,6 @@ class ObjectPushSession:
 
 
 @dataclass
-class ConversationRecord:
-    """Store conversation metadata and internal backing series."""
-
-    series_id: int
-    conversation: Conversation
-
-
-@dataclass
 class MessageRecord:
     """Retain metadata after releasing the pending Message reference."""
 
@@ -203,9 +195,10 @@ class InMemoryCoreState(
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
-        self.conversation_store: dict[int, ConversationRecord] = {}
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
+        self.conversation_store: dict[int, Conversation] = {}
+        self.lock_conversation_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -971,16 +964,13 @@ class InMemoryCoreState(
         return True
 
     def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
-        """Create a conversation, its backing series, and creator participation."""
+        """Create a conversation and enroll its creator atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
-        with self.lock_run_series_store:
+        with self.lock_conversation_store:
             conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
             if conversation_id in self.conversation_store:
                 raise ValueError("Conversation ID already exists")
-            series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
-            if series_id in self.run_series_store:
-                raise ValueError("Run series ID already exists")
             timestamp = now().isoformat()
             conversation = Conversation(
                 conversation_id=conversation_id,
@@ -989,16 +979,7 @@ class InMemoryCoreState(
                 updated_at=timestamp,
                 participants=[ConversationParticipant(flwr_aid=flwr_aid)],
             )
-            self.run_series_store[series_id] = RunSeries(
-                series_id=series_id,
-                federation=federation_id,
-                created_at=timestamp,
-                updated_at=timestamp,
-            )
-            self.agent_run_series_ids.add(series_id)
-            self.conversation_store[conversation.conversation_id] = ConversationRecord(
-                series_id=series_id, conversation=conversation
-            )
+            self.conversation_store[conversation_id] = conversation
             return conversation
 
     def add_conversation_participant(
@@ -1007,25 +988,25 @@ class InMemoryCoreState(
         """Enroll a participant without duplicating existing membership."""
         if not (participant.flwr_aid or participant.agent_id):
             return False
-        with self.lock_run_series_store:
-            record = self.conversation_store.get(conversation_id)
-            if record is None:
+        with self.lock_conversation_store:
+            conversation = self.conversation_store.get(conversation_id)
+            if conversation is None:
                 return False
-            if participant not in record.conversation.participants:
-                record.conversation.participants.append(participant)
-                record.conversation.updated_at = now().isoformat()
+            if participant not in conversation.participants:
+                conversation.participants.append(participant)
+                conversation.updated_at = now().isoformat()
             return True
 
     def remove_conversation_participant(
         self, conversation_id: int, participant: ConversationParticipant
     ) -> bool:
         """Remove a participant and update conversation metadata on a change."""
-        with self.lock_run_series_store:
-            record = self.conversation_store.get(conversation_id)
-            if record is None or participant not in record.conversation.participants:
+        with self.lock_conversation_store:
+            conversation = self.conversation_store.get(conversation_id)
+            if conversation is None or participant not in conversation.participants:
                 return False
-            record.conversation.participants.remove(participant)
-            record.conversation.updated_at = now().isoformat()
+            conversation.participants.remove(participant)
+            conversation.updated_at = now().isoformat()
             return True
 
     def get_conversations(
@@ -1033,14 +1014,14 @@ class InMemoryCoreState(
     ) -> Sequence[Conversation]:
         """Return participating conversations, newest metadata update first."""
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
-        with self.lock_run_series_store:
+        with self.lock_conversation_store:
             conversations = [
-                record.conversation
-                for record in self.conversation_store.values()
-                if viewer in record.conversation.participants
+                conversation
+                for conversation in self.conversation_store.values()
+                if viewer in conversation.participants
                 and (
                     federation_ids is None
-                    or record.conversation.federation_id in federation_ids
+                    or conversation.federation_id in federation_ids
                 )
             ]
             conversations.sort(key=lambda item: item.updated_at, reverse=True)

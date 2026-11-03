@@ -1200,28 +1200,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return updated_oauth_session_id is not None
 
     def create_conversation(self, *, flwr_aid: str, federation_id: str) -> Conversation:
-        """Create a conversation, its backing series, and creator participation."""
+        """Create a conversation and enroll its creator atomically."""
         if not flwr_aid:
             raise ValueError("Conversation creator must be nonempty")
         conversation_id = generate_rand_int_from_bytes(CONVERSATION_ID_NUM_BYTES)
-        series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
         created_at = now()
         with self.session() as session:
-            session.execute(
-                insert(RunSeriesModel).values(
-                    series_id=uint64_to_int64(series_id),
-                    federation_id=federation_id,
-                    is_agent=True,
-                    description=None,
-                    created_at=created_at,
-                    updated_at=created_at,
-                )
-            )
             model = session.scalars(
                 insert(ConversationModel)
                 .values(
                     conversation_id=uint64_to_int64(conversation_id),
-                    series_id=uint64_to_int64(series_id),
+                    federation_id=federation_id,
                     title="",
                     created_at=created_at,
                     updated_at=created_at,
@@ -1233,7 +1222,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     conversation_id=model.conversation_id, flwr_aid=flwr_aid
                 )
             )
-            conversation = _conversation_from_model(model, federation_id)
+            conversation = _conversation_from_model(model)
             conversation.participants.add(flwr_aid=flwr_aid)
             return conversation
 
@@ -1303,10 +1292,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> Sequence[Conversation]:
         """Return participating conversations, newest metadata update first."""
         query = (
-            select(ConversationModel, RunSeriesModel.federation_id)
-            .join(
-                RunSeriesModel, ConversationModel.series_id == RunSeriesModel.series_id
-            )
+            select(ConversationModel)
             .where(
                 ConversationModel.conversation_id.in_(
                     select(ConversationParticipantModel.conversation_id).where(
@@ -1318,11 +1304,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .execution_options(populate_existing=True)
         )
         if federation_ids is not None:
-            query = query.where(RunSeriesModel.federation_id.in_(federation_ids))
+            query = query.where(ConversationModel.federation_id.in_(federation_ids))
         with self.session() as session:
             conversations = {
-                model.conversation_id: _conversation_from_model(model, federation_id)
-                for model, federation_id in session.execute(query)
+                model.conversation_id: _conversation_from_model(model)
+                for model in session.scalars(query)
             }
             if not conversations:
                 return []
@@ -2620,13 +2606,11 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _conversation_from_model(
-    model: ConversationModel, federation_id: str
-) -> Conversation:
+def _conversation_from_model(model: ConversationModel) -> Conversation:
     """Convert conversation metadata to its API representation."""
     return Conversation(
         conversation_id=int64_to_uint64(model.conversation_id),
-        federation_id=federation_id,
+        federation_id=model.federation_id,
         title=model.title,
         created_at=model.created_at.isoformat(),
         updated_at=model.updated_at.isoformat(),

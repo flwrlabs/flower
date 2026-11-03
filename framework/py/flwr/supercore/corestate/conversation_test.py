@@ -51,26 +51,17 @@ def conversation_state(request: pytest.FixtureRequest, tmp_path: Path) -> LinkSt
 
 
 def test_create_conversation(state: LinkState) -> None:
-    """Create metadata and an empty backing series without starting work."""
+    """Create metadata without creating a run series or starting work."""
     conversation = state.create_conversation(
         flwr_aid="alice", federation_id=NOOP_FEDERATION_ID
     )
     assert conversation.title == ""
+    assert conversation.federation_id == NOOP_FEDERATION_ID
     assert list(conversation.participants) == [
         ConversationParticipant(flwr_aid="alice")
     ]
-    series = state.get_run_series(is_agent=True)
-    assert len(series) == 1
-    series_id = series[0].series_id
-    if isinstance(state, InMemoryLinkState):
-        assert (
-            state.conversation_store[conversation.conversation_id].series_id
-            == series_id
-        )
-    assert series[0].federation == NOOP_FEDERATION_ID
-    assert not series[0].run_ids
+    assert not state.get_run_series()
     assert not state.get_tasks()
-    assert state.get_run_series_context(series_id) is None
     assert list(state.get_conversations("alice")) == [conversation]
     assert Conversation.FromString(conversation.SerializeToString()) == conversation
 
@@ -141,7 +132,7 @@ def test_agent_and_user_participants_are_distinct(state: LinkState) -> None:
     ]
     assert state.remove_conversation_participant(conversation.conversation_id, agent)
     assert len(state.get_conversations("7")[0].participants) == 2
-    assert len(state.get_run_series()) == 1
+    assert not state.get_run_series()
     assert not state.get_tasks()
 
 
@@ -177,28 +168,27 @@ def test_unknown_conversation_cannot_gain_participants(state: LinkState) -> None
     assert not state.get_conversations("bob")
 
 
-def test_sql_creation_rolls_back_backing_series_on_failure() -> None:
-    """A failed conversation insert cannot leave an orphan backing series."""
+def test_sql_creation_collision_preserves_existing_conversation() -> None:
+    """A duplicate conversation ID cannot alter existing metadata or participants."""
     sql_state = SqlLinkState(
         ":memory:", NoOpFederationManager(), ObjectStoreFactory().store()
     )
     sql_state.initialize()
     original = sql_state.create_conversation(flwr_aid="alice", federation_id="a")
-    series_id = sql_state.get_run_series()[0].series_id
     with (
         patch(
             "flwr.supercore.corestate.sql_corestate.generate_rand_int_from_bytes",
-            side_effect=[original.conversation_id, series_id ^ 1],
+            return_value=original.conversation_id,
         ),
         pytest.raises(IntegrityError),
     ):
-        sql_state.create_conversation(flwr_aid="alice", federation_id="a")
-    assert len(sql_state.get_run_series()) == 1
+        sql_state.create_conversation(flwr_aid="bob", federation_id="b")
     assert list(sql_state.get_conversations("alice")) == [original]
+    assert not sql_state.get_conversations("bob")
 
 
 def test_sql_reload_preserves_unsigned_ids(tmp_path: Path) -> None:
-    """Migrated file storage retains full uint64 conversation and series IDs."""
+    """Migrated file storage retains full uint64 IDs and federation membership."""
     database_path = str(tmp_path / "persistent.db")
     sql_state = SqlLinkState(
         database_path, NoOpFederationManager(), ObjectStoreFactory().store()
@@ -222,9 +212,11 @@ def test_sql_reload_preserves_unsigned_ids(tmp_path: Path) -> None:
     assert list(reloaded.get_conversations("alice")) == [expected]
     assert list(reloaded.get_conversations("bob")) == [expected]
     assert conversation.conversation_id == 2**63 + 42
-    assert reloaded.get_run_series()[0].series_id == 2**63 + 42
     stored = reloaded.query(
-        "SELECT series_id FROM conversation WHERE conversation_id = :conversation_id",
+        "SELECT conversation_id, federation_id FROM conversation "
+        "WHERE conversation_id = :conversation_id",
         {"conversation_id": uint64_to_int64(conversation.conversation_id)},
     )
-    assert stored == [{"series_id": uint64_to_int64(2**63 + 42)}]
+    assert stored == [
+        {"conversation_id": uint64_to_int64(2**63 + 42), "federation_id": "a"}
+    ]
