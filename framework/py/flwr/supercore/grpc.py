@@ -18,7 +18,7 @@
 import concurrent.futures
 import os
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from logging import DEBUG, ERROR
 from typing import Any
 
@@ -48,7 +48,6 @@ def create_channel(
     insecure: bool,
     root_certificates: bytes | None = None,
     max_message_length: int = GRPC_MAX_MESSAGE_LENGTH,
-    interceptors: Sequence[grpc.UnaryUnaryClientInterceptor] | None = None,
 ) -> grpc.Channel:
     """Create a gRPC channel, either secure or insecure."""
     # Check for conflicting parameters
@@ -79,9 +78,6 @@ def create_channel(
         )
         log(DEBUG, "Opened secure gRPC connection using certificates")
 
-    if interceptors is not None:
-        channel = grpc.intercept_channel(channel, *interceptors)
-
     return channel
 
 
@@ -105,7 +101,6 @@ def generic_create_grpc_server(  # pylint: disable=too-many-arguments, R0914, R0
     max_message_length: int = GRPC_MAX_MESSAGE_LENGTH,
     keepalive_time_ms: int = 210000,
     certificates: tuple[bytes, bytes, bytes] | None = None,
-    interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Create a gRPC server with a single servicer.
 
@@ -151,8 +146,6 @@ def generic_create_grpc_server(  # pylint: disable=too-many-arguments, R0914, R0
             * CA certificate.
             * server certificate.
             * server private key.
-    interceptors : Optional[Sequence[grpc.ServerInterceptor]] (default: None)
-        A list of gRPC interceptors.
 
     Returns
     -------
@@ -200,7 +193,6 @@ def generic_create_grpc_server(  # pylint: disable=too-many-arguments, R0914, R0
         # returning RESOURCE_EXHAUSTED status, or None to indicate no limit.
         maximum_concurrent_rpcs=max_concurrent_workers,
         options=options,
-        interceptors=interceptors,
     )
     add_servicer_to_server_fn(servicer, server)
 
