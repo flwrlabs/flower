@@ -73,7 +73,6 @@ erDiagram
   conversation {
     BIGINT conversation_id PK
     TIMESTAMP created_at
-    VARCHAR federation_id
     VARCHAR title
     TIMESTAMP updated_at
   }
