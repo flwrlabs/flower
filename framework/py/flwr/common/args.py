@@ -17,14 +17,38 @@
 import argparse
 import re
 import sys
+from collections.abc import Sequence
 from io import BufferedReader
 from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INSTALL
 from flwr.supercore import log
+
+
+def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
+    """Reject the removed gRPC health server option without showing it in help."""
+    parser.add_argument(
+        "--health-server-address",
+        action=_RemovedHealthServerAddress,
+        nargs="?",
+        help=argparse.SUPPRESS,
+    )
+
+
+class _RemovedHealthServerAddress(argparse.Action):
+    """Reject the removed option with or without an address value."""
+
+    def __call__(
+        self,
+        _parser: argparse.ArgumentParser,
+        _namespace: argparse.Namespace,
+        _values: str | Sequence[Any] | None,
+        _option_string: str | None = None,
+    ) -> None:
+        raise argparse.ArgumentError(self, "gRPC health service is no longer supported")
 
 
 def add_args_runtime_dependency_install(
