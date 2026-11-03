@@ -15,7 +15,7 @@
 """Add conversation layer.
 
 Revision ID: 10abac2005b4
-Revises: 5f41a476ec4c
+Revises: 47f4cc7c58b6
 Create Date: 2026-11-03 11:31:06.596007
 """
 from collections.abc import Sequence
@@ -29,7 +29,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "10abac2005b4"
-down_revision: str | Sequence[str] | None = "5f41a476ec4c"
+down_revision: str | Sequence[str] | None = "47f4cc7c58b6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
