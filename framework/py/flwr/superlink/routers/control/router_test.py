@@ -43,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
+    ConversationParticipant,
     CreateAgentRequest,
     CreateAgentResponse,
     CreateConversationRequest,
@@ -139,6 +140,10 @@ def test_conversation_create_and_list(
     conversation = CreateConversationResponse.FromString(response.content).conversation
     assert conversation.title == ""
     assert conversation.federation_id == NOOP_FEDERATION_ID
+    assert list(conversation.participants) == [
+        ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    ]
+    assert not state.get_run_series()
     assert not state.get_tasks()
 
     state.create_conversation(
@@ -215,7 +220,8 @@ def test_conversation_starts_untitled_and_rejects_invalid_federation(
     )
     assert invalid.status_code == 412
     assert invalid.json()["code"] == ApiErrorCode.FEDERATION_NOT_FOUND
-    assert len(state.get_run_series()) == 1
+    assert len(state.get_conversations(_ACCOUNT.flwr_aid)) == 1
+    assert not state.get_run_series()
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
