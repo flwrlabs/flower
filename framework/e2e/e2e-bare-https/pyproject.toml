@@ -7,7 +7,7 @@ name = "e2e-bare-https"
 version = "1.0.0"
 description = "HTTPS-enabled bare Federated Learning test with Flower"
 license = "Apache-2.0"
-dependencies = ["flwr @ {root:parent:parent:uri}"]
+dependencies = ["flwr[grpc] @ {root:parent:parent:uri}"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
