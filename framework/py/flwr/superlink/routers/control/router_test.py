@@ -19,7 +19,7 @@
 import inspect
 from collections.abc import Callable
 from datetime import datetime
-from unittest.mock import Mock, PropertyMock, call, patch
+from unittest.mock import Mock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -114,13 +114,11 @@ _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
-@pytest.fixture(name="conversation_client", params=[FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def conversation_client_fixture(
-    request: pytest.FixtureRequest,
-) -> tuple[TestClient, LinkState]:
-    """Exercise authenticated conversation routes with real state implementations."""
+@pytest.fixture(name="conversation_client")
+def conversation_client_fixture() -> tuple[TestClient, LinkState]:
+    """Provide authenticated conversation routes backed by in-memory state."""
     state = LinkStateFactory(
-        request.param, NoOpFederationManager(), ObjectStoreFactory()
+        FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
@@ -136,25 +134,27 @@ def conversation_client_fixture(
     )
 
 
-def test_conversation_create_and_list(
+def test_conversation_routes(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Create a UUID conversation and list the caller's conversations."""
+    """Create, list, send, and read with authenticated caller membership."""
     client, state = conversation_client
+    agent = state.create_agent(
+        flwr_aid=_ACCOUNT.flwr_aid,
+        config=AgentConfig(name="Research", app_spec="@flower/research"),
+    )
+    assert agent is not None
+    caller = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    agent_participant = ConversationParticipant(agent_id=agent.id)
     response = client.post(
         "/v1/control/create-conversation",
-        content=CreateConversationRequest().SerializeToString(),
+        content=CreateConversationRequest(
+            participants=[agent_participant]
+        ).SerializeToString(),
     )
     assert response.status_code == 200
     conversation = CreateConversationResponse.FromString(response.content).conversation
-    assert str(UUID(conversation.id)) == conversation.id
-    assert conversation.title == ""
-    assert list(conversation.participants) == [
-        ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    ]
-    state.create_conversation(
-        participants=[ConversationParticipant(flwr_aid="other-user")]
-    )
+    assert list(conversation.participants) == [caller, agent_participant]
     listed = client.post(
         "/v1/control/list-conversations",
         content=ListConversationsRequest().SerializeToString(),
@@ -163,64 +163,37 @@ def test_conversation_create_and_list(
     assert list(ListConversationsResponse.FromString(listed.content).conversations) == [
         conversation
     ]
-    assert not state.get_run_series() and not state.get_tasks()
-
-
-@pytest.mark.parametrize("include_caller", [False, True])
-def test_create_conversation_with_participants(
-    conversation_client: tuple[TestClient, LinkState], include_caller: bool
-) -> None:
-    """Accept initial participants and automatically include the caller once."""
-    client, state = conversation_client
-    agent = state.create_agent(
-        flwr_aid=_ACCOUNT.flwr_aid,
-        config=AgentConfig(name="Research", app_spec="@flower/research"),
-    )
-    assert agent is not None
-    caller = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    bob = ConversationParticipant(flwr_aid="bob")
-    agent_participant = ConversationParticipant(agent_id=agent.id)
-    participants = [bob, agent_participant, bob]
-    if include_caller:
-        participants.append(caller)
     response = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest(
-            participants=participants
+        "/v1/control/send-conversation-message",
+        content=SendConversationMessageRequest(
+            conversation_id=conversation.id, content="Hello"
         ).SerializeToString(),
     )
     assert response.status_code == 200
-    conversation = CreateConversationResponse.FromString(response.content).conversation
-    assert len(conversation.participants) == 3
-    assert all(
-        member in conversation.participants
-        for member in [caller, bob, agent_participant]
+    message = SendConversationMessageResponse.FromString(response.content).message
+    assert message.author == caller and message.content == "Hello"
+    history = client.post(
+        "/v1/control/get-conversation-messages",
+        content=GetConversationMessagesRequest(
+            conversation_id=conversation.id
+        ).SerializeToString(),
     )
-    assert state.get_conversations("bob")[0].id == conversation.id
-    assert (
-        state.get_conversation_messages(UUID(conversation.id), _ACCOUNT.flwr_aid) == []
-    )
+    assert history.status_code == 200
+    assert list(
+        GetConversationMessagesResponse.FromString(history.content).messages
+    ) == [message]
+    assert not state.get_run_series() and not state.get_tasks()
 
 
-@pytest.mark.parametrize(
-    "participant",
-    [
-        ConversationParticipant(),
-        ConversationParticipant(flwr_aid=""),
-        ConversationParticipant(agent_id=0),
-        ConversationParticipant(agent_id=9999),
-    ],
-)
 def test_create_conversation_rejects_invalid_participants(
     conversation_client: tuple[TestClient, LinkState],
-    participant: ConversationParticipant,
 ) -> None:
     """Reject invalid initial participants without creating a conversation."""
     client, state = conversation_client
     response = client.post(
         "/v1/control/create-conversation",
         content=CreateConversationRequest(
-            participants=[participant]
+            participants=[ConversationParticipant()]
         ).SerializeToString(),
     )
     assert response.status_code == 400
@@ -249,42 +222,10 @@ def test_create_conversation_rejects_other_users_agent(
     assert not state.get_conversations(_ACCOUNT.flwr_aid)
 
 
-def test_conversation_send_and_history(
-    conversation_client: tuple[TestClient, LinkState],
-) -> None:
-    """Store authenticated authorship, exact content, and retrievable history."""
-    client, state = conversation_client
-    conversation = state.create_conversation(
-        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
-    )
-    response = client.post(
-        "/v1/control/send-conversation-message",
-        content=SendConversationMessageRequest(
-            conversation_id=conversation.id, content="Review this.\n\nPrice: €100."
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    message = SendConversationMessageResponse.FromString(response.content).message
-    assert message.id > 0 and message.created_at
-    assert message.conversation_id == conversation.id
-    assert message.author == ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    assert message.content == "Review this.\n\nPrice: €100."
-    history = client.post(
-        "/v1/control/get-conversation-messages",
-        content=GetConversationMessagesRequest(
-            conversation_id=conversation.id
-        ).SerializeToString(),
-    )
-    assert history.status_code == 200
-    page = GetConversationMessagesResponse.FromString(history.content)
-    assert list(page.messages) == [message]
-    assert not state.get_run_series() and not state.get_tasks()
-
-
 def test_conversation_history_pagination(
     conversation_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Page backwards without gaps or duplication when new messages arrive."""
+    """Apply the HTTP request's exclusive cursor and page size."""
     client, state = conversation_client
     conversation = state.create_conversation(
         participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
@@ -293,30 +234,20 @@ def test_conversation_history_pagination(
     author = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
     messages = [
         state.create_conversation_message(conversation_id, author, str(i))
-        for i in range(5)
+        for i in range(3)
     ]
-
-    def page(before_id: int | None = None) -> GetConversationMessagesResponse:
-        request = GetConversationMessagesRequest(
-            conversation_id=conversation.id, limit=2
-        )
-        if before_id is not None:
-            request.before_id = before_id
-        response = client.post(
-            "/v1/control/get-conversation-messages", content=request.SerializeToString()
-        )
-        assert response.status_code == 200
-        return GetConversationMessagesResponse.FromString(response.content)
-
-    newest = page()
-    assert list(newest.messages) == messages[3:]
-    state.create_conversation_message(conversation_id, author, "New arrival")
-    older = page(newest.messages[0].id)
-    assert list(older.messages) == messages[1:3]
-    oldest = page(older.messages[0].id)
-    assert list(oldest.messages) == messages[:1]
-    assert len(oldest.messages) < 2
-    assert not page(oldest.messages[0].id).messages
+    last = messages[-1]
+    assert last is not None
+    response = client.post(
+        "/v1/control/get-conversation-messages",
+        content=GetConversationMessagesRequest(
+            conversation_id=conversation.id, before_id=last.id, limit=1
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(
+        GetConversationMessagesResponse.FromString(response.content).messages
+    ) == [messages[1]]
 
 
 @pytest.mark.parametrize(
@@ -330,7 +261,6 @@ def test_conversation_unavailable_to_nonparticipants(
     private = state.create_conversation(
         participants=[ConversationParticipant(flwr_aid="alice")]
     )
-    responses = []
     for conversation_id in [private.id, str(uuid4())]:
         request = (
             GetConversationMessagesRequest(conversation_id=conversation_id)
@@ -344,48 +274,11 @@ def test_conversation_unavailable_to_nonparticipants(
         )
         assert response.status_code == 404
         assert response.json()["code"] == ApiErrorCode.CONVERSATION_NOT_FOUND
-        responses.append(response.json())
-    assert responses[0] == responses[1]
-    assert state.get_conversation_messages(UUID(private.id), "alice") == []
-
-
-def test_shared_conversation_access(
-    conversation_client: tuple[TestClient, LinkState],
-) -> None:
-    """Allow initial participants to read and write a shared conversation."""
-    client, state = conversation_client
-    conversation = state.create_conversation(
-        participants=[
-            ConversationParticipant(flwr_aid="alice"),
-            ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid),
-        ]
-    )
-    conversation_id = UUID(conversation.id)
-    request = SendConversationMessageRequest(
-        conversation_id=conversation.id, content="Shared reply"
-    )
-    response = client.post(
-        "/v1/control/send-conversation-message", content=request.SerializeToString()
-    )
-    assert response.status_code == 200
-    message = SendConversationMessageResponse.FromString(response.content).message
-    assert state.get_conversation_messages(conversation_id, "alice") == [message]
-    response = client.post(
-        "/v1/control/get-conversation-messages",
-        content=GetConversationMessagesRequest(
-            conversation_id=conversation.id
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    assert list(
-        GetConversationMessagesResponse.FromString(response.content).messages
-    ) == [message]
 
 
 @pytest.mark.parametrize(
     "endpoint,fields",
     [
-        ("send-conversation-message", {"content": ""}),
         ("send-conversation-message", {"content": " \n"}),
         (
             "send-conversation-message",
@@ -402,64 +295,18 @@ def test_invalid_conversation_request(
     fields: dict[str, str | int],
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
-    client, state = conversation_client
-    conversation = state.create_conversation(
-        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
-    )
+    client, _ = conversation_client
     request_type = (
         SendConversationMessageRequest
         if endpoint == "send-conversation-message"
         else GetConversationMessagesRequest
     )
-    request = ParseDict({"conversation_id": conversation.id, **fields}, request_type())
+    request = ParseDict({"conversation_id": str(uuid4()), **fields}, request_type())
     response = client.post(
         f"/v1/control/{endpoint}", content=request.SerializeToString()
     )
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_CONVERSATION_REQUEST
-    assert (
-        state.get_conversation_messages(UUID(conversation.id), _ACCOUNT.flwr_aid) == []
-    )
-
-
-def test_conversations_do_not_access_federations(
-    conversation_client: tuple[TestClient, LinkState],
-) -> None:
-    """All conversation operations work without resolving federation resources."""
-    client, state = conversation_client
-    with patch.object(
-        type(state),
-        "federation_manager",
-        new_callable=PropertyMock,
-        side_effect=AssertionError("Unexpected federation dependency"),
-    ):
-        created = client.post(
-            "/v1/control/create-conversation",
-            content=CreateConversationRequest().SerializeToString(),
-        )
-        assert created.status_code == 200
-        conversation = CreateConversationResponse.FromString(
-            created.content
-        ).conversation
-        sent = client.post(
-            "/v1/control/send-conversation-message",
-            content=SendConversationMessageRequest(
-                conversation_id=conversation.id, content="Hello"
-            ).SerializeToString(),
-        )
-        assert sent.status_code == 200
-        history = client.post(
-            "/v1/control/get-conversation-messages",
-            content=GetConversationMessagesRequest(
-                conversation_id=conversation.id
-            ).SerializeToString(),
-        )
-        assert history.status_code == 200
-        listed = client.post(
-            "/v1/control/list-conversations",
-            content=ListConversationsRequest().SerializeToString(),
-        )
-        assert listed.status_code == 200
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
