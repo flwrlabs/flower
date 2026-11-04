@@ -109,7 +109,6 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
 )
 
 # Log streaming configurations
-CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
 LOG_STREAM_INTERVAL = 0.5  # Control API log stream interval
 RUN_EVENTS_STREAM_INTERVAL = 0.1  # Event stream interval for `StreamRunEvents`
@@ -123,8 +122,6 @@ ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
 
 # Constants for node authentication
-PUBLIC_KEY_HEADER = "flwr-public-key-bin"  # Must end with "-bin" for binary data
-SIGNATURE_HEADER = "flwr-signature-bin"  # Must end with "-bin" for binary data
 TIMESTAMP_HEADER = "flwr-timestamp"
 TIMESTAMP_TOLERANCE = 300  # General tolerance for timestamp verification
 SYSTEM_TIME_TOLERANCE = 5  # Allowance for system time drift

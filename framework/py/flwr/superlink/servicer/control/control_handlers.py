@@ -613,13 +613,12 @@ def _refresh_hub_app_in_thread(
     federation_id: str,
     app_id: str,
     previous_fab_hash: str,
-    fleet_api_type: str | None,
 ) -> None:
     """Refresh a Hub app in a daemon thread."""
 
     def refresh() -> None:
         try:
-            fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
+            fab_file, verification_dict, _ = _get_remote_fab(app_id)
             if len(fab_file) > FAB_MAX_SIZE:
                 raise ValueError("Downloaded FAB exceeds the maximum size")
             fab_config = get_fab_config(fab_file)
@@ -646,7 +645,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
-    fleet_api_type: str | None,
     *,
     source: RunSource = "unknown",
 ) -> StartRunResponse:
@@ -723,9 +721,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         is_cached_hub_app = True
     # Start a run using a remote app
     elif request.app_spec:
-        fab_file, verification_dict, note = _get_remote_fab(
-            fleet_api_type, request.app_spec
-        )
+        fab_file, verification_dict, note = _get_remote_fab(request.app_spec)
         is_hub_app = True
     # Start a run using the provided app
     else:
@@ -868,7 +864,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 federation_id,
                 app_id,
                 cached_fab.hash_str,
-                fleet_api_type,
             )
     return response
 
@@ -1153,7 +1148,6 @@ def dispatch_automation(
             request,
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
-            None,
             source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -1759,12 +1753,11 @@ def add_app(
     request: AddAppRequest,
     account: AccountInfo,
     state: LinkState,
-    fleet_api_type: str | None,
 ) -> AddAppResponse:
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, _ = _get_remote_fab(request.app_id)
     try:
         fab_config = get_fab_config(fab_file)
         app_type = _get_app_type(fab_config)
@@ -2248,17 +2241,9 @@ def _get_app_type(fab_config: dict[str, Any]) -> str:
 
 
 def _get_remote_fab(
-    fleet_api_type: str | None,
     app_spec: str,
 ) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
-    if fleet_api_type == "grpc-adapter":
-        raise FlowerError(
-            ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT,
-            "The selected SuperLink transport type is not "
-            "supported for connecting to Flower Hub.",
-        )
-
     # Parse and validate app specification
     try:
         app_id, app_version = parse_app_spec(app_spec)

@@ -588,7 +588,6 @@ def test_start_run_forwards_resolved_source() -> None:
             request,
             linkstate,
             _ACCOUNT,
-            "grpc-rere",
             "unknown",
             Mock(),
         )
@@ -598,7 +597,6 @@ def test_start_run_forwards_resolved_source() -> None:
         request,
         _ACCOUNT,
         linkstate,
-        "grpc-rere",
         source="unknown",
     )
 
@@ -617,7 +615,6 @@ def test_start_run_forwards_caller_provided_source() -> None:
             request,
             linkstate,
             _ACCOUNT,
-            fleet_api_type="grpc-rere",
             run_source="cli",
             tracing=Mock(),
         )
@@ -629,7 +626,6 @@ def test_start_run_reads_client_metadata_header() -> None:
     """Read and normalize the client metadata header through the HTTP stack."""
     linkstate = Mock(spec=LinkState)
     app = _create_app()
-    app.state.fleet_api_type = "grpc-rere"
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     expected = StartRunResponse(run_id=1)
 
@@ -655,13 +651,12 @@ def test_start_run_reads_client_metadata_header() -> None:
         StartRunRequest(),
         _ACCOUNT,
         linkstate,
-        "grpc-rere",
         source="web_ui",
     )
 
 
-def test_add_app_forwards_fleet_api_type() -> None:
-    """Forward the configured Fleet API transport type to the control handler."""
+def test_add_app_forwards_request() -> None:
+    """Forward the request to the control handler."""
     request = AddAppRequest()
     linkstate = Mock()
     expected = AddAppResponse()
@@ -670,10 +665,10 @@ def test_add_app_forwards_fleet_api_type() -> None:
         "flwr.superlink.routers.control.router.control_handlers.add_app",
         return_value=expected,
     ) as add_app:
-        response = add_app_route(request, linkstate, _ACCOUNT, "grpc-rere")
+        response = add_app_route(request, linkstate, _ACCOUNT)
 
     assert response is expected
-    add_app.assert_called_once_with(request, _ACCOUNT, linkstate, "grpc-rere")
+    add_app.assert_called_once_with(request, _ACCOUNT, linkstate)
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:
