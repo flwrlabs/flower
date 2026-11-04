@@ -28,6 +28,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from .utils import (
     MetadataLookupError,
     build_sql_in_params,
+    get_metadata_bytes,
     get_metadata_str,
     get_metadata_str_checked,
     humanize_bytes,
@@ -174,6 +175,22 @@ def test_get_metadata_str_checked(
 
     assert value == expected_value
     assert error_type == expected_error
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-bin", b"value")], "x-bin", b"value"),
+        ([("x-bin", b"")], "x-bin", None),
+        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
+        ([("x-bin", "value")], "x-bin", None),
+    ],
+)
+def test_get_metadata_bytes(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
+) -> None:
+    """Return exactly one non-empty bytes value of the expected type."""
+    assert get_metadata_bytes(metadata, key) == expected
 
 
 @parameterized.expand(  # type: ignore

@@ -25,7 +25,7 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar, cast
 
 import requests
 
@@ -37,6 +37,7 @@ from flwr.supercore.version import package_version as flwr_version
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 from .typing import JSONObject, JSONValue
 
+T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
 
 
@@ -433,11 +434,12 @@ def is_valid_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def get_metadata_str_checked(
+def _get_metadata_typed_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
-) -> str:
-    """Return exactly one non-empty string metadata value for `key`.
+    value_type: type[T],
+) -> T:
+    """Return exactly one non-empty string or bytes metadata value for `key`.
 
     Raises
     ------
@@ -453,11 +455,41 @@ def get_metadata_str_checked(
     if len(values) > 1:
         raise MetadataLookupError(key, "duplicate")
     value = values[0]
-    if not isinstance(value, str):
+    if not isinstance(value, value_type):
         raise MetadataLookupError(key, "wrong_type")
     if value in ("", b""):
         raise MetadataLookupError(key, "empty")
     return value
+
+
+def get_metadata_str_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> str:
+    """Return exactly one non-empty string metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, str)
+
+
+def get_metadata_bytes_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes:
+    """Return exactly one non-empty bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, bytes)
 
 
 def get_metadata_str(
@@ -468,6 +500,18 @@ def get_metadata_str(
     found or invalid."""
     try:
         return get_metadata_str_checked(metadata, key)
+    except MetadataLookupError:
+        return None
+
+
+def get_metadata_bytes(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes | None:
+    """Return exactly one non-empty bytes metadata value for `key`, or None if not found
+    or invalid."""
+    try:
+        return get_metadata_bytes_checked(metadata, key)
     except MetadataLookupError:
         return None
 
