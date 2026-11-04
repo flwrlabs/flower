@@ -1329,26 +1329,36 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ).one_or_none()
             return None if model is None else _conversation_message_from_model(model)
 
-    def get_conversation_messages(
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
         self,
         conversation_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
+        after_id: int | None = None,
     ) -> Sequence[ConversationMessage] | None:
         """Return a participating user's history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        forward = after_id is not None
         query = (
             select(ConversationMessageModel)
             .where(ConversationMessageModel.conversation_id == conversation_id)
-            .order_by(ConversationMessageModel.id.desc())
+            .order_by(
+                ConversationMessageModel.id.asc()
+                if forward
+                else ConversationMessageModel.id.desc()
+            )
             .limit(limit)
         )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             query = query.where(ConversationMessageModel.id < before_id)
+        if after_id is not None:
+            query = query.where(ConversationMessageModel.id > min(after_id, 2**63 - 1))
         with self.session() as session:
             authorized = session.scalar(
                 select(
@@ -1365,7 +1375,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 _conversation_message_from_model(model)
                 for model in session.scalars(query)
             ]
-            return list(reversed(messages))
+            return messages if forward else list(reversed(messages))
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,

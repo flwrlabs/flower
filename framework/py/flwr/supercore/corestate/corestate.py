@@ -686,18 +686,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a participant's message, or return None if membership is absent."""
 
     @abstractmethod
-    def get_conversation_messages(
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
         self,
         conversation_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
+        after_id: int | None = None,
     ) -> Sequence[ConversationMessage] | None:
-        """Return the newest matching page in ascending ID order.
+        """Return a message page in ascending ID order.
 
-        The ID bound is exclusive. Return None when the conversation is missing
-        or the user is not a participant. Raise ValueError for a nonpositive limit.
+        Bounds are exclusive. With after_id, select the earliest matching page;
+        otherwise select the latest. Return None for missing conversations or
+        nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
         """
 
     @abstractmethod

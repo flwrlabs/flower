@@ -1036,17 +1036,21 @@ class InMemoryCoreState(
             self.conversation_message_store[message.id] = message
             return message
 
-    def get_conversation_messages(
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
         self,
         conversation_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
+        after_id: int | None = None,
     ) -> Sequence[ConversationMessage] | None:
         """Return a participating user's history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        forward = after_id is not None
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
         with self.lock_conversation_store:
             conversation = self.conversation_store.get(conversation_id)
@@ -1057,9 +1061,11 @@ class InMemoryCoreState(
                 for message in self.conversation_message_store.values()
                 if message.conversation_id == str(conversation_id)
                 and (before_id is None or message.id < before_id)
+                and (after_id is None or message.id > after_id)
             ]
-            messages.sort(key=lambda message: message.id, reverse=True)
-            return list(reversed(messages[:limit]))
+            messages.sort(key=lambda message: message.id, reverse=not forward)
+            page = messages[:limit]
+            return page if forward else list(reversed(page))
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,

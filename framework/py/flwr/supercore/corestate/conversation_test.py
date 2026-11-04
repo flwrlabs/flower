@@ -114,6 +114,19 @@ def test_message_history_and_pagination(state: CoreState) -> None:
         conversation_id, "alice", before_id=second.id
     ) == [first]
     assert state.get_conversation_messages(other_id, "alice") == [other]
+    assert state.get_conversation_messages(
+        conversation_id, "alice", after_id=first.id, limit=1
+    ) == [second]
+    assert state.get_conversation_messages(
+        conversation_id, "alice", after_id=first.id, before_id=third.id
+    ) == [second]
+    assert state.get_conversation_messages(
+        conversation_id, "alice", after_id=0, limit=1
+    ) == [first]
+    assert (
+        state.get_conversation_messages(conversation_id, "alice", after_id=2**64 - 1)
+        == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -148,3 +161,13 @@ def test_unknown_conversation(state: CoreState) -> None:
     author = ConversationParticipant(flwr_aid="alice")
     assert state.create_conversation_message(conversation_id, author, "Hello") is None
     assert state.get_conversation_messages(conversation_id, "alice") is None
+
+
+@pytest.mark.parametrize("before_id,after_id", [(1, 1), (1, 2)])
+def test_invalid_message_range(state: CoreState, before_id: int, after_id: int) -> None:
+    """Reject equal or reversed exclusive message bounds."""
+    conversation_id = UUID(state.create_conversation(flwr_aid="alice").id)
+    with pytest.raises(ValueError, match="after_id"):
+        state.get_conversation_messages(
+            conversation_id, "alice", before_id=before_id, after_id=after_id
+        )
