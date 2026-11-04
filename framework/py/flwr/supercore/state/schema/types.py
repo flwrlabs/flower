@@ -17,17 +17,30 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import TIMESTAMP, BigInteger
+from sqlalchemy import TIMESTAMP, BigInteger, Integer
 from sqlalchemy.types import TypeDecorator
 
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 
 class UInt64(TypeDecorator[int]):  # pylint: disable=too-many-ancestors,abstract-method
-    """Store unsigned 64-bit identifiers using signed BIGINT bit patterns."""
+    """Store unsigned 64-bit identifiers using signed BIGINT bit patterns.
 
-    impl = BigInteger
+    Parameters
+    ----------
+    sqlite_autoincrement : bool
+        Use SQLite INTEGER storage to support an autoincrement primary key.
+    """
+
+    impl = BigInteger()
     cache_ok = True
+
+    def __init__(self, *, sqlite_autoincrement: bool = False) -> None:
+        """Keep unsigned conversion when using SQLite's autoincrement type."""
+        super().__init__()
+        self.sqlite_autoincrement = sqlite_autoincrement
+        if sqlite_autoincrement:
+            self.impl = self.impl.with_variant(Integer(), "sqlite")
 
     @property
     def python_type(self) -> type[int]:

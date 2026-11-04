@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import Column, MetaData, Table, create_engine, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import StatementError
 from sqlalchemy.schema import CreateTable
 
@@ -28,10 +29,17 @@ from flwr.supercore.state.schema.types import UInt64, UTCDateTime
     ("value", "stored"),
     [(None, None), (0, 0), (2**63 - 1, 2**63 - 1), (2**63, -(2**63)), (2**64 - 1, -1)],
 )
-def test_uint64_round_trips_and_filters(value: int | None, stored: int | None) -> None:
+@pytest.mark.parametrize("sqlite_autoincrement", [False, True])
+def test_uint64_round_trips_and_filters(
+    value: int | None, stored: int | None, sqlite_autoincrement: bool
+) -> None:
     """Preserve all identifier bits in storage, reads, and typed filters."""
     engine = create_engine("sqlite:///:memory:")
-    table = Table("sample", MetaData(), Column("identifier", UInt64()))
+    table = Table(
+        "sample",
+        MetaData(),
+        Column("identifier", UInt64(sqlite_autoincrement=sqlite_autoincrement)),
+    )
     table.create(engine)
 
     with engine.begin() as conn:
@@ -65,6 +73,33 @@ def test_uint64_rejects_invalid_identifiers(value: int | float) -> None:
     with engine.begin() as conn:
         with pytest.raises(StatementError, match="UInt64 requires an integer"):
             conn.execute(table.insert().values(identifier=value))
+
+
+def test_uint64_autoincrement_preserves_dialect_storage() -> None:
+    """Keep SQLite INTEGER and PostgreSQL BIGSERIAL for generated identifiers."""
+    table = Table(
+        "sample",
+        MetaData(),
+        Column(
+            "identifier",
+            UInt64(sqlite_autoincrement=True),
+            primary_key=True,
+            autoincrement=True,
+        ),
+        sqlite_autoincrement=True,
+    )
+
+    engine = create_engine("sqlite:///:memory:")
+    assert "identifier INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT" in str(
+        CreateTable(table).compile(engine)
+    )
+    pg_dialect = postgresql.dialect()  # type: ignore[no-untyped-call]
+    assert "identifier BIGSERIAL NOT NULL" in str(
+        CreateTable(table).compile(dialect=pg_dialect)
+    )
+    table.create(engine)
+    with engine.begin() as conn:
+        assert conn.execute(table.insert()).inserted_primary_key == (1,)
 
 
 def test_utc_datetime_compiles_as_timestamp_on_sqlite() -> None:

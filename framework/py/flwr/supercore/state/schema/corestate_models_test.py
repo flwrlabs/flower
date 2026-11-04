@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 
 from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
@@ -91,7 +91,13 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
 )
 @pytest.mark.parametrize(
     ("flwr_aid", "agent_id", "valid"),
-    [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
+    [
+        ("user", None, True),
+        (None, 1, True),
+        (None, 2**64 - 1, True),
+        (None, None, False),
+        ("user", 1, False),
+    ],
 )
 def test_conversation_requires_exactly_one_identity(
     table_name: str,
@@ -114,6 +120,12 @@ def test_conversation_requires_exactly_one_identity(
     with engine.begin() as conn:
         if valid:
             conn.execute(table.insert().values(**values))
+            assert (
+                conn.execute(
+                    select(table.c.agent_id).where(table.c.agent_id == agent_id)
+                ).scalar_one()
+                == agent_id
+            )
         else:
             with pytest.raises(IntegrityError, match=f"ck_{table_name}_identity"):
                 conn.execute(table.insert().values(**values))

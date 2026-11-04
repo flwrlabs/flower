@@ -182,7 +182,7 @@ class Agent(FlwrBase):
     )
 
     agent_id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
+        UInt64(sqlite_autoincrement=True),
         primary_key=True,
         autoincrement=True,
         nullable=False,
@@ -224,7 +224,7 @@ ConversationParticipantTable = Table(
     FlwrBase.metadata,
     Column("conversation_id", Uuid, ForeignKey("conversation.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
-    Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
+    Column("agent_id", UInt64(), ForeignKey("agent.agent_id"), nullable=True),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
@@ -260,7 +260,7 @@ class ConversationMessage(FlwrBase):
     )
     flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("agent.agent_id"), nullable=True
+        UInt64(), ForeignKey("agent.agent_id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
