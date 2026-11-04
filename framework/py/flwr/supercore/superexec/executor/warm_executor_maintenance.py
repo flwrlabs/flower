@@ -270,7 +270,6 @@ class WarmExecutorPoolManager:  # pylint: disable=too-many-instance-attributes
             with self._lock:
                 self._cold_launches -= 1
                 self._capacity_generation += 1
-            self.request_maintenance()
 
     def _reserve_creation_capacity(
         self,

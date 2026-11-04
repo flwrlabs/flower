@@ -71,7 +71,6 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
             allow_warm_dispatch=self._can_dispatch_warm(
                 insecure, root_certificates_path
             ),
-            reconcile_warm_pools=True,
         )
 
     def get_eligible_capacity(
@@ -83,9 +82,7 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
     ) -> tuple[set[TaskType], set[str]]:
         """Return task types and FABs with a cold slot or ready warm Pod."""
         manager = self._warm_executor_pool_manager
-        if manager is not None:
-            manager.request_maintenance()
-        else:
+        if manager is None:
             self._sweep_completed_pods_if_due()
         if self._config.active_pod_budget is None:
             return supported_task_types, set()
@@ -128,7 +125,7 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
         return set(), set()
 
     def reconcile(self) -> None:
-        """Maintain warm capacity even when there are no pending tasks."""
+        """Start periodic warm-pool maintenance independently of task polling."""
         if self._warm_executor_pool_manager is not None:
             self._warm_executor_pool_manager.request_maintenance()
 
@@ -138,20 +135,10 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
         *,
         fab_hash: str | None = None,
         allow_warm_dispatch: bool,
-        reconcile_warm_pools: bool,
     ) -> bool:
         """Wait for capacity and return True for warm dispatch or False for cold."""
         if self._warm_executor_pool_manager is None:
             self._sweep_completed_pods_if_due()
-        if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
-            self._warm_executor_pool_manager.request_maintenance()
-            has_ready_warm_pod = (
-                allow_warm_dispatch
-                and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
-            )
-            if has_ready_warm_pod:
-                return True
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
@@ -176,12 +163,9 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
                 )
                 return False
             if active_pod_count < self._config.active_pod_budget:
-                if waited_for_capacity:
-                    if self._warm_executor_pool_manager is None:
-                        self._last_completed_pod_sweep_at = self._config.monotonic()
-                        self._sweep_completed_pods()
-                    else:
-                        self._warm_executor_pool_manager.request_maintenance()
+                if waited_for_capacity and self._warm_executor_pool_manager is None:
+                    self._last_completed_pod_sweep_at = self._config.monotonic()
+                    self._sweep_completed_pods()
                 return False
 
             if self._config.capacity_log_interval is not None:
@@ -254,7 +238,6 @@ class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
                         spec.task_type,
                         fab_hash=spec.fab_hash,
                         allow_warm_dispatch=allow_warm_dispatch,
-                        reconcile_warm_pools=False,
                     ):
                         cold_result = self._warm_executor_pool_manager.launch_cold(
                             lambda: self._resources.launch_cold(

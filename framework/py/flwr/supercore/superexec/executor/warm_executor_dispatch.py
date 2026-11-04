@@ -384,8 +384,6 @@ class WarmExecutorDispatcher:
                 self._log_dispatch(primary_pool, "setup_unavailable")
                 return None
             if claimed is None:
-                if self._request_maintenance is not None:
-                    self._request_maintenance()
                 self._log_dispatch(primary_pool, "capacity_unavailable")
                 return None
             pool, pod_name = claimed
@@ -538,6 +536,8 @@ class WarmExecutorDispatcher:
                     self._state.consumed_pods.add(pod_name)
                     self._state.pending_creations.pop(pod_name, None)
                     self._busy_pods.add(pod_name)
+                    if self._request_maintenance is not None:
+                        self._request_maintenance()
                     return pool, pod_name
         return None
 

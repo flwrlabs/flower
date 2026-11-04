@@ -298,7 +298,6 @@ def test_launch_capacity_retry_preserves_task_fab_hash(
         TaskType.AGENT_APP,
         fab_hash=_FAB_HASH,
         allow_warm_dispatch=True,
-        reconcile_warm_pools=False,
     )
     client.create_namespaced_pod.assert_not_called()
 
@@ -706,18 +705,22 @@ def test_launch_warm_executor_is_inert_and_becomes_ready() -> None:
         (TaskType.CONNECTOR, "flwr-connector"),
     ],
 )
-def test_warm_launch_defers_replenishment(
+def test_warm_launch_requests_background_replenishment(
     monkeypatch: pytest.MonkeyPatch,
     insecure: bool,
     transport_args: list[str],
     task_type: TaskType,
     task_command: str,
 ) -> None:  # pylint: disable=too-many-locals
-    """A warm task receives its token before replacement work begins."""
+    """A warm claim schedules replenishment without waiting for its creation."""
     # pylint: disable=too-many-locals
     span = Mock()
     tracing = Mock(side_effect=lambda *_: nullcontext(span))
     monkeypatch.setattr(warm_executor_dispatch, "trace_span", tracing)
+    request_maintenance = Mock()
+    monkeypatch.setattr(
+        maintenance.WarmExecutorPoolManager, "request_maintenance", request_maintenance
+    )
     client = Mock()
     exec_client = Mock()
     pool_key = _warm_executor_pool_key(
@@ -810,9 +813,8 @@ def test_warm_launch_defers_replenishment(
     assert dispatch._log_output is suppress_output  # pylint: disable=protected-access
     assert started[0][1][-1] is (not suppress_output)
 
-    request_maintenance = Mock()
-    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
-    monkeypatch.setattr(manager, "request_maintenance", request_maintenance)
+    request_maintenance.assert_called_once_with()
+    request_maintenance.reset_mock()
     executor.reconcile()
     request_maintenance.assert_called_once_with()
     client.create_namespaced_pod.assert_not_called()
@@ -1009,6 +1011,9 @@ def test_launch_preserves_outcome_when_cleanup_thread_cannot_start(
         threading,
         "Thread",
         lambda **_kwargs: SimpleNamespace(start=_raise_runtime_error),
+    )
+    monkeypatch.setattr(
+        maintenance.WarmExecutorPoolManager, "request_maintenance", Mock()
     )
     executor = _executor(client=client, config=config)
 
@@ -1737,7 +1742,9 @@ def test_warm_pool_replaces_missing_pod_with_reserved_cold_capacity(
     )
 
 
-def test_reconciliation_refills_after_terminating_pods_release_capacity() -> None:
+def test_reconciliation_refills_after_terminating_pods_release_capacity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Periodic maintenance refills an empty pool without another task launch."""
     client = Mock()
     client.list_namespaced_secret.return_value = {"items": []}
@@ -1757,15 +1764,26 @@ def test_reconciliation_refills_after_terminating_pods_release_capacity() -> Non
         ),
     )
     executor = _executor(client=client, config=config)
+    manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
+    assert manager is not None
+    checked = threading.Event()
+    ensure_capacity = manager.ensure_capacity
+
+    def reconcile() -> None:
+        ensure_capacity()
+        checked.set()
+
+    monkeypatch.setattr(manager, "ensure_capacity", reconcile)
+    monkeypatch.setattr(maintenance, "_WARM_MAINTENANCE_RETRY_INTERVAL_SECONDS", 0.01)
     created = threading.Event()
     client.create_namespaced_pod.side_effect = lambda *_args: created.set()
     client.create_namespaced_pod.assert_not_called()
 
     executor.reconcile()
+    assert checked.wait(2)
     client.create_namespaced_pod.assert_not_called()
 
     active_count = 0
-    executor.reconcile()
     assert created.wait(2)
     executor.close()
     client.create_namespaced_pod.assert_called_once()
@@ -2146,7 +2164,6 @@ def test_cold_fallback_does_not_reconcile_while_waiting_for_capacity(
     executor._wait_for_capacity(  # pylint: disable=protected-access
         None,
         allow_warm_dispatch=False,
-        reconcile_warm_pools=False,
     )
 
     manager.retry_retiring_pods.assert_not_called()
