@@ -47,8 +47,7 @@ def _column_signature(column: Column[Any]) -> tuple[object, ...]:
         tuple(
             sorted(
                 (
-                    foreign_key.column.table.name,
-                    foreign_key.column.name,
+                    foreign_key.target_fullname,
                     foreign_key.ondelete,
                 )
                 for foreign_key in column.foreign_keys

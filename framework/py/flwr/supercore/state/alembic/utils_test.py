@@ -22,6 +22,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 from alembic import command
 from alembic.autogenerate import compare_metadata
@@ -35,12 +36,14 @@ from sqlalchemy import (
     Table,
     create_engine,
     inspect,
+    select,
     text,
 )
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
@@ -298,6 +301,59 @@ class TestAlembicRun(unittest.TestCase):
                 diffs = compare_metadata(context, metadata)
             # Assert
             self.assertEqual(diffs, [])
+        finally:
+            engine.dispose()
+
+    def test_run_conversation_migration_preserves_existing_runs(self) -> None:
+        """Preserve legacy runs and allow conversation runs without legacy scopes."""
+        engine = self.create_engine("run_conversation.db")
+        try:
+            self.upgrade_to_revision(engine, "10abac2005b4")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO run "
+                        "(run_id, primary_task_id, federation_id, series_id) "
+                        "VALUES (1, 1, '@alice/test', 7)"
+                    )
+                )
+
+            self.upgrade_to_revision(engine, "01711e450ea4")
+            metadata = get_combined_metadata()
+            run = metadata.tables["run"]
+            conversation_id = uuid4()
+            with engine.begin() as connection:
+                connection.execute(
+                    metadata.tables["conversation"]
+                    .insert()
+                    .values(id=conversation_id, title="", created_at=now())
+                )
+                connection.execute(
+                    run.insert().values(
+                        run_id=2, primary_task_id=2, conversation_id=conversation_id
+                    )
+                )
+                rows = connection.execute(
+                    select(
+                        run.c.conversation_id, run.c.federation_id, run.c.series_id
+                    ).order_by(run.c.run_id)
+                ).all()
+                self.assertEqual(
+                    rows, [(None, "@alice/test", 7), (conversation_id, None, None)]
+                )
+
+            self.downgrade_to_revision(engine, "10abac2005b4")
+            self.assertNotIn(
+                "conversation_id",
+                {column["name"] for column in inspect(engine).get_columns("run")},
+            )
+            with engine.connect() as connection:
+                self.assertEqual(
+                    connection.scalars(
+                        select(run.c.run_id).order_by(run.c.run_id)
+                    ).all(),
+                    [1, 2],
+                )
         finally:
             engine.dispose()
 
