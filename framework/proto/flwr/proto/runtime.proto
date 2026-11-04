@@ -17,6 +17,7 @@ syntax = "proto3";
 
 package flwr.proto;
 
+import "flwr/proto/control.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/file.proto";
@@ -63,6 +64,26 @@ message PushTaskMessageResponse { string message_id = 1; }
 // PushTaskEvents messages
 message PushTaskEventsRequest { repeated TaskEvent events = 1; }
 message PushTaskEventsResponse {}
+
+// GetConversationMessages messages
+// The conversation is resolved from the authenticated task.
+message RuntimeGetConversationMessagesRequest {
+  // Exclusive ID bounds. With after_id, select the earliest matching page;
+  // otherwise select the latest matching page.
+  optional uint64 before_id = 1;
+  optional uint64 after_id = 2;
+  // Absent uses the server's default page size.
+  optional uint32 limit = 3;
+}
+message RuntimeGetConversationMessagesResponse {
+  // Messages in the selected page, ordered by ascending ID.
+  repeated ConversationMessage messages = 1;
+}
+
+// SendConversationMessage messages
+// The conversation and agent author are resolved from the authenticated task.
+message RuntimeSendConversationMessageRequest { string content = 1; }
+message RuntimeSendConversationMessageResponse { ConversationMessage message = 1; }
 
 // GetRunSeriesEvents messages
 message GetRunSeriesEventsRequest {

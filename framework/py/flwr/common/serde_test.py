@@ -31,6 +31,10 @@ from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto import transport_pb2 as pb2
 from flwr.proto.control_pb2 import Agent as ProtoAgent
 from flwr.proto.control_pb2 import AgentConfig as ProtoAgentConfig
+from flwr.proto.control_pb2 import ConversationMessage as ProtoConversationMessage
+from flwr.proto.control_pb2 import (
+    ConversationParticipant as ProtoConversationParticipant,
+)
 from flwr.proto.control_pb2 import (
     CreateAgentRequest,
     CreateAgentResponse,
@@ -45,6 +49,12 @@ from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
+from flwr.proto.runtime_pb2 import (
+    RuntimeGetConversationMessagesRequest,
+    RuntimeGetConversationMessagesResponse,
+    RuntimeSendConversationMessageRequest,
+    RuntimeSendConversationMessageResponse,
+)
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -141,6 +151,53 @@ def test_agent_messages_proto_roundtrip() -> None:
     assert (
         ListAgentsResponse.FromString(list_response.SerializeToString())
         == list_response
+    )
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{}, {"after_id": 0}, {"before_id": 2**64 - 1, "after_id": 0, "limit": 50}],
+)
+def test_runtime_conversation_pagination_proto_roundtrip(
+    fields: dict[str, int],
+) -> None:
+    """Preserve absent bounds, explicit zero, and unsigned message IDs on the wire."""
+    request = RuntimeGetConversationMessagesRequest(**fields)
+
+    actual = RuntimeGetConversationMessagesRequest.FromString(
+        request.SerializeToString()
+    )
+
+    assert actual == request
+    assert actual.HasField("before_id") is ("before_id" in fields)
+    assert actual.HasField("after_id") is ("after_id" in fields)
+    assert actual.HasField("limit") is ("limit" in fields)
+
+
+def test_runtime_conversation_messages_proto_roundtrip() -> None:
+    """Preserve text and the shared conversation message type in Runtime messages."""
+    message = ProtoConversationMessage(
+        id=1,
+        conversation_id="00000000-0000-4000-8000-000000000001",
+        author=ProtoConversationParticipant(agent_id=2**64 - 1),
+        created_at="2026-11-04T12:00:00Z",
+        content="Result: €100.\nNext step.",
+    )
+    request = RuntimeSendConversationMessageRequest(content=message.content)
+    sent = RuntimeSendConversationMessageResponse(message=message)
+    history = RuntimeGetConversationMessagesResponse(messages=[message])
+
+    assert (
+        RuntimeSendConversationMessageRequest.FromString(request.SerializeToString())
+        == request
+    )
+    assert (
+        RuntimeSendConversationMessageResponse.FromString(sent.SerializeToString())
+        == sent
+    )
+    assert (
+        RuntimeGetConversationMessagesResponse.FromString(history.SerializeToString())
+        == history
     )
 
 
