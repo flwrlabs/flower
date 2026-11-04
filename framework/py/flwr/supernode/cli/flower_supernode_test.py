@@ -112,7 +112,6 @@ def test_parse_supernode_lifespan_config_returns_final_defaults(
     assert config.port == flower_supernode_module.SUPERNODE_UVICORN_DEFAULT_PORT
     assert config.runtime_certificates is None
     assert config.runtime_root_certificates_path is None
-    assert config.health_server_address is None
     assert config.trusted_entities is None
     assert config.superexec_auth_secret is None
     assert config.runtime_dependency_install is False

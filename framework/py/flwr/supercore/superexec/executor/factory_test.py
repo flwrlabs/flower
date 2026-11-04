@@ -77,7 +77,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     )
 
     assert isinstance(executor, KubernetesExecutor)
-    assert executor._client is client  # pylint: disable=protected-access
+    assert executor._resources._client is client  # pylint: disable=protected-access
     config = executor._config  # pylint: disable=protected-access
     assert config.namespace == "flower-system"
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
@@ -213,7 +213,8 @@ def test_get_executor_configures_usable_typed_warm_executor_pool(
     )
     manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
     assert manager is not None
-    assert manager._exec_client is exec_client  # pylint: disable=protected-access
+    # pylint: disable-next=protected-access
+    assert manager._resources._exec_client is exec_client
     executor.reconcile()
     assert client.create_namespaced_pod.call_count == (2 if enabled else 0)
     assert client.create_namespaced_secret.call_count == (

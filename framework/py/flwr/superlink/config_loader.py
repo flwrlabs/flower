@@ -62,7 +62,6 @@ except ImportError:
 class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperLink lifespan."""
 
-    health_server_address: str | None
     host: str
     port: int
     insecure: bool

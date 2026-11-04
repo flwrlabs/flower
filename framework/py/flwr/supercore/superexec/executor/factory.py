@@ -22,8 +22,8 @@ from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
-from .kubernetes_executor import (
-    KubernetesExecutor,
+from .kubernetes_executor import KubernetesExecutor
+from .kubernetes_resources import (
     KubernetesExecutorConfig,
     create_incluster_kubernetes_clients,
 )
