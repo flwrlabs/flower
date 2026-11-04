@@ -23,8 +23,10 @@ import typer
 from flwr.cli.config_migration import migrate, warn_if_federation_config_overrides
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
 from flwr.cli.flower_config import read_superlink_connection
-from flwr.common.constant import CliOutputFormat
+from flwr.common.constant import CliOutputFormat, Status
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    ListRunsRequest,
+    ListRunsResponse,
     StopRunRequest,
     StopRunResponse,
 )
@@ -37,12 +39,15 @@ from .utils import (
     print_json_to_stdout,
 )
 
+_RUNS_PAGE_SIZE = 20
+_ACTIVE_STATUSES = {Status.PENDING, Status.STARTING, Status.RUNNING}
+
 
 def stop(  # pylint: disable=R0914
     ctx: typer.Context,
-    run_id: Annotated[  # pylint: disable=unused-argument
-        int,
-        typer.Argument(help="The Flower run ID to stop"),
+    run_id: Annotated[
+        str,
+        typer.Argument(help="The Flower run ID, or 'latest' or 'all'"),
     ],
     superlink: Annotated[
         str | None,
@@ -65,54 +70,113 @@ def stop(  # pylint: disable=R0914
         ),
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
-    """Stop a Flower run.
-
-    This command stops a running Flower App execution by sending a stop request to the
-    SuperLink via the Control API.
-    """
+    """Stop a Flower run by ID, or use 'latest' or 'all' for active runs."""
     with cli_output_handler(output_format=output_format) as is_json:
-        # Warn `--federation-config` is ignored
         warn_if_federation_config_overrides(federation_config_overrides)
-
         migrate(superlink, args=ctx.args)
-
-        # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
         control_client = None
-
         try:
             control_client = init_http_client_from_connection(superlink_connection)
+            if run_id.isdecimal():
+                run_ids = [int(run_id)]
+            elif run_id == "latest":
+                run_ids = _list_run_ids(control_client, latest_only=True)
+                if not run_ids:
+                    raise click.ClickException("No runs found.")
+            elif run_id == "all":
+                run_ids = _list_run_ids(control_client, active_only=True)
+                if not run_ids:
+                    raise click.ClickException("No active runs found.")
+            else:
+                raise click.BadParameter(
+                    "Run ID must be an integer, 'latest', or 'all'.",
+                    param_hint="RUN_ID",
+                )
 
-            typer.secho(f"✋ Stopping run ID {run_id}...", fg=typer.colors.GREEN)
-            _stop_run(stub=control_client, run_id=run_id, is_json=is_json)
-
+            if run_id == "all":
+                failures = _stop_all_runs(control_client, run_ids)
+                if failures:
+                    raise click.ClickException(
+                        "Some runs couldn't be stopped: " + "; ".join(failures)
+                    )
+            else:
+                for selected_run_id in run_ids:
+                    typer.secho(
+                        f"✋ Stopping run ID {selected_run_id}...",
+                        fg=typer.colors.GREEN,
+                    )
+                    _stop_run(
+                        stub=control_client,
+                        run_id=selected_run_id,
+                        is_json=is_json,
+                    )
+            if is_json and len(run_ids) > 1:
+                print_json_to_stdout(
+                    {
+                        "success": True,
+                        "run-ids": [str(selected_run_id) for selected_run_id in run_ids],
+                    }
+                )
         finally:
             if control_client:
                 control_client.close()
 
 
-def _stop_run(stub: ControlHttpClient, run_id: int, is_json: bool) -> None:
-    """Stop a run and display the result.
+def _list_run_ids(
+    stub: ControlHttpClient,
+    *,
+    latest_only: bool = False,
+    active_only: bool = False,
+) -> list[int]:
+    """Return selected run IDs, paging through the complete run history when needed."""
+    run_ids: list[int] = []
+    skip = 0
+    while True:
+        with flwr_cli_exc_handler():
+            response: ListRunsResponse = stub.ListRuns(
+                request=ListRunsRequest(limit=_RUNS_PAGE_SIZE, skip=skip)
+            )
+        page = sorted(
+            response.run_dict.values(),
+            key=lambda run: run.pending_at,
+            reverse=True,
+        )
+        if latest_only:
+            return [page[0].run_id] if page else []
+        for run in page:
+            if not active_only or run.status.status in _ACTIVE_STATUSES:
+                run_ids.append(run.run_id)
+        if len(page) < _RUNS_PAGE_SIZE:
+            break
+        skip += len(page)
+    # Offset pagination can expose the same run on adjacent pages if new runs
+    # are inserted while the history is being listed.
+    return list(dict.fromkeys(run_ids))
 
-    Parameters
-    ----------
-    stub : ControlHttpClient
-        The HTTP client for Control API communication.
-    run_id : int
-        The unique identifier of the run to stop.
-    is_json : bool
-        Whether JSON output format is requested.
-    """
+
+def _stop_all_runs(stub: ControlHttpClient, run_ids: list[int]) -> list[str]:
+    """Attempt every selected run and return errors for runs that failed."""
+    failures = []
+    for run_id in run_ids:
+        typer.secho(
+            f"✋ Stopping run ID {run_id}...",
+            fg=typer.colors.GREEN,
+        )
+        try:
+            _stop_run(stub=stub, run_id=run_id, is_json=False)
+        except click.ClickException as exc:
+            failures.append(f"run {run_id}: {exc.format_message()}")
+    return failures
+
+
+def _stop_run(stub: ControlHttpClient, run_id: int, is_json: bool) -> None:
+    """Stop a run and display the result."""
     with flwr_cli_exc_handler():
         response: StopRunResponse = stub.StopRun(request=StopRunRequest(run_id=run_id))
     if response.success:
         typer.secho(f"✅ Run {run_id} successfully stopped.", fg=typer.colors.GREEN)
         if is_json:
-            print_json_to_stdout(
-                {
-                    "success": True,
-                    "run-id": f"{run_id}",
-                }
-            )
+            print_json_to_stdout({"success": True, "run-id": f"{run_id}"})
     else:
         raise click.ClickException(f"Run {run_id} couldn't be stopped.")
