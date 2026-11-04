@@ -232,12 +232,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
-    # Start the main loop
+    # Start executor maintenance once, independently of task polling.
     try:
+        executor.reconcile()
         while True:
             timings = PhaseTimings()
-            with timings.measure("executor.reconcile"):
-                executor.reconcile()
             with timings.measure("executor.capacity"):
                 supported_task_types, agentapp_fab_hashes = (
                     executor.get_eligible_capacity(

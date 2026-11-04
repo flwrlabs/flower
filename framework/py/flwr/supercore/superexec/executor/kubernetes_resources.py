@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Kubernetes resource operations and executor configuration."""
+"""Kubernetes resources and configuration shared by cold and warm executors."""
 
 # pylint: disable=too-many-lines
 
@@ -61,11 +61,9 @@ from .warm_executor_pool import (
     WARM_EXECUTOR_TASK_TYPES,
     WarmExecutorPoolConfig,
     WarmExecutorPoolKey,
-    WarmExecutorPoolState,
     WarmExecutorUnavailable,
     is_compatible_warm_executor,
     is_warm_executor,
-    new_warm_executor_id,
 )
 
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
@@ -176,10 +174,12 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
     return _create_incluster_kubernetes_clients(1)[0]
 
 
-def create_incluster_kubernetes_clients() -> tuple[KubernetesClient, KubernetesClient]:
-    """Create separate Kubernetes clients for API and WebSocket exec calls."""
-    clients = _create_incluster_kubernetes_clients(2)
-    return clients[0], clients[1]
+def create_incluster_kubernetes_clients() -> (
+    tuple[KubernetesClient, KubernetesClient, KubernetesClient]
+):
+    """Create independent API, dispatch and maintenance-probe transports."""
+    clients = _create_incluster_kubernetes_clients(3)
+    return clients[0], clients[1], clients[2]
 
 
 def _create_incluster_kubernetes_clients(
@@ -345,8 +345,8 @@ class CompletedPodSweeper:
         self._client = client
         self._config = config
 
-    def sweep(self) -> None:
-        """Delete terminal Pods and orphaned credential or warm trust Secrets."""
+    def sweep(self, can_delete_orphans: Callable[[], bool] | None = None) -> None:
+        """Delete terminal resources, skipping orphan cleanup during cold creation."""
         selector = _taskexecutor_pool_label_selector(self._config)
         pods = _pod_items(
             self._client.list_namespaced_pod(
@@ -407,15 +407,15 @@ class CompletedPodSweeper:
             credential_secret_name = _credential_secret_name_from_pod_name(pod_name)
             if credential_secret_name in task_secret_names:
                 self._delete_secret(credential_secret_name)
-            warm_root_certificates_secret_name = (
+            secret_name: str | None = (
                 _warm_executor_root_certificates_secret_name_from_pod_name(pod_name)
             )
-            if (
-                warm_root_certificates_secret_name
-                in warm_root_certificates_secret_names
-            ):
-                self._delete_secret(warm_root_certificates_secret_name)
+            if secret_name in warm_root_certificates_secret_names:
+                self._delete_secret(secret_name)
 
+        # A concurrent creation can make a listed Secret look orphaned.
+        if can_delete_orphans is not None and not can_delete_orphans():
+            return
         # Delete Secrets whose owner Pod is no longer listed.
         for secret in secrets:
             secret_name = _object_name(secret)
@@ -638,11 +638,17 @@ def _create_warm_executor(
         secret = _build_warm_executor_root_certificates_secret(
             pool_key, config, executor_id
         )
-        client.create_namespaced_secret(config.namespace, secret)
+        try:
+            client.create_namespaced_secret(config.namespace, secret)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            if _exception_status(exc) != 409:
+                raise
     pod = _build_warm_executor_pod(pool_key, config, executor_id)
     try:
         client.create_namespaced_pod(config.namespace, pod)
     except Exception as exc:
+        if _exception_status(exc) == 409:
+            return
         if config.runtime_root_certificates is not None and _is_definite_pod_rejection(
             exc
         ):
@@ -1146,7 +1152,7 @@ def _has_task_id_label(value: object) -> bool:
 
 def _object_field(value: object, field_name: str) -> object | None:
     """Return a field from a Kubernetes dict or model object."""
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return value.get(field_name)
     return getattr(value, field_name, None)
 
@@ -1238,94 +1244,6 @@ def _is_dns_label(value: str) -> bool:
     return len(value) <= 63 and _DNS_LABEL_PATTERN.fullmatch(value) is not None
 
 
-class KubernetesTaskResources:
-    """Own cold task resources and the pool-wide capacity view."""
-
-    def __init__(
-        self, client: KubernetesClient, config: KubernetesExecutorConfig
-    ) -> None:
-        self._client = client
-        self._config = config
-        self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
-
-    @property
-    def pool_selector(self) -> str:
-        """Return the configured selector for pool-wide capacity and cleanup."""
-        return _taskexecutor_pool_label_selector(self._config)
-
-    def root_certificates(self, spec: ExecutionSpec) -> str | None:
-        """Resolve Runtime CA data before either warm or cold task dispatch."""
-        return _get_runtime_root_certificates(spec, self._config)
-
-    def sweep_completed_pods(self) -> None:
-        """Keep orphan cleanup from observing a Secret before its Pod exists."""
-        self._completed_pod_sweeper.sweep()
-
-    def launch_cold(
-        self, spec: ExecutionSpec, runtime_root_certificates: str | None
-    ) -> LaunchResult:
-        """Submit the TaskExecutor Pod and credential Secret."""
-        try:
-            launch_attempt_id = _new_launch_attempt_id()
-            secret_name = _credential_secret_name(spec, launch_attempt_id)
-            secret = _build_appio_credentials_secret(
-                spec, self._config, runtime_root_certificates, launch_attempt_id
-            )
-            pod = _build_taskexecutor_pod(
-                spec, self._config, runtime_root_certificates, launch_attempt_id
-            )
-            self._client.create_namespaced_secret(self._config.namespace, secret)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            return launch_result_from_exception(exc)
-
-        try:
-            self._client.create_namespaced_pod(self._config.namespace, pod)
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            result = launch_result_from_exception(exc)
-            if _is_definite_pod_rejection(exc):
-                _delete_secret_best_effort(
-                    self._client, self._config.namespace, secret_name
-                )
-            return result
-
-        return LaunchResult.accepted()
-
-    def active_pod_count(self) -> int:
-        """Return the active TaskExecutor Pod count for the configured pool."""
-        pod_list = self._client.list_namespaced_pod(
-            self._config.namespace,
-            label_selector=self.pool_selector,
-        )
-        pods = _pod_items(pod_list)
-        if self._config.warm_executor_owner:
-            # Surviving busy Pods still consume this owner's capacity after
-            # caller labels or resource-pool settings change on restart.
-            pod_names = {_object_name(pod) for pod in pods}
-            owned_pods = self._client.list_namespaced_pod(
-                self._config.namespace,
-                label_selector=_warm_executor_owner_label_selector(self._config),
-            )
-            pods.extend(
-                pod
-                for pod in _pod_items(owned_pods)
-                if _object_name(pod) not in pod_names
-            )
-        return sum(1 for pod in pods if _is_active_pod(pod))
-
-    def launch_warm(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
-        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
-        try:
-            _create_warm_executor(
-                self._client,
-                pool_key,
-                self._config,
-                new_warm_executor_id(),
-            )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            return launch_result_from_exception(exc)
-        return LaunchResult.accepted()
-
-
 # A surviving consumed Pod is safe to retire only after all task processes exit.
 # Ignore PID 1 (the idle parent), this probe, and zombies. A concurrent readiness
 # probe can delay retirement, but cannot make a running task appear finished.
@@ -1348,22 +1266,6 @@ else:
 """
 
 
-def _warm_object_field(value: object, field_name: str) -> object | None:
-    """Read a warm-pool field from a Mapping or Kubernetes model."""
-    if isinstance(value, Mapping):
-        return value.get(field_name)
-    return getattr(value, field_name, None)
-
-
-def _warm_object_name(value: object) -> str | None:
-    """Return a warm resource's metadata name."""
-    metadata = _warm_object_field(value, "metadata")
-    name = _warm_object_field(metadata, "name")
-    if isinstance(name, str) and name.strip():
-        return name
-    return None
-
-
 class WarmExecutorResources:
     """Own Kubernetes resources and transports used by a warm worker pool."""
 
@@ -1372,14 +1274,41 @@ class WarmExecutorResources:
         client: KubernetesClient,
         config: KubernetesExecutorConfig,
         exec_client: KubernetesClient | None = None,
-        *,
-        state: WarmExecutorPoolState,
+        probe_client: KubernetesClient | None = None,
     ) -> None:
+        transports = [
+            getattr(api, "api_client", api)
+            for api in (client, exec_client, probe_client)
+        ]
+        if config.warm_executor_owner and (
+            exec_client is None
+            or probe_client is None
+            or any(
+                a is b for i, a in enumerate(transports) for b in transports[i + 1 :]
+            )
+        ):
+            raise ValueError(
+                "Warm executors need independent REST, dispatch and probe transports."
+            )
         self._client = client
         self.config = config
         self._exec_client = exec_client or client
-        self._exec_client_lock = state.lock
+        self._probe_client = probe_client or self._exec_client
+        self._exec_client_lock = threading.Lock()
+        self._probe_client_lock = (
+            threading.Lock() if probe_client is not None else self._exec_client_lock
+        )
         self._lifecycle_lock = threading.RLock()
+
+    @staticmethod
+    def is_definite_rejection(exc: Exception) -> bool:
+        """Return whether submission was rejected before creating a resource."""
+        return _is_definite_pod_rejection(exc)
+
+    @staticmethod
+    def pod_name(executor_id: str) -> str:
+        """Return the resource name used by one pending worker creation."""
+        return _warm_executor_pod_name(executor_id)
 
     def create(self, key: WarmExecutorPoolKey, executor_id: str) -> None:
         """Create a warm Pod without racing completed-Pod cleanup."""
@@ -1426,18 +1355,15 @@ class WarmExecutorResources:
         except Exception:  # pylint: disable=broad-exception-caught
             log(WARNING, "Failed to list warm TaskExecutor Pods.", exc_info=True)
             return None
-        items = _warm_object_field(pod_list, "items")
-        if isinstance(items, Sequence) and not isinstance(items, str):
-            return list(items)
-        return []
+        return _pod_items(pod_list)
 
     def open_exec(
         self,
         *,
         pod_name: str,
-        command: Callable[[], list[str]],
+        command: list[str],
     ) -> object:
-        """Build and open an exec command under the shared pool lock."""
+        """Open an exec transport without delivering task authority."""
         try:
             stream = importlib.import_module("kubernetes.stream").stream
             # Kubernetes temporarily changes the exec client's transport during
@@ -1448,7 +1374,7 @@ class WarmExecutorResources:
                     pod_name,
                     self.config.namespace,
                     container="taskexecutor",
-                    command=command(),
+                    command=command,
                     stderr=True,
                     stdin=True,
                     stdout=True,
@@ -1464,7 +1390,7 @@ class WarmExecutorResources:
 
     def consumed_has_finished(self, pod: object) -> bool:
         """Preserve surviving tasks unless their exit can be established."""
-        if _warm_object_field(_warm_object_field(pod, "status"), "phase") in {
+        if _object_field(_object_field(pod, "status"), "phase") in {
             "Succeeded",
             "Failed",
         }:
@@ -1472,10 +1398,10 @@ class WarmExecutorResources:
         response = None
         try:
             stream = importlib.import_module("kubernetes.stream").stream
-            with self._exec_client_lock:
+            with self._probe_client_lock:
                 response = stream(
-                    self._exec_client.connect_get_namespaced_pod_exec,
-                    _warm_object_name(pod),
+                    self._probe_client.connect_get_namespaced_pod_exec,
+                    _object_name(pod),
                     self.config.namespace,
                     container="taskexecutor",
                     command=["python", "-c", _WARM_EXECUTOR_IDLE_CHECK],
@@ -1496,12 +1422,10 @@ class WarmExecutorResources:
             return False
         finally:
             if response is not None:
-                close = getattr(response, "close", None)
-                if callable(close):
-                    try:
-                        close()
-                    except Exception:  # pylint: disable=broad-exception-caught
-                        log(WARNING, "Failed to close warm TaskExecutor exec stream.")
+                try:
+                    response.close()
+                except Exception:  # pylint: disable=broad-exception-caught
+                    log(WARNING, "Failed to close warm TaskExecutor exec stream.")
 
     def mark_consumed(self, pod_name: str) -> None:
         """Persist exclusive consumption before delivering a task token."""
@@ -1519,3 +1443,109 @@ class WarmExecutorResources:
             raise WarmExecutorUnavailable(
                 "Failed to persist warm TaskExecutor Pod consumption."
             ) from err
+
+
+class KubernetesTaskResources:
+    """Own cold task resources and the pool-wide capacity view."""
+
+    def __init__(
+        self, client: KubernetesClient, config: KubernetesExecutorConfig
+    ) -> None:
+        self._client = client
+        self._config = config
+        self._creation_lock = threading.Lock()
+        self._creation_generation = 0
+        self._creations_in_flight = 0
+        self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
+
+    @property
+    def pool_selector(self) -> str:
+        """Return the configured selector for pool-wide capacity and cleanup."""
+        return _taskexecutor_pool_label_selector(self._config)
+
+    def root_certificates(self, spec: ExecutionSpec) -> str | None:
+        """Resolve Runtime CA data before either warm or cold task dispatch."""
+        return _get_runtime_root_certificates(spec, self._config)
+
+    def launch_cold(
+        self, spec: ExecutionSpec, runtime_root_certificates: str | None
+    ) -> LaunchResult:
+        """Create one cold task, preserving uncertain submission and its Secret."""
+        with self._creation_lock:
+            self._creation_generation += 1
+            self._creations_in_flight += 1
+        try:
+            return self._launch_cold(spec, runtime_root_certificates)
+        finally:
+            with self._creation_lock:
+                self._creations_in_flight -= 1
+                self._creation_generation += 1
+
+    def sweep_completed_pods(self) -> None:
+        """Skip orphan cleanup when a cold creation overlaps the resource listings."""
+        with self._creation_lock:
+            generation = self._creation_generation
+
+        def can_delete_orphans() -> bool:
+            with self._creation_lock:
+                return (
+                    self._creations_in_flight == 0
+                    and self._creation_generation == generation
+                )
+
+        # Later launches use new names, absent from this sweep's Secret snapshot.
+        self._completed_pod_sweeper.sweep(can_delete_orphans)
+
+    def _launch_cold(
+        self, spec: ExecutionSpec, runtime_root_certificates: str | None
+    ) -> LaunchResult:
+        """Submit the Secret and Pod while tracking concurrent cleanup."""
+        try:
+            launch_attempt_id = _new_launch_attempt_id()
+            secret_name = _credential_secret_name(spec, launch_attempt_id)
+            secret = _build_appio_credentials_secret(
+                spec, self._config, runtime_root_certificates, launch_attempt_id
+            )
+            pod = _build_taskexecutor_pod(
+                spec, self._config, runtime_root_certificates, launch_attempt_id
+            )
+            self._client.create_namespaced_secret(self._config.namespace, secret)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            return launch_result_from_exception(exc)
+
+        try:
+            self._client.create_namespaced_pod(self._config.namespace, pod)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            result = launch_result_from_exception(exc)
+            if _is_definite_pod_rejection(exc):
+                _delete_secret_best_effort(
+                    self._client, self._config.namespace, secret_name
+                )
+            return result
+
+        return LaunchResult.accepted()
+
+    def active_pod_count(self, pending: set[str] | None = None) -> int:
+        """Return the active TaskExecutor Pod count for the configured pool."""
+        pod_list = self._client.list_namespaced_pod(
+            self._config.namespace,
+            label_selector=self.pool_selector,
+        )
+        pods = _pod_items(pod_list)
+        if self._config.warm_executor_owner:
+            # Surviving busy Pods still consume this owner's capacity after
+            # caller labels or resource-pool settings change on restart.
+            pod_names = {_object_name(pod) for pod in pods}
+            owned_pods = self._client.list_namespaced_pod(
+                self._config.namespace,
+                label_selector=_warm_executor_owner_label_selector(self._config),
+            )
+            pods.extend(
+                pod
+                for pod in _pod_items(owned_pods)
+                if _object_name(pod) not in pod_names
+            )
+        pending = pending or set()
+        return sum(1 for pod in pods if _is_active_pod(pod)) + len(
+            pending - {_object_name(pod) for pod in pods}
+        )

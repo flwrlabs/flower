@@ -73,7 +73,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     enable_event_log: bool
     artifact_provider: ArtifactProvider | None
     enable_supernode_auth: bool
-    fleet_api_type: str
     simulation: bool
     ssl_ca_certfile: str | None
     ssl_certfile: str | None

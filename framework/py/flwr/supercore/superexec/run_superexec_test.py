@@ -93,15 +93,19 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     """Kubernetes polls with available capacity, including when none is ready."""
     task = Task(task_id=123, type=TaskType.AGENT_APP, fab_hash="ready-fab")
     client = Mock()
-    client.AcquireTask.return_value = (
-        AcquireTaskResponse(task=task, token="task-token")
-        if ready_fabs
-        else AcquireTaskResponse()
-    )
+    client.AcquireTask.side_effect = [
+        (
+            AcquireTaskResponse(task=task, token="task-token")
+            if ready_fabs
+            else AcquireTaskResponse()
+        ),
+        AcquireTaskResponse(),
+    ]
     executor = Mock()
     executor.get_eligible_capacity.return_value = (set(), ready_fabs)
     executor.launch.return_value = LaunchResult.accepted()
     order = Mock()
+    order.attach_mock(executor.reconcile, "reconcile")
     order.attach_mock(executor.get_eligible_capacity, "capacity")
     order.attach_mock(client.AcquireTask, "acquire")
     publish = Mock()
@@ -117,7 +121,7 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
     monkeypatch.setattr(
         "flwr.supercore.superexec.run_superexec.time.sleep",
-        Mock(side_effect=KeyboardInterrupt()),
+        Mock(side_effect=[None, KeyboardInterrupt()]),
     )
 
     with pytest.raises(KeyboardInterrupt):
@@ -128,7 +132,13 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
             executor_config={},
         )
 
-    assert [call[0] for call in order.mock_calls] == ["capacity", "acquire"]
+    assert [call[0] for call in order.mock_calls] == [
+        "reconcile",
+        "capacity",
+        "acquire",
+        "capacity",
+        "acquire",
+    ]
     request = client.AcquireTask.call_args.args[0]
     assert not request.supported_task_types
     assert set(request.agentapp_fab_hashes) == ready_fabs
