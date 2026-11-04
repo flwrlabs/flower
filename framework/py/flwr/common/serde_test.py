@@ -158,11 +158,15 @@ def test_agent_messages_proto_roundtrip() -> None:
     "fields",
     [{}, {"after_id": 0}, {"before_id": 2**64 - 1, "after_id": 0, "limit": 50}],
 )
-def test_runtime_conversation_pagination_proto_roundtrip(
+def test_conversation_pagination_proto_roundtrip(
     fields: dict[str, int],
 ) -> None:
     """Preserve absent bounds, explicit zero, and unsigned message IDs on the wire."""
-    request = GetConversationMessagesRequest(**fields)
+    request = GetConversationMessagesRequest(
+        before_id=fields.get("before_id"),
+        after_id=fields.get("after_id"),
+        limit=fields.get("limit"),
+    )
 
     actual = GetConversationMessagesRequest.FromString(request.SerializeToString())
 
@@ -172,8 +176,11 @@ def test_runtime_conversation_pagination_proto_roundtrip(
     assert actual.HasField("limit") is ("limit" in fields)
 
 
-def test_runtime_conversation_messages_proto_roundtrip() -> None:
-    """Preserve text and the shared conversation message type in Runtime messages."""
+@pytest.mark.parametrize(
+    "conversation_id", ["", "00000000-0000-4000-8000-000000000001"]
+)
+def test_conversation_messages_proto_roundtrip(conversation_id: str) -> None:
+    """Preserve text with an explicit Control scope or an implicit Runtime scope."""
     message = ProtoConversationMessage(
         id=1,
         conversation_id="00000000-0000-4000-8000-000000000001",
@@ -181,7 +188,9 @@ def test_runtime_conversation_messages_proto_roundtrip() -> None:
         created_at="2026-11-04T12:00:00Z",
         content="Result: €100.\nNext step.",
     )
-    request = SendConversationMessageRequest(content=message.content)
+    request = SendConversationMessageRequest(
+        conversation_id=conversation_id, content=message.content
+    )
     sent = SendConversationMessageResponse(message=message)
     history = GetConversationMessagesResponse(messages=[message])
 

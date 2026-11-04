@@ -22,9 +22,16 @@ import collections.abc
 import grpc
 import grpc.aio
 import typing
-from flwr.proto.runtime_conversation_pb2 import (
+from flwr.proto.conversation_pb2 import (
+    Conversation as Conversation,
+    ConversationMessage as ConversationMessage,
+    ConversationParticipant as ConversationParticipant,
+    CreateConversationRequest as CreateConversationRequest,
+    CreateConversationResponse as CreateConversationResponse,
     GetConversationMessagesRequest as GetConversationMessagesRequest,
     GetConversationMessagesResponse as GetConversationMessagesResponse,
+    ListConversationsRequest as ListConversationsRequest,
+    ListConversationsResponse as ListConversationsResponse,
     SendConversationMessageRequest as SendConversationMessageRequest,
     SendConversationMessageResponse as SendConversationMessageResponse,
 )

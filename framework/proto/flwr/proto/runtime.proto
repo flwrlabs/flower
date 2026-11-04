@@ -17,6 +17,7 @@ syntax = "proto3";
 
 package flwr.proto;
 
+import public "flwr/proto/conversation.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/file.proto";
@@ -25,7 +26,6 @@ import "flwr/proto/node.proto";
 import "flwr/proto/recorddict.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/runseries.proto";
-import public "flwr/proto/runtime_conversation.proto";
 import "flwr/proto/task.proto";
 
 // SendTaskHeartbeat messages
