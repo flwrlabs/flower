@@ -50,10 +50,10 @@ from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
 from flwr.proto.runtime_pb2 import (
-    RuntimeGetConversationMessagesRequest,
-    RuntimeGetConversationMessagesResponse,
-    RuntimeSendConversationMessageRequest,
-    RuntimeSendConversationMessageResponse,
+    GetConversationMessagesRequest,
+    GetConversationMessagesResponse,
+    SendConversationMessageRequest,
+    SendConversationMessageResponse,
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
@@ -162,11 +162,9 @@ def test_runtime_conversation_pagination_proto_roundtrip(
     fields: dict[str, int],
 ) -> None:
     """Preserve absent bounds, explicit zero, and unsigned message IDs on the wire."""
-    request = RuntimeGetConversationMessagesRequest(**fields)
+    request = GetConversationMessagesRequest(**fields)
 
-    actual = RuntimeGetConversationMessagesRequest.FromString(
-        request.SerializeToString()
-    )
+    actual = GetConversationMessagesRequest.FromString(request.SerializeToString())
 
     assert actual == request
     assert actual.HasField("before_id") is ("before_id" in fields)
@@ -183,20 +181,17 @@ def test_runtime_conversation_messages_proto_roundtrip() -> None:
         created_at="2026-11-04T12:00:00Z",
         content="Result: €100.\nNext step.",
     )
-    request = RuntimeSendConversationMessageRequest(content=message.content)
-    sent = RuntimeSendConversationMessageResponse(message=message)
-    history = RuntimeGetConversationMessagesResponse(messages=[message])
+    request = SendConversationMessageRequest(content=message.content)
+    sent = SendConversationMessageResponse(message=message)
+    history = GetConversationMessagesResponse(messages=[message])
 
     assert (
-        RuntimeSendConversationMessageRequest.FromString(request.SerializeToString())
+        SendConversationMessageRequest.FromString(request.SerializeToString())
         == request
     )
+    assert SendConversationMessageResponse.FromString(sent.SerializeToString()) == sent
     assert (
-        RuntimeSendConversationMessageResponse.FromString(sent.SerializeToString())
-        == sent
-    )
-    assert (
-        RuntimeGetConversationMessagesResponse.FromString(history.SerializeToString())
+        GetConversationMessagesResponse.FromString(history.SerializeToString())
         == history
     )
 

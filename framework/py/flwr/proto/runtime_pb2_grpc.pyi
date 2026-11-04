@@ -22,6 +22,12 @@ import collections.abc
 import grpc
 import grpc.aio
 import typing
+from flwr.proto.runtime_conversation_pb2 import (
+    GetConversationMessagesRequest as GetConversationMessagesRequest,
+    GetConversationMessagesResponse as GetConversationMessagesResponse,
+    SendConversationMessageRequest as SendConversationMessageRequest,
+    SendConversationMessageResponse as SendConversationMessageResponse,
+)
 
 _T = typing.TypeVar("_T")
 

@@ -19,7 +19,6 @@ limitations under the License.
 
 import builtins
 import collections.abc
-import flwr.proto.control_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.file_pb2
@@ -33,6 +32,12 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 import typing
+from flwr.proto.runtime_conversation_pb2 import (
+    GetConversationMessagesRequest as GetConversationMessagesRequest,
+    GetConversationMessagesResponse as GetConversationMessagesResponse,
+    SendConversationMessageRequest as SendConversationMessageRequest,
+    SendConversationMessageResponse as SendConversationMessageResponse,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
@@ -239,96 +244,6 @@ class PushTaskEventsResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PushTaskEventsResponse = PushTaskEventsResponse
-
-@typing.final
-class RuntimeGetConversationMessagesRequest(google.protobuf.message.Message):
-    """GetConversationMessages messages
-    The conversation is resolved from the authenticated task.
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    BEFORE_ID_FIELD_NUMBER: builtins.int
-    AFTER_ID_FIELD_NUMBER: builtins.int
-    LIMIT_FIELD_NUMBER: builtins.int
-    before_id: builtins.int
-    """Exclusive ID bounds. With after_id, select the earliest matching page;
-    otherwise select the latest matching page.
-    """
-    after_id: builtins.int
-    limit: builtins.int
-    """Absent uses the server's default page size."""
-    def __init__(
-        self,
-        *,
-        before_id: builtins.int | None = ...,
-        after_id: builtins.int | None = ...,
-        limit: builtins.int | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_after_id", b"_after_id"]) -> typing.Literal["after_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_before_id", b"_before_id"]) -> typing.Literal["before_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
-
-global___RuntimeGetConversationMessagesRequest = RuntimeGetConversationMessagesRequest
-
-@typing.final
-class RuntimeGetConversationMessagesResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    MESSAGES_FIELD_NUMBER: builtins.int
-    @property
-    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.control_pb2.ConversationMessage]:
-        """Messages in the selected page, ordered by ascending ID."""
-
-    def __init__(
-        self,
-        *,
-        messages: collections.abc.Iterable[flwr.proto.control_pb2.ConversationMessage] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
-
-global___RuntimeGetConversationMessagesResponse = RuntimeGetConversationMessagesResponse
-
-@typing.final
-class RuntimeSendConversationMessageRequest(google.protobuf.message.Message):
-    """SendConversationMessage messages
-    The conversation and agent author are resolved from the authenticated task.
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    CONTENT_FIELD_NUMBER: builtins.int
-    content: builtins.str
-    def __init__(
-        self,
-        *,
-        content: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["content", b"content"]) -> None: ...
-
-global___RuntimeSendConversationMessageRequest = RuntimeSendConversationMessageRequest
-
-@typing.final
-class RuntimeSendConversationMessageResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    MESSAGE_FIELD_NUMBER: builtins.int
-    @property
-    def message(self) -> flwr.proto.control_pb2.ConversationMessage: ...
-    def __init__(
-        self,
-        *,
-        message: flwr.proto.control_pb2.ConversationMessage | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["message", b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
-
-global___RuntimeSendConversationMessageResponse = RuntimeSendConversationMessageResponse
 
 @typing.final
 class GetRunSeriesEventsRequest(google.protobuf.message.Message):
