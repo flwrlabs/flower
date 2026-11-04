@@ -22,10 +22,11 @@ from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     MetaData,
+    and_,
     case,
     delete,
     exists,
@@ -60,6 +61,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    Conversation,
+    ConversationMessage,
+    ConversationParticipant,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
@@ -97,6 +101,13 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import (
+    Conversation as ConversationModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ConversationMessage as ConversationMessageModel,
+)
+from flwr.supercore.state.schema.corestate_models import ConversationParticipantTable
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -130,6 +141,7 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -1189,6 +1201,164 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(ConnectorOAuthSessionModel.oauth_session_id)
             )
             return updated_oauth_session_id is not None
+
+    def create_conversation(
+        self,
+        *,
+        participants: Sequence[ConversationParticipant],
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
+        members: list[ConversationParticipant] = []
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError(
+                    "Conversation participants must have a nonempty identity"
+                )
+            if participant not in members:
+                members.append(participant)
+        try:
+            with self.session() as session:
+                model = session.scalars(
+                    insert(ConversationModel)
+                    .values(id=uuid4(), title="", created_at=now())
+                    .returning(ConversationModel)
+                ).one()
+                if members:
+                    session.execute(
+                        insert(ConversationParticipantTable),
+                        [
+                            {
+                                "conversation_id": model.id,
+                                "flwr_aid": member.flwr_aid or None,
+                                "agent_id": member.agent_id or None,
+                            }
+                            for member in members
+                        ],
+                    )
+                conversation = _conversation_from_model(model)
+                conversation.participants.extend(members)
+                return conversation
+        except IntegrityError as exc:
+            raise ValueError("Invalid conversation participants") from exc
+
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
+        """Return participating conversations, newest first."""
+        viewer = ConversationParticipantTable.alias("viewer")
+        query = (
+            select(
+                ConversationModel,
+                ConversationParticipantTable.c.flwr_aid,
+                ConversationParticipantTable.c.agent_id,
+            )
+            .join(viewer, viewer.c.conversation_id == ConversationModel.id)
+            .join(
+                ConversationParticipantTable,
+                ConversationParticipantTable.c.conversation_id == ConversationModel.id,
+            )
+            .where(viewer.c.flwr_aid == flwr_aid)
+            .order_by(ConversationModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        with self.session() as session:
+            conversations: dict[UUID, Conversation] = {}
+            for model, member_flwr_aid, member_agent_id in session.execute(query):
+                if model.id not in conversations:
+                    conversations[model.id] = _conversation_from_model(model)
+                conversation = conversations[model.id]
+                if member_flwr_aid is not None:
+                    conversation.participants.add(flwr_aid=member_flwr_aid)
+                else:
+                    conversation.participants.add(agent_id=member_agent_id)
+            return list(conversations.values())
+
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Authorize membership in the message insert itself."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        if not (author.flwr_aid or author.agent_id):
+            return None
+        field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+        identity = author.flwr_aid or author.agent_id
+        source = select(
+            ConversationParticipantTable.c.conversation_id,
+            ConversationParticipantTable.c.flwr_aid,
+            ConversationParticipantTable.c.agent_id,
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(
+            ConversationParticipantTable.c.conversation_id == conversation_id,
+            ConversationParticipantTable.c[field] == identity,
+        )
+        with self.session() as session:
+            model = session.scalars(
+                insert(ConversationMessageModel)
+                .from_select(
+                    [
+                        "conversation_id",
+                        "flwr_aid",
+                        "agent_id",
+                        "created_at",
+                        "content",
+                    ],
+                    source,
+                )
+                .returning(ConversationMessageModel)
+            ).one_or_none()
+            return None if model is None else _conversation_message_from_model(model)
+
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return a participating user's history page in ascending ID order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        forward = after_id is not None
+        message_conditions = [
+            ConversationMessageModel.conversation_id
+            == ConversationParticipantTable.c.conversation_id
+        ]
+        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
+        if before_id is not None and before_id <= 2**63 - 1:
+            message_conditions.append(ConversationMessageModel.id < before_id)
+        if after_id is not None:
+            message_conditions.append(
+                ConversationMessageModel.id > min(after_id, 2**63 - 1)
+            )
+        query = (
+            select(ConversationMessageModel)
+            .select_from(ConversationParticipantTable)
+            .outerjoin(ConversationMessageModel, and_(*message_conditions))
+            .where(
+                ConversationParticipantTable.c.conversation_id == conversation_id,
+                ConversationParticipantTable.c.flwr_aid == flwr_aid,
+            )
+            .order_by(
+                ConversationMessageModel.id.asc()
+                if forward
+                else ConversationMessageModel.id.desc()
+            )
+            .limit(limit)
+        )
+        with self.session() as session:
+            models = list(session.scalars(query))
+            if not models:
+                return None
+            messages = [
+                _conversation_message_from_model(model)
+                for model in models
+                if model is not None
+            ]
+            return messages if forward else list(reversed(messages))
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2462,6 +2632,33 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+
+
+def _conversation_from_model(model: ConversationModel) -> Conversation:
+    """Convert conversation metadata to its API representation."""
+    return Conversation(
+        id=str(model.id),
+        title=model.title,
+        created_at=model.created_at.isoformat(),
+    )
+
+
+def _conversation_message_from_model(
+    model: ConversationMessageModel,
+) -> ConversationMessage:
+    """Convert a persisted user or agent message to its API representation."""
+    author = ConversationParticipant()
+    if model.flwr_aid is not None:
+        author.flwr_aid = model.flwr_aid
+    else:
+        author.agent_id = cast(int, model.agent_id)
+    return ConversationMessage(
+        id=model.id,
+        conversation_id=str(model.conversation_id),
+        author=author,
+        created_at=model.created_at.isoformat(),
+        content=model.content,
     )
 
 
