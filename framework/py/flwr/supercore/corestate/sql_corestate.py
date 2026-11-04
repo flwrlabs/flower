@@ -26,6 +26,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     MetaData,
+    and_,
     case,
     delete,
     exists,
@@ -1204,13 +1205,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def create_conversation(
         self,
         *,
-        flwr_aid: str,
-        participants: Sequence[ConversationParticipant] = (),
+        participants: Sequence[ConversationParticipant],
     ) -> Conversation:
         """Create a conversation and its initial membership atomically."""
-        if not flwr_aid:
-            raise ValueError("Conversation creator must be nonempty")
-        members = [ConversationParticipant(flwr_aid=flwr_aid)]
+        members: list[ConversationParticipant] = []
         for participant in participants:
             if not (participant.flwr_aid or participant.agent_id):
                 raise ValueError(
@@ -1218,78 +1216,59 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             if participant not in members:
                 members.append(participant)
-        with self.session() as session:
-            agent_ids = {
-                uint64_to_int64(member.agent_id)
-                for member in members
-                if member.agent_id
-            }
-            if agent_ids and agent_ids != set(
-                session.scalars(
-                    select(AgentModel.agent_id).where(
-                        AgentModel.agent_id.in_(agent_ids)
+        try:
+            with self.session() as session:
+                model = session.scalars(
+                    insert(ConversationModel)
+                    .values(id=uuid4(), title="", created_at=now())
+                    .returning(ConversationModel)
+                ).one()
+                if members:
+                    session.execute(
+                        insert(ConversationParticipantTable),
+                        [
+                            {
+                                "conversation_id": model.id,
+                                "flwr_aid": member.flwr_aid or None,
+                                "agent_id": member.agent_id or None,
+                            }
+                            for member in members
+                        ],
                     )
-                )
-            ):
-                raise ValueError("Agent participant does not exist")
-            model = session.scalars(
-                insert(ConversationModel)
-                .values(id=uuid4(), title="", created_at=now())
-                .returning(ConversationModel)
-            ).one()
-            session.execute(
-                insert(ConversationParticipantTable),
-                [
-                    {
-                        "conversation_id": model.id,
-                        "flwr_aid": member.flwr_aid or None,
-                        "agent_id": (
-                            uint64_to_int64(member.agent_id)
-                            if member.agent_id
-                            else None
-                        ),
-                    }
-                    for member in members
-                ],
-            )
-            conversation = _conversation_from_model(model)
-            conversation.participants.extend(members)
-            return conversation
+                conversation = _conversation_from_model(model)
+                conversation.participants.extend(members)
+                return conversation
+        except IntegrityError as exc:
+            raise ValueError("Invalid conversation participants") from exc
 
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """Return participating conversations, newest first."""
+        viewer = ConversationParticipantTable.alias("viewer")
         query = (
-            select(ConversationModel)
-            .where(
-                ConversationModel.id.in_(
-                    select(ConversationParticipantTable.c.conversation_id).where(
-                        ConversationParticipantTable.c.flwr_aid == flwr_aid
-                    )
-                )
+            select(
+                ConversationModel,
+                ConversationParticipantTable.c.flwr_aid,
+                ConversationParticipantTable.c.agent_id,
             )
+            .join(viewer, viewer.c.conversation_id == ConversationModel.id)
+            .join(
+                ConversationParticipantTable,
+                ConversationParticipantTable.c.conversation_id == ConversationModel.id,
+            )
+            .where(viewer.c.flwr_aid == flwr_aid)
             .order_by(ConversationModel.created_at.desc())
             .execution_options(populate_existing=True)
         )
         with self.session() as session:
-            conversations = {
-                model.id: _conversation_from_model(model)
-                for model in session.scalars(query)
-            }
-            if not conversations:
-                return []
-            participants = session.execute(
-                select(ConversationParticipantTable).where(
-                    ConversationParticipantTable.c.conversation_id.in_(
-                        list(conversations)
-                    )
-                )
-            ).mappings()
-            for participant in participants:
-                conversation = conversations[participant["conversation_id"]]
-                if participant["flwr_aid"] is not None:
-                    conversation.participants.add(flwr_aid=participant["flwr_aid"])
+            conversations: dict[UUID, Conversation] = {}
+            for model, member_flwr_aid, member_agent_id in session.execute(query):
+                if model.id not in conversations:
+                    conversations[model.id] = _conversation_from_model(model)
+                conversation = conversations[model.id]
+                if member_flwr_aid is not None:
+                    conversation.participants.add(flwr_aid=member_flwr_aid)
                 else:
-                    conversation.participants.add(agent_id=participant["agent_id"])
+                    conversation.participants.add(agent_id=member_agent_id)
             return list(conversations.values())
 
     def create_conversation_message(
@@ -1301,7 +1280,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not (author.flwr_aid or author.agent_id):
             return None
         field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
-        identity = author.flwr_aid or uint64_to_int64(author.agent_id)
+        identity = author.flwr_aid or author.agent_id
         source = select(
             ConversationParticipantTable.c.conversation_id,
             ConversationParticipantTable.c.flwr_aid,
@@ -1344,9 +1323,25 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
         forward = after_id is not None
+        message_conditions = [
+            ConversationMessageModel.conversation_id
+            == ConversationParticipantTable.c.conversation_id
+        ]
+        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
+        if before_id is not None and before_id <= 2**63 - 1:
+            message_conditions.append(ConversationMessageModel.id < before_id)
+        if after_id is not None:
+            message_conditions.append(
+                ConversationMessageModel.id > min(after_id, 2**63 - 1)
+            )
         query = (
             select(ConversationMessageModel)
-            .where(ConversationMessageModel.conversation_id == conversation_id)
+            .select_from(ConversationParticipantTable)
+            .outerjoin(ConversationMessageModel, and_(*message_conditions))
+            .where(
+                ConversationParticipantTable.c.conversation_id == conversation_id,
+                ConversationParticipantTable.c.flwr_aid == flwr_aid,
+            )
             .order_by(
                 ConversationMessageModel.id.asc()
                 if forward
@@ -1354,26 +1349,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             .limit(limit)
         )
-        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
-        if before_id is not None and before_id <= 2**63 - 1:
-            query = query.where(ConversationMessageModel.id < before_id)
-        if after_id is not None:
-            query = query.where(ConversationMessageModel.id > min(after_id, 2**63 - 1))
         with self.session() as session:
-            authorized = session.scalar(
-                select(
-                    exists().where(
-                        ConversationParticipantTable.c.conversation_id
-                        == conversation_id,
-                        ConversationParticipantTable.c.flwr_aid == flwr_aid,
-                    )
-                )
-            )
-            if not authorized:
+            models = list(session.scalars(query))
+            if not models:
                 return None
             messages = [
                 _conversation_message_from_model(model)
-                for model in session.scalars(query)
+                for model in models
+                if model is not None
             ]
             return messages if forward else list(reversed(messages))
 

@@ -198,7 +198,7 @@ class InMemoryCoreState(
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
         self.conversation_store: dict[UUID, Conversation] = {}
-        self.conversation_message_store: dict[int, ConversationMessage] = {}
+        self.conversation_message_store: dict[UUID, list[ConversationMessage]] = {}
         self.conversation_message_id_counter = 0
         self.lock_conversation_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
@@ -968,13 +968,10 @@ class InMemoryCoreState(
     def create_conversation(
         self,
         *,
-        flwr_aid: str,
-        participants: Sequence[ConversationParticipant] = (),
+        participants: Sequence[ConversationParticipant],
     ) -> Conversation:
         """Create a conversation and its initial membership atomically."""
-        if not flwr_aid:
-            raise ValueError("Conversation creator must be nonempty")
-        members = [ConversationParticipant(flwr_aid=flwr_aid)]
+        members: list[ConversationParticipant] = []
         for participant in participants:
             if not (participant.flwr_aid or participant.agent_id):
                 raise ValueError(
@@ -1001,6 +998,7 @@ class InMemoryCoreState(
                 participants=members,
             )
             self.conversation_store[conversation_id] = conversation
+            self.conversation_message_store[conversation_id] = []
             return conversation
 
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
@@ -1033,7 +1031,7 @@ class InMemoryCoreState(
                 created_at=now().isoformat(),
                 content=content,
             )
-            self.conversation_message_store[message.id] = message
+            self.conversation_message_store[conversation_id].append(message)
             return message
 
     def get_conversation_messages(  # pylint: disable=too-many-arguments
@@ -1050,7 +1048,6 @@ class InMemoryCoreState(
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        forward = after_id is not None
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
         with self.lock_conversation_store:
             conversation = self.conversation_store.get(conversation_id)
@@ -1058,14 +1055,11 @@ class InMemoryCoreState(
                 return None
             messages = [
                 message
-                for message in self.conversation_message_store.values()
-                if message.conversation_id == str(conversation_id)
-                and (before_id is None or message.id < before_id)
+                for message in self.conversation_message_store[conversation_id]
+                if (before_id is None or message.id < before_id)
                 and (after_id is None or message.id > after_id)
             ]
-            messages.sort(key=lambda message: message.id, reverse=not forward)
-            page = messages[:limit]
-            return page if forward else list(reversed(page))
+            return messages[:limit] if after_id is not None else messages[-limit:]
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,

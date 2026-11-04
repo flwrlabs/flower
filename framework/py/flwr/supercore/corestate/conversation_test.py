@@ -43,7 +43,7 @@ def conversation_state(request: pytest.FixtureRequest) -> CoreState:
 
 
 def test_create_and_list_conversations(state: CoreState) -> None:
-    """Include the creator, deduplicate participants, and filter listings."""
+    """Store explicit participants, deduplicate them, and filter listings."""
     agent = state.create_agent(
         flwr_aid="alice",
         config=AgentConfig(name="Research", app_spec="@flower/research"),
@@ -52,10 +52,10 @@ def test_create_and_list_conversations(state: CoreState) -> None:
     alice = ConversationParticipant(flwr_aid="alice")
     bob = ConversationParticipant(flwr_aid="bob")
     agent_participant = ConversationParticipant(agent_id=agent.id)
-    first = state.create_conversation(
-        flwr_aid="alice", participants=[bob, agent_participant, alice, bob]
-    )
-    second = state.create_conversation(flwr_aid="alice")
+    first = state.create_conversation(participants=[bob, agent_participant, alice, bob])
+    second = state.create_conversation(participants=[alice])
+    empty = state.create_conversation(participants=[])
+    assert not empty.participants
     assert first.title == ""
     assert len(first.participants) == 3
     assert all(
@@ -69,12 +69,18 @@ def test_create_and_list_conversations(state: CoreState) -> None:
         first.id
     ]
     assert not state.get_conversations(str(agent.id))
+    assert all(
+        member in state.get_conversations("bob")[0].participants
+        for member in [alice, bob, agent_participant]
+    )
 
 
 def test_participation_controls_message_access(state: CoreState) -> None:
     """Only initial participants can read and publish conversation messages."""
     bob = ConversationParticipant(flwr_aid="bob")
-    conversation = state.create_conversation(flwr_aid="alice", participants=[bob])
+    conversation = state.create_conversation(
+        participants=[ConversationParticipant(flwr_aid="alice"), bob]
+    )
     conversation_id = UUID(conversation.id)
     outsider = ConversationParticipant(flwr_aid="charlie")
     assert state.get_conversation_messages(conversation_id, "charlie") is None
@@ -86,13 +92,14 @@ def test_participation_controls_message_access(state: CoreState) -> None:
     assert message is not None and message.author == bob
     assert state.get_conversation_messages(conversation_id, "bob") == [message]
     assert state.get_conversation_messages(conversation_id, "alice") == [message]
+    assert state.get_conversation_messages(conversation_id, "charlie") is None
 
 
 def test_message_history_and_pagination(state: CoreState) -> None:
     """Keep messages ordered, preserve text, and isolate conversation history."""
-    conversation_id = UUID(state.create_conversation(flwr_aid="alice").id)
-    other_id = UUID(state.create_conversation(flwr_aid="alice").id)
     author = ConversationParticipant(flwr_aid="alice")
+    conversation_id = UUID(state.create_conversation(participants=[author]).id)
+    other_id = UUID(state.create_conversation(participants=[author]).id)
     first = state.create_conversation_message(
         conversation_id, author, "Hello, €100.\nNext."
     )
@@ -113,6 +120,10 @@ def test_message_history_and_pagination(state: CoreState) -> None:
     assert state.get_conversation_messages(
         conversation_id, "alice", before_id=second.id
     ) == [first]
+    assert (
+        state.get_conversation_messages(conversation_id, "alice", before_id=first.id)
+        == []
+    )
     assert state.get_conversation_messages(other_id, "alice") == [other]
     assert state.get_conversation_messages(
         conversation_id, "alice", after_id=first.id, limit=1
@@ -138,7 +149,6 @@ def test_invalid_initial_participants(
     """Reject invalid membership without creating a partial conversation."""
     with pytest.raises(ValueError):
         state.create_conversation(
-            flwr_aid="alice",
             participants=[ConversationParticipant(flwr_aid="bob"), participant],
         )
     assert not state.get_conversations("alice")
@@ -147,7 +157,11 @@ def test_invalid_initial_participants(
 
 def test_empty_message(state: CoreState) -> None:
     """Reject blank content without appending history."""
-    conversation_id = UUID(state.create_conversation(flwr_aid="alice").id)
+    conversation_id = UUID(
+        state.create_conversation(
+            participants=[ConversationParticipant(flwr_aid="alice")]
+        ).id
+    )
     with pytest.raises(ValueError, match="content"):
         state.create_conversation_message(
             conversation_id, ConversationParticipant(flwr_aid="alice"), " \n"
@@ -166,7 +180,11 @@ def test_unknown_conversation(state: CoreState) -> None:
 @pytest.mark.parametrize("before_id,after_id", [(1, 1), (1, 2)])
 def test_invalid_message_range(state: CoreState, before_id: int, after_id: int) -> None:
     """Reject equal or reversed exclusive message bounds."""
-    conversation_id = UUID(state.create_conversation(flwr_aid="alice").id)
+    conversation_id = UUID(
+        state.create_conversation(
+            participants=[ConversationParticipant(flwr_aid="alice")]
+        ).id
+    )
     with pytest.raises(ValueError, match="after_id"):
         state.get_conversation_messages(
             conversation_id, "alice", before_id=before_id, after_id=after_id

@@ -670,8 +670,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def create_conversation(
         self,
         *,
-        flwr_aid: str,
-        participants: Sequence[ConversationParticipant] = (),
+        participants: Sequence[ConversationParticipant],
     ) -> Conversation:
         """Create a conversation and its initial membership atomically."""
 
