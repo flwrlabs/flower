@@ -17,6 +17,7 @@ syntax = "proto3";
 
 package flwr.proto;
 
+import public "flwr/proto/conversation.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
@@ -109,54 +110,6 @@ message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
 }
-
-message ConversationParticipant {
-  oneof participant {
-    string flwr_aid = 1;
-    uint64 agent_id = 2;
-  }
-}
-
-message Conversation {
-  string id = 1;
-  string title = 2;
-  string created_at = 3;
-  repeated ConversationParticipant participants = 4;
-}
-
-message CreateConversationRequest {
-  repeated ConversationParticipant participants = 1;
-}
-message CreateConversationResponse { Conversation conversation = 1; }
-
-message ListConversationsRequest {}
-message ListConversationsResponse { repeated Conversation conversations = 1; }
-
-message ConversationMessage {
-  uint64 id = 1;
-  string conversation_id = 2;
-  ConversationParticipant author = 3;
-  string created_at = 4;
-  string content = 5;
-}
-
-message GetConversationMessagesRequest {
-  string conversation_id = 1;
-  // Exclusive upper ID bound. Absent selects the newest page.
-  optional uint64 before_id = 2;
-  // Absent uses the server's default page size.
-  optional uint32 limit = 3;
-}
-message GetConversationMessagesResponse {
-  // Messages in the selected page, ordered by ascending ID.
-  repeated ConversationMessage messages = 1;
-}
-
-message SendConversationMessageRequest {
-  string conversation_id = 1;
-  string content = 2;
-}
-message SendConversationMessageResponse { ConversationMessage message = 1; }
 
 message ListRunSeriesRequest {
   optional string updated_before = 1;

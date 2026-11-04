@@ -17,6 +17,7 @@ syntax = "proto3";
 
 package flwr.proto;
 
+import public "flwr/proto/conversation.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/file.proto";
