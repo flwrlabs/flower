@@ -33,7 +33,6 @@ from flwr.supercore.utils import get_flwr_home, get_popen_detach_kwargs
 from .constant import (
     CONTROL_API_PROBE_INTERVAL,
     CONTROL_API_PROBE_TIMEOUT,
-    LOCAL_CONTROL_API_ADDRESS,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
     LOCAL_SUPERLINK_HTTP_API_PORT,
@@ -114,8 +113,6 @@ def _start_local_superlink(
         "--simulation",
         "--isolation",
         ISOLATION_MODE_SUBPROCESS,
-        "--control-api-address",
-        LOCAL_CONTROL_API_ADDRESS,
         "--host",
         "127.0.0.1",
         "--port",
