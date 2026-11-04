@@ -22,7 +22,6 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
 
 from alembic import command
 from alembic.autogenerate import compare_metadata
@@ -36,14 +35,12 @@ from sqlalchemy import (
     Table,
     create_engine,
     inspect,
-    select,
     text,
 )
 from sqlalchemy.engine import URL, Connection, Engine
 
 from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
-from flwr.supercore.date import now
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
