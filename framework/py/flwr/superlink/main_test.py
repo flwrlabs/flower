@@ -206,7 +206,6 @@ def test_create_app_exposes_configured_dependencies(
         database=FLWR_IN_MEMORY_DB_NAME,
         superexec_auth_secret=None,
         artifact_provider=artifact_provider,
-        fleet_api_type="grpc-rere",
         authn_plugin=Mock(),
         event_log_plugin=None,
         fleet_event_log_plugin=fleet_event_log_plugin,
@@ -217,6 +216,5 @@ def test_create_app_exposes_configured_dependencies(
 
     assert app.state.superexec_auth_secret is None
     assert app.state.artifact_provider is artifact_provider
-    assert app.state.fleet_api_type == "grpc-rere"
     assert app.state.fleet_event_log_plugin is fleet_event_log_plugin
     lifespan_class.assert_called_once()
