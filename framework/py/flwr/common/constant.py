@@ -112,7 +112,7 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
 LOG_STREAM_INTERVAL = 0.5  # Control API log stream interval
-RUN_EVENTS_STREAM_INTERVAL = 0.5  # Event stream interval for `StreamRunEvents`
+RUN_EVENTS_STREAM_INTERVAL = 0.1  # Event stream interval for `StreamRunEvents`
 LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 
 # Retry configurations
