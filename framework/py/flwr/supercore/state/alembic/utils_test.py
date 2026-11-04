@@ -301,6 +301,75 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_space_rename_preserves_messages_and_participants(self) -> None:
+        """Preserve rows and foreign keys when renaming the conversation table."""
+        engine = self.create_engine("space_rename.db")
+        values = {
+            "id": "00000000000000000000000000000001",
+            "created_at": "2026-11-04 12:00:00+00:00",
+        }
+        try:
+            self.upgrade_to_revision(engine, "10abac2005b4")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO conversation (id, created_at, title) "
+                        "VALUES (:id, :created_at, 'Research')"
+                    ),
+                    values,
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO conversation_participant "
+                        "(conversation_id, flwr_aid) "
+                        "VALUES (:id, 'alice')"
+                    ),
+                    values,
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO conversation_message "
+                        "(conversation_id, flwr_aid, created_at, content) "
+                        "VALUES (:id, 'alice', :created_at, 'Hello')"
+                    ),
+                    values,
+                )
+
+            with engine.begin() as connection:
+                connection.execute(text("PRAGMA foreign_keys=ON"))
+                config = build_alembic_config(engine)
+                config.attributes["connection"] = connection
+                command.upgrade(config, "a8f6aa405dfa")
+                rows = connection.execute(
+                    text(
+                        "SELECT s.id, s.title, p.flwr_aid, m.content FROM space AS s "
+                        "JOIN conversation_participant AS p "
+                        "ON p.conversation_id = s.id "
+                        "JOIN conversation_message AS m ON m.conversation_id = s.id"
+                    )
+                ).all()
+                self.assertEqual(rows, [(values["id"], "Research", "alice", "Hello")])
+                self.assertFalse(inspect(connection).has_table("conversation"))
+                for table in ("conversation_participant", "conversation_message"):
+                    self.assertTrue(
+                        any(
+                            fk["referred_table"] == "space"
+                            for fk in inspect(connection).get_foreign_keys(table)
+                        )
+                    )
+
+            self.downgrade_to_revision(engine, "10abac2005b4")
+            self.assertFalse(inspect(engine).has_table("space"))
+            with engine.connect() as connection:
+                self.assertEqual(
+                    connection.execute(
+                        text("SELECT title FROM conversation")
+                    ).scalar_one(),
+                    "Research",
+                )
+        finally:
+            engine.dispose()
+
     def test_hub_origin_migration_preserves_unknown_legacy_rows(self) -> None:
         """Ensure legacy federation apps retain unknown Hub provenance."""
         engine = self.create_engine("federation_app_hub_origin.db")

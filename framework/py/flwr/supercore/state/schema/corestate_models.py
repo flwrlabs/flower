@@ -212,7 +212,7 @@ class RunSeries(FlwrBase):
 class Conversation(FlwrBase):
     """Represent a conversation."""
 
-    __tablename__ = "conversation"
+    __tablename__ = "space"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -222,7 +222,7 @@ class Conversation(FlwrBase):
 ConversationParticipantTable = Table(
     "conversation_participant",
     FlwrBase.metadata,
-    Column("conversation_id", Uuid, ForeignKey("conversation.id"), nullable=False),
+    Column("conversation_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
     CheckConstraint(
@@ -256,7 +256,7 @@ class ConversationMessage(FlwrBase):
         autoincrement=True,
     )
     conversation_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("conversation.id"), nullable=False
+        Uuid, ForeignKey("space.id"), nullable=False
     )
     flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_id: Mapped[int | None] = mapped_column(
