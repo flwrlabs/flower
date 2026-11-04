@@ -1256,46 +1256,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             conversation.participants.extend(members)
             return conversation
 
-    def add_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Enroll a participant without duplicating existing membership."""
-        if not (participant.flwr_aid or participant.agent_id):
-            return False
-        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
-        identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
-        try:
-            with self.session() as session:
-                if session.get(ConversationModel, conversation_id) is None:
-                    return False
-                session.execute(
-                    self.dialect_insert(ConversationParticipantTable)
-                    .values(conversation_id=conversation_id, **{field: identity})
-                    .on_conflict_do_nothing(index_elements=["conversation_id", field])
-                )
-                return True
-        except IntegrityError:
-            return False
-
-    def remove_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Remove a participant, returning whether membership existed."""
-        if not (participant.flwr_aid or participant.agent_id):
-            return False
-        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
-        identity = participant.flwr_aid or uint64_to_int64(participant.agent_id)
-        with self.session() as session:
-            removed = session.scalar(
-                delete(ConversationParticipantTable)
-                .where(
-                    ConversationParticipantTable.c.conversation_id == conversation_id,
-                    ConversationParticipantTable.c[field] == identity,
-                )
-                .returning(ConversationParticipantTable.c.conversation_id)
-            )
-            return removed is not None
-
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """Return participating conversations, newest first."""
         query = (

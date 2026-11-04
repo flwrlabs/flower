@@ -676,23 +676,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Create a conversation and its initial membership atomically."""
 
     @abstractmethod
-    def add_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Enroll a user or agent in an existing conversation.
-
-        Existing membership succeeds without changing metadata. Callers authorize
-        assignment before calling this persistence operation. Invalid identities
-        and unknown conversations return False.
-        """
-
-    @abstractmethod
-    def remove_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Remove a participant, returning whether membership existed."""
-
-    @abstractmethod
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """List conversations the user participates in."""
 

@@ -1003,35 +1003,6 @@ class InMemoryCoreState(
             self.conversation_store[conversation_id] = conversation
             return conversation
 
-    def add_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Enroll a participant without duplicating existing membership."""
-        if not (participant.flwr_aid or participant.agent_id):
-            return False
-        if participant.agent_id and not any(
-            participant.agent_id in agents for agents in self.agent_store.values()
-        ):
-            return False
-        with self.lock_conversation_store:
-            conversation = self.conversation_store.get(conversation_id)
-            if conversation is None:
-                return False
-            if participant not in conversation.participants:
-                conversation.participants.append(participant)
-            return True
-
-    def remove_conversation_participant(
-        self, conversation_id: UUID, participant: ConversationParticipant
-    ) -> bool:
-        """Remove a participant, returning whether membership existed."""
-        with self.lock_conversation_store:
-            conversation = self.conversation_store.get(conversation_id)
-            if conversation is None or participant not in conversation.participants:
-                return False
-            conversation.participants.remove(participant)
-            return True
-
     def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
         """Return participating conversations, newest first."""
         viewer = ConversationParticipant(flwr_aid=flwr_aid)
