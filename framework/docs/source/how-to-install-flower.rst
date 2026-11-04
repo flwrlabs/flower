@@ -32,6 +32,13 @@ For simulations that use the Simulation Runtime, ``flwr`` should be installed wi
 
     python -m pip install "flwr[simulation]"
 
+To run compatibility ``flwr.client.Client`` and ``flwr.server.Server`` applications over
+gRPC using ``start_client`` and ``start_server``, install the ``grpc`` extra:
+
+::
+
+    python -m pip install "flwr[grpc]"
+
 Using conda (or mamba)
 ======================
 
