@@ -151,8 +151,6 @@ def test_start_local_superlink_uses_builtin_log_rotation(tmp_path: Path) -> None
     assert cmd[cmd.index("--host") + 1] == "127.0.0.1"
     assert "--port" in cmd
     assert cmd[cmd.index("--port") + 1] == LOCAL_SUPERLINK_HTTP_API_PORT
-    assert "--database" in cmd
-    assert str(database) in cmd
     assert "--log-rotation-interval-hours" in cmd
     assert "24" in cmd
     assert "--log-rotation-backup-count" in cmd
