@@ -61,9 +61,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Conversation,
-    ConversationMessage,
-    ConversationParticipant,
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
@@ -101,13 +101,6 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
-from flwr.supercore.state.schema.corestate_models import (
-    Conversation as ConversationModel,
-)
-from flwr.supercore.state.schema.corestate_models import (
-    ConversationMessage as ConversationMessageModel,
-)
-from flwr.supercore.state.schema.corestate_models import ConversationParticipantTable
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -135,6 +128,11 @@ from flwr.supercore.state.schema.corestate_models import (
     SeriesContext as SeriesContextModel,
 )
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
+from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
+from flwr.supercore.state.schema.corestate_models import (
+    SpaceMessage as SpaceMessageModel,
+)
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
@@ -1202,78 +1200,76 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
-    def create_conversation(
+    def create_space(
         self,
         *,
-        participants: Sequence[ConversationParticipant],
-    ) -> Conversation:
-        """Create a conversation and its initial membership atomically."""
-        members: list[ConversationParticipant] = []
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+        members: list[SpaceParticipant] = []
         for participant in participants:
             if not (participant.flwr_aid or participant.agent_id):
-                raise ValueError(
-                    "Conversation participants must have a nonempty identity"
-                )
+                raise ValueError("Space participants must have a nonempty identity")
             if participant not in members:
                 members.append(participant)
         try:
             with self.session() as session:
                 model = session.scalars(
-                    insert(ConversationModel)
+                    insert(SpaceModel)
                     .values(id=uuid4(), title="", created_at=now())
-                    .returning(ConversationModel)
+                    .returning(SpaceModel)
                 ).one()
                 if members:
                     session.execute(
-                        insert(ConversationParticipantTable),
+                        insert(SpaceParticipantTable),
                         [
                             {
-                                "conversation_id": model.id,
+                                "space_id": model.id,
                                 "flwr_aid": member.flwr_aid or None,
                                 "agent_id": member.agent_id or None,
                             }
                             for member in members
                         ],
                     )
-                conversation = _conversation_from_model(model)
-                conversation.participants.extend(members)
-                return conversation
+                space = _space_from_model(model)
+                space.participants.extend(members)
+                return space
         except IntegrityError as exc:
-            raise ValueError("Invalid conversation participants") from exc
+            raise ValueError("Invalid space participants") from exc
 
-    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
-        """Return participating conversations, newest first."""
-        viewer = ConversationParticipantTable.alias("viewer")
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """Return participating spaces, newest first."""
+        viewer = SpaceParticipantTable.alias("viewer")
         query = (
             select(
-                ConversationModel,
-                ConversationParticipantTable.c.flwr_aid,
-                ConversationParticipantTable.c.agent_id,
+                SpaceModel,
+                SpaceParticipantTable.c.flwr_aid,
+                SpaceParticipantTable.c.agent_id,
             )
-            .join(viewer, viewer.c.conversation_id == ConversationModel.id)
+            .join(viewer, viewer.c.space_id == SpaceModel.id)
             .join(
-                ConversationParticipantTable,
-                ConversationParticipantTable.c.conversation_id == ConversationModel.id,
+                SpaceParticipantTable,
+                SpaceParticipantTable.c.space_id == SpaceModel.id,
             )
             .where(viewer.c.flwr_aid == flwr_aid)
-            .order_by(ConversationModel.created_at.desc())
+            .order_by(SpaceModel.created_at.desc())
             .execution_options(populate_existing=True)
         )
         with self.session() as session:
-            conversations: dict[UUID, Conversation] = {}
+            spaces: dict[UUID, Space] = {}
             for model, member_flwr_aid, member_agent_id in session.execute(query):
-                if model.id not in conversations:
-                    conversations[model.id] = _conversation_from_model(model)
-                conversation = conversations[model.id]
+                if model.id not in spaces:
+                    spaces[model.id] = _space_from_model(model)
+                space = spaces[model.id]
                 if member_flwr_aid is not None:
-                    conversation.participants.add(flwr_aid=member_flwr_aid)
+                    space.participants.add(flwr_aid=member_flwr_aid)
                 else:
-                    conversation.participants.add(agent_id=member_agent_id)
-            return list(conversations.values())
+                    space.participants.add(agent_id=member_agent_id)
+            return list(spaces.values())
 
-    def create_conversation_message(
-        self, conversation_id: UUID, author: ConversationParticipant, content: str
-    ) -> ConversationMessage | None:
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
         """Authorize membership in the message insert itself."""
         if not content.strip():
             raise ValueError("Message content must be nonempty")
@@ -1282,21 +1278,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
         identity = author.flwr_aid or author.agent_id
         source = select(
-            ConversationParticipantTable.c.conversation_id,
-            ConversationParticipantTable.c.flwr_aid,
-            ConversationParticipantTable.c.agent_id,
+            SpaceParticipantTable.c.space_id,
+            SpaceParticipantTable.c.flwr_aid,
+            SpaceParticipantTable.c.agent_id,
             literal(now(), type_=UTCDateTime()),
             literal(content),
         ).where(
-            ConversationParticipantTable.c.conversation_id == conversation_id,
-            ConversationParticipantTable.c[field] == identity,
+            SpaceParticipantTable.c.space_id == space_id,
+            SpaceParticipantTable.c[field] == identity,
         )
         with self.session() as session:
             model = session.scalars(
-                insert(ConversationMessageModel)
+                insert(SpaceMessageModel)
                 .from_select(
                     [
-                        "conversation_id",
+                        "space_id",
                         "flwr_aid",
                         "agent_id",
                         "created_at",
@@ -1304,19 +1300,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     ],
                     source,
                 )
-                .returning(ConversationMessageModel)
+                .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _conversation_message_from_model(model)
+            return None if model is None else _space_message_from_model(model)
 
-    def get_conversation_messages(  # pylint: disable=too-many-arguments
+    def get_space_messages(  # pylint: disable=too-many-arguments
         self,
-        conversation_id: UUID,
+        space_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-    ) -> Sequence[ConversationMessage] | None:
+    ) -> Sequence[SpaceMessage] | None:
         """Return a participating user's history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
@@ -1324,28 +1320,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("after_id must be less than before_id")
         forward = after_id is not None
         message_conditions = [
-            ConversationMessageModel.conversation_id
-            == ConversationParticipantTable.c.conversation_id
+            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
-            message_conditions.append(ConversationMessageModel.id < before_id)
+            message_conditions.append(SpaceMessageModel.id < before_id)
         if after_id is not None:
-            message_conditions.append(
-                ConversationMessageModel.id > min(after_id, 2**63 - 1)
-            )
+            message_conditions.append(SpaceMessageModel.id > min(after_id, 2**63 - 1))
         query = (
-            select(ConversationMessageModel)
-            .select_from(ConversationParticipantTable)
-            .outerjoin(ConversationMessageModel, and_(*message_conditions))
+            select(SpaceMessageModel)
+            .select_from(SpaceParticipantTable)
+            .outerjoin(SpaceMessageModel, and_(*message_conditions))
             .where(
-                ConversationParticipantTable.c.conversation_id == conversation_id,
-                ConversationParticipantTable.c.flwr_aid == flwr_aid,
+                SpaceParticipantTable.c.space_id == space_id,
+                SpaceParticipantTable.c.flwr_aid == flwr_aid,
             )
             .order_by(
-                ConversationMessageModel.id.asc()
-                if forward
-                else ConversationMessageModel.id.desc()
+                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
@@ -1354,7 +1345,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not models:
                 return None
             messages = [
-                _conversation_message_from_model(model)
+                _space_message_from_model(model)
                 for model in models
                 if model is not None
             ]
@@ -2635,27 +2626,27 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     )
 
 
-def _conversation_from_model(model: ConversationModel) -> Conversation:
-    """Convert conversation metadata to its API representation."""
-    return Conversation(
+def _space_from_model(model: SpaceModel) -> Space:
+    """Convert space metadata to its API representation."""
+    return Space(
         id=str(model.id),
         title=model.title,
         created_at=model.created_at.isoformat(),
     )
 
 
-def _conversation_message_from_model(
-    model: ConversationMessageModel,
-) -> ConversationMessage:
+def _space_message_from_model(
+    model: SpaceMessageModel,
+) -> SpaceMessage:
     """Convert a persisted user or agent message to its API representation."""
-    author = ConversationParticipant()
+    author = SpaceParticipant()
     if model.flwr_aid is not None:
         author.flwr_aid = model.flwr_aid
     else:
         author.agent_id = cast(int, model.agent_id)
-    return ConversationMessage(
+    return SpaceMessage(
         id=model.id,
-        conversation_id=str(model.conversation_id),
+        space_id=str(model.space_id),
         author=author,
         created_at=model.created_at.isoformat(),
         content=model.content,

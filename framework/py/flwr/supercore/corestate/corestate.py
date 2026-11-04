@@ -28,9 +28,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Conversation,
-    ConversationMessage,
-    ConversationParticipant,
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -667,37 +667,37 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def create_conversation(
+    def create_space(
         self,
         *,
-        participants: Sequence[ConversationParticipant],
-    ) -> Conversation:
-        """Create a conversation and its initial membership atomically."""
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
 
     @abstractmethod
-    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
-        """List conversations the user participates in."""
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """List spaces the user participates in."""
 
     @abstractmethod
-    def create_conversation_message(
-        self, conversation_id: UUID, author: ConversationParticipant, content: str
-    ) -> ConversationMessage | None:
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
 
     @abstractmethod
-    def get_conversation_messages(  # pylint: disable=too-many-arguments
+    def get_space_messages(  # pylint: disable=too-many-arguments
         self,
-        conversation_id: UUID,
+        space_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-    ) -> Sequence[ConversationMessage] | None:
+    ) -> Sequence[SpaceMessage] | None:
         """Return a message page in ascending ID order.
 
         Bounds are exclusive. With after_id, select the earliest matching page;
-        otherwise select the latest. Return None for missing conversations or
+        otherwise select the latest. Return None for missing spaces or
         nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
         """
 

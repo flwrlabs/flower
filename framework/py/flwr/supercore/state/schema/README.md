@@ -70,21 +70,6 @@ erDiagram
     VARCHAR state
   }
 
-  conversation_message {
-    BIGINT id PK
-    BIGINT agent_id FK "nullable"
-    CHAR(32) conversation_id FK
-    TEXT content
-    TIMESTAMP created_at
-    VARCHAR flwr_aid "nullable"
-  }
-
-  conversation_participant {
-    BIGINT agent_id FK "nullable"
-    CHAR(32) conversation_id FK
-    VARCHAR flwr_aid "nullable"
-  }
-
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -248,6 +233,21 @@ erDiagram
     VARCHAR title
   }
 
+  space_message {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
+  }
+
+  space_participant {
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    VARCHAR flwr_aid "nullable"
+  }
+
   task {
     TIMESTAMP active_until "nullable"
     INTEGER connector_id "nullable"
@@ -307,16 +307,16 @@ erDiagram
     VARCHAR usage_type
   }
 
-  space ||--o{ conversation_message : conversation_id
-  agent ||--o{ conversation_message : agent_id
-  space ||--o{ conversation_participant : conversation_id
-  agent ||--o{ conversation_participant : agent_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
   objects ||--o| run_objects : object_id
+  space ||--o{ space_message : space_id
+  agent ||--o{ space_message : agent_id
+  space ||--o{ space_participant : space_id
+  agent ||--o{ space_participant : agent_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
