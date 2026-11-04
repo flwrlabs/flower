@@ -22,8 +22,8 @@ from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
-from .kubernetes_executor import (
-    KubernetesExecutor,
+from .kubernetes_executor import KubernetesExecutor
+from .kubernetes_resources import (
     KubernetesExecutorConfig,
     create_incluster_kubernetes_clients,
 )
@@ -88,13 +88,14 @@ def get_executor(
             # Retain the owner so reconciliation can clean up surviving idle Pods.
             config.warm_executor_pools = ()
         try:
-            client, exec_client = create_incluster_kubernetes_clients()
+            client, exec_client, probe_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
             exec_client=exec_client,
+            probe_client=probe_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")

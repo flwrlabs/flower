@@ -500,7 +500,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
             with self.assertRaises(FlowerError) as error:
@@ -511,7 +510,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                     ),
                     get_current_account_info(),
                     self.state,
-                    None,
                     source="unknown",
                 )
             with self.assertRaises(FlowerError) as duplicate_error:
@@ -524,7 +522,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                     duplicate_request,
                     get_current_account_info(),
                     self.state,
-                    None,
                     source="unknown",
                 )
 
@@ -560,7 +557,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -581,7 +577,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 StartRunRequest(),
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -620,7 +615,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -668,7 +662,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -709,7 +702,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -748,7 +740,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -795,7 +786,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
         runs = self.state.get_run_info(run_ids=[response.run_id])
@@ -836,7 +826,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -871,7 +860,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
@@ -923,7 +911,6 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 get_current_account_info(),
                 self.state,
-                None,
                 source="unknown",
             )
 
