@@ -294,7 +294,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
-        fleet_api_type="http",
         simulation=args.simulation,
         ssl_ca_certfile=(
             str(Path(args.ssl_ca_certfile).expanduser())
@@ -451,7 +450,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         "--insecure",
         action="store_true",
         help="Run the server without HTTPS, regardless of whether certificate "
-        "paths are provided. Data transmitted between the gRPC client and server "
+        "paths are provided. Data transmitted between the client and server "
         "is not encrypted. By default, the server runs with HTTPS enabled. "
         "Use this flag only if you understand the risks.",
     )

@@ -59,7 +59,6 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.fleet_api_type == "http"
     assert config.certificates is None
     assert config.superexec_auth_secret is None
     assert config.host == app_module.UVICORN_DEFAULT_HOST

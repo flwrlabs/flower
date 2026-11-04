@@ -392,7 +392,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
             request.app_spec = "@flwr/demo==0.0.1"
             request.fab.hash_str = fab_hash
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         mock_store_app.assert_not_called()
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
@@ -438,7 +438,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
             ) as get_remote_fab,
         ):
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         get_remote_fab.assert_not_called()
         thread.return_value.start.assert_called_once()
@@ -483,7 +483,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ".start_title_generation"
             ) as start_title,
         ):
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
@@ -530,7 +530,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 self.assertRaises(FlowerError) as error,
             ):
-                start_run(request, self.account, self.state, None)
+                start_run(request, self.account, self.state)
 
             self.assertEqual(
                 error.exception.code,
@@ -572,7 +572,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 self.account,
                 self.state,
-                None,
                 source="web_ui",
             )
 
@@ -588,7 +587,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = "unknown"
 
         with self.assertRaises(FlowerError) as error:
-            start_run(request, self.account, self.state, None)
+            start_run(request, self.account, self.state)
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
@@ -604,7 +603,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
         ) as mock_get_remote_fab:
             with self.assertRaises(FlowerError) as error:
-                start_run(request, self.account, self.state, None)
+                start_run(request, self.account, self.state)
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
         mock_get_remote_fab.assert_not_called()
@@ -788,11 +787,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 self.account,
                 self.state,
-                None,
             )
 
         self.assertEqual(response, AddAppResponse())
-        mock_get_remote_fab.assert_called_once_with(None, "@flwr/demo")
+        mock_get_remote_fab.assert_called_once_with("@flwr/demo")
         fab_hash = hashlib.sha256(fab_content).hexdigest()
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(

@@ -190,7 +190,7 @@ def load_certificate_in_connection(
     -------
     bytes | None
         The loaded root certificate bytes if a custom certificate is configured.
-        None if TLS is disabled or if gRPC should use its default trust store.
+        None if TLS is disabled or the HTTP client uses its default trust store.
 
     Raises
     ------

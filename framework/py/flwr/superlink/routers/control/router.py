@@ -120,7 +120,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
-from flwr.superlink.dependencies.fleet_api import FleetApiTypeDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
@@ -178,13 +177,12 @@ def start_run(  # pylint: disable=too-many-arguments,too-many-positional-argumen
     request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-    fleet_api_type: FleetApiTypeDependency,
     run_source: RunSourceDependency,
     tracing: RunCreationTracingDependency,
 ) -> StartRunResponse:
     """Start a run."""
     response = control_handlers.start_run(
-        request, account, linkstate, fleet_api_type, source=run_source
+        request, account, linkstate, source=run_source
     )
     tracing.set_attribute("flwr.run_id", str(response.run_id))
     return response
@@ -462,10 +460,9 @@ def add_app(
     request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-    fleet_api_type: FleetApiTypeDependency,
 ) -> AddAppResponse:
     """Add an app to a federation."""
-    return control_handlers.add_app(request, account, linkstate, fleet_api_type)
+    return control_handlers.add_app(request, account, linkstate)
 
 
 @router.post("/remove-app")
