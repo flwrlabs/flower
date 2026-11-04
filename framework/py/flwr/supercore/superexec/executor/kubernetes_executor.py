@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Kubernetes executor for SuperExec TaskExecutor processes."""
+"""Kubernetes admission and cold task launches with optional warm dispatch."""
 
 from logging import INFO, WARNING
 
@@ -29,10 +29,9 @@ from .kubernetes_resources import (
 )
 from .types import ExecutionSpec, LaunchResult
 from .warm_executor_maintenance import WarmExecutorPoolManager
-from .warm_executor_pool import WarmExecutorPoolKey, WarmExecutorPoolState
 
 
-class KubernetesExecutor:
+class KubernetesExecutor:  # pylint: disable=too-many-instance-attributes
     """Submit TaskExecutor Pods to Kubernetes."""
 
     def __init__(
@@ -41,19 +40,21 @@ class KubernetesExecutor:
         client: KubernetesClient,
         config: KubernetesExecutorConfig,
         exec_client: KubernetesClient | None = None,
+        probe_client: KubernetesClient | None = None,
     ) -> None:
         self._resources = KubernetesTaskResources(client, config)
         self._config = config
         self._last_completed_pod_sweep_at: float | None = None
         self._last_capacity_log_at: float | None = None
-        self._warm_executor_pool_manager: WarmExecutorPoolManager | None = None
-        if config.warm_executor_owner:
-            state = WarmExecutorPoolState()
-            self._warm_executor_pool_manager = WarmExecutorPoolManager(
-                WarmExecutorResources(client, config, exec_client, state=state),
-                self._active_pod_count,
-                state=state,
+        self._warm_executor_pool_manager = (
+            WarmExecutorPoolManager(
+                WarmExecutorResources(client, config, exec_client, probe_client),
+                self._resources.active_pod_count,
+                sweep_completed_pods=self._sweep_completed_pods_if_due,
             )
+            if config.warm_executor_owner
+            else None
+        )
 
     def wait_for_capacity(
         self,
@@ -70,7 +71,6 @@ class KubernetesExecutor:
             allow_warm_dispatch=self._can_dispatch_warm(
                 insecure, root_certificates_path
             ),
-            reconcile_warm_pools=True,
         )
 
     def get_eligible_capacity(
@@ -81,12 +81,9 @@ class KubernetesExecutor:
         root_certificates_path: str | None = None,
     ) -> tuple[set[TaskType], set[str]]:
         """Return task types and FABs with a cold slot or ready warm Pod."""
-        self._sweep_completed_pods_if_due()
         manager = self._warm_executor_pool_manager
-        if manager is not None:
-            manager.ensure_capacity(reserved_pod_capacity=1)
-        if manager is not None:
-            manager.retry_retiring_pods()
+        if manager is None:
+            self._sweep_completed_pods_if_due()
         if self._config.active_pod_budget is None:
             return supported_task_types, set()
         try:
@@ -105,19 +102,7 @@ class KubernetesExecutor:
         if manager is not None and self._can_dispatch_warm(
             insecure, root_certificates_path
         ):
-            ready_keys = manager.ready_pool_keys()
-            ready_types = {
-                key.task_type
-                for key in ready_keys
-                if key.fab_hash is None and key.task_type in supported_task_types
-            }
-            ready_fabs = {
-                key.fab_hash
-                for key in ready_keys
-                if key.fab_hash is not None
-                and key.task_type == TaskType.AGENT_APP
-                and key.task_type in supported_task_types
-            }
+            ready_types, ready_fabs = manager.eligible_capacity(supported_task_types)
             if ready_types or ready_fabs:
                 return ready_types, ready_fabs
 
@@ -140,37 +125,23 @@ class KubernetesExecutor:
         return set(), set()
 
     def reconcile(self) -> None:
-        """Maintain warm capacity even when there are no pending tasks."""
+        """Start periodic warm-pool maintenance independently of task polling."""
         if self._warm_executor_pool_manager is not None:
-            self._sweep_completed_pods_if_due()
-            self._warm_executor_pool_manager.ensure_capacity()
+            self._warm_executor_pool_manager.request_maintenance()
 
-    def _wait_for_capacity(
+    def _wait_for_capacity(  # pylint: disable=too-many-branches
         self,
         task_type: TaskType | None,
         *,
         fab_hash: str | None = None,
         allow_warm_dispatch: bool,
-        reconcile_warm_pools: bool,
     ) -> bool:
         """Wait for capacity and return True for warm dispatch or False for cold."""
-        self._sweep_completed_pods_if_due()
-        if reconcile_warm_pools and self._warm_executor_pool_manager is not None:
-            has_ready_warm_pod = (
-                allow_warm_dispatch
-                and task_type is not None
-                and self._warm_executor_pool_manager.has_ready_pod(task_type, fab_hash)
-            )
-            self._warm_executor_pool_manager.ensure_capacity(
-                reserved_pod_capacity=0 if has_ready_warm_pod else 1
-            )
-            if has_ready_warm_pod:
-                return True
+        if self._warm_executor_pool_manager is None:
+            self._sweep_completed_pods_if_due()
         last_log_at: float | None = None
         waited_for_capacity = False
         while True:
-            if self._warm_executor_pool_manager is not None:
-                self._warm_executor_pool_manager.retry_retiring_pods()
             if self._config.active_pod_budget is None:
                 return False
             if (
@@ -192,7 +163,7 @@ class KubernetesExecutor:
                 )
                 return False
             if active_pod_count < self._config.active_pod_budget:
-                if waited_for_capacity:
+                if waited_for_capacity and self._warm_executor_pool_manager is None:
                     self._last_completed_pod_sweep_at = self._config.monotonic()
                     self._sweep_completed_pods()
                 return False
@@ -247,7 +218,7 @@ class KubernetesExecutor:
             )
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
-        """Submit the TaskExecutor Pod and credential Secret."""
+        """Try a warm worker, then launch a cold task if no handoff occurred."""
         try:
             runtime_root_certificates = self._resources.root_certificates(spec)
             if self._warm_executor_pool_manager is not None:
@@ -267,15 +238,20 @@ class KubernetesExecutor:
                         spec.task_type,
                         fab_hash=spec.fab_hash,
                         allow_warm_dispatch=allow_warm_dispatch,
-                        reconcile_warm_pools=False,
                     ):
-                        break
-            return self._resources.launch_cold(spec, runtime_root_certificates)
+                        cold_result = self._warm_executor_pool_manager.launch_cold(
+                            lambda: self._resources.launch_cold(
+                                spec, runtime_root_certificates
+                            )
+                        )
+                        if cold_result is not None:
+                            return cold_result
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return launch_result_from_exception(exc)
+        return self._resources.launch_cold(spec, runtime_root_certificates)
 
     def close(self) -> None:
-        """Delete idle warm Pods owned by this SuperExec instance."""
+        """Stop warm-pool maintenance and clean idle owned workers."""
         if self._warm_executor_pool_manager is not None:
             self._warm_executor_pool_manager.close()
 
@@ -289,10 +265,11 @@ class KubernetesExecutor:
             or root_certificates_path is None
         )
 
-    def _launch_warm_executor(self, pool_key: WarmExecutorPoolKey) -> LaunchResult:
-        """Submit one warm TaskExecutor Pod for a fixed compatibility key."""
-        return self._resources.launch_warm(pool_key)
-
     def _active_pod_count(self) -> int:
-        """Return the active TaskExecutor Pod count for the configured pool."""
-        return self._resources.active_pod_count()
+        """Count observed Pods and any unobserved warm creation reservations."""
+        pending = (
+            self._warm_executor_pool_manager.pending_pod_names()
+            if self._warm_executor_pool_manager is not None
+            else set()
+        )
+        return self._resources.active_pod_count(pending)

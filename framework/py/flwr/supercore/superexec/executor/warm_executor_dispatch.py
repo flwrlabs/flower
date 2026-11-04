@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Worker reservation and task handoff for synchronous warm executor pools."""
+"""Worker reservation and Kubernetes task handoff for warm executors."""
 
 from __future__ import annotations
 
@@ -345,21 +345,23 @@ def warm_executor_command(
 
 
 class WarmExecutorDispatcher:
-    """Reserve compatible warm workers and deliver one task's authority."""
+    """Reserve compatible workers and deliver one task invocation."""
 
     def __init__(
         self,
         resources: WarmExecutorResources,
         state: WarmExecutorPoolState,
-        replenish_pool: Callable[[WarmExecutorPoolKey, int], None],
+        request_maintenance: Callable[[], None] | None = None,
     ) -> None:
         self._resources = resources
         self._state = state
         self._lock = state.lock
         self._busy_pods = state.busy_pods
         self._retiring_pods = state.retiring_pods
-        self._pools = {pool.key: pool for pool in resources.config.warm_executor_pools}
-        self._replenish_pool = replenish_pool
+        self._pools = {
+            pool.key: pool for pool in self._resources.config.warm_executor_pools
+        }
+        self._request_maintenance = request_maintenance
 
     # pylint: disable-next=too-many-return-statements
     def launch(
@@ -382,9 +384,6 @@ class WarmExecutorDispatcher:
                 self._log_dispatch(primary_pool, "setup_unavailable")
                 return None
             if claimed is None:
-                with trace_span("executor.replenish"):
-                    for candidate in candidates:
-                        self._replenish_pool(candidate.key, 1)
                 self._log_dispatch(primary_pool, "capacity_unavailable")
                 return None
             pool, pod_name = claimed
@@ -512,6 +511,7 @@ class WarmExecutorDispatcher:
         return (
             pod_name is not None
             and pod_name not in self._busy_pods
+            and pod_name not in self._state.consumed_pods
             and pod_name not in self._retiring_pods
             and not is_consumed_warm_executor(pod)
             and self._resources.has_configuration(pod, key)
@@ -533,7 +533,11 @@ class WarmExecutorDispatcher:
                     except WarmExecutorUnavailable:
                         self._retire_unavailable_pod(pod_name, pool.key)
                         raise
+                    self._state.consumed_pods.add(pod_name)
+                    self._state.pending_creations.pop(pod_name, None)
                     self._busy_pods.add(pod_name)
+                    if self._request_maintenance is not None:
+                        self._request_maintenance()
                     return pool, pod_name
         return None
 
@@ -577,22 +581,29 @@ class WarmExecutorDispatcher:
             log(WARNING, "Warm TaskExecutor exec stream ended without an exit status.")
         finally:
             dispatch.close()
-            with self._lock:
-                if completed:
-                    self._retire_pod(pod_name, key)
-                else:
+            if completed:
+                self._retire_pod(pod_name, key)
+            else:
+                with self._lock:
                     self._busy_pods.discard(pod_name)
-                if not self._state.closed:
-                    self._replenish_pool(key, 0)
+            if self._request_maintenance is not None:
+                self._request_maintenance()
 
     def _release_pod(self, pod_name: str) -> None:
         with self._lock:
             self._busy_pods.discard(pod_name)
+            self._state.consumed_pods.discard(pod_name)
+            self._state.pending_creations.pop(pod_name, None)
             self._retiring_pods.pop(pod_name, None)
 
     def _retire_unavailable_pod(self, pod_name: str, key: WarmExecutorPoolKey) -> None:
-        """Delete a Pod that failed before task authority was delivered."""
-        self._retire_pod(pod_name, key)
+        """Retire a Pod that failed before task authority was delivered."""
+        if self._request_maintenance is None:
+            self._retire_pod(pod_name, key)
+            return
+        with self._lock:
+            self._retiring_pods[pod_name] = key
+        self._request_maintenance()
 
     def _retire_pod(
         self, pod_name: str, key: WarmExecutorPoolKey | None = None
@@ -614,9 +625,7 @@ class WarmExecutorDispatcher:
     ) -> KubernetesWarmExecutorDispatch:
         response = self._resources.open_exec(
             pod_name=pod_name,
-            command=lambda: warm_executor_command(
-                spec, runtime_root_certificates, pool_key
-            ),
+            command=warm_executor_command(spec, runtime_root_certificates, pool_key),
         )
         return KubernetesWarmExecutorDispatch(
             response,
