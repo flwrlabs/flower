@@ -1311,15 +1311,6 @@ class InvalidConversationRequestError(FlowerError):
         )
 
 
-def _parse_conversation_id(value: str) -> UUID:
-    try:
-        return UUID(value)
-    except ValueError as exc:
-        raise InvalidConversationRequestError(
-            "conversation_id must be a UUID."
-        ) from exc
-
-
 def create_conversation(
     request: CreateConversationRequest, account: AccountInfo, state: LinkState
 ) -> CreateConversationResponse:
@@ -1327,7 +1318,7 @@ def create_conversation(
     agent_ids = {
         participant.agent_id
         for participant in request.participants
-        if participant.HasField("agent_id")
+        if participant.agent_id
     }
     if agent_ids and not agent_ids.issubset(
         {agent.id for agent in state.list_agents(account.flwr_aid)}
@@ -1361,16 +1352,18 @@ def get_conversation_messages(
     request: GetConversationMessagesRequest, account: AccountInfo, state: LinkState
 ) -> GetConversationMessagesResponse:
     """Read a participating user's message history with an exclusive ID cursor."""
-    conversation_id = _parse_conversation_id(request.conversation_id)
     limit = request.limit if request.HasField("limit") else 50
-    if not 1 <= limit <= 100:
-        raise InvalidConversationRequestError("limit must be between 1 and 100.")
-    messages = state.get_conversation_messages(
-        conversation_id,
-        account.flwr_aid,
-        limit=limit,
-        before_id=request.before_id if request.HasField("before_id") else None,
-    )
+    if limit > 100:
+        raise InvalidConversationRequestError("limit must be at most 100.")
+    try:
+        messages = state.get_conversation_messages(
+            UUID(request.conversation_id),
+            account.flwr_aid,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+        )
+    except ValueError as exc:
+        raise InvalidConversationRequestError(str(exc)) from exc
     if messages is None:
         raise FlowerError(
             ApiErrorCode.CONVERSATION_NOT_FOUND,
@@ -1383,14 +1376,14 @@ def send_conversation_message(
     request: SendConversationMessageRequest, account: AccountInfo, state: LinkState
 ) -> SendConversationMessageResponse:
     """Persist a message authored by the authenticated account."""
-    conversation_id = _parse_conversation_id(request.conversation_id)
-    if not request.content.strip():
-        raise InvalidConversationRequestError("Message content must be nonempty.")
-    message = state.create_conversation_message(
-        conversation_id,
-        ConversationParticipant(flwr_aid=account.flwr_aid),
-        request.content,
-    )
+    try:
+        message = state.create_conversation_message(
+            UUID(request.conversation_id),
+            ConversationParticipant(flwr_aid=account.flwr_aid),
+            request.content,
+        )
+    except ValueError as exc:
+        raise InvalidConversationRequestError(str(exc)) from exc
     if message is None:
         raise FlowerError(
             ApiErrorCode.CONVERSATION_NOT_FOUND,
