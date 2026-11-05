@@ -17,16 +17,24 @@
 from __future__ import annotations
 
 import json
+import re
+import socket
 import sys
 import threading
 import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
+from io import BufferedReader
+from pathlib import Path
 from queue import Empty, Full, Queue
-from typing import Any, BinaryIO, Protocol, TextIO, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, TextIO, cast
 
-from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
-from flwr.supercore.typing import JSONObject
+if TYPE_CHECKING:
+    from flwr.supercore.typing import JSONObject
+
+# Mirror common.constant without loading its package on the dispatch path.
+FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
+FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_TASK_TOKEN_ACCEPTED"
 
 MAX_PROTOCOL_MESSAGE_BYTES = 16_384
 _MAX_OUTPUT_FRAME_CHARS = 1_024
@@ -238,25 +246,16 @@ class _RelayedTextOutput:
 @contextmanager
 def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None]:
     """Relay task output as redacted, bounded protocol frames."""
-    # Keep the exec-side dispatcher lightweight by importing logger state only
-    # in the resident process after task authority has been accepted.
-    from flwr.supercore.logger import (  # pylint: disable=import-outside-toplevel
-        console_handler,
-    )
-
     secrets = (token, FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT)
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     stdout = _RelayedTextOutput(sender, "stdout", secrets, original_stdout)
     stderr = _RelayedTextOutput(sender, "stderr", secrets, original_stderr)
-    original_log_stream = console_handler.stream
     sys.stdout = cast(TextIO, stdout)
     sys.stderr = cast(TextIO, stderr)
-    console_handler.stream = cast(TextIO, stderr)
     try:
         yield
     finally:
-        console_handler.stream = original_log_stream
         sys.stdout = original_stdout
         sys.stderr = original_stderr
         stdout.finish()
@@ -299,3 +298,96 @@ def read_message(channel: MessageChannel) -> JSONObject:
     if not isinstance(payload, dict):
         raise ValueError("Task worker protocol message must be a JSON object.")
     return payload
+
+
+_TASK_TOKEN_PATTERN = re.compile(rf"[0-9a-f]{{{FLWR_TASK_TOKEN_LENGTH * 2}}}")
+_TOKEN_STDIN_READ_LIMIT = FLWR_TASK_TOKEN_LENGTH * 2 + 2
+
+
+def read_task_token_from_stdin() -> str:
+    """Return one bounded task token received over standard input."""
+    try:
+        token_bytes = bytearray()
+        token_stdin = cast(BufferedReader, sys.stdin.buffer)
+        while b"\n" not in token_bytes and len(token_bytes) < _TOKEN_STDIN_READ_LIMIT:
+            chunk = token_stdin.read1(_TOKEN_STDIN_READ_LIMIT - len(token_bytes))
+            if not chunk:
+                break
+            token_bytes.extend(chunk)
+        token_input = token_bytes.decode("ascii")
+    except (AttributeError, OSError, UnicodeError):
+        sys.exit("Standard input does not contain exactly one valid task token.")
+    finally:
+        try:
+            sys.stdin.close()
+        except OSError:
+            pass
+
+    token = token_input.removesuffix("\n")
+    if _TASK_TOKEN_PATTERN.fullmatch(token) is None:
+        sys.exit("Standard input does not contain exactly one valid task token.")
+    return token
+
+
+def dispatch_prestarted_task(  # pylint: disable=too-many-return-statements
+    payload: JSONObject,
+    socket_path: Path,
+    task_name: str,
+) -> int:
+    """Relay one exec-delivered invocation to a prestarted task worker."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.connect(str(socket_path))
+            with connection.makefile("rwb") as channel:
+                send_message(channel, payload)
+                accepted = False
+                while True:
+                    response = read_message(channel)
+                    event_name = response.get("event")
+                    if event_name == "accepted":
+                        if accepted or set(response) != {"event"}:
+                            return 1
+                        accepted = True
+                        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
+                    elif event_name == "rejected":
+                        reason = response.get("reason")
+                        if (
+                            accepted
+                            or set(response) != {"event", "reason"}
+                            or not isinstance(reason, str)
+                        ):
+                            return 1
+                        print(reason, file=sys.stderr)
+                        return 1
+                    elif event_name == "output":
+                        stream = response.get("stream")
+                        output = response.get("data")
+                        if (
+                            not accepted
+                            or set(response) != {"event", "stream", "data"}
+                            or stream not in {"stdout", "stderr"}
+                            or not isinstance(output, str)
+                        ):
+                            return 1
+                        output_stream = sys.stdout if stream == "stdout" else sys.stderr
+                        try:
+                            output_stream.write(output)
+                            output_stream.flush()
+                        except (OSError, ValueError):
+                            # Output remains best effort after task acceptance.
+                            pass
+                    elif event_name == "finished":
+                        returncode = response.get("returncode")
+                        return (
+                            returncode
+                            if accepted
+                            and set(response) == {"event", "returncode"}
+                            and isinstance(returncode, int)
+                            and not isinstance(returncode, bool)
+                            else 1
+                        )
+                    else:
+                        return 1
+    except (OSError, ValueError) as err:
+        print(f"Prestarted {task_name} dispatch failed: {err}", file=sys.stderr)
+        return 1
