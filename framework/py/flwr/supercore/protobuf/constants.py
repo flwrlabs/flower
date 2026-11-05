@@ -17,4 +17,5 @@
 
 PROTOBUF_MEDIA_TYPE = "application/protobuf"
 PROTOBUF_STREAM_MEDIA_TYPE = "application/flower-protobuf-stream"
+SSE_MEDIA_TYPE = "text/event-stream"
 FRAME_HEADER_SIZE = 4

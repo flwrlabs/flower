@@ -723,6 +723,104 @@ class SendSpaceMessageResponse(google.protobuf.message.Message):
 global___SendSpaceMessageResponse = SendSpaceMessageResponse
 
 @typing.final
+class StreamEventsRequest(google.protobuf.message.Message):
+    """User-wide changes to owned agents and participating spaces.
+    Fetch initial state separately; this feed records changes after deployment.
+    POST /v1/control/stream-events uses the authenticated account, without user
+    IDs or subscriptions supplied by the caller. All participating spaces share
+    one cursor. Accept: text/event-stream selects SSE with protobuf JSON in each
+    data field. Otherwise the response uses the existing binary protobuf stream
+    framing. After reconnecting, resume after the last processed ID. Events can
+    be replayed; consumers should deduplicate by ID. Heartbeats do not advance
+    the cursor.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_EVENT_ID_FIELD_NUMBER: builtins.int
+    after_event_id: builtins.int
+    """Exclusive cursor. Absent replays all available events, or uses
+    Last-Event-ID.
+    """
+    def __init__(
+        self,
+        *,
+        after_event_id: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "after_event_id", b"after_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "after_event_id", b"after_event_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_event_id", b"_after_event_id"]) -> typing.Literal["after_event_id"] | None: ...
+
+global___StreamEventsRequest = StreamEventsRequest
+
+@typing.final
+class SpaceRunStatus(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RUN_ID_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    run_id: builtins.int
+    @property
+    def status(self) -> flwr.proto.task_pb2.TaskStatus: ...
+    def __init__(
+        self,
+        *,
+        run_id: builtins.int = ...,
+        status: flwr.proto.task_pb2.TaskStatus | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["run_id", b"run_id", "status", b"status"]) -> None: ...
+
+global___SpaceRunStatus = SpaceRunStatus
+
+@typing.final
+class StreamEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
+    AGENT_CREATED_FIELD_NUMBER: builtins.int
+    SPACE_CREATED_FIELD_NUMBER: builtins.int
+    MESSAGE_CREATED_FIELD_NUMBER: builtins.int
+    TASK_EVENT_FIELD_NUMBER: builtins.int
+    RUN_STATUS_FIELD_NUMBER: builtins.int
+    HEARTBEAT_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    """Durable cursor. Heartbeats have no cursor and must not advance it."""
+    created_at: builtins.str
+    space_id: builtins.str
+    heartbeat: builtins.bool
+    @property
+    def agent_created(self) -> global___Agent: ...
+    @property
+    def space_created(self) -> global___Space: ...
+    @property
+    def message_created(self) -> global___SpaceMessage: ...
+    @property
+    def task_event(self) -> flwr.proto.task_pb2.TaskEvent: ...
+    @property
+    def run_status(self) -> global___SpaceRunStatus: ...
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        created_at: builtins.str = ...,
+        space_id: builtins.str = ...,
+        agent_created: global___Agent | None = ...,
+        space_created: global___Space | None = ...,
+        message_created: global___SpaceMessage | None = ...,
+        task_event: flwr.proto.task_pb2.TaskEvent | None = ...,
+        run_status: global___SpaceRunStatus | None = ...,
+        heartbeat: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["agent_created", b"agent_created", "event", b"event", "heartbeat", b"heartbeat", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "task_event", b"task_event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent_created", b"agent_created", "created_at", b"created_at", "event", b"event", "heartbeat", b"heartbeat", "id", b"id", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "space_id", b"space_id", "task_event", b"task_event"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["event", b"event"]) -> typing.Literal["agent_created", "space_created", "message_created", "task_event", "run_status", "heartbeat"] | None: ...
+
+global___StreamEventsResponse = StreamEventsResponse
+
+@typing.final
 class ListRunSeriesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

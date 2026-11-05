@@ -65,6 +65,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     SpaceMessage,
     SpaceParticipant,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -101,6 +102,10 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import (
+    ControlEvent as ControlEventModel,
+)
+from flwr.supercore.state.schema.corestate_models import ControlEventSequence
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -170,6 +175,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+
+    def initialize(self, log_queries: bool = False, **engine_kwargs: Any) -> list[str]:
+        """Initialize tables and seed the journal for metadata-only SQLite stores."""
+        tables = super().initialize(log_queries, **engine_kwargs)
+        if self._is_in_memory_sqlite:
+            with self.session() as session:
+                session.execute(insert(ControlEventSequence).values(id=1, last_id=0))
+        return tables
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -732,7 +745,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.add(model)
             session.flush()
-            return _agent_from_model(model)
+            agent = _agent_from_model(model)
+            self._store_control_event(
+                StreamEventsResponse(agent_created=agent), flwr_aid=flwr_aid
+            )
+            return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
@@ -1198,6 +1215,65 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
+    def _store_control_event(
+        self,
+        event: StreamEventsResponse,
+        *,
+        flwr_aid: str | None = None,
+        space_id: UUID | None = None,
+    ) -> None:
+        """Append to the journal in the domain mutation's transaction."""
+        with self.session() as session:
+            # The transactional counter serializes publication until commit.
+            # A database sequence alone permits late commits behind a reader's cursor.
+            cursor = session.scalar(
+                update(ControlEventSequence)
+                .where(ControlEventSequence.id == 1)
+                .values(last_id=ControlEventSequence.last_id + 1)
+                .returning(ControlEventSequence.last_id)
+            )
+            if cursor is None:
+                raise RuntimeError("Control event sequence has not been initialized.")
+            event.id = cursor
+            event.created_at = now().isoformat()
+            event.space_id = str(space_id) if space_id is not None else ""
+            session.add(
+                ControlEventModel(
+                    id=cursor,
+                    flwr_aid=flwr_aid,
+                    space_id=space_id,
+                    payload=event.SerializeToString(),
+                )
+            )
+
+    def get_control_events(
+        self, flwr_aid: str, *, after_id: int = 0, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read ordered events authorized against current Space membership."""
+        if after_id < 0 or limit <= 0:
+            raise ValueError("Cursor must be nonnegative and limit must be positive.")
+        if after_id >= 2**63 - 1:
+            return []
+        spaces = select(SpaceParticipantTable.c.space_id).where(
+            SpaceParticipantTable.c.flwr_aid == flwr_aid
+        )
+        stmt = (
+            select(ControlEventModel.payload)
+            .where(
+                ControlEventModel.id > after_id,
+                or_(
+                    ControlEventModel.flwr_aid == flwr_aid,
+                    ControlEventModel.space_id.in_(spaces),
+                ),
+            )
+            .order_by(ControlEventModel.id)
+            .limit(limit)
+        )
+        with self.session() as session:
+            return [
+                StreamEventsResponse.FromString(data) for data in session.scalars(stmt)
+            ]
+
     def create_space(
         self,
         *,
@@ -1231,6 +1307,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 space = _space_from_model(model)
                 space.participants.extend(members)
+                self._store_control_event(
+                    StreamEventsResponse(space_created=space), space_id=model.id
+                )
                 return space
         except IntegrityError as exc:
             raise ValueError("Invalid space participants") from exc
@@ -1300,7 +1379,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _space_message_from_model(model)
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            self._store_control_event(
+                StreamEventsResponse(message_created=message), space_id=space_id
+            )
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
@@ -2028,6 +2113,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .returning(TaskModel.task_id)
                 )
+                if claimed_task_id is not None:
+                    self._on_task_status_changed(claimed_task_id)
             if claimed_task_id is None:
                 return None
 
@@ -2057,6 +2144,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .values(running_at=activated_at, active_until=active_until)
                 .returning(TaskModel.task_id)
             )
+            if activated_task_id is not None:
+                self._on_task_status_changed(activated_task_id)
         return activated_task_id is not None
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
@@ -2085,6 +2174,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     token=None,
                 ).returning(TaskModel.task_id)
             )
+            if finished_task_id is not None:
+                self._on_task_status_changed(finished_task_id)
             return finished_task_id is not None
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -2251,7 +2342,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         ]
 
         with self.session() as session:
-            session.execute(insert(TaskEventModel), event_rows)
+            stored = session.scalars(
+                insert(TaskEventModel).returning(
+                    TaskEventModel, sort_by_parameter_order=True
+                ),
+                event_rows,
+            ).all()
+            self._on_task_events_stored([_task_event_from_model(row) for row in stored])
 
         return True
 
@@ -2360,7 +2457,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expired_at = now()
         with self.session() as session:
             # Claims that never reached RUNNING are retryable launch failures.
-            session.execute(
+            reset_task_ids = session.scalars(
                 update(TaskModel)
                 .where(
                     TaskModel.token.is_not(None),
@@ -2374,7 +2471,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     sub_status="",
                     details="",
                 )
-            )
+                .returning(TaskModel.task_id)
+            ).all()
 
             # Expired running task claims are terminal failures and lose their token.
             expired_tasks = [
@@ -2396,6 +2494,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
+            for task_id in [*reset_task_ids, *(task.task_id for task in expired_tasks)]:
+                self._on_task_status_changed(task_id)
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
 

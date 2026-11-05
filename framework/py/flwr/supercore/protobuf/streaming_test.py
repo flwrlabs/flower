@@ -15,6 +15,7 @@
 """Tests for protobuf-over-HTTP stream cancellation helpers."""
 
 import asyncio
+import json
 import time
 from collections.abc import Iterator
 from threading import Event
@@ -23,9 +24,15 @@ import pytest
 from fastapi import Request
 from starlette.types import Message
 
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    SpaceMessage,
+    StreamEventsResponse,
+)
+
 from .streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
+    encode_sse_message,
     get_protobuf_stream_context,
 )
 
@@ -128,3 +135,20 @@ def test_disconnect_unblocks_synchronous_stream_iteration(
     asyncio.run(run_response())
 
     assert not context.is_active()
+
+
+def test_sse_protobuf_json_preserves_cursor_and_content() -> None:
+    """Encode large cursors without losing precision or injecting SSE lines."""
+    message = StreamEventsResponse(
+        id=2**63 - 1,
+        message_created=SpaceMessage(id=1, content="Hello, €100.\n\nid: injected"),
+    )
+    frame = encode_sse_message(message).decode()
+    lines = frame.splitlines()
+    assert lines[0] == f"id: {message.id}"
+    assert len(lines) == 3 and lines[-1] == ""
+    payload = json.loads(lines[1].removeprefix("data: "))
+    assert payload["id"] == str(message.id)
+    assert payload["messageCreated"]["content"] == message.message_created.content
+    heartbeat = encode_sse_message(StreamEventsResponse(heartbeat=True))
+    assert not heartbeat.startswith(b"id:")

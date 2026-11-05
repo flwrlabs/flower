@@ -17,7 +17,7 @@
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -98,6 +98,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -170,6 +172,27 @@ def list_agents(
 ) -> ListAgentsResponse:
     """List agents."""
     return control_handlers.list_agents(request, account, linkstate)
+
+
+@router.post("/stream-events")
+def stream_events(
+    request: Annotated[StreamEventsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    stream_context: ProtobufStreamContextDependency,
+    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+) -> Iterator[StreamEventsResponse]:
+    """Stream user-wide Agent and Space changes.
+
+    Use Accept: text/event-stream for SSE, or the default protobuf stream format.
+    """
+    return control_handlers.stream_events(
+        request,
+        account,
+        linkstate,
+        stream_context.is_active,
+        last_event_id=last_event_id,
+    )
 
 
 @router.post("/start-run")

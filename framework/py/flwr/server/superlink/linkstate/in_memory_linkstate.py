@@ -34,6 +34,10 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    SpaceRunStatus,
+    StreamEventsResponse,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -424,12 +428,40 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 initial_task_event.task_id = task_id
                 self.task_event_store.setdefault(run_id, []).append(initial_task_event)
                 self._next_task_event_id += 1
+                self._on_task_events_stored([initial_task_event])
             self.bind_connectors_to_run(
                 run_id=run_id,
                 connector_ids=connector_ids,
             )
+            self._on_task_status_changed(task_id)
 
             return run_id
+
+    def _on_task_events_stored(self, events: Sequence[TaskEvent]) -> None:
+        """Journal task events only for runs attached to a Space."""
+        for event in events:
+            record = self.run_ids.get(event.run_id)
+            if record is not None and record.run.space_id is not None:
+                self._store_control_event(
+                    StreamEventsResponse(task_event=event), space_id=record.run.space_id
+                )
+
+    def _on_task_status_changed(self, task_id: int) -> None:
+        """Publish primary task status without including legacy runs."""
+        task = self.task_store.get(task_id)
+        record = self.run_ids.get(task.run_id) if task is not None else None
+        if (
+            task is not None
+            and record is not None
+            and record.run.primary_task_id == task_id
+            and record.run.space_id is not None
+        ):
+            self._store_control_event(
+                StreamEventsResponse(
+                    run_status=SpaceRunStatus(run_id=task.run_id, status=task.status)
+                ),
+                space_id=record.run.space_id,
+            )
 
     def get_run_info(
         self,

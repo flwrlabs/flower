@@ -95,6 +95,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -128,6 +130,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListAgents",
             request=request,
             response_type=ListAgentsResponse,
+        )
+
+    def StreamEvents(
+        self, request: StreamEventsRequest
+    ) -> Generator[StreamEventsResponse, None, None]:
+        """Stream replayable changes to the caller's agents and Spaces."""
+        return self._unary_stream(
+            path="/v1/control/stream-events",
+            rpc_method="/flwr.proto.Control/StreamEvents",
+            request=request,
+            response_type=StreamEventsResponse,
         )
 
     def StartRun(self, request: StartRunRequest) -> StartRunResponse:

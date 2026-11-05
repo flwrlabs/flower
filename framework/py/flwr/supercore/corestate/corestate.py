@@ -32,6 +32,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     SpaceMessage,
     SpaceParticipant,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -665,6 +666,28 @@ class CoreState(ABC):  # pylint: disable=R0904
             stored and a list of object IDs that still need to be pushed. If
             storing the Message fails, returns `(False, [])`.
         """
+
+    @abstractmethod
+    def _store_control_event(
+        self,
+        event: StreamEventsResponse,
+        *,
+        flwr_aid: str | None = None,
+        space_id: UUID | None = None,
+    ) -> None:
+        """Record a change in the current mutation's transaction or lock scope."""
+
+    @abstractmethod
+    def get_control_events(
+        self, flwr_aid: str, *, after_id: int = 0, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read ordered changes visible to the account's current memberships."""
+
+    def _on_task_events_stored(self, events: Sequence[TaskEvent]) -> None:
+        """Allow LinkState to forward events belonging to Space runs."""
+
+    def _on_task_status_changed(self, task_id: int) -> None:
+        """Allow LinkState to forward primary task lifecycle changes."""
 
     @abstractmethod
     def create_space(

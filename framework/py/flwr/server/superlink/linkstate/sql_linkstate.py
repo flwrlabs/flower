@@ -37,20 +37,23 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    SpaceRunStatus,
+    StreamEventsResponse,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
-from flwr.supercore.corestate.sql_corestate import SqlCoreState
+from flwr.supercore.corestate.sql_corestate import SqlCoreState, task_from_model
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
-from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
@@ -457,23 +460,57 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if initial_task_event is not None:
                     initial_task_event.run_id = run_id
                     initial_task_event.task_id = task_id
-                    session.execute(
-                        insert(TaskEventModel).values(
-                            timestamp=current,
-                            run_id=run_id,
-                            task_id=task_id,
-                            event=initial_task_event.event,
-                            data=initial_task_event.data,
-                        )
-                    )
+                    self.store_task_events([initial_task_event])
                 self.bind_connectors_to_run(
                     run_id=run_id,
                     connector_ids=connector_ids,
                 )
+                self._on_task_status_changed(task_id)
                 return run_id
 
         log(ERROR, "Unexpected run creation failure.")
         return 0
+
+    def _on_task_events_stored(self, events: Sequence[TaskEvent]) -> None:
+        """Journal task output and its source event IDs in the same transaction."""
+        with self.session() as session:
+            spaces = dict(
+                session.execute(
+                    select(RunModel.run_id, RunModel.space_id).where(
+                        RunModel.run_id.in_({event.run_id for event in events}),
+                        RunModel.space_id.is_not(None),
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            for event in events:
+                if (space_id := spaces.get(event.run_id)) is not None:
+                    self._store_control_event(
+                        StreamEventsResponse(task_event=event), space_id=space_id
+                    )
+
+    def _on_task_status_changed(self, task_id: int) -> None:
+        """Journal Space run status before committing the task transition."""
+        with self.session() as session:
+            row = session.execute(
+                select(RunModel.space_id, TaskModel)
+                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                .where(
+                    RunModel.primary_task_id == task_id, RunModel.space_id.is_not(None)
+                )
+            ).first()
+            if row is not None:
+                space_id, model = row
+                task = task_from_model(model)
+                self._store_control_event(
+                    StreamEventsResponse(
+                        run_status=SpaceRunStatus(
+                            run_id=task.run_id, status=task.status
+                        )
+                    ),
+                    space_id=space_id,
+                )
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,
@@ -830,4 +867,5 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=run.series_id or 0,
+        space_id=run.space_id,
     )
