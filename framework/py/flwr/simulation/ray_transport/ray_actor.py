@@ -98,6 +98,10 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # `num_gpus` above only retains the last node's value, so it cannot answer "does
     # this cluster have a GPU at all?". Track that separately across every node.
     cluster_num_gpus: int | float = 0
+    # Best case (across all nodes) of how many actors CPU alone could host, ignoring
+    # the GPU requirement. If this is 0, no node has enough CPUs for even one client,
+    # so GPU-lowering advice alone would still leave the pool empty.
+    max_actors_by_cpu = 0
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -120,6 +124,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         num_gpus = node_resources.get("GPU", 0)
         cluster_num_gpus = max(cluster_num_gpus, num_gpus)
         num_actors = int(num_cpus / client_resources["num_cpus"])
+        max_actors_by_cpu = max(max_actors_by_cpu, num_actors)
 
         # If a GPU is present and client resources do require one
         if "num_gpus" in client_resources.keys() and client_resources["num_gpus"] > 0.0:
@@ -159,18 +164,45 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                 cluster_num_gpus,
                 requested_gpus,
             )
-            if os.path.exists("/dev/kfd"):
+            if max_actors_by_cpu == 0:
+                # Setting num_gpus=0 would not be enough either: no node has the CPUs
+                # this client needs, so the pool would still end up empty.
                 log(
                     WARNING,
-                    "The ROCm kernel driver is loaded (/dev/kfd exists), so an AMD "
-                    "GPU is likely present on this host. If Ray's GPU resources were "
-                    "not limited deliberately, check that Ray can enumerate it: Ray "
-                    "finds AMD GPUs by opening `$ROCM_PATH/lib/librocm_smi64.so` "
-                    "(ROCM_PATH defaults to /opt/rocm) under that *unversioned* name. "
-                    "Ensure ROCM_PATH points at a ROCm root containing the "
-                    "`librocm_smi64.so` symlink rather than only a versioned "
-                    "`librocm_smi64.so.<N>`.",
+                    "In addition, no node has enough CPUs for even one client: each "
+                    "client requests num_cpus=%s but the best node only reports "
+                    "CPUs=%s. Setting `num_gpus=0` alone will not fix this -- also "
+                    "lower `num_cpus` or add CPU capacity to the cluster.",
+                    client_resources.get("num_cpus"),
+                    num_cpus,
                 )
+            if os.path.exists("/dev/kfd"):
+                if os.access("/dev/kfd", os.R_OK | os.W_OK):
+                    log(
+                        WARNING,
+                        "The ROCm kernel driver is loaded (/dev/kfd exists), so an "
+                        "AMD GPU is likely present on this host. If Ray's GPU "
+                        "resources were not limited deliberately, check that Ray can "
+                        "enumerate it: Ray finds AMD GPUs by opening "
+                        "`$ROCM_PATH/lib/librocm_smi64.so` (ROCM_PATH defaults to "
+                        "/opt/rocm) under that *unversioned* name. Ensure ROCM_PATH "
+                        "points at a ROCm root containing the `librocm_smi64.so` "
+                        "symlink rather than only a versioned `librocm_smi64.so.<N>`.",
+                    )
+                else:
+                    log(
+                        WARNING,
+                        "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
+                        "process cannot open it (no read/write access). This is a "
+                        "permissions issue, not a missing or misplaced "
+                        "`librocm_smi64.so`: the current user is likely missing from "
+                        "the `render` (and `video`) group that owns `/dev/kfd`, or "
+                        "the container was started without `--device=/dev/kfd "
+                        "--device=/dev/dri --group-add render --group-add video`. "
+                        "Both Ray and the ML framework will report zero GPUs until "
+                        "device access is fixed; pointing ROCM_PATH at the SMI "
+                        "library will not help.",
+                    )
         else:
             log(
                 WARNING,

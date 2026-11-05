@@ -84,6 +84,81 @@ class TestPoolSizeFromResources(TestCase):
         self.assertIn("Lowering these resources could help", output)
         self.assertNotIn("set `num_gpus=0`", output)
 
+    def test_zero_gpu_branch_also_reports_cpu_shortage(self) -> None:
+        """Test that a concurrent CPU shortage is surfaced, not just the GPU one.
+
+        When no node has enough CPUs either, telling the user to set `num_gpus=0`
+        would still leave the pool empty -- the CPU shortage must be named too.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 1}}],  # Too few CPUs, and no GPU
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("Set `num_gpus=0`", output)
+        self.assertIn("no node has enough CPUs for even one client", output)
+
+    def test_kfd_present_but_inaccessible_reports_permissions(self) -> None:
+        """Test that an unopenable /dev/kfd is diagnosed as a permissions issue.
+
+        A non-root host or container missing render-group access still has
+        `/dev/kfd` on disk, but the process cannot open it. The hint must not point
+        at the SMI library path in that case -- it would not fix anything.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.access",
+                return_value=False,
+            ),
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("cannot open it", output)
+        self.assertIn("render", output)
+        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+
+    def test_kfd_present_and_accessible_points_at_smi_library(self) -> None:
+        """Test that an openable /dev/kfd keeps pointing at the SMI library path."""
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.access",
+                return_value=True,
+            ),
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("cannot open it", output)
+
     def test_case_with_no_usable_node(self) -> None:
         """Test that a cluster with no usable node raises ValueError.
 
