@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.43.0.md:2
 #, fuzzy
 msgid "v1.43.0 (2026-11-04)"
-msgstr "v1.4.0 (2023-04-21)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -154,8 +154,6 @@ msgid ""
 "**Stop strategies before all rounds complete** "
 "([#8401](https://github.com/flwrlabs/flower/pull/8401))"
 msgstr ""
-"**添加新策略： Krum 和 MultiKrum** "
-"([#1481](https://github.com/adap/flower/pull/1481))"
 
 #: ../../source/changelog/v1.43.0.md:14
 msgid ""
@@ -176,12 +174,6 @@ msgid ""
 "[#8468](https://github.com/flwrlabs/flower/pull/8468), "
 "[#8475](https://github.com/flwrlabs/flower/pull/8475))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.43.0.md:18
 msgid ""
@@ -201,12 +193,6 @@ msgid ""
 "[#8437](https://github.com/flwrlabs/flower/pull/8437), "
 "[#8449](https://github.com/flwrlabs/flower/pull/8449))"
 msgstr ""
-"**改进教程** ([#1468](https://github.com/adap/flower/pull/1468), "
-"[#1470](https://github.com/adap/flower/pull/1470), "
-"[#1472](https://github.com/adap/flower/pull/1472), "
-"[#1473](https://github.com/adap/flower/pull/1473), "
-"[#1474](https://github.com/adap/flower/pull/1474), "
-"[#1475](https://github.com/adap/flower/pull/1475)))"
 
 #: ../../source/changelog/v1.43.0.md:22
 msgid ""
@@ -227,13 +213,6 @@ msgid ""
 "[#8443](https://github.com/flwrlabs/flower/pull/8443), "
 "[#8445](https://github.com/flwrlabs/flower/pull/8445))"
 msgstr ""
-"** 更新文档** ([#1629](https://github.com/adap/flower/pull/1629), "
-"[#1628](https://github.com/adap/flower/pull/1628), "
-"[#1620](https://github.com/adap/flower/pull/1620), "
-"[#1618](https://github.com/adap/flower/pull/1618), "
-"[#1617](https://github.com/adap/flower/pull/1617), "
-"[#1613](https://github.com/adap/flower/pull/1613), "
-"[#1614](https://github.com/adap/flower/pull/1614)))"
 
 #: ../../source/changelog/v1.43.0.md:26
 msgid ""
@@ -266,13 +245,6 @@ msgid ""
 "[#8471](https://github.com/flwrlabs/flower/pull/8471), "
 "[#8472](https://github.com/flwrlabs/flower/pull/8472))"
 msgstr ""
-"**引入（试验性）REST API** ([#1594](https://github.com/adap/flower/pull/1594), "
-"[#1690](https://github.com/adap/flower/pull/1690), "
-"[#1695](https://github.com/adap/flower/pull/1695), "
-"[#1712](https://github.com/adap/flower/pull/1712), "
-"[#1802](https://github.com/adap/flower/pull/1802), "
-"[#1770](https://github.com/adap/flower/pull/1770), "
-"[#1733](https://github.com/adap/flower/pull/1733))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -331,13 +303,6 @@ msgid ""
 "[#8426](https://github.com/flwrlabs/flower/pull/8426), "
 "[#8429](https://github.com/flwrlabs/flower/pull/8429))"
 msgstr ""
-"** 更新文档** ([#1629](https://github.com/adap/flower/pull/1629), "
-"[#1628](https://github.com/adap/flower/pull/1628), "
-"[#1620](https://github.com/adap/flower/pull/1620), "
-"[#1618](https://github.com/adap/flower/pull/1618), "
-"[#1617](https://github.com/adap/flower/pull/1617), "
-"[#1613](https://github.com/adap/flower/pull/1613), "
-"[#1614](https://github.com/adap/flower/pull/1614)))"
 
 #: ../../source/changelog/v1.43.0.md:36
 msgid ""
