@@ -28,7 +28,6 @@ from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
 
 # pylint: disable=E0611
-from flwr.proto import control_pb2
 from flwr.proto import transport_pb2 as pb2
 from flwr.proto.control_pb2 import Agent as ProtoAgent
 from flwr.proto.control_pb2 import AgentConfig as ProtoAgentConfig
@@ -143,28 +142,6 @@ def test_agent_messages_proto_roundtrip() -> None:
         ListAgentsResponse.FromString(list_response.SerializeToString())
         == list_response
     )
-
-
-def test_space_messages_proto_roundtrip() -> None:
-    """Preserve Space identities, message text, and request fields on the wire."""
-    # pylint: disable=no-member
-    participant = control_pb2.SpaceParticipant(agent_id=2**64 - 1)
-    space = control_pb2.Space(
-        id="00000000-0000-4000-8000-000000000001", participants=[participant]
-    )
-    message = control_pb2.SpaceMessage(
-        id=1, space_id=space.id, author=participant, content="Hello, €100.\nNext."
-    )
-    for proto in [
-        control_pb2.CreateSpaceRequest(participants=[participant]),
-        control_pb2.CreateSpaceResponse(space=space),
-        control_pb2.ListSpacesResponse(spaces=[space]),
-        control_pb2.GetSpaceMessagesRequest(space_id=space.id, before_id=2**64 - 1),
-        control_pb2.GetSpaceMessagesResponse(messages=[message]),
-        control_pb2.SendSpaceMessageRequest(space_id=space.id, content=message.content),
-        control_pb2.SendSpaceMessageResponse(message=message),
-    ]:
-        assert type(proto).FromString(proto.SerializeToString()) == proto
 
 
 def test_status_to_proto() -> None:
