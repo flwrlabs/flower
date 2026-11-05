@@ -15,18 +15,58 @@
 """Utility functions for State."""
 
 
-from flwr.app import DEFAULT_TTL, ConfigRecord, Message, Metadata, RecordDict
+from collections.abc import Sequence
+from uuid import UUID
+
+from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
     SYSTEM_MESSAGE_TYPE,
+    TaskType,
 )
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
 from flwr.supercore.date import now
+
+
+def validate_run_scope(  # pylint: disable=too-many-arguments
+    *,
+    federation_id: str | None,
+    space_id: UUID | None,
+    series_id: int | None,
+    federation_config: SimulationConfig | None,
+    series_description: str | None,
+    connector_ids: Sequence[int],
+    primary_task_type: str,
+) -> None:
+    """Require either a federation run or a Space AgentApp run."""
+    if space_id is None:
+        if not federation_id:
+            raise ValueError("A run requires a federation_id or space_id.")
+        return
+    if federation_id is not None or series_id is not None:
+        raise ValueError("space_id cannot be combined with federation_id or series_id.")
+    if federation_config is not None or series_description is not None or connector_ids:
+        raise ValueError("Space runs cannot use federation configuration or resources.")
+    if primary_task_type != TaskType.AGENT_APP:
+        raise ValueError("Space runs require an AgentApp primary task.")
+
+
+def create_run_context(run_id: int, series_id: int = 0) -> Context:
+    """Create an empty execution context for a run."""
+    return Context(
+        run_id=run_id,
+        node_id=SUPERLINK_NODE_ID,
+        node_config={},
+        state=RecordDict(),
+        run_config={},
+        series_id=series_id,
+    )
 
 
 def create_user_prompt_message(run_id: int, user_prompt: str) -> Message:
