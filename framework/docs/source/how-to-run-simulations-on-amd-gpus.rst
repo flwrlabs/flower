@@ -204,28 +204,63 @@ re-imports Ray on startup, this also surfaces indirectly as workers that never r
 
 Satisfy Ray without disturbing ``ROCR_VISIBLE_DEVICES``, by deriving
 ``HIP_VISIBLE_DEVICES`` from how many devices it already lists rather than copying its
-values. Only do this when ``HIP_VISIBLE_DEVICES`` is not already set -- the import error
-this works around only occurs in that case, and an existing value may deliberately
-select a subset of the ROCr-visible devices. Test for ``ROCR_VISIBLE_DEVICES`` being
-*set*, not merely non-empty: a scheduler can export it as an empty string to hide every
-device, and that case must still satisfy Ray's import guard by propagating an equally
-empty ``HIP_VISIBLE_DEVICES`` -- counting entries in an empty string would otherwise
-synthesize ``HIP_VISIBLE_DEVICES=0`` and wrongly reveal a device. The same applies to
-the nonempty ``-1`` sentinel some schedulers use for "no device": it contains no comma,
-so the comma-counting branch would otherwise read it as one listed GPU and export
-``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and schedule onto a device ROCr never
-actually exposed:
+values. Only *synthesize* a value when ``HIP_VISIBLE_DEVICES`` is not already set -- the
+import error this works around only occurs in that case, and an existing value may
+deliberately select a subset of the ROCr-visible devices. Test for
+``ROCR_VISIBLE_DEVICES`` being *set*, not merely non-empty: a scheduler can export it as
+an empty string to hide every device, and that case must still satisfy Ray's import
+guard by propagating an equally empty ``HIP_VISIBLE_DEVICES`` -- counting entries in an
+empty string would otherwise synthesize ``HIP_VISIBLE_DEVICES=0`` and wrongly reveal a
+device. The same applies to the nonempty ``-1`` sentinel some schedulers use for "no
+device": it contains no comma, so the comma-counting branch would otherwise read it as
+one listed GPU and export ``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and schedule
+onto a device ROCr never actually exposed.
+
+When ``HIP_VISIBLE_DEVICES`` is already set, do not simply trust it, either: validate
+that every value it names is actually an ordinal ROCr's filtering leaves available,
+rather than assuming any existing nonempty value is already expressed correctly. A
+scheduler, or an earlier, less careful shell setup, can copy a *physical* device ID into
+both variables -- for example ``ROCR_VISIBLE_DEVICES=3`` alongside
+``HIP_VISIBLE_DEVICES=3``. Left alone, that pair passes every check below while still
+being broken: ROCr's filter exposes that single device as ordinal ``0``, so
+``HIP_VISIBLE_DEVICES=3`` asks for an ordinal that no longer exists, and the
+verification steps later in this guide still report zero GPUs with no indication of
+why:
 
 .. code-block:: shell
 
-    if [ -n "${ROCR_VISIBLE_DEVICES+x}" ] && [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
+    if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ]; then
-            export HIP_VISIBLE_DEVICES=""
+            _n=0
         else
             _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))
-            export HIP_VISIBLE_DEVICES="$(seq -s, 0 $((_n - 1)))"
-            unset _n
         fi
+        if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
+            if [ "$_n" -gt 0 ]; then
+                export HIP_VISIBLE_DEVICES="$(seq -s, 0 $((_n - 1)))"
+            else
+                export HIP_VISIBLE_DEVICES=""
+            fi
+        else
+            _bad=0
+            IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
+            for _id in "${_hip_ids[@]}"; do
+                if ! [[ "$_id" =~ ^[0-9]+$ ]] || [ "$_id" -ge "$_n" ]; then
+                    _bad=1
+                fi
+            done
+            if [ "$_bad" -eq 1 ]; then
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
+                     "valid selection of ordinals 0..$((_n - 1)) -- the only" \
+                     "ordinals ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES exposes" \
+                     "after filtering. This usually means a physical device ID was" \
+                     "copied in verbatim; left unchanged, so Ray will see no usable" \
+                     "GPU. Unset HIP_VISIBLE_DEVICES and re-run this snippet, or" \
+                     "correct it to ordinals in that range." >&2
+            fi
+            unset _hip_ids _id _bad
+        fi
+        unset _n
     fi
 
 .. important::
@@ -245,10 +280,13 @@ actually exposed:
     contiguously from ``0``. Selecting all of them (``0`` through ``n-1`` in
     ``HIP_VISIBLE_DEVICES``) reproduces the original restriction exactly, while leaving
     ``ROCR_VISIBLE_DEVICES`` itself untouched. The snippet only synthesizes this value
-    when ``HIP_VISIBLE_DEVICES`` is unset: an existing value is already expressed in the
-    renumbered space and may deliberately select a subset of it -- for example, to
-    dedicate only one of two ROCr-visible devices to this process -- so it is left
-    alone.
+    when ``HIP_VISIBLE_DEVICES`` is unset: an existing value may deliberately select a
+    subset of the renumbered space -- for example, to dedicate only one of two
+    ROCr-visible devices to this process -- so it is not overwritten. But it is not
+    assumed to already be expressed in that renumbered space either: the snippet checks
+    that every ordinal it names is ``< n``, and warns instead of silently proceeding
+    when one is not, since that is the signature of a physical device ID having been
+    copied in rather than a deliberately chosen ordinal.
 
 .. important::
 
