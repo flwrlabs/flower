@@ -40,6 +40,7 @@ def test_version() -> None:
         "assert 'flwr.supercore.version' not in sys.modules\n"
         "assert set(flwr.__all__).issubset(dir(flwr))",
         "from flwr import common\nfrom flwr.app import Message",
+        "from flwr.supercore import log\nimport flwr.supercore.superexec.executor",
         "from flwr import server\nfrom flwr import client",
         "import flwr.compat.server.grpc_bidi.grpc_server",
         "import flwr.supercore.agentapp_worker\n"
