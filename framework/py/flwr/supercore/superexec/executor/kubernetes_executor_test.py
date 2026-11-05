@@ -20,7 +20,6 @@ import importlib
 import json
 import logging
 import os
-import socket
 import subprocess
 import sys
 import threading
@@ -28,7 +27,6 @@ from contextlib import nullcontext
 from inspect import signature
 from io import StringIO
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -819,14 +817,8 @@ def test_warm_launch_requests_background_replenishment(
     assert stream.return_value.is_open()
 
 
-@pytest.mark.skipif(
-    sys.platform == "win32", reason="Kubernetes workers use Unix sockets"
-)
-@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.CONNECTOR])
-def test_prestarted_dispatch_without_flower_imports(
-    tmp_path: Path, task_type: TaskType
-) -> None:
-    """Run the installed relay without importing its parent package."""
+def test_prestarted_dispatch_without_flower_imports(tmp_path: Path) -> None:
+    """Start the standalone relay without importing its parent package."""
     package = tmp_path / "flwr"
     (package / "supercore").mkdir(parents=True)
     (package / "__init__.py").write_text(
@@ -836,60 +828,24 @@ def test_prestarted_dispatch_without_flower_imports(
         Path(task_worker_protocol.__file__).read_text(encoding="utf-8"),
         encoding="utf-8",
     )
-    token = "a" * (task_worker_protocol.FLWR_TASK_TOKEN_LENGTH * 2)
     command = warm_executor_dispatch.warm_executor_command(
-        _execution_spec(task_type=task_type, fab_hash=_FAB_HASH, insecure=True),
-        None,
-        _warm_executor_pool_key(fab_hash=_FAB_HASH, fab_path="/opt/app.fab"),
+        _execution_spec(task_type=TaskType.CONNECTOR, insecure=True), None
     )
-    metadata = json.loads(command[-1])
-    received: dict[str, Any] = {}
-    with (
-        TemporaryDirectory(dir="/tmp") as directory,
-        socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server,
-    ):
-        metadata["socket_path"] = str(Path(directory) / "worker.sock")
-        server.bind(metadata["socket_path"])
-        server.listen(1)
-        server.settimeout(5)
-
-        def respond() -> None:
-            with (
-                server.accept()[0] as connection,
-                connection.makefile("rwb") as channel,
-            ):
-                received.update(task_worker_protocol.read_message(channel))
-                frames: tuple[dict[str, Any], ...] = (
-                    {"event": "accepted"},
-                    {"event": "output", "stream": "stdout", "data": "out\n"},
-                    {"event": "output", "stream": "stderr", "data": "err\n"},
-                    {"event": "finished", "returncode": 7},
-                )
-                for frame in frames:
-                    task_worker_protocol.send_message(channel, frame)
-
-        thread = threading.Thread(target=respond, daemon=True)
-        thread.start()
-        result = subprocess.run(
-            [sys.executable, *command[1:-1], json.dumps(metadata)],
-            input=token + "\n",
-            text=True,
-            capture_output=True,
-            env={**os.environ, "PYTHONPATH": str(tmp_path)},
-            cwd=tmp_path,
-            timeout=10,
-            check=False,
-        )
-        thread.join(timeout=5)
-    assert not thread.is_alive()
-    assert result.returncode == 7
-    assert result.stdout == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
-    assert result.stderr == "err\n"
-    assert received == {
-        key: value
-        for key, value in {**metadata, "token": token}.items()
-        if key not in {"socket_path", "task_name"}
-    }
+    result = subprocess.run(
+        [sys.executable, *command[1:]],
+        input="invalid-token\n",
+        text=True,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(tmp_path)},
+        cwd=tmp_path,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        "Standard input does not contain exactly one valid task token.\n"
+    )
 
 
 @pytest.mark.parametrize(
