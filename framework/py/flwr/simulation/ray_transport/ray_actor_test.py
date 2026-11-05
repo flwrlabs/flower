@@ -156,7 +156,8 @@ class TestPoolSizeFromResources(TestCase):
         self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
 
     def test_kfd_present_and_accessible_points_at_smi_library(self) -> None:
-        """Test that an openable /dev/kfd keeps pointing at the SMI library path."""
+        """Test that an openable /dev/kfd with a usable render node points at the SMI
+        library path."""
         client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
         with (
             patch(
@@ -171,6 +172,10 @@ class TestPoolSizeFromResources(TestCase):
                 "flwr.simulation.ray_transport.ray_actor.os.access",
                 return_value=True,
             ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.glob.glob",
+                return_value=["/dev/dri/renderD128"],  # A usable render node exists
+            ),
         ):
             with self.assertLogs("flwr", level="WARNING") as logs:
                 with self.assertRaises(ValueError):
@@ -179,6 +184,39 @@ class TestPoolSizeFromResources(TestCase):
         output = "\n".join(logs.output)
         self.assertIn("librocm_smi64.so` (ROCM_PATH", output)
         self.assertNotIn("cannot open it", output)
+        self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
+
+    def test_kfd_accessible_but_no_usable_render_node_reports_render_node(self) -> None:
+        """Test that an openable /dev/kfd without a usable render node does not point
+        at the SMI library -- it names the missing/inaccessible render node instead."""
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.access",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.glob.glob",
+                return_value=[],  # No /dev/dri/renderD* node found
+            ),
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("cannot open it", output)
+        self.assertIn("no accessible `/dev/dri/renderD*` node", output)
+        self.assertIn("render", output)
 
     def test_case_with_no_usable_node(self) -> None:
         """Test that a cluster with no usable node raises ValueError.

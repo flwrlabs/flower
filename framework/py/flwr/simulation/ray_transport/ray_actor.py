@@ -15,6 +15,7 @@
 """Ray-based Flower Actor and ActorPool implementation."""
 
 
+import glob
 import os
 import threading
 from abc import ABC
@@ -82,6 +83,75 @@ class ClientAppActor(VirtualClientEngineActor):
         super().__init__()
         if on_actor_init_fn:
             on_actor_init_fn()
+
+
+def _log_kfd_diagnostics() -> None:
+    """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
+
+    Split out of `pool_size_from_resources` purely to keep that function's branch
+    count manageable; this covers only the no-GPU-detected diagnostic path.
+    """
+    if not os.path.exists("/dev/kfd"):
+        return
+
+    if not os.access("/dev/kfd", os.R_OK | os.W_OK):
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
+            "process cannot open it (no read/write access). This is a "
+            "permissions issue, not a missing or misplaced "
+            "`librocm_smi64.so`: the current user is likely missing from "
+            "the `render` (and `video`) group that owns `/dev/kfd` -- the "
+            "`/dev/dri/renderD*` node ROCm also needs is commonly owned by "
+            "the same group and likely affected too -- or "
+            "the container was started without `--device=/dev/kfd "
+            "--device=/dev/dri --group-add render --group-add video`. "
+            "Both Ray and the ML framework will report zero GPUs until "
+            "device access is fixed; pointing ROCM_PATH at the SMI "
+            "library will not help.",
+        )
+        return
+
+    # /dev/kfd alone is not sufficient: ROCm also reaches the GPU through a
+    # /dev/dri/renderD* node, which a container or host can pass through (or
+    # permission) independently of /dev/kfd. If no such node is usable, pointing
+    # ROCM_PATH at the SMI library -- the fix for the common case below -- would
+    # not help at all.
+    render_nodes = glob.glob("/dev/dri/renderD*")
+    accessible_render_nodes = [
+        node for node in render_nodes if os.access(node, os.R_OK | os.W_OK)
+    ]
+    if accessible_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), so "
+            "an AMD GPU is likely present on this host. If Ray's GPU "
+            "resources were not limited deliberately, check that Ray "
+            "can enumerate it: Ray finds AMD GPUs by opening "
+            "`$ROCM_PATH/lib/librocm_smi64.so` (ROCM_PATH defaults to "
+            "/opt/rocm) under that *unversioned* name. Ensure "
+            "ROCM_PATH points at a ROCm root containing the "
+            "`librocm_smi64.so` symlink rather than only a versioned "
+            "`librocm_smi64.so.<N>`.",
+        )
+    else:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), but no accessible `/dev/dri/renderD*` node "
+            "was found (%s). ROCm reaches the GPU through both "
+            "`/dev/kfd` and a render node, so pointing ROCM_PATH at "
+            "the SMI library will not help here -- Ray and the ML "
+            "framework will both keep reporting zero GPUs until the "
+            "render node itself is present and accessible. This is "
+            "usually the same permissions issue as missing `/dev/kfd` "
+            "access, just affecting the other device node: the "
+            "current user is likely missing from the `render` group "
+            "that owns it, or a container was started with "
+            "`--device=/dev/kfd` but without `--device=/dev/dri "
+            "--group-add render`.",
+            ", ".join(render_nodes) if render_nodes else "none found",
+        )
 
 
 def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
@@ -181,33 +251,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                     client_resources.get("num_cpus"),
                     max_num_cpus,
                 )
-            if os.path.exists("/dev/kfd"):
-                if os.access("/dev/kfd", os.R_OK | os.W_OK):
-                    log(
-                        WARNING,
-                        "The ROCm kernel driver is loaded (/dev/kfd exists), so an "
-                        "AMD GPU is likely present on this host. If Ray's GPU "
-                        "resources were not limited deliberately, check that Ray can "
-                        "enumerate it: Ray finds AMD GPUs by opening "
-                        "`$ROCM_PATH/lib/librocm_smi64.so` (ROCM_PATH defaults to "
-                        "/opt/rocm) under that *unversioned* name. Ensure ROCM_PATH "
-                        "points at a ROCm root containing the `librocm_smi64.so` "
-                        "symlink rather than only a versioned `librocm_smi64.so.<N>`.",
-                    )
-                else:
-                    log(
-                        WARNING,
-                        "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
-                        "process cannot open it (no read/write access). This is a "
-                        "permissions issue, not a missing or misplaced "
-                        "`librocm_smi64.so`: the current user is likely missing from "
-                        "the `render` (and `video`) group that owns `/dev/kfd`, or "
-                        "the container was started without `--device=/dev/kfd "
-                        "--device=/dev/dri --group-add render --group-add video`. "
-                        "Both Ray and the ML framework will report zero GPUs until "
-                        "device access is fixed; pointing ROCM_PATH at the SMI "
-                        "library will not help.",
-                    )
+            _log_kfd_diagnostics()
         else:
             log(
                 WARNING,

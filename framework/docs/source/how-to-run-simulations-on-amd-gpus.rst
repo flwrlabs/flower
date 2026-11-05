@@ -147,11 +147,24 @@ Ray enumerates AMD GPUs by opening ``$ROCM_PATH/lib/librocm_smi64.so``, where
 - If you installed ROCm from Python wheels rather than system packages, there is usually
   no ``/opt/rocm`` at all, so ``ROCM_PATH`` must be set explicitly.
 
-Confirm the library is where Ray will look for it:
+Confirm the library is where Ray will look for it. Use the same unset-vs-empty test as
+``ROCR_VISIBLE_DEVICES`` below rather than a plain ``${ROCM_PATH:-/opt/rocm}``
+substitution: ``:-`` falls back to ``/opt/rocm`` both when ``ROCM_PATH`` is unset *and*
+when it is set to an empty string, but Ray 2.55.1 only applies its own ``/opt/rocm``
+default when ``ROCM_PATH`` is completely absent from the environment -- an explicit
+``ROCM_PATH=""`` is kept as-is and Ray ends up opening ``/lib/librocm_smi64.so``
+instead. A check using ``:-`` would still find the library under ``/opt/rocm`` and
+misleadingly print "ROCm SMI found" in that case, even though Ray reports zero GPUs:
 
 .. code-block:: shell
 
-    test -f "${ROCM_PATH:-/opt/rocm}/lib/librocm_smi64.so" && echo "ROCm SMI found"
+    if [ -n "${ROCM_PATH+x}" ]; then
+        _rocm_path="$ROCM_PATH"
+    else
+        _rocm_path="/opt/rocm"
+    fi
+    test -f "$_rocm_path/lib/librocm_smi64.so" && echo "ROCm SMI found"
+    unset _rocm_path
 
 If that prints nothing, set ``ROCM_PATH`` to a ROCm root that contains the unversioned
 symlink and re-check. When ROCm is installed from wheels, the ``rocm-sdk`` tool reports
@@ -271,6 +284,28 @@ actually exposed:
     different masks sequentially, stopping the SuperLink between them, rather than
     concurrently.
 
+.. important::
+
+    The guidance above assumes the single-node, Flower-managed-SuperLink flow. Flower
+    also supports :ref:`multi-node simulations <multinodesimulations>`, where you run
+    ``ray start --head`` on one node and ``ray start --address=...`` on each worker node
+    yourself, before ``flwr run``. There, restarting the SuperLink does not help at all:
+    each node's own ``ray start`` already performed AMD GPU discovery using whatever
+    ``ROCM_PATH``, ``HIP_VISIBLE_DEVICES``, and ``ROCR_VISIBLE_DEVICES`` were present in
+    *that node's* shell at the moment ``ray start`` ran there. Exporting corrected
+    values afterwards -- in the driver shell that later runs ``flwr run``, or by
+    restarting only the Flower-managed SuperLink -- changes nothing for nodes Ray
+    itself started, since Flower does not manage those processes.
+
+    For a manually started Ray cluster, ``ROCM_PATH`` and the
+    ``HIP_VISIBLE_DEVICES``/``ROCR_VISIBLE_DEVICES`` handling above must therefore be
+    exported in the shell on **every** node -- head and each worker -- *before* that
+    node's ``ray start`` command runs. If a cluster is already running with the wrong
+    environment, stop it (``ray stop`` on every node, or tear the cluster down and
+    restart it) so each node redoes GPU discovery with the corrected environment; those
+    nodes will keep reporting ``GPU=0`` until they are individually fixed and
+    restarted.
+
 *************************************
  Verify that Ray detects the AMD GPU
 *************************************
@@ -362,12 +397,20 @@ warning right after this one, naming that CPU shortage explicitly -- in that cas
 setting ``num_gpus=0`` alone will not be enough; also lower
 ``client-resources-num-cpus`` or add CPU capacity to the cluster.
 
-If ``/dev/kfd`` exists and this process can open it, Flower follows the warning above
-with a second one naming the ``ROCM_PATH`` requirement directly. If ``/dev/kfd`` exists
-but the process cannot open it -- the missing ``render``-group access covered in `Check
-that ROCm can reach the GPU`_ -- Flower instead reports a permissions problem and
-states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
-instructions instead, not the ``ROCM_PATH`` steps below.
+If ``/dev/kfd`` exists, Flower follows the warning above with a second one that depends
+on what else it can detect about device access:
+
+- If the process cannot open ``/dev/kfd`` -- the missing ``render``-group access covered
+  in `Check that ROCm can reach the GPU`_ -- Flower reports a permissions problem and
+  states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
+  instructions instead, not the ``ROCM_PATH`` steps below.
+- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node is, Flower reports that
+  render-node gap instead -- again stating that ``ROCM_PATH`` will not help, since ROCm
+  needs both device nodes. Fix render-node access the same way as ``/dev/kfd`` access
+  above.
+- Only when both ``/dev/kfd`` and a render node are accessible does Flower name the
+  ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at the ROCm SMI
+  library`_.
 
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
