@@ -113,5 +113,5 @@ def test_space_requires_exactly_one_identity(
         if valid:
             conn.execute(table.insert().values(**values))
         else:
-            with pytest.raises(IntegrityError, match=f"ck_{table_name}_identity"):
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
                 conn.execute(table.insert().values(**values))

@@ -228,7 +228,7 @@ SpaceParticipantTable = Table(
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-        name="ck_space_participant_identity",
+        name="ck_conversation_participant_identity",
     ),
     UniqueConstraint("space_id", "flwr_aid"),
     UniqueConstraint("space_id", "agent_id"),
@@ -244,7 +244,7 @@ class SpaceMessage(FlwrBase):
         CheckConstraint(
             "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
             "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-            name="ck_space_message_identity",
+            name="ck_conversation_message_identity",
         ),
         Index("idx_space_message_space_id_id", "space_id", "id"),
         {"sqlite_autoincrement": True},

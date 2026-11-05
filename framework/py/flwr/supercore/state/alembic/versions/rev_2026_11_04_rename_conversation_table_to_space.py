@@ -45,15 +45,7 @@ def downgrade() -> None:
 
 
 def _rename_children(source: str, target: str) -> None:
-    """Rename participant/message storage while retaining message ID allocation."""
-    bind = op.get_bind()
-    sequence = None
-    if bind.dialect.name == "sqlite":
-        sequence = bind.execute(
-            sa.text("SELECT seq FROM sqlite_sequence WHERE name = :name"),
-            {"name": f"{source}_message"},
-        ).scalar_one_or_none()
-
+    """Rename child tables, columns, and indexes without rebuilding tables."""
     for suffix, old_columns, new_columns in (
         ("participant", ["flwr_aid"], ["flwr_aid"]),
         ("message", [f"{source}_id", "id"], [f"{target}_id", "id"]),
@@ -68,25 +60,10 @@ def _rename_children(source: str, target: str) -> None:
             existing_type=sa.Uuid(),
             existing_nullable=False,
         )
-        with op.batch_alter_table(
+        op.drop_index(f"idx_{old_table}_{'_'.join(old_columns)}", table_name=new_table)
+        op.create_index(
+            f"idx_{new_table}_{'_'.join(new_columns)}",
             new_table,
-            table_kwargs={"sqlite_autoincrement": True} if suffix == "message" else {},
-        ) as batch_op:
-            batch_op.drop_constraint(f"ck_{old_table}_identity", type_="check")
-            batch_op.create_check_constraint(
-                f"ck_{new_table}_identity",
-                "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
-                "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-            )
-            batch_op.drop_index(f"idx_{old_table}_{'_'.join(old_columns)}")
-            batch_op.create_index(
-                f"idx_{new_table}_{'_'.join(new_columns)}", new_columns, unique=False
-            )
-
-    if sequence is not None:
-        values = {"name": f"{target}_message", "seq": sequence}
-        bind.execute(sa.text("DELETE FROM sqlite_sequence WHERE name = :name"), values)
-        bind.execute(
-            sa.text("INSERT INTO sqlite_sequence (name, seq) VALUES (:name, :seq)"),
-            values,
+            new_columns,
+            unique=False,
         )
