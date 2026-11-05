@@ -80,7 +80,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return IDs of runs associated with the given space."""
         with self.session() as session:
             return [
-                int64_to_uint64(run_id)
+                run_id
                 for run_id in session.scalars(
                     select(RunModel.run_id).where(RunModel.space_id == space_id)
                 )

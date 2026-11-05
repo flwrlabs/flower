@@ -445,7 +445,7 @@ class StateTest(CoreStateTest):
                 with state.session() as session:
                     session.execute(
                         update(RunModel)
-                        .where(RunModel.run_id == uint64_to_int64(assigned_run_id))
+                        .where(RunModel.run_id == assigned_run_id)
                         .values(space_id=assigned_space_id)
                     )
         task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
