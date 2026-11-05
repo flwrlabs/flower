@@ -209,44 +209,44 @@ class RunSeries(FlwrBase):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
-class Conversation(FlwrBase):
-    """Represent a conversation."""
+class Space(FlwrBase):
+    """Represent a space."""
 
-    __tablename__ = "conversation"
+    __tablename__ = "space"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
 
 
-ConversationParticipantTable = Table(
-    "conversation_participant",
+SpaceParticipantTable = Table(
+    "space_participant",
     FlwrBase.metadata,
-    Column("conversation_id", Uuid, ForeignKey("conversation.id"), nullable=False),
+    Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-        name="ck_conversation_participant_identity",
+        name="ck_space_participant_identity",
     ),
-    UniqueConstraint("conversation_id", "flwr_aid"),
-    UniqueConstraint("conversation_id", "agent_id"),
-    Index("idx_conversation_participant_flwr_aid", "flwr_aid"),
+    UniqueConstraint("space_id", "flwr_aid"),
+    UniqueConstraint("space_id", "agent_id"),
+    Index("idx_space_participant_flwr_aid", "flwr_aid"),
 )
 
 
-class ConversationMessage(FlwrBase):
-    """Represent a message authored by a user or agent in a conversation."""
+class SpaceMessage(FlwrBase):
+    """Represent a message authored by a user or agent in a space."""
 
-    __tablename__ = "conversation_message"
+    __tablename__ = "space_message"
     __table_args__ = (
         CheckConstraint(
             "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
             "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-            name="ck_conversation_message_identity",
+            name="ck_space_message_identity",
         ),
-        Index("idx_conversation_message_conversation_id_id", "conversation_id", "id"),
+        Index("idx_space_message_space_id_id", "space_id", "id"),
         {"sqlite_autoincrement": True},
     )
 
@@ -255,9 +255,7 @@ class ConversationMessage(FlwrBase):
         primary_key=True,
         autoincrement=True,
     )
-    conversation_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("conversation.id"), nullable=False
-    )
+    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
     flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
     agent_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("agent.agent_id"), nullable=True
