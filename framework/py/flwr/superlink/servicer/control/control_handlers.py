@@ -941,6 +941,8 @@ def stream_run_events(
     account: AccountInfo,
     state: LinkState,
     is_active: Callable[[], bool] | None = None,
+    *,
+    poll_interval: float = RUN_EVENTS_STREAM_INTERVAL,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
     run_id = request.run_id
@@ -969,15 +971,18 @@ def stream_run_events(
         after_task_event_id,
         state,
         is_active,
+        poll_interval=poll_interval,
     )
 
 
-def _stream_run_events(
+def _stream_run_events(  # pylint: disable=too-many-arguments
     run_id: int,
     run: Run,
     after_task_event_id: int | None,
     state: LinkState,
     is_active: Callable[[], bool] | None,
+    *,
+    poll_interval: float,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Yield task events until the run finishes or the stream is cancelled."""
     # LinkState creates every run with a primary task, so casting is safe
@@ -1007,7 +1012,7 @@ def _stream_run_events(
         if run.status.status == Status.FINISHED:
             continue
 
-        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+        time.sleep(poll_interval)
 
 
 def start_automation(  # pylint: disable=too-many-branches,too-many-locals

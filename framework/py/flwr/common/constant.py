@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import math
 import os
 from typing import Final
 
@@ -112,20 +111,7 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
 # Log streaming configurations
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
 LOG_STREAM_INTERVAL = 0.5  # Control API log stream interval
-# Read once at startup; seconds between Control API run-event polls.
-try:
-    RUN_EVENTS_STREAM_INTERVAL = float(
-        os.getenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", "0.5")
-    )
-    if not math.isfinite(RUN_EVENTS_STREAM_INTERVAL) or not (
-        0.01 <= RUN_EVENTS_STREAM_INTERVAL <= 60.0
-    ):
-        raise ValueError
-except ValueError as err:
-    raise ValueError(
-        "FLWR_RUN_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
-        "between 0.01 and 60."
-    ) from err
+RUN_EVENTS_STREAM_INTERVAL = 0.5  # Event stream interval for `StreamRunEvents`
 LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 
 # Retry configurations

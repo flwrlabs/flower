@@ -1773,6 +1773,37 @@ class TestControlHandlersAuth(unittest.TestCase):
             all(isinstance(message, StreamRunEventsResponse) for message in msgs)
         )
 
+    def test_streamrunevents_uses_configured_poll_interval(self) -> None:
+        """Use the injected interval between event reads while a run is active."""
+        run = Mock(
+            federation_id=NOOP_FEDERATION_ID,
+            primary_task_id=123,
+            status=RunStatus(Status.RUNNING, "", ""),
+        )
+        is_active = Mock(side_effect=[True, False])
+        with (
+            patch.object(self.state, "get_run_info", return_value=[run]),
+            patch.object(self.state, "get_task_events", return_value=[]),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.time.sleep"
+            ) as sleep,
+        ):
+            messages = list(
+                control_handlers.stream_run_events(
+                    StreamRunEventsRequest(run_id=789),
+                    get_current_account_info(),
+                    self.state,
+                    is_active,
+                    poll_interval=0.1,
+                )
+            )
+
+        self.assertEqual(messages, [])
+        sleep.assert_called_once_with(0.1)
+
     def test_streamrunevents_stops_when_client_is_inactive(self) -> None:
         """Test StreamRunEvents stops when the client disconnects."""
         run_id = 789

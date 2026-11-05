@@ -46,6 +46,7 @@ from flwr.superlink.config_loader import (
     load_control_authn_plugin,
     load_control_event_log_plugin,
     load_fleet_event_log_plugin,
+    load_run_events_stream_interval,
 )
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.routers.control import router as control_router
@@ -119,6 +120,9 @@ def create_app(  # pylint: disable=too-many-statements
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
+    run_events_stream_interval = load_run_events_stream_interval(
+        config.run_events_stream_interval if config is not None else None
+    )
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
@@ -193,6 +197,7 @@ def create_app(  # pylint: disable=too-many-statements
         middleware=_get_middleware(),
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
+    fastapi_app.state.run_events_stream_interval = run_events_stream_interval
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.enable_supernode_auth = (
         config.enable_supernode_auth if config else False

@@ -54,8 +54,10 @@ SuperLink polls for new run events every 0.5 seconds per open Control API event
 stream by default. Set `FLWR_RUN_EVENTS_STREAM_INTERVAL` in the SuperLink
 environment to change this interval without rebuilding the image. The value is
 in seconds and must be finite and between 0.01 and 60, inclusive. Invalid values
-prevent startup. The setting is read at startup, so restart SuperLink after
-changing it.
+prevent app startup. The setting is read when the SuperLink FastAPI app is
+created, so restart SuperLink after changing it. Applications that construct
+SuperLink directly can supply `SuperLinkLifespanConfig.run_events_stream_interval`
+instead; an explicit value takes precedence over the environment variable.
 
 ```yaml
 superlink:
