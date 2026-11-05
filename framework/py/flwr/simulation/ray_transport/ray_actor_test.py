@@ -103,6 +103,27 @@ class TestPoolSizeFromResources(TestCase):
         self.assertIn("Set `num_gpus=0`", output)
         self.assertIn("no node has enough CPUs for even one client", output)
 
+    def test_cpu_shortage_warning_reports_the_best_node_not_the_last(self) -> None:
+        """Test that the reported CPU count is the cluster-wide best, not the last.
+
+        `num_cpus` is only ever assigned the last node's value inside the per-node
+        loop, so reporting it directly would understate the best node whenever a
+        smaller-CPU node happens to come last in `ray.nodes()`.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            # The best node (CPU=1) comes first, the smaller one (CPU=0.5) last.
+            return_value=[{"Resources": {"CPU": 1}}, {"Resources": {"CPU": 0.5}}],
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("CPUs=1", output)
+        self.assertNotIn("CPUs=0.5", output)
+
     def test_kfd_present_but_inaccessible_reports_permissions(self) -> None:
         """Test that an unopenable /dev/kfd is diagnosed as a permissions issue.
 

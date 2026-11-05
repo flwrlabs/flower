@@ -102,6 +102,10 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # the GPU requirement. If this is 0, no node has enough CPUs for even one client,
     # so GPU-lowering advice alone would still leave the pool empty.
     max_actors_by_cpu = 0
+    # `num_cpus` above only retains the last node's value, which misreports "the best
+    # node" when node order doesn't match node capacity. Track the actual best alongside
+    # `max_actors_by_cpu` so the two stay consistent.
+    max_num_cpus: int | float = 0
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -123,6 +127,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         num_cpus = node_resources.get("CPU", 0)
         num_gpus = node_resources.get("GPU", 0)
         cluster_num_gpus = max(cluster_num_gpus, num_gpus)
+        max_num_cpus = max(max_num_cpus, num_cpus)
         num_actors = int(num_cpus / client_resources["num_cpus"])
         max_actors_by_cpu = max(max_actors_by_cpu, num_actors)
 
@@ -174,7 +179,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                     "CPUs=%s. Setting `num_gpus=0` alone will not fix this -- also "
                     "lower `num_cpus` or add CPU capacity to the cluster.",
                     client_resources.get("num_cpus"),
-                    num_cpus,
+                    max_num_cpus,
                 )
             if os.path.exists("/dev/kfd"):
                 if os.access("/dev/kfd", os.R_OK | os.W_OK):

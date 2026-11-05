@@ -317,12 +317,17 @@ accelerator -- see :doc:`how-to-run-simulations`:
 ``ActorPool is empty. Stopping Simulation.``
 ============================================
 
-Ray detected no GPU while your ``ClientApp`` requested a fraction of one. Despite the
-message, the process does not always exit: the run can appear to hang after the error is
-printed. If that happens, interrupt it and scroll back -- the warning below is emitted
-before the hang and is the part that names the cause.
+This error is raised for two different reasons, and the warning immediately above it
+tells you which one applies. Despite the error message, the process does not always
+exit: the run can appear to hang after the error is printed. If that happens, interrupt
+it and scroll back for the warning that precedes it.
 
-The preceding warning names the mismatch:
+No GPU reported while a GPU was requested
+------------------------------------------
+
+If the preceding warning reads ``Ray reports no GPU resources (GPUs=0) but each client
+requests num_gpus=...``, Ray detected no GPU at all while your ``ClientApp`` requested a
+fraction of one:
 
 .. code-block:: text
 
@@ -352,11 +357,33 @@ Compare what Ray actually detects (``ray.cluster_resources()``, as verified abov
 against the ``--init-args-num-gpus`` value you configured to tell the second case apart
 from the third.
 
-When ``/dev/kfd`` is present, Flower follows that warning with a second one naming the
-``ROCM_PATH`` requirement directly.
+If the cluster also has too few CPUs for even one client, Flower emits an additional
+warning right after this one, naming that CPU shortage explicitly -- in that case,
+setting ``num_gpus=0`` alone will not be enough; also lower
+``client-resources-num-cpus`` or add CPU capacity to the cluster.
+
+If ``/dev/kfd`` exists and this process can open it, Flower follows the warning above
+with a second one naming the ``ROCM_PATH`` requirement directly. If ``/dev/kfd`` exists
+but the process cannot open it -- the missing ``render``-group access covered in `Check
+that ROCm can reach the GPU`_ -- Flower instead reports a permissions problem and
+states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
+instructions instead, not the ``ROCM_PATH`` steps below.
 
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
+
+CPU or GPU capacity is too small for even one client
+------------------------------------------------------
+
+If the preceding warning instead reads ``The ActorPool is empty. The system (CPUs=...,
+GPUs=...) does not meet the criteria to host at least one client...``, Ray *did* detect
+resources, but no single node has enough of them for a client on its own -- for example
+a node reporting ``CPU=1`` with ``client-resources-num-cpus`` set to ``2``, or a 1-GPU
+node with ``client-resources-num-gpus`` set to ``2``. This is a resource-sizing problem,
+not a GPU discovery problem: lower ``client-resources-num-cpus`` and/or
+``client-resources-num-gpus``, or add CPU/GPU capacity to the cluster. The
+``ROCM_PATH`` and ``HIP_VISIBLE_DEVICES`` fixes elsewhere in this guide do not apply
+here.
 
 Both the ML framework and Ray report zero GPUs
 ==============================================
