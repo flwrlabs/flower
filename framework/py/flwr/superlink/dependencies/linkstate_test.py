@@ -63,6 +63,7 @@ def _create_app_with_linkstate_factory(state_factory_mock: Mock) -> FastAPI:
     config.simulation = False
     config.database = ":flwr-in-memory:"
     config.authn_plugin = Mock()
+    config.run_events_stream_interval = None
     with (
         patch("flwr.superlink.main.get_federation_manager"),
         patch(

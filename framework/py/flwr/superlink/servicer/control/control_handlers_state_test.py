@@ -1794,7 +1794,7 @@ class TestControlHandlersAuth(unittest.TestCase):
             messages = list(
                 control_handlers.stream_run_events(
                     StreamRunEventsRequest(run_id=789),
-                    get_current_account_info(),
+                    AccountInfo(flwr_aid="user-123", account_name="Test user"),
                     self.state,
                     is_active,
                     poll_interval=0.1,
