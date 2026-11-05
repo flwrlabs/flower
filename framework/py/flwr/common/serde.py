@@ -16,6 +16,7 @@
 
 
 from typing import Any, cast
+from uuid import UUID
 
 from flwr import common
 from flwr.app.message import (
@@ -656,6 +657,8 @@ def run_to_proto(run: Run) -> ProtoRun:
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
+    if run.space_id is not None:
+        proto.space_id = str(run.space_id)
     return proto
 
 
@@ -683,6 +686,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         primary_task_type=run_proto.primary_task_type,
         series_id=run_proto.series_id,
         account_name=run_proto.account_name,
+        space_id=UUID(run_proto.space_id) if run_proto.HasField("space_id") else None,
     )
     return run
 

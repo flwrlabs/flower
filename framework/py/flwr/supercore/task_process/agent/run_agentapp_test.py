@@ -24,12 +24,15 @@ import threading
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import pytest
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.common.constant import SubStatus
+from flwr.common.serde import context_to_proto, fab_to_proto, run_to_proto
+from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -302,6 +305,69 @@ def test_preloaded_agentapp_requires_exact_task_identity(
     install.assert_not_called()
     load.assert_not_called()
     install_dependencies.assert_not_called()
+
+
+def test_space_run_uses_preloaded_agentapp(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Execute a Space run through the existing preloaded worker lifecycle."""
+    run = Run.create_empty(456)
+    run.space_id = UUID(int=1)
+    run.fab_id = "publisher/app"
+    run.fab_version = "1.0"
+    run.fab_hash = "a" * 64
+    context = Context(
+        run_id=run.run_id,
+        node_id=1,
+        node_config={},
+        state=RecordDict(),
+        run_config={},
+        series_id=0,
+    )
+    fab = Fab(run.fab_hash, b"task-fab", {})
+    grid = Mock()
+    grid._runtime_client.PullTaskInput.return_value = PullTaskInputResponse(
+        run=run_to_proto(run),
+        context=context_to_proto(context),
+        fab=fab_to_proto(fab),
+        task_id=123,
+    )
+    grid.pull_messages.return_value = [_payload_message(1, SYSTEM_MESSAGE_TYPE)]
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
+    monkeypatch.setattr(run_agentapp_module, "HeartbeatSender", Mock())
+    monkeypatch.setattr(run_agentapp_module, "RuntimeAgentEvents", Mock())
+    monkeypatch.setattr(
+        run_agentapp_module, "start_log_uploader", Mock(return_value=None)
+    )
+    monkeypatch.setattr(
+        run_agentapp_module, "get_fused_config_from_dir", Mock(return_value={})
+    )
+    monkeypatch.setattr(run_agentapp_module, "event", Mock())
+    monkeypatch.setattr(run_agentapp_module, "_set_runtime_environment", Mock())
+    app = Mock(spec=AgentApp)
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=False,
+        preloaded=PreloadedAgentApp(
+            app=app,
+            app_path=tmp_path,
+            fab_id=run.fab_id,
+            fab_version=run.fab_version,
+            fab_hash=run.fab_hash,
+        ),
+    )
+    assert lifecycle.run() == ExitCode.SUCCESS
+    app.assert_called_once()
+    assert app.call_args.kwargs["context"].run_id == run.run_id
+    assert app.call_args.kwargs["context"].series_id == 0
+    assert app.call_args.kwargs["agent"].prompt == "hello world!"
+    grid.set_run.assert_called_once_with(run)
 
 
 def test_run_agentapp_task_constructs_lifecycle_with_keywords(

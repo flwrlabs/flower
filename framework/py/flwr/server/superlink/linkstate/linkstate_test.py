@@ -31,7 +31,7 @@ from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any, cast
 from unittest.mock import Mock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
@@ -425,6 +425,90 @@ class StateTest(CoreStateTest):
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
+
+    def test_create_space_run(self) -> None:
+        """Create a Space AgentApp run without federation or series resources."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        with patch.object(state.federation_manager, "filter_nodes") as filter_nodes:
+            run_id = state.create_run(
+                "flwr/test",
+                "1.0",
+                "hash",
+                {},
+                None,
+                None,
+                "account",
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            run = state.get_run_info(run_ids=[run_id])[0]
+            assert run.space_id == space_id
+            assert run.federation_id == "" and run.series_id == 0
+            assert state.get_run_series() == []
+            assert state.get_nodes(run_id) == set()
+            assert (
+                len(state.get_messages(dst_node_id=SUPERLINK_NODE_ID, run_id=run_id))
+                == 1
+            )
+            assert not state.store_messages(
+                [
+                    message_from_proto(
+                        create_ins_message(
+                            src_node_id=SUPERLINK_NODE_ID,
+                            dst_node_id=2,
+                            run_id=run_id,
+                        )
+                    )
+                ]
+            )[0]
+        filter_nodes.assert_not_called()
+
+    def test_create_run_rejects_invalid_scope(self) -> None:
+        """Reject missing/mixed scopes and non-AgentApp Space runs before writes."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        for federation_id, series_id, scope, task_type in (
+            (None, None, None, TaskType.AGENT_APP),
+            (NOOP_FEDERATION_ID, None, space_id, TaskType.AGENT_APP),
+            (None, 123, space_id, TaskType.AGENT_APP),
+            (None, None, space_id, TaskType.SERVER_APP),
+        ):
+            with self.assertRaises(ValueError):
+                state.create_run(
+                    "",
+                    "",
+                    "hash",
+                    {},
+                    federation_id,
+                    None,
+                    "account",
+                    task_type,
+                    series_id=series_id,
+                    space_id=scope,
+                )
+        assert state.get_run_info() == []
+        assert state.get_tasks() == [] and state.get_run_series() == []
+
+    def test_create_run_rejects_unknown_space(self) -> None:
+        """An unknown Space must not leave an orphan run or primary task."""
+        state = self.state_factory()
+        assert (
+            state.create_run(
+                "",
+                "",
+                "hash",
+                {},
+                None,
+                None,
+                "account",
+                TaskType.AGENT_APP,
+                space_id=uuid4(),
+            )
+            == 0
+        )
+        assert state.get_run_info() == [] and state.get_tasks() == []
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
