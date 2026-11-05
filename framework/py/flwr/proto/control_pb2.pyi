@@ -509,7 +509,7 @@ class ListRunsResponse(google.protobuf.message.Message):
 global___ListRunsResponse = ListRunsResponse
 
 @typing.final
-class ConversationParticipant(google.protobuf.message.Message):
+class SpaceParticipant(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FLWR_AID_FIELD_NUMBER: builtins.int
@@ -526,10 +526,10 @@ class ConversationParticipant(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "flwr_aid", b"flwr_aid", "participant", b"participant"]) -> None: ...
     def WhichOneof(self, oneof_group: typing.Literal["participant", b"participant"]) -> typing.Literal["flwr_aid", "agent_id"] | None: ...
 
-global___ConversationParticipant = ConversationParticipant
+global___SpaceParticipant = SpaceParticipant
 
 @typing.final
-class Conversation(google.protobuf.message.Message):
+class Space(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
@@ -540,115 +540,115 @@ class Conversation(google.protobuf.message.Message):
     title: builtins.str
     created_at: builtins.str
     @property
-    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationParticipant]: ...
+    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceParticipant]: ...
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         title: builtins.str = ...,
         created_at: builtins.str = ...,
-        participants: collections.abc.Iterable[global___ConversationParticipant] | None = ...,
+        participants: collections.abc.Iterable[global___SpaceParticipant] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "participants", b"participants", "title", b"title"]) -> None: ...
 
-global___Conversation = Conversation
+global___Space = Space
 
 @typing.final
-class CreateConversationRequest(google.protobuf.message.Message):
+class CreateSpaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     PARTICIPANTS_FIELD_NUMBER: builtins.int
     @property
-    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationParticipant]: ...
+    def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceParticipant]: ...
     def __init__(
         self,
         *,
-        participants: collections.abc.Iterable[global___ConversationParticipant] | None = ...,
+        participants: collections.abc.Iterable[global___SpaceParticipant] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["participants", b"participants"]) -> None: ...
 
-global___CreateConversationRequest = CreateConversationRequest
+global___CreateSpaceRequest = CreateSpaceRequest
 
 @typing.final
-class CreateConversationResponse(google.protobuf.message.Message):
+class CreateSpaceResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONVERSATION_FIELD_NUMBER: builtins.int
+    SPACE_FIELD_NUMBER: builtins.int
     @property
-    def conversation(self) -> global___Conversation: ...
+    def space(self) -> global___Space: ...
     def __init__(
         self,
         *,
-        conversation: global___Conversation | None = ...,
+        space: global___Space | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["conversation", b"conversation"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["conversation", b"conversation"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["space", b"space"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["space", b"space"]) -> None: ...
 
-global___CreateConversationResponse = CreateConversationResponse
+global___CreateSpaceResponse = CreateSpaceResponse
 
 @typing.final
-class ListConversationsRequest(google.protobuf.message.Message):
+class ListSpacesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
 
-global___ListConversationsRequest = ListConversationsRequest
+global___ListSpacesRequest = ListSpacesRequest
 
 @typing.final
-class ListConversationsResponse(google.protobuf.message.Message):
+class ListSpacesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONVERSATIONS_FIELD_NUMBER: builtins.int
+    SPACES_FIELD_NUMBER: builtins.int
     @property
-    def conversations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Conversation]: ...
+    def spaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Space]: ...
     def __init__(
         self,
         *,
-        conversations: collections.abc.Iterable[global___Conversation] | None = ...,
+        spaces: collections.abc.Iterable[global___Space] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["conversations", b"conversations"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["spaces", b"spaces"]) -> None: ...
 
-global___ListConversationsResponse = ListConversationsResponse
+global___ListSpacesResponse = ListSpacesResponse
 
 @typing.final
-class ConversationMessage(google.protobuf.message.Message):
+class SpaceMessage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
-    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
     AUTHOR_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
     id: builtins.int
-    conversation_id: builtins.str
+    space_id: builtins.str
     created_at: builtins.str
     content: builtins.str
     @property
-    def author(self) -> global___ConversationParticipant: ...
+    def author(self) -> global___SpaceParticipant: ...
     def __init__(
         self,
         *,
         id: builtins.int = ...,
-        conversation_id: builtins.str = ...,
-        author: global___ConversationParticipant | None = ...,
+        space_id: builtins.str = ...,
+        author: global___SpaceParticipant | None = ...,
         created_at: builtins.str = ...,
         content: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["author", b"author"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "conversation_id", b"conversation_id", "created_at", b"created_at", "id", b"id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "id", b"id", "space_id", b"space_id"]) -> None: ...
 
-global___ConversationMessage = ConversationMessage
+global___SpaceMessage = SpaceMessage
 
 @typing.final
-class GetConversationMessagesRequest(google.protobuf.message.Message):
+class GetSpaceMessagesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
     BEFORE_ID_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
-    conversation_id: builtins.str
+    space_id: builtins.str
     before_id: builtins.int
     """Exclusive upper ID bound. Absent selects the newest page."""
     limit: builtins.int
@@ -656,71 +656,71 @@ class GetConversationMessagesRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        conversation_id: builtins.str = ...,
+        space_id: builtins.str = ...,
         before_id: builtins.int | None = ...,
         limit: builtins.int | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_before_id", b"_before_id", "_limit", b"_limit", "before_id", b"before_id", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_before_id", b"_before_id", "_limit", b"_limit", "before_id", b"before_id", "conversation_id", b"conversation_id", "limit", b"limit"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_before_id", b"_before_id", "_limit", b"_limit", "before_id", b"before_id", "limit", b"limit", "space_id", b"space_id"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_before_id", b"_before_id"]) -> typing.Literal["before_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
 
-global___GetConversationMessagesRequest = GetConversationMessagesRequest
+global___GetSpaceMessagesRequest = GetSpaceMessagesRequest
 
 @typing.final
-class GetConversationMessagesResponse(google.protobuf.message.Message):
+class GetSpaceMessagesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MESSAGES_FIELD_NUMBER: builtins.int
     @property
-    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ConversationMessage]:
+    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceMessage]:
         """Messages in the selected page, ordered by ascending ID."""
 
     def __init__(
         self,
         *,
-        messages: collections.abc.Iterable[global___ConversationMessage] | None = ...,
+        messages: collections.abc.Iterable[global___SpaceMessage] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
 
-global___GetConversationMessagesResponse = GetConversationMessagesResponse
+global___GetSpaceMessagesResponse = GetSpaceMessagesResponse
 
 @typing.final
-class SendConversationMessageRequest(google.protobuf.message.Message):
+class SendSpaceMessageRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
-    conversation_id: builtins.str
+    space_id: builtins.str
     content: builtins.str
     def __init__(
         self,
         *,
-        conversation_id: builtins.str = ...,
+        space_id: builtins.str = ...,
         content: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["content", b"content", "conversation_id", b"conversation_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
 
-global___SendConversationMessageRequest = SendConversationMessageRequest
+global___SendSpaceMessageRequest = SendSpaceMessageRequest
 
 @typing.final
-class SendConversationMessageResponse(google.protobuf.message.Message):
+class SendSpaceMessageResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MESSAGE_FIELD_NUMBER: builtins.int
     @property
-    def message(self) -> global___ConversationMessage: ...
+    def message(self) -> global___SpaceMessage: ...
     def __init__(
         self,
         *,
-        message: global___ConversationMessage | None = ...,
+        message: global___SpaceMessage | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["message", b"message"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
 
-global___SendConversationMessageResponse = SendConversationMessageResponse
+global___SendSpaceMessageResponse = SendSpaceMessageResponse
 
 @typing.final
 class ListRunSeriesRequest(google.protobuf.message.Message):

@@ -31,9 +31,9 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
-    "conversation",
-    "conversation_participant",
-    "conversation_message",
+    "space",
+    "space_participant",
+    "space_message",
     "run_series",
     "compacted_contexts",
     "series_context",
@@ -86,14 +86,12 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     assert TaskLogsTable.primary_key.columns.values() == []
 
 
-@pytest.mark.parametrize(
-    "table_name", ["conversation_participant", "conversation_message"]
-)
+@pytest.mark.parametrize("table_name", ["space_participant", "space_message"])
 @pytest.mark.parametrize(
     ("flwr_aid", "agent_id", "valid"),
     [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
 )
-def test_conversation_requires_exactly_one_identity(
+def test_space_requires_exactly_one_identity(
     table_name: str,
     flwr_aid: str | None,
     agent_id: int | None,
@@ -104,16 +102,16 @@ def test_conversation_requires_exactly_one_identity(
     engine = create_engine("sqlite:///:memory:")
     table.create(engine)
     values: dict[str, object] = {
-        "conversation_id": UUID(int=1),
+        "space_id": UUID(int=1),
         "flwr_aid": flwr_aid,
         "agent_id": agent_id,
     }
-    if table_name == "conversation_message":
+    if table_name == "space_message":
         values.update(content="Hello", created_at=datetime.now(UTC))
 
     with engine.begin() as conn:
         if valid:
             conn.execute(table.insert().values(**values))
         else:
-            with pytest.raises(IntegrityError, match=f"ck_{table_name}_identity"):
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
                 conn.execute(table.insert().values(**values))
