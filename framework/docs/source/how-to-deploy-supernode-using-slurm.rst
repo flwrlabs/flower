@@ -205,9 +205,20 @@ Create ``superexec-clientapp-gpu.sbatch``:
     export FLWR_HOME="${SLURM_TMPDIR:-/tmp}/flower-${SLURM_JOB_ID}"
 
     # Slurm names the assigned devices per vendor: CUDA_VISIBLE_DEVICES on NVIDIA,
-    # ROCR_VISIBLE_DEVICES on AMD. Only treat the job as GPU-less if neither is set.
-    gpu_devices="${CUDA_VISIBLE_DEVICES:-}${ROCR_VISIBLE_DEVICES:-}"
-    if [[ -z "$gpu_devices" ]]; then
+    # ROCR_VISIBLE_DEVICES on AMD. Some Slurm AMD GRES setups express a no-device
+    # allocation as ROCR_VISIBLE_DEVICES=-1 rather than leaving it unset or empty
+    # (see the AMD simulation guide's discussion of that same "-1" sentinel), so check
+    # each variable on its own instead of concatenating them -- concatenation would
+    # let that nonempty "-1" masquerade as an assigned device and pass a plain
+    # emptiness check.
+    no_gpu=1
+    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+        no_gpu=0
+    fi
+    if [[ -n "${ROCR_VISIBLE_DEVICES:-}" && "${ROCR_VISIBLE_DEVICES}" != "-1" ]]; then
+        no_gpu=0
+    fi
+    if [[ "$no_gpu" -eq 1 ]]; then
         echo "Slurm did not assign a GPU to this job." >&2
         exit 1
     fi
