@@ -181,7 +181,7 @@ erDiagram
   }
 
   run {
-    CHAR(32) conversation_id FK "nullable"
+    CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
@@ -313,7 +313,7 @@ erDiagram
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
-  conversation ||--o{ run : conversation_id
+  space ||--o{ run : space_id
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
