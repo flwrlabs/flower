@@ -45,33 +45,33 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
-    ConversationParticipant,
     CreateAgentRequest,
     CreateAgentResponse,
-    CreateConversationRequest,
-    CreateConversationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
-    GetConversationMessagesRequest,
-    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
-    ListConversationsRequest,
-    ListConversationsResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
-    SendConversationMessageRequest,
-    SendConversationMessageResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -114,9 +114,9 @@ _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
-@pytest.fixture(name="conversation_client")
-def conversation_client_fixture() -> tuple[TestClient, LinkState]:
-    """Provide authenticated conversation routes backed by in-memory state."""
+@pytest.fixture(name="space_client")
+def space_client_fixture() -> tuple[TestClient, LinkState]:
+    """Provide authenticated space routes backed by in-memory state."""
     state = LinkStateFactory(
         FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
@@ -134,179 +134,166 @@ def conversation_client_fixture() -> tuple[TestClient, LinkState]:
     )
 
 
-def test_conversation_routes(
-    conversation_client: tuple[TestClient, LinkState],
+def test_space_routes(
+    space_client: tuple[TestClient, LinkState],
 ) -> None:
     """Create, list, send, and read with authenticated caller membership."""
-    client, state = conversation_client
+    client, state = space_client
     agent = state.create_agent(
         flwr_aid=_ACCOUNT.flwr_aid,
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
-    caller = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    agent_participant = ConversationParticipant(agent_id=agent.id)
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    agent_participant = SpaceParticipant(agent_id=agent.id)
     response = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest(
+        "/v1/control/create-space",
+        content=CreateSpaceRequest(
             participants=[agent_participant]
         ).SerializeToString(),
     )
     assert response.status_code == 200
-    conversation = CreateConversationResponse.FromString(response.content).conversation
-    assert list(conversation.participants) == [caller, agent_participant]
+    space = CreateSpaceResponse.FromString(response.content).space
+    assert list(space.participants) == [caller, agent_participant]
     listed = client.post(
-        "/v1/control/list-conversations",
-        content=ListConversationsRequest().SerializeToString(),
+        "/v1/control/list-spaces",
+        content=ListSpacesRequest().SerializeToString(),
     )
     assert listed.status_code == 200
-    assert list(ListConversationsResponse.FromString(listed.content).conversations) == [
-        conversation
-    ]
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [space]
     response = client.post(
-        "/v1/control/send-conversation-message",
-        content=SendConversationMessageRequest(
-            conversation_id=conversation.id, content="Hello"
+        "/v1/control/send-space-message",
+        content=SendSpaceMessageRequest(
+            space_id=space.id, content="Hello"
         ).SerializeToString(),
     )
     assert response.status_code == 200
-    message = SendConversationMessageResponse.FromString(response.content).message
+    message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
     history = client.post(
-        "/v1/control/get-conversation-messages",
-        content=GetConversationMessagesRequest(
-            conversation_id=conversation.id
-        ).SerializeToString(),
+        "/v1/control/get-space-messages",
+        content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
     )
     assert history.status_code == 200
-    assert list(
-        GetConversationMessagesResponse.FromString(history.content).messages
-    ) == [message]
+    assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
+        message
+    ]
     assert not state.get_run_series() and not state.get_tasks()
 
 
-def test_create_conversation_rejects_invalid_participants(
-    conversation_client: tuple[TestClient, LinkState],
+def test_create_space_rejects_invalid_participants(
+    space_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Reject invalid initial participants without creating a conversation."""
-    client, state = conversation_client
+    """Reject invalid initial participants without creating a space."""
+    client, state = space_client
     response = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest(
-            participants=[ConversationParticipant()]
+        "/v1/control/create-space",
+        content=CreateSpaceRequest(
+            participants=[SpaceParticipant()]
         ).SerializeToString(),
     )
     assert response.status_code == 400
-    assert response.json()["code"] == ApiErrorCode.INVALID_CONVERSATION_REQUEST
-    assert not state.get_conversations(_ACCOUNT.flwr_aid)
+    assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
+    assert not state.get_spaces(_ACCOUNT.flwr_aid)
 
 
-def test_create_conversation_rejects_other_users_agent(
-    conversation_client: tuple[TestClient, LinkState],
+def test_create_space_rejects_other_users_agent(
+    space_client: tuple[TestClient, LinkState],
 ) -> None:
     """An account cannot attach another account's private agent."""
-    client, state = conversation_client
+    client, state = space_client
     agent = state.create_agent(
         flwr_aid="other-user",
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
     response = client.post(
-        "/v1/control/create-conversation",
-        content=CreateConversationRequest(
-            participants=[ConversationParticipant(agent_id=agent.id)]
+        "/v1/control/create-space",
+        content=CreateSpaceRequest(
+            participants=[SpaceParticipant(agent_id=agent.id)]
         ).SerializeToString(),
     )
     assert response.status_code == 400
-    assert response.json()["code"] == ApiErrorCode.INVALID_CONVERSATION_REQUEST
-    assert not state.get_conversations(_ACCOUNT.flwr_aid)
+    assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
+    assert not state.get_spaces(_ACCOUNT.flwr_aid)
 
 
-def test_conversation_history_pagination(
-    conversation_client: tuple[TestClient, LinkState],
+def test_space_history_pagination(
+    space_client: tuple[TestClient, LinkState],
 ) -> None:
     """Apply the HTTP request's exclusive cursor and page size."""
-    client, state = conversation_client
-    conversation = state.create_conversation(
-        participants=[ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+    client, state = space_client
+    space = state.create_space(
+        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
     )
-    conversation_id = UUID(conversation.id)
-    author = ConversationParticipant(flwr_aid=_ACCOUNT.flwr_aid)
-    messages = [
-        state.create_conversation_message(conversation_id, author, str(i))
-        for i in range(3)
-    ]
+    space_id = UUID(space.id)
+    author = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    messages = [state.create_space_message(space_id, author, str(i)) for i in range(3)]
     last = messages[-1]
     assert last is not None
     response = client.post(
-        "/v1/control/get-conversation-messages",
-        content=GetConversationMessagesRequest(
-            conversation_id=conversation.id, before_id=last.id, limit=1
+        "/v1/control/get-space-messages",
+        content=GetSpaceMessagesRequest(
+            space_id=space.id, before_id=last.id, limit=1
         ).SerializeToString(),
     )
     assert response.status_code == 200
-    assert list(
-        GetConversationMessagesResponse.FromString(response.content).messages
-    ) == [messages[1]]
+    assert list(GetSpaceMessagesResponse.FromString(response.content).messages) == [
+        messages[1]
+    ]
 
 
-@pytest.mark.parametrize(
-    "endpoint", ["get-conversation-messages", "send-conversation-message"]
-)
-def test_conversation_unavailable_to_nonparticipants(
-    conversation_client: tuple[TestClient, LinkState], endpoint: str
+@pytest.mark.parametrize("endpoint", ["get-space-messages", "send-space-message"])
+def test_space_unavailable_to_nonparticipants(
+    space_client: tuple[TestClient, LinkState], endpoint: str
 ) -> None:
-    """Missing and inaccessible conversations produce the same 404 response."""
-    client, state = conversation_client
-    private = state.create_conversation(
-        participants=[ConversationParticipant(flwr_aid="alice")]
-    )
-    for conversation_id in [private.id, str(uuid4())]:
+    """Missing and inaccessible spaces produce the same 404 response."""
+    client, state = space_client
+    private = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
+    for space_id in [private.id, str(uuid4())]:
         request = (
-            GetConversationMessagesRequest(conversation_id=conversation_id)
-            if endpoint == "get-conversation-messages"
-            else SendConversationMessageRequest(
-                conversation_id=conversation_id, content="No access"
-            )
+            GetSpaceMessagesRequest(space_id=space_id)
+            if endpoint == "get-space-messages"
+            else SendSpaceMessageRequest(space_id=space_id, content="No access")
         )
         response = client.post(
             f"/v1/control/{endpoint}", content=request.SerializeToString()
         )
         assert response.status_code == 404
-        assert response.json()["code"] == ApiErrorCode.CONVERSATION_NOT_FOUND
+        assert response.json()["code"] == ApiErrorCode.SPACE_NOT_FOUND
 
 
 @pytest.mark.parametrize(
     "endpoint,fields",
     [
-        ("send-conversation-message", {"content": " \n"}),
+        ("send-space-message", {"content": " \n"}),
         (
-            "send-conversation-message",
-            {"content": "Hello", "conversation_id": "bad-uuid"},
+            "send-space-message",
+            {"content": "Hello", "space_id": "bad-uuid"},
         ),
-        ("get-conversation-messages", {"conversation_id": "bad-uuid"}),
-        ("get-conversation-messages", {"limit": 0}),
-        ("get-conversation-messages", {"limit": 101}),
+        ("get-space-messages", {"space_id": "bad-uuid"}),
+        ("get-space-messages", {"limit": 0}),
+        ("get-space-messages", {"limit": 101}),
     ],
 )
-def test_invalid_conversation_request(
-    conversation_client: tuple[TestClient, LinkState],
+def test_invalid_space_request(
+    space_client: tuple[TestClient, LinkState],
     endpoint: str,
     fields: dict[str, str | int],
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
-    client, _ = conversation_client
+    client, _ = space_client
     request_type = (
-        SendConversationMessageRequest
-        if endpoint == "send-conversation-message"
-        else GetConversationMessagesRequest
+        SendSpaceMessageRequest
+        if endpoint == "send-space-message"
+        else GetSpaceMessagesRequest
     )
-    request = ParseDict({"conversation_id": str(uuid4()), **fields}, request_type())
+    request = ParseDict({"space_id": str(uuid4()), **fields}, request_type())
     response = client.post(
         f"/v1/control/{endpoint}", content=request.SerializeToString()
     )
     assert response.status_code == 400
-    assert response.json()["code"] == ApiErrorCode.INVALID_CONVERSATION_REQUEST
+    assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
 
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:

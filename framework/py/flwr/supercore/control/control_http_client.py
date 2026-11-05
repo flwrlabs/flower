@@ -33,22 +33,22 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationResponse,
     CreateAgentRequest,
     CreateAgentResponse,
-    CreateConversationRequest,
-    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
-    GetConversationMessagesRequest,
-    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -59,8 +59,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
-    ListConversationsRequest,
-    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -73,6 +71,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -89,8 +89,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendConversationMessageRequest,
-    SendConversationMessageResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -207,48 +207,44 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=ListRunsResponse,
         )
 
-    def CreateConversation(
-        self, request: CreateConversationRequest
-    ) -> CreateConversationResponse:
-        """Create conversation."""
+    def CreateSpace(self, request: CreateSpaceRequest) -> CreateSpaceResponse:
+        """Create space."""
         return self._unary_unary(
-            path="/v1/control/create-conversation",
-            rpc_method="/flwr.proto.Control/CreateConversation",
+            path="/v1/control/create-space",
+            rpc_method="/flwr.proto.Control/CreateSpace",
             request=request,
-            response_type=CreateConversationResponse,
+            response_type=CreateSpaceResponse,
         )
 
-    def ListConversations(
-        self, request: ListConversationsRequest
-    ) -> ListConversationsResponse:
-        """List conversations."""
+    def ListSpaces(self, request: ListSpacesRequest) -> ListSpacesResponse:
+        """List spaces."""
         return self._unary_unary(
-            path="/v1/control/list-conversations",
-            rpc_method="/flwr.proto.Control/ListConversations",
+            path="/v1/control/list-spaces",
+            rpc_method="/flwr.proto.Control/ListSpaces",
             request=request,
-            response_type=ListConversationsResponse,
+            response_type=ListSpacesResponse,
         )
 
-    def GetConversationMessages(
-        self, request: GetConversationMessagesRequest
-    ) -> GetConversationMessagesResponse:
-        """Get conversation messages."""
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Get space messages."""
         return self._unary_unary(
-            path="/v1/control/get-conversation-messages",
-            rpc_method="/flwr.proto.Control/GetConversationMessages",
+            path="/v1/control/get-space-messages",
+            rpc_method="/flwr.proto.Control/GetSpaceMessages",
             request=request,
-            response_type=GetConversationMessagesResponse,
+            response_type=GetSpaceMessagesResponse,
         )
 
-    def SendConversationMessage(
-        self, request: SendConversationMessageRequest
-    ) -> SendConversationMessageResponse:
-        """Send conversation message."""
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Send space message."""
         return self._unary_unary(
-            path="/v1/control/send-conversation-message",
-            rpc_method="/flwr.proto.Control/SendConversationMessage",
+            path="/v1/control/send-space-message",
+            rpc_method="/flwr.proto.Control/SendSpaceMessage",
             request=request,
-            response_type=SendConversationMessageResponse,
+            response_type=SendSpaceMessageResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:

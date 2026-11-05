@@ -71,25 +71,24 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
     Connector,
-    ConversationParticipant,
     CreateAgentRequest,
     CreateAgentResponse,
-    CreateConversationRequest,
-    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
-    GetConversationMessagesRequest,
-    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -100,8 +99,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
-    ListConversationsRequest,
-    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -114,6 +111,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -130,12 +129,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendConversationMessageRequest,
-    SendConversationMessageResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    SpaceParticipant,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -1302,19 +1302,19 @@ def list_runs(
     )
 
 
-class InvalidConversationRequestError(FlowerError):
-    """Exception raised when a conversation request is invalid."""
+class InvalidSpaceRequestError(FlowerError):
+    """Exception raised when a space request is invalid."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(
-            ApiErrorCode.INVALID_CONVERSATION_REQUEST, reason, public_details=reason
+            ApiErrorCode.INVALID_SPACE_REQUEST, reason, public_details=reason
         )
 
 
-def create_conversation(
-    request: CreateConversationRequest, account: AccountInfo, state: LinkState
-) -> CreateConversationResponse:
-    """Create an untitled conversation and enroll the authenticated account."""
+def create_space(
+    request: CreateSpaceRequest, account: AccountInfo, state: LinkState
+) -> CreateSpaceResponse:
+    """Create an untitled space and enroll the authenticated account."""
     agent_ids = {
         participant.agent_id
         for participant in request.participants
@@ -1323,73 +1323,71 @@ def create_conversation(
     if agent_ids and not agent_ids.issubset(
         {agent.id for agent in state.list_agents(account.flwr_aid)}
     ):
-        raise InvalidConversationRequestError(
+        raise InvalidSpaceRequestError(
             "Agent participants must belong to your account."
         )
     try:
-        conversation = state.create_conversation(
+        space = state.create_space(
             participants=[
-                ConversationParticipant(flwr_aid=account.flwr_aid),
+                SpaceParticipant(flwr_aid=account.flwr_aid),
                 *request.participants,
             ]
         )
     except ValueError as exc:
-        raise InvalidConversationRequestError(str(exc)) from exc
-    return CreateConversationResponse(conversation=conversation)
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    return CreateSpaceResponse(space=space)
 
 
-def list_conversations(
-    request: ListConversationsRequest, account: AccountInfo, state: LinkState
-) -> ListConversationsResponse:
-    """List conversations the authenticated account participates in."""
+def list_spaces(
+    request: ListSpacesRequest, account: AccountInfo, state: LinkState
+) -> ListSpacesResponse:
+    """List spaces the authenticated account participates in."""
     _ = request
-    return ListConversationsResponse(
-        conversations=state.get_conversations(account.flwr_aid)
-    )
+    return ListSpacesResponse(spaces=state.get_spaces(account.flwr_aid))
 
 
-def get_conversation_messages(
-    request: GetConversationMessagesRequest, account: AccountInfo, state: LinkState
-) -> GetConversationMessagesResponse:
+def get_space_messages(
+    request: GetSpaceMessagesRequest, account: AccountInfo, state: LinkState
+) -> GetSpaceMessagesResponse:
     """Read a participating user's message history with an exclusive ID cursor."""
     limit = request.limit if request.HasField("limit") else 50
     if limit > 100:
-        raise InvalidConversationRequestError("limit must be at most 100.")
+        raise InvalidSpaceRequestError("limit must be at most 100.")
     try:
-        messages = state.get_conversation_messages(
-            UUID(request.conversation_id),
+        messages = state.get_space_messages(
+            UUID(request.space_id),
             account.flwr_aid,
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
         )
     except ValueError as exc:
-        raise InvalidConversationRequestError(str(exc)) from exc
+        raise InvalidSpaceRequestError(str(exc)) from exc
     if messages is None:
         raise FlowerError(
-            ApiErrorCode.CONVERSATION_NOT_FOUND,
-            "Conversation not found or account is not a participant.",
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
         )
-    return GetConversationMessagesResponse(messages=messages)
+    return GetSpaceMessagesResponse(messages=messages)
 
 
-def send_conversation_message(
-    request: SendConversationMessageRequest, account: AccountInfo, state: LinkState
-) -> SendConversationMessageResponse:
+def send_space_message(
+    request: SendSpaceMessageRequest, account: AccountInfo, state: LinkState
+) -> SendSpaceMessageResponse:
     """Persist a message authored by the authenticated account."""
     try:
-        message = state.create_conversation_message(
-            UUID(request.conversation_id),
-            ConversationParticipant(flwr_aid=account.flwr_aid),
+        message = state.create_space_message(
+            UUID(request.space_id),
+            SpaceParticipant(flwr_aid=account.flwr_aid),
             request.content,
         )
     except ValueError as exc:
-        raise InvalidConversationRequestError(str(exc)) from exc
+        raise InvalidSpaceRequestError(str(exc)) from exc
     if message is None:
         raise FlowerError(
-            ApiErrorCode.CONVERSATION_NOT_FOUND,
-            "Conversation not found or account is not a participant.",
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
         )
-    return SendConversationMessageResponse(message=message)
+    return SendSpaceMessageResponse(message=message)
 
 
 def list_run_series(

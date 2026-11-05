@@ -36,22 +36,22 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ConfigureSimulationFederationResponse,
     CreateAgentRequest,
     CreateAgentResponse,
-    CreateConversationRequest,
-    CreateConversationResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
-    GetConversationMessagesRequest,
-    GetConversationMessagesResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -62,8 +62,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
-    ListConversationsRequest,
-    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -76,6 +74,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -92,8 +92,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendConversationMessageRequest,
-    SendConversationMessageResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -206,44 +206,44 @@ def list_runs(
     return control_handlers.list_runs(request, account, linkstate)
 
 
-@router.post("/create-conversation")
-def create_conversation(
-    request: Annotated[CreateConversationRequest, Depends(get_protobuf_request)],
+@router.post("/create-space")
+def create_space(
+    request: Annotated[CreateSpaceRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-) -> CreateConversationResponse:
-    """Create conversation."""
-    return control_handlers.create_conversation(request, account, linkstate)
+) -> CreateSpaceResponse:
+    """Create space."""
+    return control_handlers.create_space(request, account, linkstate)
 
 
-@router.post("/list-conversations")
-def list_conversations(
-    request: Annotated[ListConversationsRequest, Depends(get_protobuf_request)],
+@router.post("/list-spaces")
+def list_spaces(
+    request: Annotated[ListSpacesRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-) -> ListConversationsResponse:
-    """List conversations."""
-    return control_handlers.list_conversations(request, account, linkstate)
+) -> ListSpacesResponse:
+    """List spaces."""
+    return control_handlers.list_spaces(request, account, linkstate)
 
 
-@router.post("/get-conversation-messages")
-def get_conversation_messages(
-    request: Annotated[GetConversationMessagesRequest, Depends(get_protobuf_request)],
+@router.post("/get-space-messages")
+def get_space_messages(
+    request: Annotated[GetSpaceMessagesRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-) -> GetConversationMessagesResponse:
-    """Get conversation messages."""
-    return control_handlers.get_conversation_messages(request, account, linkstate)
+) -> GetSpaceMessagesResponse:
+    """Get space messages."""
+    return control_handlers.get_space_messages(request, account, linkstate)
 
 
-@router.post("/send-conversation-message")
-def send_conversation_message(
-    request: Annotated[SendConversationMessageRequest, Depends(get_protobuf_request)],
+@router.post("/send-space-message")
+def send_space_message(
+    request: Annotated[SendSpaceMessageRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-) -> SendConversationMessageResponse:
-    """Send conversation message."""
-    return control_handlers.send_conversation_message(request, account, linkstate)
+) -> SendSpaceMessageResponse:
+    """Send space message."""
+    return control_handlers.send_space_message(request, account, linkstate)
 
 
 @router.post("/list-run-series")

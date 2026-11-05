@@ -227,13 +227,13 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="Invalid agent request.",
     ),
-    ApiErrorCode.INVALID_CONVERSATION_REQUEST: ApiErrorSpec(
+    ApiErrorCode.INVALID_SPACE_REQUEST: ApiErrorSpec(
         http_status_code=status.HTTP_400_BAD_REQUEST,
-        public_message="Invalid conversation request.",
+        public_message="Invalid space request.",
     ),
-    ApiErrorCode.CONVERSATION_NOT_FOUND: ApiErrorSpec(
+    ApiErrorCode.SPACE_NOT_FOUND: ApiErrorSpec(
         http_status_code=status.HTTP_404_NOT_FOUND,
-        public_message="Conversation not found.",
+        public_message="Space not found.",
     ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
