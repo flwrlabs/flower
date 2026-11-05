@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, TextIO, cast
 if TYPE_CHECKING:
     from flwr.supercore.typing import JSONObject
 
+# Mirror common.constant without loading its package on the dispatch path.
 FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_TASK_TOKEN_ACCEPTED"
 

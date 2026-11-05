@@ -15,6 +15,11 @@
 """Test for flwr __init__.py."""
 
 
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
 import semver
 
 
@@ -25,3 +30,27 @@ def test_version() -> None:
 
     # Assert
     semver.VersionInfo.parse(__version__)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "import sys\nimport flwr\n"
+        "assert 'flwr.app' not in sys.modules\n"
+        "assert 'flwr.supercore.version' not in sys.modules\n"
+        "assert set(flwr.__all__).issubset(dir(flwr))",
+        "from flwr import common\nfrom flwr.app import Message",
+        "from flwr import server\nfrom flwr import client",
+        "import flwr.compat.server.grpc_bidi.grpc_server",
+        "import flwr.supercore.agentapp_worker\n"
+        "import flwr.supercore.connector_worker",
+    ],
+)
+def test_package_imports_in_fresh_process(code: str) -> None:
+    """Keep package imports lazy and independent of application import order."""
+    subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parent.parent,
+        check=True,
+        timeout=30,
+    )
