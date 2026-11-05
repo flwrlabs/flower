@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import UUID
 
 from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -74,6 +75,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.session() as session:
+            return [
+                run_id
+                for run_id in session.scalars(
+                    select(RunModel.run_id).where(RunModel.space_id == space_id)
+                )
+                if run_id is not None
+            ]
 
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""

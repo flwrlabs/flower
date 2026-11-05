@@ -31,7 +31,7 @@ from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any, cast
 from unittest.mock import Mock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
@@ -85,6 +85,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -425,6 +426,53 @@ class StateTest(CoreStateTest):
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
+
+    def test_get_task_events_filters_by_space(self) -> None:
+        """Return events only from runs assigned to the requested space."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        other_space_id = UUID(state.create_space(participants=[]).id)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        for assigned_run_id, assigned_space_id in (
+            (run_id, space_id),
+            (other_run_id, other_space_id),
+        ):
+            if isinstance(state, InMemoryLinkState):
+                state.run_ids[assigned_run_id].space_id = assigned_space_id
+            else:
+                assert isinstance(state, SqlLinkState)
+                with state.session() as session:
+                    session.execute(
+                        update(RunModel)
+                        .where(RunModel.run_id == assigned_run_id)
+                        .values(space_id=assigned_space_id)
+                    )
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        other_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=other_run_id
+        )
+        assert task_id is not None and other_task_id is not None
+        assert state.store_task_events(
+            [
+                TaskEvent(run_id=run_id, task_id=task_id, event="message", data="{}"),
+                TaskEvent(
+                    run_id=other_run_id,
+                    task_id=other_task_id,
+                    event="message",
+                    data="{}",
+                ),
+                TaskEvent(run_id=run_id, task_id=task_id, event="message", data="{}"),
+            ]
+        )
+
+        events = state.get_task_events(space_id=space_id)
+        self.assertEqual([event.run_id for event in events], [run_id, run_id])
+        self.assertEqual(state.get_task_events(space_id=space_id, last_n=1), events[1:])
+        self.assertEqual(
+            state.get_task_events(space_id=space_id, run_ids=[other_run_id]), []
+        )
+        self.assertEqual(state.get_task_events(space_id=uuid4()), [])
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
