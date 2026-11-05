@@ -141,7 +141,6 @@ from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageM
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -362,7 +361,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expires_at = now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
         stmt = self.dialect_insert(ObjectPushSessionModel).values(
             session_id=session_id,
-            run_id=uint64_to_int64(run_id),
+            run_id=run_id,
             expires_at=expires_at,
             pending_count=0,
         )
@@ -375,7 +374,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(
                 delete(ObjectPushSessionModel).where(
-                    ObjectPushSessionModel.run_id == uint64_to_int64(run_id)
+                    ObjectPushSessionModel.run_id == run_id
                 )
             )
 
@@ -390,7 +389,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             if push_session is None:
                 raise ValueError(f"Unknown object push session: {session_id}")
-            run_id = int64_to_uint64(push_session.run_id)
+            run_id = push_session.run_id
 
             # Preregister the tree and collect its currently missing objects.
             missing_objects = self.object_store.preregister(run_id, object_tree)
@@ -453,7 +452,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     select(ObjectPushSessionModel.session_id)
                     .where(
                         ObjectPushSessionModel.session_id == session_id,
-                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.run_id == run_id,
                     )
                     .exists(),
                 )
@@ -546,7 +545,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .where(
                         ObjectPushSessionPendingModel.object_id == object_id,
-                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.run_id == run_id,
                         ObjectPushSessionModel.expires_at <= now(),
                     )
                 )
@@ -1097,10 +1096,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Associate connector IDs with a run."""
         if isinstance(connector_ids, (str, bytes)):
             return False
-        stored_run_id = uint64_to_int64(run_id)
         bound_ids = set(self.get_run_connector_ids(run_id))
         run_connectors = [
-            RunConnectorModel(run_id=stored_run_id, connector_id=connector_id)
+            RunConnectorModel(run_id=run_id, connector_id=connector_id)
             for connector_id in dict.fromkeys(connector_ids)
             if connector_id not in bound_ids
         ]
@@ -1115,7 +1113,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return list(
                 session.scalars(
                     select(RunConnectorModel.connector_id)
-                    .where(RunConnectorModel.run_id == uint64_to_int64(run_id))
+                    .where(RunConnectorModel.run_id == run_id)
                     .order_by(RunConnectorModel.connector_id)
                 )
             )
@@ -1373,10 +1371,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         page_query = select(RunSeriesModel.series_id)
         if series_ids is not None:
-            sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
-            page_query = page_query.where(
-                RunSeriesModel.series_id.in_(sint64_series_ids)
-            )
+            page_query = page_query.where(RunSeriesModel.series_id.in_(series_ids))
         if federation_ids is not None:
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
@@ -1410,14 +1405,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Fold the joined rows back into one RunSeries per series.
         series_by_id: dict[int, RunSeries] = {}
         with self.session() as session:
-            for series_model, stored_run_id in session.execute(query):
+            for series_model, run_id in session.execute(query):
                 series_id = series_model.series_id
                 if series_id not in series_by_id:
                     series_by_id[series_id] = _run_series_from_model(series_model)
-                if stored_run_id is not None:
-                    series_by_id[series_id].run_ids.append(
-                        int64_to_uint64(stored_run_id)
-                    )
+                if run_id is not None:
+                    series_by_id[series_id].run_ids.append(run_id)
         return list(series_by_id.values())
 
     def set_run_series_description(self, series_id: int, description: str) -> None:
@@ -1427,7 +1420,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return
         stmt = (
             update(RunSeriesModel)
-            .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
+            .where(RunSeriesModel.series_id == series_id)
             .values(description=normalized)
         )
         with self.session() as session:
@@ -1438,7 +1431,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             row = session.get(
                 SeriesContextModel,
-                uint64_to_int64(series_id),
+                series_id,
                 populate_existing=True,
             )
             if row is None or row.context is None:
@@ -1494,10 +1487,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
-        sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
         stmt = self.dialect_insert(SeriesContextModel).values(
-            series_id=sint_series_id,
+            series_id=series_id,
             context=context_bytes,
         )
         stmt = stmt.on_conflict_do_update(
@@ -1525,7 +1517,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     stmt = (
                         self.dialect_insert(RunSeriesModel)
                         .values(
-                            series_id=uint64_to_int64(candidate),
+                            series_id=candidate,
                             federation_id=federation_id,
                             is_agent=is_agent,
                             description=description,
@@ -1547,7 +1539,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     updated_series_id = session.scalar(
                         update(RunSeriesModel)
                         .where(
-                            RunSeriesModel.series_id == uint64_to_int64(series_id),
+                            RunSeriesModel.series_id == series_id,
                             RunSeriesModel.federation_id == federation_id,
                         )
                         .values(updated_at=now())
@@ -1566,8 +1558,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 # Store the membership last so callers only receive linked series IDs.
                 session.add(
                     SeriesRunsModel(
-                        series_id=uint64_to_int64(resolved_series_id),
-                        run_id=uint64_to_int64(run_id),
+                        series_id=resolved_series_id,
+                        run_id=run_id,
                     )
                 )
                 session.flush()
@@ -1593,7 +1585,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .values(
                 federation_id=federation_id,
                 status=AutomationStatus.ACTIVE,
-                series_id=uint64_to_int64(series_id),
+                series_id=series_id,
                 flwr_aid=flwr_aid,
                 start_run_request=start_run_request.SerializeToString(),
                 created_at=current,
@@ -1620,12 +1612,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
-        stored_automation_id = uint64_to_int64(automation_id)
         query = select(
             AutomationModel.start_run_request,
             AutomationModel.flwr_aid,
         ).where(
-            AutomationModel.automation_id == stored_automation_id,
+            AutomationModel.automation_id == automation_id,
             AutomationModel.status == AutomationStatus.ACTIVE,
             AutomationModel.start_run_request.is_not(None),
             AutomationModel.next_run_at == datetime.fromisoformat(previous_next_run_at),
@@ -1674,11 +1665,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         query = select(AutomationModel)
         if automation_ids is not None:
-            query = query.where(
-                AutomationModel.automation_id.in_(
-                    [uint64_to_int64(automation_id) for automation_id in automation_ids]
-                )
-            )
+            query = query.where(AutomationModel.automation_id.in_(automation_ids))
         if federations is not None:
             query = query.where(AutomationModel.federation_id.in_(federations))
         if statuses is not None:
@@ -1715,7 +1702,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
             )
             .values(
@@ -1743,7 +1730,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
                 AutomationModel.next_run_at
                 == datetime.fromisoformat(previous_next_run_at),
@@ -1791,7 +1778,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
             )
             .values(status=status, updated_at=now())
@@ -1805,14 +1792,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
-        sint64_task_id = uint64_to_int64(task_id)
-
         try:
             with self.session() as session:
                 session.execute(
                     insert(TaskLogsTable).values(
                         timestamp=now().timestamp(),
-                        task_id=sint64_task_id,
+                        task_id=task_id,
                         log=log_message,
                     )
                 )
@@ -1823,8 +1808,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, task_id: int, after_timestamp: float | None
     ) -> tuple[str, float]:
         """Get task logs for the specified `task_id`."""
-        sint64_task_id = uint64_to_int64(task_id)
-
         # We don't check if the task exists before querying logs because the Control API
         # handler validates access to the associated run before reading logs.
 
@@ -1838,7 +1821,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 session.execute(
                     select(TaskLogsTable.c.log, TaskLogsTable.c.timestamp)
                     .where(
-                        TaskLogsTable.c.task_id == sint64_task_id,
+                        TaskLogsTable.c.task_id == task_id,
                         TaskLogsTable.c.timestamp > after_timestamp,
                     )
                     .order_by(TaskLogsTable.c.timestamp)
@@ -1861,12 +1844,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        sint64_task_id = uint64_to_int64(task_id)
 
         task_values = select(
-            literal(sint64_task_id, type_=TaskModel.task_id.type),
+            literal(task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
-            literal(uint64_to_int64(run_id), type_=TaskModel.run_id.type),
+            literal(run_id, type_=TaskModel.run_id.type),
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
@@ -1874,11 +1856,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(now(), type_=TaskModel.pending_at.type),
         )
         if requesting_task_id is not None:
-            sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
             task_values = task_values.where(
                 select(TaskModel.task_id)
                 .where(
-                    TaskModel.task_id == sint64_requesting_task_id,
+                    TaskModel.task_id == requesting_task_id,
                     TaskModel.finished_at.is_(None),
                 )
                 .exists()
@@ -1935,16 +1916,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskModel.task_id.in_(task_ids))
 
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [
-                uint64_to_int64(series_run_id) for series_run_id in run_ids
-            ]
-            query = query.where(TaskModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskModel.run_id.in_(run_ids))
 
         if statuses is not None:
             if not statuses:
@@ -1978,7 +1955,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        sint64_task_id = uint64_to_int64(task_id)
         usage_values = select(
             TaskModel.run_id,
             TaskModel.task_id,
@@ -1988,7 +1964,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(usage.usage_type, type_=TaskUsageModel.usage_type.type),
             literal(usage.provider, type_=TaskUsageModel.provider.type),
             literal(now(), type_=TaskUsageModel.created_at.type),
-        ).where(TaskModel.task_id == sint64_task_id)
+        ).where(TaskModel.task_id == task_id)
         stmt = insert(TaskUsageModel).from_select(
             [
                 TaskUsageModel.run_id,
@@ -2018,14 +1994,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskUsageModel.run_id.in_(run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskUsageModel.task_id.in_(task_ids))
 
         with self.session() as session:
             rows = session.scalars(query).all()
@@ -2036,7 +2010,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
         active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
-        sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
@@ -2044,7 +2017,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 claimed_task_id = session.scalar(
                     update(TaskModel)
                     .where(
-                        TaskModel.task_id == sint64_task_id,
+                        TaskModel.task_id == task_id,
                         TaskModel.token.is_(None),
                         _task_status_filter(Status.PENDING),
                     )
@@ -2078,7 +2051,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             activated_task_id = session.scalar(
                 update(TaskModel)
                 .where(
-                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.task_id == task_id,
                     _task_status_filter(Status.STARTING),
                 )
                 .values(running_at=activated_at, active_until=active_until)
@@ -2093,11 +2066,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             log(ERROR, err)
             return False
 
-        sint64_task_id = uint64_to_int64(task_id)
         with self.session() as session:
             self._cleanup_expired_task_tokens()
             query = update(TaskModel).where(
-                TaskModel.task_id == sint64_task_id,
+                TaskModel.task_id == task_id,
                 TaskModel.finished_at.is_(None),
             )
             # FINISHED:COMPLETED is only valid from RUNNING.
@@ -2125,7 +2097,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             acknowledged_task_id = session.scalar(
                 update(TaskModel)
                 .where(
-                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.task_id == task_id,
                     TaskModel.active_until >= current,
                     TaskModel.finished_at.is_(None),
                 )
@@ -2158,9 +2130,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             self._cleanup_expired_task_tokens()
             metadata = message.metadata
-            stored_run_id = uint64_to_int64(metadata.run_id)
-            stored_src_task_id = uint64_to_int64(cast(int, metadata.src_task_id))
-            stored_dst_task_id = uint64_to_int64(cast(int, metadata.dst_task_id))
+            run_id = metadata.run_id
+            src_task_id = cast(int, metadata.src_task_id)
+            dst_task_id = cast(int, metadata.dst_task_id)
             serialized_content = (
                 recorddict_to_proto(message.content).SerializeToString()
                 if message.has_content()
@@ -2172,19 +2144,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 else None
             )
             src_task_exists = exists().where(
-                TaskModel.task_id == stored_src_task_id,
-                TaskModel.run_id == stored_run_id,
+                TaskModel.task_id == src_task_id,
+                TaskModel.run_id == run_id,
             )
             dst_task_exists = exists().where(
-                TaskModel.task_id == stored_dst_task_id,
-                TaskModel.run_id == stored_run_id,
+                TaskModel.task_id == dst_task_id,
+                TaskModel.run_id == run_id,
                 TaskModel.finished_at.is_(None),
             )
             task_message_values = select(
                 literal(metadata.message_id, type_=TaskMessageModel.message_id.type),
-                literal(stored_run_id, type_=TaskMessageModel.run_id.type),
-                literal(stored_src_task_id, type_=TaskMessageModel.src_task_id.type),
-                literal(stored_dst_task_id, type_=TaskMessageModel.dst_task_id.type),
+                literal(run_id, type_=TaskMessageModel.run_id.type),
+                literal(src_task_id, type_=TaskMessageModel.src_task_id.type),
+                literal(dst_task_id, type_=TaskMessageModel.dst_task_id.type),
                 literal(
                     metadata.reply_to_message_id,
                     type_=TaskMessageModel.reply_to_message_id.type,
@@ -2270,8 +2242,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         event_rows = [
             {
                 "timestamp": current,
-                "run_id": uint64_to_int64(event.run_id),
-                "task_id": uint64_to_int64(event.task_id),
+                "run_id": event.run_id,
+                "task_id": event.task_id,
                 "event": event.event,
                 "data": event.data,
             }
@@ -2313,13 +2285,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            query = query.where(TaskEventModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskEventModel.run_id.in_(run_ids))
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskEventModel.task_id.in_(task_ids))
         query = query.order_by(
             TaskEventModel.id.desc() if last_n else TaskEventModel.id.asc()
         )
@@ -2343,11 +2313,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         # Filter by destination task IDs
         if dst_task_ids is not None:
-            sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+            query = query.where(TaskMessageModel.dst_task_id.in_(dst_task_ids))
         if src_task_ids is not None:
-            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
-            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
+            query = query.where(TaskMessageModel.src_task_id.in_(src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -2370,14 +2338,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         else:
             delete_query = delete(TaskMessageModel)
             if dst_task_ids is not None:
-                sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
                 delete_query = delete_query.where(
-                    TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                    TaskMessageModel.dst_task_id.in_(dst_task_ids)
                 )
             if src_task_ids is not None:
-                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
                 delete_query = delete_query.where(
-                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
+                    TaskMessageModel.src_task_id.in_(src_task_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)
@@ -2534,24 +2500,6 @@ def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
     return timestamp_to_iso(value)
 
 
-def determine_task_status(row: dict[str, Any]) -> TaskStatus:
-    """Determine the status of the task based on timestamp fields."""
-    if row["pending_at"]:
-        if row["finished_at"]:
-            return TaskStatus(
-                status=Status.FINISHED,
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-        if row["starting_at"]:
-            if row["running_at"]:
-                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
-            return TaskStatus(status=Status.STARTING, sub_status="", details="")
-        return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(row["task_id"])
-    raise ValueError(f"The task {task_id} does not have a valid status.")
-
-
 def _determine_task_model_status(model: TaskModel) -> TaskStatus:
     """Determine the status of the task based on timestamp fields."""
     if model.pending_at:
@@ -2566,8 +2514,7 @@ def _determine_task_model_status(model: TaskModel) -> TaskStatus:
                 return TaskStatus(status=Status.RUNNING, sub_status="", details="")
             return TaskStatus(status=Status.STARTING, sub_status="", details="")
         return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(model.task_id)
-    raise ValueError(f"The task {task_id} does not have a valid status.")
+    raise ValueError(f"The task {model.task_id} does not have a valid status.")
 
 
 def _task_status_filter(status: str) -> Any:
@@ -2587,30 +2534,12 @@ def _task_status_filter(status: str) -> Any:
     raise ValueError(f"Unsupported task status {status!r}.")
 
 
-def task_from_row(row: dict[str, Any]) -> Task:
-    """Convert a database row to a Task object."""
-    return Task(
-        task_id=int64_to_uint64(row["task_id"]),
-        type=row["type"],
-        run_id=int64_to_uint64(row["run_id"]),
-        pending_at=timestamp_to_iso(row["pending_at"]),
-        starting_at=timestamp_to_iso(row["starting_at"]),
-        running_at=timestamp_to_iso(row["running_at"]),
-        finished_at=timestamp_to_iso(row["finished_at"]),
-        status=determine_task_status(row),
-        fab_hash=row["fab_hash"],
-        model_ref=row["model_ref"],
-        connector_ref=row["connector_ref"],
-        connector_id=row["connector_id"],
-    )
-
-
 def task_from_model(model: TaskModel) -> Task:
     """Convert a task ORM model to a Task object."""
     return Task(
-        task_id=int64_to_uint64(model.task_id),
+        task_id=model.task_id,
         type=model.type,
-        run_id=int64_to_uint64(model.run_id),
+        run_id=model.run_id,
         pending_at=timestamp_to_iso(model.pending_at),
         starting_at=timestamp_to_iso(model.starting_at),
         running_at=timestamp_to_iso(model.running_at),
@@ -2620,17 +2549,6 @@ def task_from_model(model: TaskModel) -> Task:
         model_ref=model.model_ref,
         connector_ref=model.connector_ref,
         connector_id=model.connector_id,
-    )
-
-
-def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
-    """Convert a database row to a RunSeries object."""
-    return RunSeries(
-        series_id=int64_to_uint64(row["series_id"]),
-        federation=row["federation_id"],
-        description=row["description"],
-        created_at=timestamp_to_iso(row["created_at"]),
-        updated_at=timestamp_to_iso(row["updated_at"]),
     )
 
 
@@ -2664,7 +2582,7 @@ def _space_message_from_model(
 def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     """Convert a run series ORM model to a RunSeries object."""
     return RunSeries(
-        series_id=int64_to_uint64(model.series_id),
+        series_id=model.series_id,
         federation=model.federation_id,
         description=model.description or "",
         created_at=timestamp_to_iso(model.created_at),
@@ -2700,8 +2618,8 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
     return TaskEvent(
         id=model.id,
         timestamp=timestamp_to_iso(model.timestamp),
-        run_id=int64_to_uint64(model.run_id),
-        task_id=int64_to_uint64(model.task_id),
+        run_id=model.run_id,
+        task_id=model.task_id,
         event=model.event,
         data=model.data,
     )
@@ -2713,7 +2631,7 @@ def _automation_from_model(model: AutomationModel) -> Automation:
         automation_id=model.automation_id,
         status=model.status,
         federation=model.federation_id,
-        series_id=int64_to_uint64(model.series_id),
+        series_id=model.series_id,
         flwr_aid=model.flwr_aid,
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
@@ -2749,7 +2667,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         error = error_from_proto(ProtoError.FromString(row["error"]))
 
     metadata = Metadata(
-        run_id=int64_to_uint64(row["run_id"]),
+        run_id=row["run_id"],
         message_id=row["message_id"],
         src_node_id=node_id,
         dst_node_id=node_id,
@@ -2758,7 +2676,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
-        src_task_id=int64_to_uint64(row["src_task_id"]),
-        dst_task_id=int64_to_uint64(row["dst_task_id"]),
+        src_task_id=row["src_task_id"],
+        dst_task_id=row["dst_task_id"],
     )
     return make_message(metadata=metadata, content=content, error=error)
