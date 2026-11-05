@@ -150,5 +150,3 @@ def test_sse_protobuf_json_preserves_cursor_and_content() -> None:
     payload = json.loads(lines[1].removeprefix("data: "))
     assert payload["id"] == str(message.id)
     assert payload["messageCreated"]["content"] == message.message_created.content
-    heartbeat = encode_sse_message(StreamEventsResponse(heartbeat=True))
-    assert not heartbeat.startswith(b"id:")

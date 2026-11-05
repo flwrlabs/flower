@@ -163,8 +163,7 @@ message SendSpaceMessageResponse { SpaceMessage message = 1; }
 // one cursor. Accept: text/event-stream selects SSE with protobuf JSON in each
 // data field. Otherwise the response uses the existing binary protobuf stream
 // framing. After reconnecting, resume after the last processed ID. Events can
-// be replayed; consumers should deduplicate by ID. Heartbeats do not advance
-// the cursor.
+// be replayed; consumers should deduplicate by ID.
 message StreamEventsRequest {
   // Exclusive cursor. Absent replays all available events, or uses
   // Last-Event-ID.
@@ -175,7 +174,7 @@ message SpaceRunStatus {
   TaskStatus status = 2;
 }
 message StreamEventsResponse {
-  // Durable cursor. Heartbeats have no cursor and must not advance it.
+  // Durable cursor.
   uint64 id = 1;
   string created_at = 2;
   string space_id = 3;
@@ -185,7 +184,6 @@ message StreamEventsResponse {
     SpaceMessage message_created = 6;
     TaskEvent task_event = 7;
     SpaceRunStatus run_status = 8;
-    bool heartbeat = 9;
   }
 }
 

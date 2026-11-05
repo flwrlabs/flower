@@ -127,7 +127,6 @@ def test_user_stream_transport(media_type: str) -> None:
     state = Mock(spec=LinkState)
     app.dependency_overrides[get_linkstate] = lambda: state
     events = [
-        StreamEventsResponse(heartbeat=True),
         StreamEventsResponse(
             id=7,
             space_id="space",
@@ -154,7 +153,7 @@ def test_user_stream_transport(media_type: str) -> None:
     assert handler.call_args.kwargs["last_event_id"] == "6"
     if media_type == SSE_MEDIA_TYPE:
         frames = response.text.strip().split("\n\n")
-        assert frames[0].startswith("data:") and frames[1].startswith("id: 7\n")
+        assert frames[0].startswith("id: 7\n")
         decoded = [
             Parse(frame.split("data: ", 1)[1], StreamEventsResponse())
             for frame in frames

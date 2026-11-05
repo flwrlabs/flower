@@ -961,9 +961,6 @@ def _stream_events(
     is_active: Callable[[], bool] | None,
 ) -> Generator[StreamEventsResponse, None, None]:
     """Replay journal batches and stay connected until the client disconnects."""
-    heartbeat_at = time.monotonic()
-    # Flush response headers promptly without advancing the durable cursor.
-    yield StreamEventsResponse(heartbeat=True)
     while is_active is None or is_active():
         events = state.get_control_events(flwr_aid, after_id=cursor, limit=100)
         for event in events:
@@ -972,11 +969,7 @@ def _stream_events(
             cursor = event.id
             yield event
         if events:
-            heartbeat_at = time.monotonic()
             continue
-        if time.monotonic() - heartbeat_at >= 15:
-            yield StreamEventsResponse(heartbeat=True)
-            heartbeat_at = time.monotonic()
         time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 

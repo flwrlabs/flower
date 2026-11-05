@@ -43,7 +43,6 @@ def test_replay_and_disconnect() -> None:
         state,
         context.is_active,
     )
-    assert next(stream).heartbeat
     assert [next(stream).id, next(stream).id] == [8, 11]
     context.cancel()
     assert not list(stream)
@@ -57,7 +56,7 @@ def test_replay_and_disconnect() -> None:
         context.is_active,
         last_event_id="11",
     )
-    assert next(stream).heartbeat and next(stream).id == 12
+    assert next(stream).id == 12
     context.cancel()
     assert not list(stream)
     assert state.get_control_events.call_args.kwargs["after_id"] == 11
@@ -75,7 +74,7 @@ def test_request_cursor_takes_precedence() -> None:
         context.is_active,
         last_event_id="99",
     )
-    assert next(stream).heartbeat and next(stream).id == 1
+    assert next(stream).id == 1
     context.cancel()
     state.get_control_events.assert_called_once_with("alice", after_id=0, limit=100)
 

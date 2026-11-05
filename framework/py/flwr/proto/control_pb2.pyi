@@ -731,8 +731,7 @@ class StreamEventsRequest(google.protobuf.message.Message):
     one cursor. Accept: text/event-stream selects SSE with protobuf JSON in each
     data field. Otherwise the response uses the existing binary protobuf stream
     framing. After reconnecting, resume after the last processed ID. Events can
-    be replayed; consumers should deduplicate by ID. Heartbeats do not advance
-    the cursor.
+    be replayed; consumers should deduplicate by ID.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -785,12 +784,10 @@ class StreamEventsResponse(google.protobuf.message.Message):
     MESSAGE_CREATED_FIELD_NUMBER: builtins.int
     TASK_EVENT_FIELD_NUMBER: builtins.int
     RUN_STATUS_FIELD_NUMBER: builtins.int
-    HEARTBEAT_FIELD_NUMBER: builtins.int
     id: builtins.int
-    """Durable cursor. Heartbeats have no cursor and must not advance it."""
+    """Durable cursor."""
     created_at: builtins.str
     space_id: builtins.str
-    heartbeat: builtins.bool
     @property
     def agent_created(self) -> global___Agent: ...
     @property
@@ -812,11 +809,10 @@ class StreamEventsResponse(google.protobuf.message.Message):
         message_created: global___SpaceMessage | None = ...,
         task_event: flwr.proto.task_pb2.TaskEvent | None = ...,
         run_status: global___SpaceRunStatus | None = ...,
-        heartbeat: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["agent_created", b"agent_created", "event", b"event", "heartbeat", b"heartbeat", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "task_event", b"task_event"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["agent_created", b"agent_created", "created_at", b"created_at", "event", b"event", "heartbeat", b"heartbeat", "id", b"id", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "space_id", b"space_id", "task_event", b"task_event"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["event", b"event"]) -> typing.Literal["agent_created", "space_created", "message_created", "task_event", "run_status", "heartbeat"] | None: ...
+    def HasField(self, field_name: typing.Literal["agent_created", b"agent_created", "event", b"event", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "task_event", b"task_event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent_created", b"agent_created", "created_at", b"created_at", "event", b"event", "id", b"id", "message_created", b"message_created", "run_status", b"run_status", "space_created", b"space_created", "space_id", b"space_id", "task_event", b"task_event"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["event", b"event"]) -> typing.Literal["agent_created", "space_created", "message_created", "task_event", "run_status"] | None: ...
 
 global___StreamEventsResponse = StreamEventsResponse
 
