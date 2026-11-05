@@ -24,7 +24,6 @@ import threading
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
-from uuid import UUID
 
 import pytest
 
@@ -313,7 +312,6 @@ def test_space_run_uses_preloaded_agentapp(
 ) -> None:
     """Execute a Space run through the existing preloaded worker lifecycle."""
     run = Run.create_empty(456)
-    run.space_id = UUID(int=1)
     run.fab_id = "publisher/app"
     run.fab_version = "1.0"
     run.fab_hash = "a" * 64

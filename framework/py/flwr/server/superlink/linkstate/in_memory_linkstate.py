@@ -63,6 +63,7 @@ class RunRecord:  # pylint: disable=R0902
 
     run: Run
     federation_config: SimulationConfig | None = None
+    space_id: UUID | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
     usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -269,7 +270,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 return set()
-            if self.run_ids[run_id].run.space_id is not None:
+            if self.run_ids[run_id].space_id is not None:
                 return set()
             federation_id = self.run_ids[run_id].run.federation_id
             node_ids = {
@@ -413,9 +414,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     clientapp_runtime=0.0,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
-                    space_id=space_id,
                 ),
                 federation_config=federation_config,
+                space_id=space_id,
             )
             self.run_ids[run_id] = run_record
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
@@ -585,7 +586,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         sub_status=finish_sub_status,
                         details=finish_details,
                     )
-            if self.run_ids[self.task_store[task_id].run_id].run.space_id is None:
+            if self.run_ids[self.task_store[task_id].run_id].space_id is None:
                 self.federation_manager.report_run_usage()
         return result
 
@@ -609,7 +610,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
-        if any(self.run_ids[run_id].run.space_id is None for run_id, _ in pairs):
+        if any(self.run_ids[run_id].space_id is None for run_id, _ in pairs):
             self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(

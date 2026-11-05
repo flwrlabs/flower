@@ -67,7 +67,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_nodes: dict[str, set[int]] = {}
         for message in messages:
             if (run := runs.get(message.metadata.run_id)) is not None:
-                if run.space_id is not None:
+                if not run.federation_id:
                     continue
                 federation_nodes.setdefault(run.federation_id, set()).update(
                     (message.metadata.src_node_id, message.metadata.dst_node_id)
@@ -87,7 +87,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
                 results.append(False)
                 continue
             node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
-            if run.space_id is not None:
+            if not run.federation_id:
                 results.append(node_ids == {SUPERLINK_NODE_ID})
             else:
                 results.append(node_ids <= federation_nodes[run.federation_id])

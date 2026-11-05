@@ -27,6 +27,7 @@ import unittest
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any, cast
@@ -36,7 +37,7 @@ from uuid import UUID, uuid4
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
 from sqlalchemy import event, select, update
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -444,7 +445,6 @@ class StateTest(CoreStateTest):
                 user_prompt="Hello",
             )
             run = state.get_run_info(run_ids=[run_id])[0]
-            assert run.space_id == space_id
             assert run.federation_id == "" and run.series_id == 0
             assert state.get_run_series() == []
             assert state.get_nodes(run_id) == set()
@@ -494,20 +494,25 @@ class StateTest(CoreStateTest):
     def test_create_run_rejects_unknown_space(self) -> None:
         """An unknown Space must not leave an orphan run or primary task."""
         state = self.state_factory()
-        assert (
-            state.create_run(
-                "",
-                "",
-                "hash",
-                {},
-                None,
-                None,
-                "account",
-                TaskType.AGENT_APP,
-                space_id=uuid4(),
+        with (
+            self.assertRaises(IntegrityError)
+            if isinstance(state, SqlLinkState)
+            else nullcontext()
+        ):
+            assert (
+                state.create_run(
+                    "",
+                    "",
+                    "hash",
+                    {},
+                    None,
+                    None,
+                    "account",
+                    TaskType.AGENT_APP,
+                    space_id=uuid4(),
+                )
+                == 0
             )
-            == 0
-        )
         assert state.get_run_info() == [] and state.get_tasks() == []
 
     @parameterized.expand(  # type: ignore[untyped-decorator]

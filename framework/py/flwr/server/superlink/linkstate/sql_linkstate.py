@@ -50,7 +50,6 @@ from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
-from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -412,8 +411,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
         with self.session() as session:
-            if space_id is not None and session.get(SpaceModel, space_id) is None:
-                return 0
             existing_run_id = session.scalar(
                 select(RunModel.run_id).where(RunModel.run_id == run_id)
             )
@@ -858,5 +855,4 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=run.series_id or 0,
-        space_id=run.space_id,
     )
