@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import signal
 import socket
-import sys
 import threading
 from collections.abc import Callable
 from contextlib import ExitStack
@@ -27,7 +26,6 @@ from pathlib import Path
 from types import FrameType
 from typing import Any, Protocol
 
-from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
 from flwr.supercore import log
 from flwr.supercore.typing import JSONObject
 
@@ -36,6 +34,8 @@ from .tracing import initialize_tracing
 
 # Bound each socket write so a lost reader cannot stall accepted-task cleanup.
 _OUTPUT_SEND_TIMEOUT_SECONDS = 0.1
+
+dispatch_prestarted_task = protocol.dispatch_prestarted_task
 
 
 class TaskInvocation(Protocol):
@@ -166,70 +166,6 @@ def _serve_ready_worker(  # pylint: disable=too-many-arguments,too-many-position
             return _serve_connection(connection, run_once, parse_invocation, task_name)
     finally:
         busy_file.unlink(missing_ok=True)
-
-
-def dispatch_prestarted_task(  # pylint: disable=too-many-return-statements
-    payload: JSONObject,
-    socket_path: Path,
-    task_name: str,
-) -> int:
-    """Relay one exec-delivered invocation to a prestarted task worker."""
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-            connection.connect(str(socket_path))
-            with connection.makefile("rwb") as channel:
-                protocol.send_message(channel, payload)
-                accepted = False
-                while True:
-                    response = protocol.read_message(channel)
-                    event_name = response.get("event")
-                    if event_name == "accepted":
-                        if accepted or set(response) != {"event"}:
-                            return 1
-                        accepted = True
-                        print(FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT, flush=True)
-                    elif event_name == "rejected":
-                        reason = response.get("reason")
-                        if (
-                            accepted
-                            or set(response) != {"event", "reason"}
-                            or not isinstance(reason, str)
-                        ):
-                            return 1
-                        print(reason, file=sys.stderr)
-                        return 1
-                    elif event_name == "output":
-                        stream = response.get("stream")
-                        output = response.get("data")
-                        if (
-                            not accepted
-                            or set(response) != {"event", "stream", "data"}
-                            or stream not in {"stdout", "stderr"}
-                            or not isinstance(output, str)
-                        ):
-                            return 1
-                        output_stream = sys.stdout if stream == "stdout" else sys.stderr
-                        try:
-                            output_stream.write(output)
-                            output_stream.flush()
-                        except (OSError, ValueError):
-                            # Output remains best effort after task acceptance.
-                            pass
-                    elif event_name == "finished":
-                        returncode = response.get("returncode")
-                        return (
-                            returncode
-                            if accepted
-                            and set(response) == {"event", "returncode"}
-                            and isinstance(returncode, int)
-                            and not isinstance(returncode, bool)
-                            else 1
-                        )
-                    else:
-                        return 1
-    except (OSError, ValueError) as err:
-        print(f"Prestarted {task_name} dispatch failed: {err}", file=sys.stderr)
-        return 1
 
 
 def _serve_connection(

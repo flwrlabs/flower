@@ -17,7 +17,10 @@
 # pylint: disable=too-many-lines
 
 import importlib
+import json
 import logging
+import os
+import socket
 import subprocess
 import sys
 import threading
@@ -25,6 +28,7 @@ from contextlib import nullcontext
 from inspect import signature
 from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -35,10 +39,10 @@ from flwr.common.constant import (
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
 )
+from flwr.supercore import task_worker_protocol
 from flwr.supercore.constant import TaskType
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
-    WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
@@ -205,17 +209,10 @@ def test_fab_specific_agentapp_pool_uses_prestarted_worker() -> None:
         None,
         specific_key,
     )
-    assert dispatch_command[:4] == [
-        "python",
-        "-m",
-        WARM_AGENTAPP_EXECUTOR_MODULE,
-        "dispatch",
-    ]
-    assert dispatch_command[-3:] == [
-        "--fab-hash",
-        _FAB_HASH,
-        "--insecure",
-    ]
+    assert dispatch_command[:2] == ["python", "-c"]
+    invocation = json.loads(dispatch_command[-1])
+    assert invocation["fab_hash"] == _FAB_HASH
+    assert invocation["insecure"] is True
     assert "--allow-runtime-dependency-installation" not in dispatch_command
 
 
@@ -786,25 +783,26 @@ def test_warm_launch_requests_background_replenishment(
         },
     )
     client.create_namespaced_pod.assert_not_called()
-    worker_module = {
-        TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
-    }.get(task_type)
     assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
-    expected_dispatch_command = (
-        ["python", "-m", worker_module, "dispatch"]
-        if worker_module is not None
-        else [task_command]
-    )
-    expected_dispatch_command.extend(
-        [
+    command = stream.call_args.kwargs["command"]
+    if task_type == TaskType.CONNECTOR:
+        assert command[:2] == ["python", "-c"]
+        assert json.loads(command[-1]) == {
+            "socket_path": WARM_CONNECTOR_EXECUTOR_SOCKET,
+            "task_name": "Connector",
+            "runtime_api_address": "appio.example.com:9092",
+            "insecure": insecure,
+            "root_certificates_path": None if insecure else transport_args[1],
+        }
+    else:
+        assert command == [
+            task_command,
             "--runtime-api-address",
             "appio.example.com:9092",
             "--token-stdin",
             *transport_args,
         ]
-    )
-    assert stream.call_args.kwargs["command"] == expected_dispatch_command
     assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1
     dispatch = cast(
@@ -819,6 +817,79 @@ def test_warm_launch_requests_background_replenishment(
     request_maintenance.assert_called_once_with()
     client.create_namespaced_pod.assert_not_called()
     assert stream.return_value.is_open()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Kubernetes workers use Unix sockets"
+)
+@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.CONNECTOR])
+def test_prestarted_dispatch_without_flower_imports(
+    tmp_path: Path, task_type: TaskType
+) -> None:
+    """Run the installed relay without importing its parent package."""
+    package = tmp_path / "flwr"
+    (package / "supercore").mkdir(parents=True)
+    (package / "__init__.py").write_text(
+        "raise AssertionError('Flower was imported')", encoding="utf-8"
+    )
+    (package / "supercore" / "task_worker_protocol.py").write_text(
+        Path(task_worker_protocol.__file__).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    token = "a" * (task_worker_protocol.FLWR_TASK_TOKEN_LENGTH * 2)
+    command = warm_executor_dispatch.warm_executor_command(
+        _execution_spec(task_type=task_type, fab_hash=_FAB_HASH, insecure=True),
+        None,
+        _warm_executor_pool_key(fab_hash=_FAB_HASH, fab_path="/opt/app.fab"),
+    )
+    metadata = json.loads(command[-1])
+    received: dict[str, Any] = {}
+    with (
+        TemporaryDirectory(dir="/tmp") as directory,
+        socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server,
+    ):
+        metadata["socket_path"] = str(Path(directory) / "worker.sock")
+        server.bind(metadata["socket_path"])
+        server.listen(1)
+        server.settimeout(5)
+
+        def respond() -> None:
+            with (
+                server.accept()[0] as connection,
+                connection.makefile("rwb") as channel,
+            ):
+                received.update(task_worker_protocol.read_message(channel))
+                frames: tuple[dict[str, Any], ...] = (
+                    {"event": "accepted"},
+                    {"event": "output", "stream": "stdout", "data": "out\n"},
+                    {"event": "output", "stream": "stderr", "data": "err\n"},
+                    {"event": "finished", "returncode": 7},
+                )
+                for frame in frames:
+                    task_worker_protocol.send_message(channel, frame)
+
+        thread = threading.Thread(target=respond, daemon=True)
+        thread.start()
+        result = subprocess.run(
+            [sys.executable, *command[1:-1], json.dumps(metadata)],
+            input=token + "\n",
+            text=True,
+            capture_output=True,
+            env={**os.environ, "PYTHONPATH": str(tmp_path)},
+            cwd=tmp_path,
+            timeout=10,
+            check=False,
+        )
+        thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert result.returncode == 7
+    assert result.stdout == f"{FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT}\nout\n"
+    assert result.stderr == "err\n"
+    assert received == {
+        key: value
+        for key, value in {**metadata, "token": token}.items()
+        if key not in {"socket_path", "task_name"}
+    }
 
 
 @pytest.mark.parametrize(

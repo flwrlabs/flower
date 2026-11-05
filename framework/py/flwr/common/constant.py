@@ -19,6 +19,8 @@ from __future__ import annotations
 import os
 from typing import Final
 
+from flwr.supercore import task_worker_protocol
+
 TRANSPORT_TYPE_VCE = "vce"
 
 # Addresses
@@ -138,9 +140,11 @@ FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = int(
 INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
 # Constants for task-token generation
-FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
+FLWR_TASK_TOKEN_LENGTH = task_worker_protocol.FLWR_TASK_TOKEN_LENGTH
+FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = (
+    task_worker_protocol.FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+)
 FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_AGENTAPP_TOKEN_ACCEPTED"
-FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT = "FLWR_TASK_TOKEN_ACCEPTED"
 
 # SuperLink Fleet API constants
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
