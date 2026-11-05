@@ -43,9 +43,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Conversation,
-    ConversationMessage,
-    ConversationParticipant,
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -197,10 +197,10 @@ class InMemoryCoreState(
         self.run_series_store: dict[int, RunSeries] = {}
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
-        self.conversation_store: dict[UUID, Conversation] = {}
-        self.conversation_message_store: dict[UUID, list[ConversationMessage]] = {}
-        self.conversation_message_id_counter = 0
-        self.lock_conversation_store = Lock()
+        self.space_store: dict[UUID, Space] = {}
+        self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
+        self.space_message_id_counter = 0
+        self.lock_space_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -965,18 +965,16 @@ class InMemoryCoreState(
             )
         return True
 
-    def create_conversation(
+    def create_space(
         self,
         *,
-        participants: Sequence[ConversationParticipant],
-    ) -> Conversation:
-        """Create a conversation and its initial membership atomically."""
-        members: list[ConversationParticipant] = []
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+        members: list[SpaceParticipant] = []
         for participant in participants:
             if not (participant.flwr_aid or participant.agent_id):
-                raise ValueError(
-                    "Conversation participants must have a nonempty identity"
-                )
+                raise ValueError("Space participants must have a nonempty identity")
             if participant not in members:
                 members.append(participant)
         with self.lock_agent_store:
@@ -988,74 +986,74 @@ class InMemoryCoreState(
                 for member in members
             ):
                 raise ValueError("Agent participant does not exist")
-        with self.lock_conversation_store:
-            conversation_id = uuid4()
-            if conversation_id in self.conversation_store:
-                raise ValueError("Conversation ID already exists")
-            conversation = Conversation(
-                id=str(conversation_id),
+        with self.lock_space_store:
+            space_id = uuid4()
+            if space_id in self.space_store:
+                raise ValueError("Space ID already exists")
+            space = Space(
+                id=str(space_id),
                 created_at=now().isoformat(),
                 participants=members,
             )
-            self.conversation_store[conversation_id] = conversation
-            self.conversation_message_store[conversation_id] = []
-            return conversation
+            self.space_store[space_id] = space
+            self.space_message_store[space_id] = []
+            return space
 
-    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
-        """Return participating conversations, newest first."""
-        viewer = ConversationParticipant(flwr_aid=flwr_aid)
-        with self.lock_conversation_store:
-            conversations = [
-                conversation
-                for conversation in self.conversation_store.values()
-                if viewer in conversation.participants
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """Return participating spaces, newest first."""
+        viewer = SpaceParticipant(flwr_aid=flwr_aid)
+        with self.lock_space_store:
+            spaces = [
+                space
+                for space in self.space_store.values()
+                if viewer in space.participants
             ]
-            conversations.sort(key=lambda item: item.created_at, reverse=True)
-            return conversations
+            spaces.sort(key=lambda item: item.created_at, reverse=True)
+            return spaces
 
-    def create_conversation_message(
-        self, conversation_id: UUID, author: ConversationParticipant, content: str
-    ) -> ConversationMessage | None:
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
         """Store a participant's message atomically with its membership check."""
         if not content.strip():
             raise ValueError("Message content must be nonempty")
-        with self.lock_conversation_store:
-            conversation = self.conversation_store.get(conversation_id)
-            if conversation is None or author not in conversation.participants:
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or author not in space.participants:
                 return None
-            self.conversation_message_id_counter += 1
-            message = ConversationMessage(
-                id=self.conversation_message_id_counter,
-                conversation_id=str(conversation_id),
+            self.space_message_id_counter += 1
+            message = SpaceMessage(
+                id=self.space_message_id_counter,
+                space_id=str(space_id),
                 author=author,
                 created_at=now().isoformat(),
                 content=content,
             )
-            self.conversation_message_store[conversation_id].append(message)
+            self.space_message_store[space_id].append(message)
             return message
 
-    def get_conversation_messages(  # pylint: disable=too-many-arguments
+    def get_space_messages(  # pylint: disable=too-many-arguments
         self,
-        conversation_id: UUID,
+        space_id: UUID,
         flwr_aid: str,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-    ) -> Sequence[ConversationMessage] | None:
+    ) -> Sequence[SpaceMessage] | None:
         """Return a participating user's history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        viewer = ConversationParticipant(flwr_aid=flwr_aid)
-        with self.lock_conversation_store:
-            conversation = self.conversation_store.get(conversation_id)
-            if conversation is None or viewer not in conversation.participants:
+        viewer = SpaceParticipant(flwr_aid=flwr_aid)
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or viewer not in space.participants:
                 return None
             messages = [
                 message
-                for message in self.conversation_message_store[conversation_id]
+                for message in self.space_message_store[space_id]
                 if (before_id is None or message.id < before_id)
                 and (after_id is None or message.id > after_id)
             ]
