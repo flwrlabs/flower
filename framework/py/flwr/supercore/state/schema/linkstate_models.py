@@ -14,8 +14,22 @@
 # ==============================================================================
 """SQLAlchemy declarative model definitions for LinkState."""
 
-from sqlalchemy import BigInteger, Float, Index, LargeBinary, MetaData, String, text
+from uuid import UUID
+
+from sqlalchemy import (
+    BigInteger,
+    Float,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    MetaData,
+    String,
+    Uuid,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from flwr.supercore.state.schema.corestate_models import Space
 
 
 class LinkStateBase(DeclarativeBase):
@@ -57,7 +71,10 @@ class Run(LinkStateBase):
     """Represent a run."""
 
     __tablename__ = "run"
-    __table_args__ = (Index("idx_run_series_id", "series_id"),)
+    __table_args__ = (
+        Index("idx_run_series_id", "series_id"),
+        Index("idx_run_space_id", "space_id"),
+    )
 
     run_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
     fab_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -71,6 +88,11 @@ class Run(LinkStateBase):
     primary_task_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     federation_config: Mapped[str | None] = mapped_column(String, nullable=True)
     series_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    space_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(Space.id, name="fk_run_space_id"),
+        nullable=True,
+    )
     flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
