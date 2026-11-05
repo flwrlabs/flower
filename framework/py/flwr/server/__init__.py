@@ -52,6 +52,11 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+def __dir__() -> list[str]:
+    """Keep lazy exports visible to package introspection."""
+    return sorted(set(globals()) | _LAZY_EXPORTS.keys())
+
+
 __all__ = [
     "ClientManager",
     "Driver",
