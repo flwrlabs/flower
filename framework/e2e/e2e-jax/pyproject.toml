@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "JAX example training a linear regression model with federated learning"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation] @ {root:parent:parent:uri}",
+    "flwr[simulation,grpc] @ {root:parent:parent:uri}",
     "jax==0.4.31",
     "jaxlib==0.4.31",
     "scikit-learn>=1.1.1,<2.0.0",

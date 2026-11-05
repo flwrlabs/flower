@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = [{ name = "Ragy Haddad", email = "ragy202@gmail.com" }]
 maintainers = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
 dependencies = [
-    "flwr[simulation] @ {root:parent:parent:uri}",
+    "flwr[simulation,grpc] @ {root:parent:parent:uri}",
     "numpy>=2.0.0",
     "pandas>=2.0.0,<3.0.0",
     "scikit-learn>=1.1.1,<2.0.0",
