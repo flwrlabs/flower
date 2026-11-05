@@ -52,17 +52,6 @@ from .warm_executor_pool import (
     is_warm_executor_ready,
 )
 
-# Locate the installed script without importing flwr and its application modules.
-# Running a flwr.* module with -m would pay those imports on every handoff.
-_WARM_DISPATCH_BOOTSTRAP = """
-import runpy
-from importlib.util import find_spec
-from pathlib import Path
-
-script = Path(find_spec("flwr").origin).parent / "supercore" / "task_worker_protocol.py"
-runpy.run_path(str(script), run_name="__main__")
-"""
-
 _TOKEN_STDIN_ACKNOWLEDGEMENTS = (
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
@@ -334,7 +323,12 @@ def warm_executor_command(
             if spec.fab_hash != pool_key.fab_hash:
                 raise ValueError("AgentApp task does not match its warm executor pool.")
             payload["fab_hash"] = spec.fab_hash
-        return ["python", "-c", _WARM_DISPATCH_BOOTSTRAP, json.dumps(payload)]
+        return [
+            "python",
+            "-m",
+            "flwr.supercore.task_worker_protocol",
+            json.dumps(payload),
+        ]
     command = [
         TASK_TYPE_TO_COMMAND[spec.task_type],
         TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],

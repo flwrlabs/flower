@@ -19,7 +19,6 @@
 import importlib
 import json
 import logging
-import os
 import subprocess
 import sys
 import threading
@@ -37,7 +36,6 @@ from flwr.common.constant import (
     FLWR_AGENTAPP_TOKEN_STDIN_ACKNOWLEDGEMENT,
     FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
 )
-from flwr.supercore import task_worker_protocol
 from flwr.supercore.constant import TaskType
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
@@ -207,7 +205,11 @@ def test_fab_specific_agentapp_pool_uses_prestarted_worker() -> None:
         None,
         specific_key,
     )
-    assert dispatch_command[:2] == ["python", "-c"]
+    assert dispatch_command[:3] == [
+        "python",
+        "-m",
+        "flwr.supercore.task_worker_protocol",
+    ]
     invocation = json.loads(dispatch_command[-1])
     assert invocation["fab_hash"] == _FAB_HASH
     assert invocation["insecure"] is True
@@ -785,7 +787,7 @@ def test_warm_launch_requests_background_replenishment(
     assert stream.call_args.kwargs["container"] == "taskexecutor"
     command = stream.call_args.kwargs["command"]
     if task_type == TaskType.CONNECTOR:
-        assert command[:2] == ["python", "-c"]
+        assert command[:3] == ["python", "-m", "flwr.supercore.task_worker_protocol"]
         assert json.loads(command[-1]) == {
             "socket_path": WARM_CONNECTOR_EXECUTOR_SOCKET,
             "task_name": "Connector",
@@ -817,17 +819,8 @@ def test_warm_launch_requests_background_replenishment(
     assert stream.return_value.is_open()
 
 
-def test_prestarted_dispatch_without_flower_imports(tmp_path: Path) -> None:
-    """Start the standalone relay without importing its parent package."""
-    package = tmp_path / "flwr"
-    (package / "supercore").mkdir(parents=True)
-    (package / "__init__.py").write_text(
-        "raise AssertionError('Flower was imported')", encoding="utf-8"
-    )
-    (package / "supercore" / "task_worker_protocol.py").write_text(
-        Path(task_worker_protocol.__file__).read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+def test_prestarted_dispatch_entrypoint() -> None:
+    """The module entry point uses the bounded stdin token reader."""
     command = warm_executor_dispatch.warm_executor_command(
         _execution_spec(task_type=TaskType.CONNECTOR, insecure=True), None
     )
@@ -836,8 +829,7 @@ def test_prestarted_dispatch_without_flower_imports(tmp_path: Path) -> None:
         input="invalid-token\n",
         text=True,
         capture_output=True,
-        env={**os.environ, "PYTHONPATH": str(tmp_path)},
-        cwd=tmp_path,
+        cwd=Path(__file__).resolve().parents[4],
         timeout=10,
         check=False,
     )
