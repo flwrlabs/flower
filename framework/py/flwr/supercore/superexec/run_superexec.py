@@ -15,8 +15,6 @@
 """Flower SuperExec."""
 
 
-import math
-import os
 import time
 from logging import ERROR, WARNING
 from typing import Any
@@ -26,6 +24,7 @@ from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.config import load_poll_interval
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.interceptors import (
@@ -45,43 +44,12 @@ from .executor.config import ExecutorConfig
 from .plugin import AutoExecPlugin
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
-_MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
-_MAX_TASK_POLL_INTERVAL_SECONDS = 60.0
 _DEFAULT_TASK_POLL_INTERVAL_SECONDS = 1.0
 _SUPEREXEC_AUTH_METHODS = frozenset(
     {
         "/flwr.proto.Runtime/AcquireTask",
     }
 )
-
-
-def _get_task_poll_interval() -> float:
-    """Read and validate the SuperExec task polling interval."""
-    raw_interval = os.getenv(_TASK_POLL_INTERVAL_ENV)
-    if raw_interval is None:
-        return _DEFAULT_TASK_POLL_INTERVAL_SECONDS
-
-    try:
-        interval = float(raw_interval)
-    except ValueError as err:
-        raise ValueError(
-            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
-            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
-            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
-        ) from err
-
-    if (
-        not math.isfinite(interval)
-        or interval < _MIN_TASK_POLL_INTERVAL_SECONDS
-        or interval > _MAX_TASK_POLL_INTERVAL_SECONDS
-    ):
-        raise ValueError(
-            f"Environment variable {_TASK_POLL_INTERVAL_ENV} must be a finite "
-            f"number of seconds between {_MIN_TASK_POLL_INTERVAL_SECONDS} and "
-            f"{_MAX_TASK_POLL_INTERVAL_SECONDS}, got {raw_interval!r}."
-        )
-
-    return interval
 
 
 def _handle_launch_result(result: LaunchResult, task: Task) -> None:
@@ -163,7 +131,9 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
-    task_poll_interval = _get_task_poll_interval()
+    task_poll_interval = load_poll_interval(
+        _TASK_POLL_INTERVAL_ENV, _DEFAULT_TASK_POLL_INTERVAL_SECONDS
+    )
 
     try:
         executor = get_executor(

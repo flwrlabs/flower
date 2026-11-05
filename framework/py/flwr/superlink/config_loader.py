@@ -15,16 +15,11 @@
 """Load SuperLink configuration and config-driven components."""
 
 
-import math
 import os
 import sys
 from dataclasses import dataclass
 
-from flwr.common.constant import (
-    RUN_EVENTS_STREAM_INTERVAL,
-    AuthnType,
-    EventLogWriterType,
-)
+from flwr.common.constant import AuthnType, EventLogWriterType
 from flwr.common.event_log_plugin import EventLogWriterPlugin
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.license_plugin import LicensePlugin
@@ -86,26 +81,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     isolation: str
     runtime_dependency_install: bool
     run_events_stream_interval: float | None = None
-
-
-def load_run_events_stream_interval(value: float | None = None) -> float:
-    """Validate an explicit interval or load it from the SuperLink environment."""
-    try:
-        interval = float(
-            value
-            if value is not None
-            else os.getenv(
-                "FLWR_RUN_EVENTS_STREAM_INTERVAL", str(RUN_EVENTS_STREAM_INTERVAL)
-            )
-        )
-        if not math.isfinite(interval) or not 0.01 <= interval <= 60.0:
-            raise ValueError
-    except ValueError as err:
-        raise ValueError(
-            "FLWR_RUN_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
-            "between 0.01 and 60."
-        ) from err
-    return interval
 
 
 def get_license_plugin() -> LicensePlugin | None:
