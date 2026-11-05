@@ -17,13 +17,6 @@
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
-from flwr.app.constants import DEFAULT_TTL as DEFAULT_TTL
-from flwr.app.message_type import MessageType as MessageType
-from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
-from flwr.app.typing import MetricRecordValues as MetricRecordValues
-
-from ..app.error import Error as Error
-from ..app.metadata import Metadata as Metadata
 from ..compat.common.parameter import bytes_to_ndarray as bytes_to_ndarray
 from ..compat.common.parameter import ndarray_to_bytes as ndarray_to_bytes
 from ..compat.common.parameter import ndarrays_to_parameters as ndarrays_to_parameters
@@ -57,10 +50,14 @@ from ..supercore.date import now as now
 from ..supercore.telemetry import EventType as EventType
 from ..supercore.telemetry import event as event
 from .constant import MessageTypeLegacy as MessageTypeLegacy
-from .logger import configure as configure
-from .logger import log as log
 
 if TYPE_CHECKING:
+    from flwr.app.constants import DEFAULT_TTL as DEFAULT_TTL
+    from flwr.app.message_type import MessageType as MessageType
+    from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
+    from flwr.app.typing import MetricRecordValues as MetricRecordValues
+
+    from ..app.error import Error as Error
     from ..app.message import Array as Array
     from ..app.message import ArrayRecord as ArrayRecord
     from ..app.message import ConfigRecord as ConfigRecord
@@ -68,30 +65,41 @@ if TYPE_CHECKING:
     from ..app.message import Message as Message
     from ..app.message import MetricRecord as MetricRecord
     from ..app.message import RecordDict as RecordDict
+    from ..app.metadata import Metadata as Metadata
     from ..compat.common.record import ConfigsRecord as ConfigsRecord
     from ..compat.common.record import MetricsRecord as MetricsRecord
     from ..compat.common.record import ParametersRecord as ParametersRecord
     from ..compat.common.record import RecordSet as RecordSet
     from ..compat.common.record import array_from_numpy as array_from_numpy
+    from .logger import configure as configure
+    from .logger import log as log
 
 _LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
     "Array": ("flwr.app.message", "Array"),
     "ArrayRecord": ("flwr.app.message", "ArrayRecord"),
     "ConfigRecord": ("flwr.app.message", "ConfigRecord"),
+    "ConfigRecordValues": ("flwr.app.typing", "ConfigRecordValues"),
     "ConfigsRecord": ("flwr.compat.common.record", "ConfigsRecord"),
     "Context": ("flwr.app.message", "Context"),
+    "DEFAULT_TTL": ("flwr.app.constants", "DEFAULT_TTL"),
+    "Error": ("flwr.app.error", "Error"),
     "Message": ("flwr.app.message", "Message"),
+    "MessageType": ("flwr.app.message_type", "MessageType"),
+    "Metadata": ("flwr.app.metadata", "Metadata"),
     "MetricRecord": ("flwr.app.message", "MetricRecord"),
+    "MetricRecordValues": ("flwr.app.typing", "MetricRecordValues"),
     "MetricsRecord": ("flwr.compat.common.record", "MetricsRecord"),
     "ParametersRecord": ("flwr.compat.common.record", "ParametersRecord"),
     "RecordDict": ("flwr.app.message", "RecordDict"),
     "RecordSet": ("flwr.compat.common.record", "RecordSet"),
     "array_from_numpy": ("flwr.compat.common.record", "array_from_numpy"),
+    "configure": ("flwr.common.logger", "configure"),
+    "log": ("flwr.common.logger", "log"),
 }
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily resolve compatibility exports that depend on app.message."""
+    """Resolve compatibility exports without eagerly loading application modules."""
     if name in _LAZY_EXPORTS:
         module_name, attr_name = _LAZY_EXPORTS[name]
         module = import_module(module_name)
@@ -99,6 +107,11 @@ def __getattr__(name: str) -> Any:
         globals()[name] = value
         return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Keep lazy exports visible to package introspection."""
+    return sorted(set(globals()) | _LAZY_EXPORTS.keys())
 
 
 __all__ = [
