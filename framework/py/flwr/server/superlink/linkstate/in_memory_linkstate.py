@@ -22,6 +22,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from logging import ERROR
 from typing import Literal, cast
+from uuid import UUID
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
@@ -57,6 +58,7 @@ class RunRecord:  # pylint: disable=R0902
     """The record of a specific run, including its status and timestamps."""
 
     run: Run
+    space_id: UUID | None = None
     federation_config: SimulationConfig | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
     usage_reported_at: str = ""
@@ -117,6 +119,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if task is None:
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.lock:
+            return [
+                run_id
+                for run_id, record in self.run_ids.items()
+                if record.space_id == space_id
+            ]
 
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
