@@ -245,25 +245,16 @@ class _RelayedTextOutput:
 @contextmanager
 def relay_task_output(sender: ProtocolOutputSender, token: str) -> Iterator[None]:
     """Relay task output as redacted, bounded protocol frames."""
-    # Keep the exec-side dispatcher lightweight by importing logger state only
-    # in the resident process after task authority has been accepted.
-    from flwr.supercore.logger import (  # pylint: disable=import-outside-toplevel
-        console_handler,
-    )
-
     secrets = (token, FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT)
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     stdout = _RelayedTextOutput(sender, "stdout", secrets, original_stdout)
     stderr = _RelayedTextOutput(sender, "stderr", secrets, original_stderr)
-    original_log_stream = console_handler.stream
     sys.stdout = cast(TextIO, stdout)
     sys.stderr = cast(TextIO, stderr)
-    console_handler.stream = cast(TextIO, stderr)
     try:
         yield
     finally:
-        console_handler.stream = original_log_stream
         sys.stdout = original_stdout
         sys.stderr = original_stderr
         stdout.finish()

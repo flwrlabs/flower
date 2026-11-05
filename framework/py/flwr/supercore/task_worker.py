@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import signal
 import socket
+import sys
 import threading
 from collections.abc import Callable
 from contextlib import ExitStack
@@ -30,6 +31,7 @@ from flwr.supercore import log
 from flwr.supercore.typing import JSONObject
 
 from . import task_worker_protocol as protocol
+from .logger import console_handler
 from .tracing import initialize_tracing
 
 # Bound each socket write so a lost reader cannot stall accepted-task cleanup.
@@ -240,6 +242,10 @@ def _serve_channel(  # pylint: disable=too-many-arguments
             output_context.enter_context(
                 protocol.relay_task_output(sender, invocation.token)
             )
+            output_context.callback(
+                setattr, console_handler, "stream", console_handler.stream
+            )
+            console_handler.stream = sys.stderr
         except Exception:  # pylint: disable=broad-exception-caught
             # Task execution must not depend on output relay setup.
             pass
