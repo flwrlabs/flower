@@ -365,6 +365,7 @@ def dispatch_prestarted_task(  # pylint: disable=too-many-return-statements
                         if (
                             not accepted
                             or set(response) != {"event", "stream", "data"}
+                            or not isinstance(stream, str)
                             or stream not in {"stdout", "stderr"}
                             or not isinstance(output, str)
                         ):
@@ -391,3 +392,16 @@ def dispatch_prestarted_task(  # pylint: disable=too-many-return-statements
     except (OSError, ValueError) as err:
         print(f"Prestarted {task_name} dispatch failed: {err}", file=sys.stderr)
         return 1
+
+
+def main() -> None:
+    """Deliver one stdin token using deployment-supplied invocation metadata."""
+    payload = json.loads(sys.argv[1])
+    socket_path = Path(payload.pop("socket_path"))
+    task_name = payload.pop("task_name")
+    payload["token"] = read_task_token_from_stdin()
+    raise SystemExit(dispatch_prestarted_task(payload, socket_path, task_name))
+
+
+if __name__ == "__main__":
+    main()

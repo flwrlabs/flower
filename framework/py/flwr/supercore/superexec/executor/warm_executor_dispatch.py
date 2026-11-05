@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import threading
 import time
@@ -34,8 +35,8 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.tracing import trace_span
 from flwr.supercore.warm_executor_constants import (
-    WARM_AGENTAPP_EXECUTOR_MODULE,
-    WARM_CONNECTOR_EXECUTOR_MODULE,
+    WARM_AGENTAPP_EXECUTOR_SOCKET,
+    WARM_CONNECTOR_EXECUTOR_SOCKET,
 )
 
 from .kubernetes_resources import WarmExecutorResources
@@ -301,35 +302,39 @@ def warm_executor_command(
         and pool_key is not None
         and pool_key.fab_hash is not None
     )
-    worker_module = None
-    if prestarted_agentapp:
-        worker_module = WARM_AGENTAPP_EXECUTOR_MODULE
-    elif spec.task_type == TaskType.CONNECTOR:
-        worker_module = WARM_CONNECTOR_EXECUTOR_MODULE
-    if worker_module is not None:
-        command = [
-            "python",
-            "-m",
-            worker_module,
-            "dispatch",
-            "--runtime-api-address",
-            spec.runtime_api_address,
-            "--token-stdin",
-        ]
+    if prestarted_agentapp or spec.task_type == TaskType.CONNECTOR:
+        payload = {
+            "socket_path": (
+                WARM_AGENTAPP_EXECUTOR_SOCKET
+                if prestarted_agentapp
+                else WARM_CONNECTOR_EXECUTOR_SOCKET
+            ),
+            "task_name": "AgentApp" if prestarted_agentapp else "Connector",
+            "runtime_api_address": spec.runtime_api_address,
+            "insecure": spec.insecure,
+            "root_certificates_path": (
+                WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH
+                if not spec.insecure and runtime_root_certificates is not None
+                else None
+            ),
+        }
         if prestarted_agentapp:
             assert pool_key is not None
-            assert pool_key.fab_hash is not None
-            assert spec.fab_hash is not None
             if spec.fab_hash != pool_key.fab_hash:
                 raise ValueError("AgentApp task does not match its warm executor pool.")
-            command.extend(["--fab-hash", spec.fab_hash])
-    else:
-        command = [
-            TASK_TYPE_TO_COMMAND[spec.task_type],
-            TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-            spec.runtime_api_address,
-            "--token-stdin",
+            payload["fab_hash"] = spec.fab_hash
+        return [
+            "python",
+            "-m",
+            "flwr.supercore.task_worker_protocol",
+            json.dumps(payload),
         ]
+    command = [
+        TASK_TYPE_TO_COMMAND[spec.task_type],
+        TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
+        spec.runtime_api_address,
+        "--token-stdin",
+    ]
     if spec.insecure:
         command.append("--insecure")
     elif runtime_root_certificates is not None:
