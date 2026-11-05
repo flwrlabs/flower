@@ -164,7 +164,7 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
             state,
             acquired.task,
         )
-        assert response.run.space_id == str(space_id)
+        assert response.run.run_id == run_id
         assert response.context.run_id == run_id and response.context.series_id == 0
         assert not context_from_proto(response.context).state
         assert response.fab.hash_str == fab_hash

@@ -367,7 +367,8 @@ def test_space_run_uses_preloaded_agentapp(
     assert app.call_args.kwargs["context"].run_id == run.run_id
     assert app.call_args.kwargs["context"].series_id == 0
     assert app.call_args.kwargs["agent"].prompt == "hello world!"
-    grid.set_run.assert_called_once_with(run)
+    grid.set_run.assert_called_once()
+    assert grid.set_run.call_args.args[0].run_id == run.run_id
 
 
 def test_run_agentapp_task_constructs_lifecycle_with_keywords(

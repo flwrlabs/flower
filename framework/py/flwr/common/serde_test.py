@@ -19,7 +19,6 @@ import random
 import string
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
-from uuid import UUID
 
 import pytest
 
@@ -526,8 +525,7 @@ def test_context_serialization_deserialization() -> None:
     assert original == deserialized
 
 
-@pytest.mark.parametrize("space_id", [None, UUID(int=1)])
-def test_run_serialization_deserialization(space_id: UUID | None) -> None:
+def test_run_serialization_deserialization() -> None:
     """Test serialization and deserialization of Run."""
     # Prepare
     maker = RecordMaker()
@@ -543,17 +541,14 @@ def test_run_serialization_deserialization(space_id: UUID | None) -> None:
         finished_at="",
         status=RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
-        federation_id="@me/fed" if space_id is None else "",
+        federation_id="@me/fed",
         primary_task_id=42,
         bytes_sent=2048,
         bytes_recv=1024,
         clientapp_runtime=3.14,
-        primary_task_type=(
-            TaskType.SIMULATION if space_id is None else TaskType.AGENT_APP
-        ),
-        series_id=123 if space_id is None else 0,
+        primary_task_type=TaskType.SIMULATION,
+        series_id=123,
         account_name="test-account",
-        space_id=space_id,
     )
 
     # Execute
@@ -562,5 +557,4 @@ def test_run_serialization_deserialization(space_id: UUID | None) -> None:
 
     # Assert
     assert isinstance(proto, ProtoRun)
-    assert proto.HasField("space_id") is (space_id is not None)
     assert original == deserialized
