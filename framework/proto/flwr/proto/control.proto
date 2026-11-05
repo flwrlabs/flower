@@ -124,9 +124,7 @@ message Space {
   repeated SpaceParticipant participants = 4;
 }
 
-message CreateSpaceRequest {
-  repeated SpaceParticipant participants = 1;
-}
+message CreateSpaceRequest { repeated SpaceParticipant participants = 1; }
 message CreateSpaceResponse { Space space = 1; }
 
 message ListSpacesRequest {}
