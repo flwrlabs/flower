@@ -31,6 +31,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -43,6 +45,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListAppAssociationsRequest,
     ListAppAssociationsResponse,
     ListAppsRequest,
@@ -107,6 +111,24 @@ from flwr.supercore.protobuf.client import ProtobufClient
 # pylint: disable=invalid-name
 class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Control API."""
+
+    def CreateAgent(self, request: CreateAgentRequest) -> CreateAgentResponse:
+        """Create an agent."""
+        return self._unary_unary(
+            path="/v1/control/create-agent",
+            rpc_method="/flwr.proto.Control/CreateAgent",
+            request=request,
+            response_type=CreateAgentResponse,
+        )
+
+    def ListAgents(self, request: ListAgentsRequest) -> ListAgentsResponse:
+        """List agents."""
+        return self._unary_unary(
+            path="/v1/control/list-agents",
+            rpc_method="/flwr.proto.Control/ListAgents",
+            request=request,
+            response_type=ListAgentsResponse,
+        )
 
     def StartRun(self, request: StartRunRequest) -> StartRunResponse:
         """Start a run."""

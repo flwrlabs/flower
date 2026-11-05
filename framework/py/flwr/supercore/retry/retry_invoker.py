@@ -160,7 +160,7 @@ class RetryInvoker:
 
         invoker = RetryInvoker(
             exponential,  # Or use `lambda: exponential(3, 2)` to pass arguments
-            grpc.RpcError,
+            ConnectionError,
             max_tries=3,
             max_time=None,
         )

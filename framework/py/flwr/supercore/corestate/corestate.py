@@ -20,13 +20,20 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
+    Conversation,
+    ConversationMessage,
+    ConversationParticipant,
     StartRunRequest,
 )
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
@@ -131,6 +138,140 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
+
+    @abstractmethod
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+        data : bytes
+            File content to store.
+        expected_revision : int | None
+            None for create-only, which fails if a live file exists. Otherwise,
+            the current live file revision must match for the update to succeed.
+
+        Returns
+        -------
+        int
+            The new revision ID.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if a live
+            file exists for a create-only write, or if an update has no live
+            file or its current revision does not match expected_revision.
+        """
+
+    @abstractmethod
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+
+        Returns
+        -------
+        File | None
+            The current file content and metadata, or None if absent or deleted.
+        """
+
+    @abstractmethod
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        prefix : str
+            Include only files whose keys start with this prefix.
+        start_after : str
+            Exclusive cursor; include only keys greater than this value.
+        limit : int | None
+            Maximum number of files to return. If None, no limit is applied.
+
+        Returns
+        -------
+        Sequence[FileMetadata]
+            Matching live file metadata ordered lexicographically by key.
+        """
+
+    @abstractmethod
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+        expected_revision : int
+            The current live file revision, which must match for deletion to
+            succeed. After deletion, the file is excluded from reads and lists,
+            but its revision history is retained.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if the file
+            is absent or deleted, or its current revision does not match
+            expected_revision.
+        """
+
+    @abstractmethod
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create an agent owned by a Flower account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        config : AgentConfig
+            Agent name, app specification, and optional title and description.
+            Duplicate names are allowed. Optional fields must be nonempty when set.
+
+        Returns
+        -------
+        Agent | None
+            The agent with a generated ID and matching UTC creation and update
+            timestamps as ISO-formatted strings, or None if the account ID, a
+            required configuration field, or a set optional field is empty.
+            Ownership is stored separately and is not part of the returned message.
+        """
+
+    @abstractmethod
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agents.
+
+        Returns
+        -------
+        Sequence[Agent]
+            Agents belonging to the account, or an empty sequence if none exist.
+        """
 
     @abstractmethod
     def store_fab(self, fab: Fab) -> str:
@@ -523,6 +664,41 @@ class CoreState(ABC):  # pylint: disable=R0904
             A tuple containing a boolean indicating whether the Message was
             stored and a list of object IDs that still need to be pushed. If
             storing the Message fails, returns `(False, [])`.
+        """
+
+    @abstractmethod
+    def create_conversation(
+        self,
+        *,
+        participants: Sequence[ConversationParticipant],
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
+
+    @abstractmethod
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
+        """List conversations the user participates in."""
+
+    @abstractmethod
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return a message page in ascending ID order.
+
+        Bounds are exclusive. With after_id, select the earliest matching page;
+        otherwise select the latest. Return None for missing conversations or
+        nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
         """
 
     @abstractmethod

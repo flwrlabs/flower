@@ -22,10 +22,11 @@ from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
     MetaData,
+    and_,
     case,
     delete,
     exists,
@@ -56,11 +57,17 @@ from flwr.common.constant import (
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
+    Conversation,
+    ConversationMessage,
+    ConversationParticipant,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
@@ -82,8 +89,10 @@ from flwr.supercore.constant import (
     AutomationStatus,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -92,9 +101,20 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import (
+    Conversation as ConversationModel,
+)
+from flwr.supercore.state.schema.corestate_models import (
+    ConversationMessage as ConversationMessageModel,
+)
+from flwr.supercore.state.schema.corestate_models import ConversationParticipantTable
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
+)
+from flwr.supercore.state.schema.corestate_models import File as FileModel
+from flwr.supercore.state.schema.corestate_models import (
+    FileRevision as FileRevisionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
@@ -121,6 +141,7 @@ from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
@@ -566,6 +587,167 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
                 self.cancel_messages(message_ids=message_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        with self.session() as session:
+            if expected_revision is None:
+                stmt = self.dialect_insert(FileModel).values(
+                    scope=scope,
+                    key=key,
+                    latest_revision=1,
+                    is_deleted=False,
+                    size_bytes=len(data),
+                )
+                revision = session.scalar(
+                    stmt.on_conflict_do_update(
+                        index_elements=[FileModel.scope, FileModel.key],
+                        set_={
+                            "latest_revision": FileModel.latest_revision + 1,
+                            "is_deleted": False,
+                            "size_bytes": len(data),
+                        },
+                        where=FileModel.is_deleted.is_(True),
+                    ).returning(FileModel.latest_revision)
+                )
+            else:
+                revision = session.scalar(
+                    update(FileModel)
+                    .where(
+                        FileModel.scope == scope,
+                        FileModel.key == key,
+                        FileModel.is_deleted.is_(False),
+                        FileModel.latest_revision == expected_revision,
+                    )
+                    .values(
+                        latest_revision=FileModel.latest_revision + 1,
+                        size_bytes=len(data),
+                    )
+                    .returning(FileModel.latest_revision)
+                )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            session.execute(
+                insert(FileRevisionModel).values(
+                    scope=scope, key=key, revision=revision, data=data, created_at=now()
+                )
+            )
+            return revision
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        with self.session() as session:
+            row = session.execute(
+                select(
+                    FileModel.latest_revision,
+                    FileModel.size_bytes,
+                    FileRevisionModel.data,
+                )
+                .join(
+                    FileRevisionModel,
+                    (FileRevisionModel.scope == FileModel.scope)
+                    & (FileRevisionModel.key == FileModel.key)
+                    & (FileRevisionModel.revision == FileModel.latest_revision),
+                )
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=row.latest_revision, size_bytes=row.size_bytes
+                ),
+                data=row.data,
+            )
+
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        stmt = select(
+            FileModel.key, FileModel.latest_revision, FileModel.size_bytes
+        ).where(FileModel.scope == scope, FileModel.is_deleted.is_(False))
+        if prefix:
+            # LIKE is case-insensitive on SQLite and interprets wildcard characters.
+            stmt = stmt.where(func.substr(FileModel.key, 1, len(prefix)) == prefix)
+        if start_after:
+            stmt = stmt.where(FileModel.key > start_after)
+        stmt = stmt.order_by(FileModel.key).limit(limit)
+        with self.session() as session:
+            return [
+                FileMetadata(
+                    key=row.key, revision=row.latest_revision, size_bytes=row.size_bytes
+                )
+                for row in session.execute(stmt)
+            ]
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        with self.session() as session:
+            revision = session.scalar(
+                update(FileModel)
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                    FileModel.latest_revision == expected_revision,
+                )
+                .values(is_deleted=True)
+                .returning(FileModel.latest_revision)
+            )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create and return an account's agent."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=config.name,
+            title=config.title if config.HasField("title") else None,
+            description=config.description if config.HasField("description") else None,
+            app_spec=config.app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            return _agent_from_model(model)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -1019,6 +1201,164 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(ConnectorOAuthSessionModel.oauth_session_id)
             )
             return updated_oauth_session_id is not None
+
+    def create_conversation(
+        self,
+        *,
+        participants: Sequence[ConversationParticipant],
+    ) -> Conversation:
+        """Create a conversation and its initial membership atomically."""
+        members: list[ConversationParticipant] = []
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError(
+                    "Conversation participants must have a nonempty identity"
+                )
+            if participant not in members:
+                members.append(participant)
+        try:
+            with self.session() as session:
+                model = session.scalars(
+                    insert(ConversationModel)
+                    .values(id=uuid4(), title="", created_at=now())
+                    .returning(ConversationModel)
+                ).one()
+                if members:
+                    session.execute(
+                        insert(ConversationParticipantTable),
+                        [
+                            {
+                                "conversation_id": model.id,
+                                "flwr_aid": member.flwr_aid or None,
+                                "agent_id": member.agent_id or None,
+                            }
+                            for member in members
+                        ],
+                    )
+                conversation = _conversation_from_model(model)
+                conversation.participants.extend(members)
+                return conversation
+        except IntegrityError as exc:
+            raise ValueError("Invalid conversation participants") from exc
+
+    def get_conversations(self, flwr_aid: str) -> Sequence[Conversation]:
+        """Return participating conversations, newest first."""
+        viewer = ConversationParticipantTable.alias("viewer")
+        query = (
+            select(
+                ConversationModel,
+                ConversationParticipantTable.c.flwr_aid,
+                ConversationParticipantTable.c.agent_id,
+            )
+            .join(viewer, viewer.c.conversation_id == ConversationModel.id)
+            .join(
+                ConversationParticipantTable,
+                ConversationParticipantTable.c.conversation_id == ConversationModel.id,
+            )
+            .where(viewer.c.flwr_aid == flwr_aid)
+            .order_by(ConversationModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        with self.session() as session:
+            conversations: dict[UUID, Conversation] = {}
+            for model, member_flwr_aid, member_agent_id in session.execute(query):
+                if model.id not in conversations:
+                    conversations[model.id] = _conversation_from_model(model)
+                conversation = conversations[model.id]
+                if member_flwr_aid is not None:
+                    conversation.participants.add(flwr_aid=member_flwr_aid)
+                else:
+                    conversation.participants.add(agent_id=member_agent_id)
+            return list(conversations.values())
+
+    def create_conversation_message(
+        self, conversation_id: UUID, author: ConversationParticipant, content: str
+    ) -> ConversationMessage | None:
+        """Authorize membership in the message insert itself."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        if not (author.flwr_aid or author.agent_id):
+            return None
+        field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+        identity = author.flwr_aid or author.agent_id
+        source = select(
+            ConversationParticipantTable.c.conversation_id,
+            ConversationParticipantTable.c.flwr_aid,
+            ConversationParticipantTable.c.agent_id,
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(
+            ConversationParticipantTable.c.conversation_id == conversation_id,
+            ConversationParticipantTable.c[field] == identity,
+        )
+        with self.session() as session:
+            model = session.scalars(
+                insert(ConversationMessageModel)
+                .from_select(
+                    [
+                        "conversation_id",
+                        "flwr_aid",
+                        "agent_id",
+                        "created_at",
+                        "content",
+                    ],
+                    source,
+                )
+                .returning(ConversationMessageModel)
+            ).one_or_none()
+            return None if model is None else _conversation_message_from_model(model)
+
+    def get_conversation_messages(  # pylint: disable=too-many-arguments
+        self,
+        conversation_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[ConversationMessage] | None:
+        """Return a participating user's history page in ascending ID order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        forward = after_id is not None
+        message_conditions = [
+            ConversationMessageModel.conversation_id
+            == ConversationParticipantTable.c.conversation_id
+        ]
+        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
+        if before_id is not None and before_id <= 2**63 - 1:
+            message_conditions.append(ConversationMessageModel.id < before_id)
+        if after_id is not None:
+            message_conditions.append(
+                ConversationMessageModel.id > min(after_id, 2**63 - 1)
+            )
+        query = (
+            select(ConversationMessageModel)
+            .select_from(ConversationParticipantTable)
+            .outerjoin(ConversationMessageModel, and_(*message_conditions))
+            .where(
+                ConversationParticipantTable.c.conversation_id == conversation_id,
+                ConversationParticipantTable.c.flwr_aid == flwr_aid,
+            )
+            .order_by(
+                ConversationMessageModel.id.asc()
+                if forward
+                else ConversationMessageModel.id.desc()
+            )
+            .limit(limit)
+        )
+        with self.session() as session:
+            models = list(session.scalars(query))
+            if not models:
+                return None
+            messages = [
+                _conversation_message_from_model(model)
+                for model in models
+                if model is not None
+            ]
+            return messages if forward else list(reversed(messages))
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2144,6 +2484,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return session.scalar(stmt) is not None
 
 
+def _agent_from_model(model: AgentModel) -> Agent:
+    """Convert an agent ORM model to its protobuf message."""
+    return Agent(
+        id=model.agent_id,
+        config=AgentConfig(
+            name=model.name,
+            title=model.title,
+            description=model.description,
+            app_spec=model.app_spec,
+        ),
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+    )
+
+
 def _connector_oauth_session_from_model(
     model: ConnectorOAuthSessionModel,
 ) -> ConnectorOAuthSessionRecord:
@@ -2277,6 +2632,33 @@ def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
         description=row["description"],
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
+    )
+
+
+def _conversation_from_model(model: ConversationModel) -> Conversation:
+    """Convert conversation metadata to its API representation."""
+    return Conversation(
+        id=str(model.id),
+        title=model.title,
+        created_at=model.created_at.isoformat(),
+    )
+
+
+def _conversation_message_from_model(
+    model: ConversationMessageModel,
+) -> ConversationMessage:
+    """Convert a persisted user or agent message to its API representation."""
+    author = ConversationParticipant()
+    if model.flwr_aid is not None:
+        author.flwr_aid = model.flwr_aid
+    else:
+        author.agent_id = cast(int, model.agent_id)
+    return ConversationMessage(
+        id=model.id,
+        conversation_id=str(model.conversation_id),
+        author=author,
+        created_at=model.created_at.isoformat(),
+        content=model.content,
     )
 
 

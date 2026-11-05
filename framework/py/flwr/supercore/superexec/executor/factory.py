@@ -22,8 +22,8 @@ from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
-from .kubernetes_executor import (
-    KubernetesExecutor,
+from .kubernetes_executor import KubernetesExecutor
+from .kubernetes_resources import (
     KubernetesExecutorConfig,
     create_incluster_kubernetes_clients,
 )
@@ -88,13 +88,14 @@ def get_executor(
             # Retain the owner so reconciliation can clean up surviving idle Pods.
             config.warm_executor_pools = ()
         try:
-            client, exec_client = create_incluster_kubernetes_clients()
+            client, exec_client, probe_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
             exec_client=exec_client,
+            probe_client=probe_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")
@@ -169,6 +170,9 @@ def _warm_executor_pools_from_config(
     for entry in value:
         if not isinstance(entry, dict):
             raise ValueError("Warm executor pool entries must be mappings.")
+        if entry.get("task-type") == "flwr-model":
+            log(WARNING, "Ignoring obsolete flwr-model warm executor pool.")
+            continue
         allowed_fields = {
             "fab-hash",
             "fab-path",
@@ -187,8 +191,8 @@ def _warm_executor_pools_from_config(
             task_type = None
         if task_type not in WARM_EXECUTOR_TASK_TYPES:
             raise ValueError(
-                "Warm executor pools support only task types 'flwr-agentapp', "
-                "'flwr-model', and 'flwr-connector'."
+                "Warm executor pools support only task types 'flwr-agentapp' "
+                "and 'flwr-connector'."
             )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):

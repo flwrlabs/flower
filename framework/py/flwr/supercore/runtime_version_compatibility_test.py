@@ -26,58 +26,19 @@ from flwr.supercore.constant import (
 from .runtime_version_compatibility import RuntimeVersionMetadata
 
 
-def test_runtime_version_metadata_appends_new_metadata() -> None:
-    """Runtime metadata should append the shared key names."""
+def test_runtime_version_metadata_as_metadata() -> None:
+    """Runtime metadata should contain the shared key names."""
     metadata = RuntimeVersionMetadata.from_local_component(
         "supernode",
         package_name_value="flwr",
         package_version_value="1.29.0",
     )
 
-    assert metadata.append_to_grpc_metadata(None) == (
+    assert metadata.as_metadata() == (
         (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
         (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
         (FLWR_COMPONENT_NAME_METADATA_KEY, "supernode"),
     )
-
-
-def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
-    """Runtime metadata should preserve unrelated metadata when appending."""
-    metadata = RuntimeVersionMetadata.from_local_component(
-        "simulation",
-        package_name_value="flwr",
-        package_version_value="1.29.0",
-    )
-
-    grpc_metadata = metadata.append_to_grpc_metadata((("x-test", "value"),))
-
-    assert grpc_metadata == (
-        ("x-test", "value"),
-        (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-        (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
-        (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-    )
-
-
-def test_runtime_version_metadata_append_rejects_preexisting_runtime_keys() -> None:
-    """Appending should fail fast when runtime-version keys already exist."""
-    metadata = RuntimeVersionMetadata.from_local_component(
-        "simulation",
-        package_name_value="flwr",
-        package_version_value="1.29.0",
-    )
-
-    with pytest.raises(
-        RuntimeError,
-        match="gRPC metadata already contains runtime version keys: "
-        "flwr-package-name",
-    ):
-        metadata.append_to_grpc_metadata(
-            (
-                (FLWR_PACKAGE_NAME_METADATA_KEY, "old"),
-                ("x-test", "value"),
-            )
-        )
 
 
 def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
@@ -86,19 +47,17 @@ def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
         RuntimeVersionMetadata.from_local_component("")
 
 
-def test_runtime_version_metadata_from_grpc_returns_missing_for_absent_keys() -> None:
+def test_runtime_version_metadata_returns_missing_for_absent_keys() -> None:
     """Absent Flower metadata should be treated as the rollout missing case."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
-        (("other-header", "value"),)
-    )
+    metadata, error = RuntimeVersionMetadata.from_metadata((("other-header", "value"),))
 
     assert metadata is None
     assert error is None
 
 
-def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() -> None:
-    """GRPC metadata-style iterables should be supported directly."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+def test_runtime_version_metadata_from_metadata_accepts_metadata_items() -> None:
+    """Runtime metadata items should be supported directly."""
+    metadata, error = RuntimeVersionMetadata.from_metadata(
         (
             (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
@@ -115,7 +74,7 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
 
 
 @pytest.mark.parametrize(
-    ("grpc_metadata", "expected_error"),
+    ("metadata_input", "expected_error"),
     [
         (
             ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),),
@@ -152,12 +111,12 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
         ),
     ],
 )
-def test_runtime_version_metadata_from_grpc_rejects_invalid_metadata(
-    grpc_metadata: tuple[tuple[str, str | bytes], ...],
+def test_runtime_version_metadata_from_metadata_rejects_invalid_metadata(
+    metadata_input: tuple[tuple[str, str | bytes], ...],
     expected_error: str,
 ) -> None:
     """Malformed runtime metadata should be rejected explicitly."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(grpc_metadata)
+    metadata, error = RuntimeVersionMetadata.from_metadata(metadata_input)
 
     assert metadata is None
     assert error == expected_error

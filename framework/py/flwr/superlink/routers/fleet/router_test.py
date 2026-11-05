@@ -27,6 +27,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeResponse,
     RegisterNodeFleetRequest,
     RegisterNodeFleetResponse,
+    UnregisterNodeFleetRequest,
 )
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatRequest,
@@ -142,6 +143,27 @@ def test_fleet_http_handlers_and_authentication(
     )
     assert response.status_code == 401
 
+    app.state.enable_supernode_auth = True
+    response = client.post(
+        "/v1/fleet/register-node",
+        content=RegisterNodeFleetRequest(
+            public_key=public_key_bytes
+        ).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 412
+    assert response.json()["code"] == ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED
+
+    response = client.post(
+        "/v1/fleet/unregister-node",
+        content=UnregisterNodeFleetRequest(node_id=node_id).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 412
+    assert (
+        response.json()["code"] == ApiErrorCode.FLEET_SUPERNODE_UNREGISTRATION_DISABLED
+    )
+
 
 def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
     """Log Fleet calls before and after the handler when a writer is provided."""
@@ -164,6 +186,12 @@ def test_fleet_http_event_log(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert response.status_code == 200
     assert fleet_plugin.write_log.call_count == 2
+    assert [call[0] for call in fleet_plugin.method_calls] == [
+        "compose_log_before_event",
+        "write_log",
+        "compose_log_after_event",
+        "write_log",
+    ]
     assert fleet_plugin.compose_log_before_event.call_args.kwargs["method_name"] == (
         "/v1/fleet/register-node"
     )

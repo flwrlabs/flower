@@ -45,6 +45,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationRequest,
     UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
@@ -144,7 +145,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             for run_id in run_ids
         ]
         child_task_id = self.state.create_task(
-            task_type=TaskType.MODEL, run_id=run_ids[0]
+            task_type=TaskType.CONNECTOR, run_id=run_ids[0]
         )
         assert child_task_id is not None
         self._create_dummy_run_series(10, run_ids)
@@ -391,11 +392,15 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             request = StartRunRequest(federation=NOOP_FEDERATION_ID)
             request.app_spec = "@flwr/demo==0.0.1"
             request.fab.hash_str = fab_hash
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         mock_store_app.assert_not_called()
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
+        self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
+        tasks = self.state.get_tasks()
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type) for app in apps],
@@ -433,7 +438,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
             ) as get_remote_fab,
         ):
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         get_remote_fab.assert_not_called()
         thread.return_value.start.assert_called_once()
@@ -455,6 +460,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                         "flwr": {
                             "app": {
                                 "config": {"agent": {"input": ""}},
+                                "components": {"agentapp": "agent:app"},
                                 "display-name": "Local Agent",
                                 "color": "rose",
                             }
@@ -467,19 +473,27 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ".get_metadata_from_config",
                 return_value=("flwr/agent", "v0.0.1"),
             ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_app_type",
-                return_value=TaskType.AGENT_APP,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=SimulationConfig(),
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers"
                 ".start_title_generation"
             ) as start_title,
         ):
-            response = start_run(request, self.account, self.state, None)
+            response = start_run(request, self.account, self.state)
 
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
+        series = self.state.get_run_series(series_ids=[run.series_id])[0]
+        tasks = self.state.get_tasks()
+        self.assertEqual(run.primary_task_type, TaskType.AGENT_APP)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(series.description, "Hello")
+        self.assertEqual(app.app_type, TaskType.AGENT_APP)
         self.assertEqual(app.display_name, "Local Agent")
         self.assertEqual(app.description, "Local agent")
         self.assertEqual(app.color, "rose")
@@ -516,7 +530,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 self.assertRaises(FlowerError) as error,
             ):
-                start_run(request, self.account, self.state, None)
+                start_run(request, self.account, self.state)
 
             self.assertEqual(
                 error.exception.code,
@@ -558,7 +572,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 self.account,
                 self.state,
-                None,
                 source="web_ui",
             )
 
@@ -574,7 +587,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         request.fab.hash_str = "unknown"
 
         with self.assertRaises(FlowerError) as error:
-            start_run(request, self.account, self.state, None)
+            start_run(request, self.account, self.state)
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
 
@@ -590,7 +603,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             "flwr.superlink.servicer.control.control_handlers._get_remote_fab"
         ) as mock_get_remote_fab:
             with self.assertRaises(FlowerError) as error:
-                start_run(request, self.account, self.state, None)
+                start_run(request, self.account, self.state)
 
         self.assertEqual(error.exception.code, ApiErrorCode.FAB_DOWNLOAD_FAILURE)
         mock_get_remote_fab.assert_not_called()
@@ -774,11 +787,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 ),
                 self.account,
                 self.state,
-                None,
             )
 
         self.assertEqual(response, AddAppResponse())
-        mock_get_remote_fab.assert_called_once_with(None, "@flwr/demo")
+        mock_get_remote_fab.assert_called_once_with("@flwr/demo")
         fab_hash = hashlib.sha256(fab_content).hexdigest()
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
         self.assertEqual(

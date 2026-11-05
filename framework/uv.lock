@@ -1448,7 +1448,7 @@ wheels = [
 
 [[package]]
 name = "flwr"
-version = "1.43.0"
+version = "1.44.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -1457,7 +1457,6 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "grpcio" },
-    { name = "grpcio-health-checking" },
     { name = "httpx" },
     { name = "iterators" },
     { name = "numpy" },
@@ -1557,7 +1556,6 @@ requires-dist = [
     { name = "dp-accounting", marker = "extra == 'dp'", specifier = ">=0.6.0,<0.7.0" },
     { name = "fastapi", specifier = ">=0.138.0,<0.139.0" },
     { name = "grpcio", specifier = ">=1.70.0,<2.0.0" },
-    { name = "grpcio-health-checking", specifier = ">=1.70.0,<2.0.0" },
     { name = "httpx", specifier = ">=0.28.1,<1.0.0" },
     { name = "iterators", specifier = ">=0.0.2,<0.0.3" },
     { name = "mcp", marker = "extra == 'agent'", specifier = ">=1.26.0,<2.0.0" },
@@ -2020,19 +2018,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/05/33a7a4985586f27e1de4803887c417ec7ced145ebd069bc38a9607059e2b/grpcio-1.78.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:207db540302c884b8848036b80db352a832b99dfdf41db1eb554c2c2c7800f65", size = 7696837, upload-time = "2026-02-06T09:56:40.173Z" },
     { url = "https://files.pythonhosted.org/packages/73/77/7382241caf88729b106e49e7d18e3116216c778e6a7e833826eb96de22f7/grpcio-1.78.0-cp314-cp314-win32.whl", hash = "sha256:57bab6deef2f4f1ca76cc04565df38dc5713ae6c17de690721bdf30cb1e0545c", size = 4142439, upload-time = "2026-02-06T09:56:43.258Z" },
     { url = "https://files.pythonhosted.org/packages/48/b2/b096ccce418882fbfda4f7496f9357aaa9a5af1896a9a7f60d9f2b275a06/grpcio-1.78.0-cp314-cp314-win_amd64.whl", hash = "sha256:dce09d6116df20a96acfdbf85e4866258c3758180e8c49845d6ba8248b6d0bbb", size = 4929852, upload-time = "2026-02-06T09:56:45.885Z" },
-]
-
-[[package]]
-name = "grpcio-health-checking"
-version = "1.71.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "grpcio" },
-    { name = "protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/53/86/20994347ef36b7626fb74539f13128100dd8b7eaac67efc063264e6cdc80/grpcio_health_checking-1.71.2.tar.gz", hash = "sha256:1c21ece88c641932f432b573ef504b20603bdf030ad4e1ec35dd7fdb4ea02637", size = 16770, upload-time = "2025-06-28T04:24:08.768Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/74/7bc6ab96bf1083cab2684f9c3ae434caa638de3d5c5574e8435e2c146598/grpcio_health_checking-1.71.2-py3-none-any.whl", hash = "sha256:f91db41410d6bd18a7828c5b6ac2bebd77a63483263cbe42bf3c0c9b86cece33", size = 18918, upload-time = "2025-06-28T04:23:56.923Z" },
 ]
 
 [[package]]

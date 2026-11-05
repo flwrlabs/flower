@@ -17,7 +17,6 @@
 # pylint: disable=too-many-lines
 
 import inspect
-from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import Mock, call, patch
@@ -35,21 +34,25 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto import control_pb2
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
+    AgentConfig,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
+    CreateAgentRequest,
+    CreateAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListRunsRequest,
@@ -66,13 +69,15 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState
+from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
     AccountInfo,
 )
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
@@ -87,6 +92,7 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
+from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.routers.control.middlewares import ControlAuthenticationMiddleware
 from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
@@ -161,20 +167,102 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
         }
 
 
-def test_control_http_routes_cover_all_grpc_methods() -> None:
-    """Expose every Control gRPC request type plus HTTP-only token refresh."""
-    grpc_request_types = Counter(
-        method.input_type.full_name
-        for method in control_pb2.DESCRIPTOR.services_by_name["Control"].methods
-    )
-    http_request_types = Counter(
-        request_type.DESCRIPTOR.full_name
-        for (method, path), request_type in PROTOBUF_REQUEST_TYPES.items()
-        if method == "POST" and path.startswith("/v1/control/")
-    )
-    grpc_request_types[RefreshAuthTokensRequest.DESCRIPTOR.full_name] += 1
+@pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
+def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
+    """Persist an agent through HTTP and list only the authenticated owner's agents."""
+    state = LinkStateFactory(
+        database, NoOpFederationManager(), ObjectStoreFactory()
+    ).state()
+    config = AgentConfig(name="Research Agent", app_spec="@flower/research==1.2.3")
+    assert state.create_agent(flwr_aid="other-account", config=config) is not None
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    client = TestClient(app)
+    headers = {
+        "authorization": "Bearer access-token",
+        "content-type": PROTOBUF_MEDIA_TYPE,
+    }
 
-    assert http_request_types == grpc_request_types
+    response = client.post(
+        "/v1/control/create-agent",
+        content=CreateAgentRequest(config=config).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    agent = CreateAgentResponse.FromString(response.content).agent
+    assert agent.id > 0
+    assert agent.config == config
+    assert agent.created_at and agent.updated_at == agent.created_at
+    assert state.list_agents(_ACCOUNT.flwr_aid) == [agent]
+
+    response = client.post(
+        "/v1/control/list-agents",
+        content=ListAgentsRequest().SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert ListAgentsResponse.FromString(response.content).agents == [agent]
+
+
+@pytest.mark.parametrize(
+    ("protobuf_request", "detail"),
+    [
+        (CreateAgentRequest(), "configuration"),
+        (
+            CreateAgentRequest(config=AgentConfig(app_spec="@flower/research")),
+            "name",
+        ),
+        (
+            CreateAgentRequest(
+                config=AgentConfig(name="  ", app_spec="@flower/research")
+            ),
+            "name",
+        ),
+        (CreateAgentRequest(config=AgentConfig(name="Research")), "app"),
+        (
+            CreateAgentRequest(config=AgentConfig(name="Research", app_spec="invalid")),
+            "app",
+        ),
+        (
+            CreateAgentRequest(
+                config=AgentConfig(
+                    name="Research", app_spec="@flower/research", title=""
+                )
+            ),
+            "title",
+        ),
+        (
+            CreateAgentRequest(
+                config=AgentConfig(
+                    name="Research", app_spec="@flower/research", description=""
+                )
+            ),
+            "description",
+        ),
+    ],
+)
+def test_agent_creation_rejects_invalid_requests(
+    protobuf_request: CreateAgentRequest, detail: str
+) -> None:
+    """Report invalid input as HTTP 400 without attempting to store an agent."""
+    state = Mock(spec=LinkState)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+
+    response = TestClient(app).post(
+        "/v1/control/create-agent",
+        content=protobuf_request.SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == ApiErrorCode.INVALID_AGENT_REQUEST.value
+    assert detail in response.json()["extra"].lower()
+    state.create_agent.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -301,6 +389,8 @@ def test_connector_route_returns_existing_structured_error() -> None:
 @pytest.mark.parametrize(
     ("path", "protobuf_request", "handler_name"),
     [
+        ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
+        ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",
             ListConnectorsRequest(),
@@ -323,7 +413,7 @@ def test_connector_route_returns_existing_structured_error() -> None:
         ),
     ],
 )
-def test_connector_routes_reject_invalid_access_tokens_without_refresh(
+def test_control_routes_reject_invalid_access_tokens_without_refresh(
     path: str,
     protobuf_request: Message,
     handler_name: str,
@@ -498,7 +588,6 @@ def test_start_run_forwards_resolved_source() -> None:
             request,
             linkstate,
             _ACCOUNT,
-            "grpc-rere",
             "unknown",
             Mock(),
         )
@@ -508,7 +597,6 @@ def test_start_run_forwards_resolved_source() -> None:
         request,
         _ACCOUNT,
         linkstate,
-        "grpc-rere",
         source="unknown",
     )
 
@@ -527,7 +615,6 @@ def test_start_run_forwards_caller_provided_source() -> None:
             request,
             linkstate,
             _ACCOUNT,
-            fleet_api_type="grpc-rere",
             run_source="cli",
             tracing=Mock(),
         )
@@ -539,7 +626,6 @@ def test_start_run_reads_client_metadata_header() -> None:
     """Read and normalize the client metadata header through the HTTP stack."""
     linkstate = Mock(spec=LinkState)
     app = _create_app()
-    app.state.fleet_api_type = "grpc-rere"
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     expected = StartRunResponse(run_id=1)
 
@@ -565,13 +651,12 @@ def test_start_run_reads_client_metadata_header() -> None:
         StartRunRequest(),
         _ACCOUNT,
         linkstate,
-        "grpc-rere",
         source="web_ui",
     )
 
 
-def test_add_app_forwards_fleet_api_type() -> None:
-    """Forward the configured Fleet API transport type to the control handler."""
+def test_add_app_forwards_request() -> None:
+    """Forward the request to the control handler."""
     request = AddAppRequest()
     linkstate = Mock()
     expected = AddAppResponse()
@@ -580,10 +665,10 @@ def test_add_app_forwards_fleet_api_type() -> None:
         "flwr.superlink.routers.control.router.control_handlers.add_app",
         return_value=expected,
     ) as add_app:
-        response = add_app_route(request, linkstate, _ACCOUNT, "grpc-rere")
+        response = add_app_route(request, linkstate, _ACCOUNT)
 
     assert response is expected
-    add_app.assert_called_once_with(request, _ACCOUNT, linkstate, "grpc-rere")
+    add_app.assert_called_once_with(request, _ACCOUNT, linkstate)
 
 
 def test_protobuf_request_without_handler_response_returns_internal_error() -> None:

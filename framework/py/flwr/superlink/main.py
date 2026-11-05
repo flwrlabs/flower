@@ -28,8 +28,8 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.supercore import log
+from flwr.supercore.auth import load_superexec_auth_secret
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.error import ApiErrorCode, http_error_translator
@@ -122,9 +122,10 @@ def create_app(  # pylint: disable=too-many-statements
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
-        superexec_auth_secret = None
+        superexec_auth_secret = load_superexec_auth_secret(
+            os.getenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE")
+        )
         artifact_provider = None
-        fleet_api_type = TRANSPORT_TYPE_GRPC_RERE
         authn_plugin = load_control_authn_plugin()
         event_log_plugin = (
             load_control_event_log_plugin()
@@ -139,7 +140,6 @@ def create_app(  # pylint: disable=too-many-statements
         database = config.database
         superexec_auth_secret = config.superexec_auth_secret
         artifact_provider = config.artifact_provider
-        fleet_api_type = config.fleet_api_type
         authn_plugin = config.authn_plugin
         event_log_plugin = config.event_log_plugin
         fleet_log_plugin = config.fleet_event_log_plugin
@@ -151,7 +151,7 @@ def create_app(  # pylint: disable=too-many-statements
     # Force initialization before exposing LinkState through FastAPI dependencies
     linkstate_factory.state()
 
-    # Instantiate the lifespan which owns the Control and Fleet gRPC servers.
+    # Instantiate the lifespan for process-wide resources.
     superlink_lifespan = None
     if config:
         if superlink_lifespan_class is None:
@@ -167,8 +167,6 @@ def create_app(  # pylint: disable=too-many-statements
 
         try:
             if superlink_lifespan:
-                # Temporary compatibility path: start the existing gRPC APIs from
-                # FastAPI lifespan
                 superlink_lifespan.startup()
 
             lifespan_state: dict[str, object] = {}
@@ -207,7 +205,6 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app.state.runtime_handlers = _RUNTIME_HANDLERS
     fastapi_app.state.superexec_auth_secret = superexec_auth_secret
     fastapi_app.state.artifact_provider = artifact_provider
-    fastapi_app.state.fleet_api_type = fleet_api_type
     fastapi_app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     fastapi_app.state.control_event_log_plugin = event_log_plugin
     fastapi_app.state.fleet_event_log_plugin = fleet_log_plugin

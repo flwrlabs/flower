@@ -27,6 +27,25 @@ from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INST
 from flwr.supercore import log
 
 
+def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
+    """Warn about the unused gRPC health server option without showing it in help."""
+    parser.add_argument(
+        "--health-server-address",
+        type=_warn_unused_health_server_address,
+        nargs="?",
+        const="",
+        help=argparse.SUPPRESS,
+    )
+
+
+def _warn_unused_health_server_address(_value: str) -> None:
+    log(
+        WARN,
+        "The `--health-server-address` argument is no longer used. "
+        "Use the `/health` HTTP endpoint instead.",
+    )
+
+
 def add_args_runtime_dependency_install(
     parser: argparse.ArgumentParser,
     default: bool = RUNTIME_DEPENDENCY_INSTALL,
@@ -97,7 +116,7 @@ def add_args_flwr_app_common(
         "--insecure",
         action="store_true",
         help="Run the server without HTTPS, regardless of whether certificate "
-        "paths are provided. Data transmitted between the gRPC client and server "
+        "paths are provided. Data transmitted between the client and server "
         "is not encrypted. By default, the server runs with HTTPS enabled. "
         "Use this flag only if you understand the risks.",
     )
@@ -177,7 +196,7 @@ def _try_obtain_flwr_app_token_from_stdin() -> str:
 
 def try_obtain_root_certificates(
     args: argparse.Namespace,
-    grpc_server_address: str,
+    server_address: str,
 ) -> bytes | str | None:
     """Validate and return the root certificates."""
     root_cert_path: str | None = args.root_certificates
@@ -192,7 +211,7 @@ def try_obtain_root_certificates(
         log(
             WARN,
             "Option `--insecure` was set. Starting insecure channel to %s.",
-            grpc_server_address,
+            server_address,
         )
         root_certificates = None
     else:
@@ -209,7 +228,7 @@ def try_obtain_root_certificates(
             DEBUG,
             "Starting secure HTTPS channel to %s "
             "with the following certificates: %s.",
-            grpc_server_address,
+            server_address,
             root_cert_path,
         )
     return root_certificates
