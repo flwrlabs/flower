@@ -343,7 +343,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
-        *,
         space_id: UUID | None = None,
     ) -> int:
         """Create a new run."""
