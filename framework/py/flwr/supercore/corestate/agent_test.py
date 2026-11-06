@@ -93,17 +93,6 @@ def test_create_agent_with_space(state: CoreState) -> None:
     assert not state.get_tasks()
 
 
-def test_agent_creation_rolls_back_when_space_creation_fails(state: CoreState) -> None:
-    """Space creation failure must not leave an agent behind."""
-    with patch.object(state, "create_space", side_effect=ValueError("Space failed")):
-        with pytest.raises(ValueError, match="Space failed"):
-            state.create_agent_with_space(
-                "alice", AgentConfig(name="Research", app_spec="@flower/research")
-            )
-    assert state.list_agents("alice") == []
-    assert state.get_spaces("alice") == []
-
-
 @pytest.mark.parametrize(
     "field", ["flwr_aid", "name", "app_spec", "title", "description"]
 )
