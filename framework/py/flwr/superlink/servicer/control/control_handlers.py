@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import json
+import os
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -963,21 +964,37 @@ def stream_run_events(
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
+
+    raw_interval = os.getenv(
+        "FLWR_RUN_EVENTS_STREAM_INTERVAL", str(RUN_EVENTS_STREAM_INTERVAL)
+    )
+    try:
+        poll_interval = float(raw_interval)
+        if not 0.01 <= poll_interval <= 60:
+            raise ValueError
+    except ValueError as err:
+        raise ValueError(
+            "FLWR_RUN_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
+            f"between 0.01 and 60, got {raw_interval!r}."
+        ) from err
+
     return _stream_run_events(
         run_id,
         run,
         after_task_event_id,
         state,
         is_active,
+        poll_interval,
     )
 
 
-def _stream_run_events(
+def _stream_run_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     run_id: int,
     run: Run,
     after_task_event_id: int | None,
     state: LinkState,
     is_active: Callable[[], bool] | None,
+    poll_interval: float,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Yield task events until the run finishes or the stream is cancelled."""
     # LinkState creates every run with a primary task, so casting is safe
@@ -1007,7 +1024,7 @@ def _stream_run_events(
         if run.status.status == Status.FINISHED:
             continue
 
-        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+        time.sleep(poll_interval)
 
 
 def start_automation(  # pylint: disable=too-many-branches,too-many-locals
