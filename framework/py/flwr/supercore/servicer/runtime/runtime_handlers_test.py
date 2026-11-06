@@ -20,10 +20,12 @@ from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
 from fastapi import status
 
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -33,12 +35,16 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
     GetCompactedContextsRequest,
+    GetFileRequest,
+    ListFilesRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskEventsResponse,
     PushTaskMessageRequest,
     PutCompactedContextRequest,
+    PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
@@ -50,6 +56,115 @@ from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
+
+
+@pytest.mark.parametrize("expected_revision", [None, 0, 7])
+def test_put_file(expected_revision: int | None) -> None:
+    """Preserve create-only and explicit revision preconditions in the series scope."""
+    state = Mock()
+    state.put_file.return_value = 8
+    response = runtime_handlers.put_file(
+        PutFileRequest(key="file", data=b"", expected_revision=expected_revision),
+        state,
+        456,
+    )
+
+    assert response.revision == 8
+    state.put_file.assert_called_once_with(
+        scope="run-series-456",
+        key="file",
+        data=b"",
+        expected_revision=expected_revision,
+    )
+
+
+@pytest.mark.parametrize(
+    "file", [None, File(metadata=FileMetadata(key="file", revision=7), data=b"data")]
+)
+def test_get_file(file: File | None) -> None:
+    """Return the series's current file, or leave the response field absent."""
+    state = Mock()
+    state.get_file.return_value = file
+    response = runtime_handlers.get_file(GetFileRequest(key="file"), state, 456)
+
+    state.get_file.assert_called_once_with(scope="run-series-456", key="file")
+    assert response.HasField("file") == (file is not None)
+    if file is not None:
+        assert response.file == file
+
+
+@pytest.mark.parametrize(
+    ("limit", "keys", "expected_keys", "next_start_after"),
+    [
+        (None, ["a", "b", "c"], ["a", "b", "c"], ""),
+        (0, [], [], ""),
+        (1, [], [], ""),
+        (1, ["a"], ["a"], ""),
+        (1, ["a", "b"], ["a"], "a"),
+        (2, ["a"], ["a"], ""),
+        (2, ["a", "b"], ["a", "b"], ""),
+        (2, ["a", "b", "c"], ["a", "b"], "b"),
+        (2**32 - 1, ["a"], ["a"], ""),
+    ],
+)
+def test_list_files(
+    limit: int | None,
+    keys: list[str],
+    expected_keys: list[str],
+    next_start_after: str,
+) -> None:
+    """Forward filters and return a cursor only when another page exists."""
+    state = Mock()
+    files = [FileMetadata(key=key, revision=7, size_bytes=8) for key in keys]
+    state.list_files.return_value = files
+    response = runtime_handlers.list_files(
+        ListFilesRequest(prefix="prefix/", start_after="previous", limit=limit),
+        state,
+        456,
+    )
+
+    state.list_files.assert_called_once_with(
+        scope="run-series-456",
+        prefix="prefix/",
+        start_after="previous",
+        limit=limit + 1 if limit else limit,
+    )
+    assert [file.key for file in response.files] == expected_keys
+    assert list(response.files) == files[:limit]
+    assert response.next_start_after == next_start_after
+
+
+def test_delete_file() -> None:
+    """Delete the series's file using the supplied revision precondition."""
+    state = Mock()
+    response = runtime_handlers.delete_file(
+        DeleteFileRequest(key="file", expected_revision=7),
+        state,
+        456,
+    )
+
+    state.delete_file.assert_called_once_with(
+        scope="run-series-456", key="file", expected_revision=7
+    )
+    assert not response.ListFields()
+
+
+@pytest.mark.parametrize("operation", ["put_file", "delete_file"])
+def test_file_revision_conflict(operation: str) -> None:
+    """Propagate CoreState's revision conflicts without changing the error."""
+    state = Mock()
+    error = FlowerError(ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT, "Conflict")
+    getattr(state, operation).side_effect = error
+    request = (
+        PutFileRequest(key="file", data=b"data", expected_revision=7)
+        if operation == "put_file"
+        else DeleteFileRequest(key="file", expected_revision=7)
+    )
+
+    with pytest.raises(FlowerError) as caught:
+        getattr(runtime_handlers, operation)(request, state, 456)
+
+    assert caught.value is error
 
 
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904

@@ -278,28 +278,67 @@ def push_logs(
     return PushLogsResponse()
 
 
-def put_file(request: PutFileRequest, state: CoreState, task: Task) -> PutFileResponse:
-    """Store a file."""
-    raise NotImplementedError
+def put_file(
+    request: PutFileRequest, state: CoreState, series_id: int
+) -> PutFileResponse:
+    """Store a file in the authenticated task's run series."""
+    log(DEBUG, "Runtime.PutFile")
+    revision = state.put_file(
+        scope=_file_scope(series_id),
+        key=request.key,
+        data=request.data,
+        expected_revision=(
+            request.expected_revision if request.HasField("expected_revision") else None
+        ),
+    )
+    return PutFileResponse(revision=revision)
 
 
-def get_file(request: GetFileRequest, state: CoreState, task: Task) -> GetFileResponse:
-    """Get a file."""
-    raise NotImplementedError
+def get_file(
+    request: GetFileRequest, state: CoreState, series_id: int
+) -> GetFileResponse:
+    """Get a file from the authenticated task's run series."""
+    log(DEBUG, "Runtime.GetFile")
+    return GetFileResponse(
+        file=state.get_file(scope=_file_scope(series_id), key=request.key)
+    )
 
 
 def list_files(
-    request: ListFilesRequest, state: CoreState, task: Task
+    request: ListFilesRequest, state: CoreState, series_id: int
 ) -> ListFilesResponse:
-    """List file metadata."""
-    raise NotImplementedError
+    """List file metadata in the authenticated task's run series."""
+    log(DEBUG, "Runtime.ListFiles")
+    limit = request.limit if request.HasField("limit") else None
+    files = state.list_files(
+        scope=_file_scope(series_id),
+        prefix=request.prefix,
+        start_after=request.start_after,
+        limit=limit + 1 if limit else limit,
+    )
+    return ListFilesResponse(
+        files=files[:limit],
+        next_start_after=files[limit - 1].key if limit and len(files) > limit else "",
+    )
 
 
 def delete_file(
-    request: DeleteFileRequest, state: CoreState, task: Task
+    request: DeleteFileRequest, state: CoreState, series_id: int
 ) -> DeleteFileResponse:
-    """Delete a file."""
-    raise NotImplementedError
+    """Delete a file in the authenticated task's run series."""
+    log(DEBUG, "Runtime.DeleteFile")
+    state.delete_file(
+        scope=_file_scope(series_id),
+        key=request.key,
+        expected_revision=request.expected_revision,
+    )
+    return DeleteFileResponse()
+
+
+def _file_scope(series_id: int) -> str:
+    """Return the temporary file namespace for a run series."""
+    # shortcut: scope to the run series for now; use agent ID when available.
+    return f"run-series-{series_id}"
 
 
 def _validate_create_task_request(
