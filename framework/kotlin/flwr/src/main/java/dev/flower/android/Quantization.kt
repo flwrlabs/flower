@@ -173,19 +173,27 @@ object Quantization {
 
         while (elemIdx < totalElements) {
             val scale = quantized.scales[blockIdx]
-            require(scale.isFinite()) {
-                "Scale at block $blockIdx is non-finite: $scale"
+            require(scale.isFinite() && scale <= Float.MAX_VALUE / 8.0f) {
+                "Scale at block $blockIdx is invalid or causes overflow: $scale"
             }
             val blockEnd = minOf((blockIdx + 1) * blockSize, totalElements)
 
             while (elemIdx < blockEnd) {
                 val b = buffer.get().toInt()
                 val q0 = ((b shr 4) and 0x0F) - 8
-                restored[elemIdx++] = q0 * scale
+                val v0 = q0 * scale
+                require(v0.isFinite()) {
+                    "Decoded non-finite value at index $elemIdx: $v0"
+                }
+                restored[elemIdx++] = v0
 
                 if (elemIdx < blockEnd) {
                     val q1 = (b and 0x0F) - 8
-                    restored[elemIdx++] = q1 * scale
+                    val v1 = q1 * scale
+                    require(v1.isFinite()) {
+                        "Decoded non-finite value at index $elemIdx: $v1"
+                    }
+                    restored[elemIdx++] = v1
                 }
             }
             blockIdx++

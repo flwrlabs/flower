@@ -115,6 +115,21 @@ class QuantizationTest {
     }
 
     @Test
+    fun testOverflowingScaleRejectedInDequantize() {
+        // A scale near Float.MAX_VALUE would overflow Float when multiplied by non-zero nibbles
+        val buffer = ByteBuffer.wrap(byteArrayOf(0xFF.toByte()))
+        val invalidQuantized = QuantizedBuffer(
+            buffer = buffer,
+            scales = floatArrayOf(Float.MAX_VALUE),
+            originalLength = 2,
+            blockSize = 64
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            Quantization.dequantizeFromInt4(invalidQuantized)
+        }
+    }
+
+    @Test
     fun testOddAndEvenLengthsFidelity() {
         val rng = Random(42)
         val testSizes = intArrayOf(1, 2, 63, 64, 65, 128, 257)
