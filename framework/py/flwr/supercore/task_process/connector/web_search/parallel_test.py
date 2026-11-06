@@ -15,13 +15,14 @@
 """Tests for the anonymous Parallel MCP adapter (synthetic responses)."""
 
 import json
-
-# Real Response objects exercise requests encoding and redirect handling.
-# pylint: disable=protected-access
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
+from threading import Event, Thread
 from unittest.mock import Mock
 
 import pytest
 import requests
+from urllib3.response import HTTPResponse
 
 from flwr.supercore.version import package_name, package_version
 
@@ -31,6 +32,10 @@ from .parallel import (
     _parse_results,
     _read_messages,
 )
+
+
+def _set_body(response: requests.Response, body: bytes) -> None:
+    response.raw = HTTPResponse(body=BytesIO(body), preload_content=False)
 
 
 @pytest.mark.parametrize("sse", [True, False])
@@ -61,14 +66,14 @@ def test_search_mcp_lifecycle(
         response.url = request.url
         response.request = request
         if request.method == "DELETE":
-            response._content = b""
+            _set_body(response, b"")
             return response
         assert request.body is not None
         body = json.loads(request.body)
         method = body["method"]
         if method == "notifications/initialized":
             response.status_code = 202
-            response._content = b""
+            _set_body(response, b"")
             return response
         result = {
             "initialize": {"protocolVersion": "2025-03-26"},
@@ -99,7 +104,7 @@ def test_search_mcp_lifecycle(
             )
         else:
             response.headers["Content-Type"] = "application/json"
-        response._content = data.encode("utf-8")
+        _set_body(response, data.encode("utf-8"))
         if method == "initialize":
             response.headers["Mcp-Session-Id"] = "test-session"
         if method == "tools/call":
@@ -148,7 +153,7 @@ def test_transport_errors_are_not_retried(
     response = requests.Response()
     response.status_code = status
     response.headers["Location"] = "https://example.com/redirect"
-    response._content = json.dumps({"id": 1, **body}).encode()
+    _set_body(response, json.dumps({"id": 1, **body}).encode())
     send = Mock(return_value=response)
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
     with pytest.raises(RuntimeError, match="parallel MCP"):
@@ -198,7 +203,7 @@ def test_tool_failures_close_session(
     def response(body: object) -> requests.Response:
         result = requests.Response()
         result.status_code = 200
-        result._content = json.dumps(body).encode()
+        _set_body(result, json.dumps(body).encode())
         return result
 
     initialized = response({"id": 1, "result": {"protocolVersion": "2025-03-26"}})
@@ -253,9 +258,9 @@ def test_response_preserves_unicode_excerpts(
                 "",
             ]
         )
-    response._content = data.encode("utf-8")
+    _set_body(response, data.encode("utf-8"))
 
-    assert _read_messages(response) == [{"results": [{"excerpts": [excerpt]}]}]
+    assert list(_read_messages(response)) == [{"results": [{"excerpts": [excerpt]}]}]
 
 
 @pytest.mark.parametrize("line_ending", ["\n", "\r\n", "\r"])
@@ -278,16 +283,172 @@ def test_sse_errors_are_surfaced(
     response = requests.Response()
     response.status_code = 200
     response.headers["Content-Type"] = "text/event-stream"
-    response._content = line_ending.join(
+    body = line_ending.join(
         [
             *[f"data: {line}" for line in data.split("\n")],
             "",
             "",
         ]
     ).encode("utf-8")
+    _set_body(response, body)
     send = Mock(return_value=response)
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
 
     with pytest.raises(RuntimeError, match=message):
         ParallelWebSearchProvider().search("Flower")
     send.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "content_type", ["text/event-stream", "TeXt/EvEnT-StReAm ; Charset=UTF-8"]
+)
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n", "\r", "mixed"])
+@pytest.mark.parametrize("rpc_error", [False, True])
+def test_search_returns_before_sse_eof(
+    monkeypatch: pytest.MonkeyPatch,
+    content_type: str,
+    line_ending: str,
+    rpc_error: bool,
+) -> None:
+    """A real HTTP server keeps the short SSE reply open until the client returns."""
+    # pylint: disable=too-many-statements
+    flushed, release, done = Event(), Event(), Event()
+    outcomes: list[object] = []
+    requests_seen: list[tuple[str, str | None]] = []
+    excerpt = "before\u0085between\u2028another\u2029after"
+
+    class Handler(BaseHTTPRequestHandler):
+        """Serve a complete reply without closing its SSE connection."""
+
+        protocol_version = "HTTP/1.1"
+
+        def do_POST(self) -> None:  # pylint: disable=invalid-name
+            """Serve MCP replies, leaving only the tools/call response open."""
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            method = body["method"]
+            requests_seen.append((method, self.headers.get("User-Agent")))
+            if method == "notifications/initialized":
+                self.send_response(202)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            result = {
+                "initialize": {"protocolVersion": "2025-03-26"},
+                "tools/list": {"tools": [{"name": "web_search"}]},
+                "tools/call": {
+                    "structuredContent": {
+                        "results": [
+                            {
+                                "title": "Flower",
+                                "url": "https://flower.ai",
+                                "excerpts": [excerpt],
+                            }
+                        ]
+                    }
+                },
+            }[method]
+            reply = {"id": body["id"], "result": result}
+            if method == "tools/call" and rpc_error:
+                reply = {"id": body["id"], "error": {"code": -32000}}
+            self.send_response(200)
+            if method != "tools/call":
+                json_body = json.dumps(reply).encode()
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Mcp-Session-Id", "fixture-session")
+                self.send_header("Content-Length", str(len(json_body)))
+                self.end_headers()
+                self.wfile.write(json_body)
+                return
+            self.send_header("Content-Type", content_type)
+            self.end_headers()
+            lines = [
+                ": heartbeat",
+                'data: {"method":"ping"}',
+                "",
+                'data: {"id":999,"result":{}}',
+                "",
+                *[
+                    "data: " + line
+                    for line in json.dumps(reply, ensure_ascii=False, indent=2).split(
+                        "\n"
+                    )
+                ],
+                "",
+                "",
+            ]
+            endings = ["\r\n", "\n", "\r"] if line_ending == "mixed" else [line_ending]
+            data = "".join(
+                line + endings[index % len(endings)] for index, line in enumerate(lines)
+            )
+            self.wfile.write(data.encode("utf-8"))
+            self.wfile.flush()
+            flushed.set()
+            release.wait(5)
+            # pylint: disable-next=attribute-defined-outside-init
+            self.close_connection = True
+
+        def do_DELETE(self) -> None:  # pylint: disable=invalid-name
+            """Acknowledge MCP session cleanup while the search stream is open."""
+            requests_seen.append(("DELETE", self.headers.get("User-Agent")))
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        # pylint: disable-next=arguments-differ
+        def log_message(self, _format: str, *args: object) -> None:
+            """Keep local HTTP logs out of test output."""
+
+    def search() -> None:
+        try:
+            outcomes.append(ParallelWebSearchProvider().search("Flower"))
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            outcomes.append(exc)
+        finally:
+            done.set()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server_thread = Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
+    server_thread.start()
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_search.parallel.PARALLEL_MCP_URL",
+        f"http://127.0.0.1:{server.server_port}/mcp",
+    )
+    client_thread = Thread(target=search, daemon=True)
+    client_thread.start()
+    try:
+        assert flushed.wait(3), "fixture did not flush the complete RPC reply"
+        assert done.wait(1), "client waited for EOF after a complete RPC reply"
+        if rpc_error:
+            assert isinstance(outcomes[0], RuntimeError)
+            assert "RPC error" in str(outcomes[0])
+        else:
+            assert outcomes == [
+                {
+                    "results": [
+                        {
+                            "title": "Flower",
+                            "url": "https://flower.ai",
+                            "snippet": excerpt,
+                            "published_at": None,
+                        }
+                    ]
+                }
+            ]
+        assert [method for method, _ in requests_seen] == [
+            "initialize",
+            "notifications/initialized",
+            "tools/list",
+            "tools/call",
+            "DELETE",
+        ]
+        assert all(
+            agent == f"{package_name}/{package_version}" for _, agent in requests_seen
+        )
+    finally:
+        release.set()
+        client_thread.join(timeout=3)
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=3)

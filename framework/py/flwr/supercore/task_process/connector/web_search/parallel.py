@@ -15,7 +15,7 @@
 """Anonymous Parallel Unified MCP web search adapter."""
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import cast
 
 import requests
@@ -97,6 +97,7 @@ class ParallelWebSearchProvider:
                             PARALLEL_MCP_URL,
                             timeout=REQUEST_TIMEOUT,
                             allow_redirects=False,
+                            stream=True,
                         ).close()
                     except requests.RequestException:
                         pass
@@ -114,7 +115,11 @@ def _rpc(
     if params is not None:
         body["params"] = params
     with session.post(
-        PARALLEL_MCP_URL, json=body, timeout=REQUEST_TIMEOUT, allow_redirects=False
+        PARALLEL_MCP_URL,
+        json=body,
+        timeout=REQUEST_TIMEOUT,
+        allow_redirects=False,
+        stream=True,
     ) as response:
         if not 200 <= response.status_code < 300:
             raise RuntimeError(
@@ -133,23 +138,41 @@ def _rpc(
             result = message.get("result")
             if isinstance(result, dict):
                 return result
+            break
         raise RuntimeError("parallel MCP returned no matching result.")
 
 
-def _read_messages(response: requests.Response) -> list[JSONValue]:
-    if not response.headers.get("Content-Type", "").startswith("text/event-stream"):
-        return [cast(JSONValue, response.json())]
+def _read_messages(response: requests.Response) -> Iterator[JSONValue]:
+    media_type = (
+        response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+    )
+    if media_type != "text/event-stream":
+        yield cast(JSONValue, response.json())
+        return
     response.encoding = "utf-8"
-    messages: list[JSONValue] = []
-    # Only CR and LF delimit SSE lines; Unicode separators may occur in JSON.
-    text = response.text.replace("\r\n", "\n").replace("\r", "\n")
-    for event in text.split("\n\n"):
-        data = [
-            line[5:].lstrip() for line in event.split("\n") if line.startswith("data:")
-        ]
-        if data:
-            messages.append(json.loads("\n".join(data)))
-    return messages
+    data: list[str] = []
+    line = ""
+    skip_lf = False
+    # A small reply can arrive on a stream that stays open. Read without waiting
+    # for a full chunk, using requests' incremental UTF-8 decoder.
+    for char in response.iter_content(chunk_size=1, decode_unicode=True):
+        if skip_lf and char == "\n":
+            skip_lf = False
+            continue
+        skip_lf = char == "\r"
+        if char not in ("\r", "\n"):
+            line += char
+            continue
+        if not line and data:
+            yield json.loads("\n".join(data))
+            data.clear()
+        elif line.startswith("data:"):
+            data.append(line[5:].lstrip())
+        line = ""
+    if line.startswith("data:"):
+        data.append(line[5:].lstrip())
+    if data:
+        yield json.loads("\n".join(data))
 
 
 def _search_content(result: JSONObject) -> JSONObject:
