@@ -151,3 +151,34 @@ def test_unauthorized_response_requests_shutdown() -> None:
         assert invoker.invoke(target) == "success"
 
     kill.assert_called_once_with(os.getpid(), signal.SIGINT)
+
+
+@pytest.mark.parametrize("observer_fails", [False, True])
+@pytest.mark.parametrize("outcome", ["success", "recovery", "giveup"])
+def test_connection_observer_preserves_retry_results(
+    observer_fails: bool, outcome: str
+) -> None:
+    """Report attempts while preserving results and errors if observers fail."""
+    observer = Mock(
+        side_effect=RuntimeError("observer failed") if observer_fails else None
+    )
+    invoker = make_simple_http_retry_invoker(on_connection_state=observer)
+    invoker.max_tries = 2
+    invoker.wait_function = lambda _: None
+    error = _transport_error(httpx.ConnectError)
+    target = Mock(
+        side_effect={
+            "success": ["result"],
+            "recovery": [error, "result"],
+            "giveup": [error, error],
+        }[outcome]
+    )
+    if outcome == "giveup":
+        with pytest.raises(httpx.ConnectError) as raised:
+            invoker.invoke(target)
+        assert raised.value is error
+        expected = [False, False]
+    else:
+        assert invoker.invoke(target) == "result"
+        expected = [True] if outcome == "success" else [False, True]
+    assert [call.args[0] for call in observer.call_args_list] == expected
