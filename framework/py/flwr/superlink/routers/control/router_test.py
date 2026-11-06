@@ -74,6 +74,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     SpaceParticipant,
     StartRunRequest,
     StartRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -92,6 +94,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
+    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.translation import (
@@ -309,6 +312,51 @@ def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
     return app
 
 
+@pytest.mark.parametrize("media_type", [PROTOBUF_STREAM_MEDIA_TYPE, SSE_MEDIA_TYPE])
+def test_user_stream_transport(media_type: str) -> None:
+    """Expose one authenticated Control RPC with SSE and binary transports."""
+    app = _create_app()
+    state = Mock(spec=LinkState)
+    app.dependency_overrides[get_linkstate] = lambda: state
+    events = [
+        StreamEventsResponse(
+            id=7,
+            space_id="space",
+            task_event=TaskEvent(run_id=42, data='{"text":"Hello\\nWorld"}'),
+        ),
+    ]
+    request = StreamEventsRequest(after_event_id=5)
+    with patch.object(
+        control_handlers, "stream_events", return_value=iter(events)
+    ) as handler:
+        response = TestClient(app).post(
+            "/v1/control/stream-events",
+            content=request.SerializeToString(),
+            headers={
+                "content-type": PROTOBUF_MEDIA_TYPE,
+                "accept": media_type,
+                "authorization": "Bearer access-token",
+                "Last-Event-ID": "6",
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(media_type)
+    assert handler.call_args.args[:3] == (request, _ACCOUNT, state)
+    assert handler.call_args.kwargs["last_event_id"] == "6"
+    if media_type == SSE_MEDIA_TYPE:
+        frames = response.text.strip().split("\n\n")
+        assert frames[0].startswith("id: 7\n")
+        decoded = [
+            Parse(frame.split("data: ", 1)[1], StreamEventsResponse())
+            for frame in frames
+        ]
+        assert decoded == events
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-accel-buffering"] == "no"
+    else:
+        assert response.content == b"".join(frame_message(event) for event in events)
+
+
 def test_all_control_routes_have_protobuf_request_types() -> None:
     """Every Control route has exactly one protobuf request type mapping."""
     route_keys = {
@@ -333,6 +381,7 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
     stream_paths = {
         "/v1/control/stream-logs",
         "/v1/control/stream-run-events",
+        "/v1/control/stream-events",
     }
 
     assert control_routes
@@ -353,7 +402,11 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
         assert request_body["content"] == {
             PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
         }
-        assert set(success_content) == {expected_media_type}
+        expected_media_types = {expected_media_type}
+        if route.path in stream_paths:
+            expected_media_types.add(SSE_MEDIA_TYPE)
+            assert success_content[SSE_MEDIA_TYPE]["schema"] == {"type": "string"}
+        assert set(success_content) == expected_media_types
         assert success_content[expected_media_type]["schema"] == {
             "type": "string",
             "format": "binary",

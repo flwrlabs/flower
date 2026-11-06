@@ -34,6 +34,8 @@ CORESTATE_TABLE_NAMES = {
     "space",
     "space_participant",
     "space_message",
+    "control_event",
+    "control_event_sequence",
     "run_series",
     "compacted_contexts",
     "series_context",

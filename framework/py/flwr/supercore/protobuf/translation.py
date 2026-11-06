@@ -68,6 +68,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamEventsRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
@@ -116,11 +117,13 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
+    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
+    encode_sse_message,
     get_protobuf_stream_context,
 )
 
@@ -167,6 +170,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/complete-connector-oauth"): CompleteConnectorOAuthRequest,
     ("POST", "/v1/control/stream-logs"): StreamLogsRequest,
     ("POST", "/v1/control/stream-run-events"): StreamRunEventsRequest,
+    ("POST", "/v1/control/stream-events"): StreamEventsRequest,
     ("POST", "/v1/control/pull-artifacts"): PullArtifactsRequest,
     ("POST", "/v1/control/register-node"): RegisterNodeRequest,
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
@@ -267,7 +271,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         result = request.state.protobuf_response
         protobuf_response = self._response_for(
-            result, get_protobuf_stream_context(request)
+            result,
+            get_protobuf_stream_context(request),
+            sse=SSE_MEDIA_TYPE in request.headers.get("accept", "").lower(),
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
@@ -303,7 +309,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _response_for(
-        result: object, stream_context: ProtobufStreamContext
+        result: object, stream_context: ProtobufStreamContext, *, sse: bool = False
     ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
@@ -316,14 +322,17 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterator):
-            content = (
-                frame_message(message) for message in cast(Iterator[Message], result)
-            )
-            return CancellableProtobufStreamingResponse(
+            encode = encode_sse_message if sse else frame_message
+            content = (encode(message) for message in cast(Iterator[Message], result))
+            response = CancellableProtobufStreamingResponse(
                 content,
                 stream_context,
-                PROTOBUF_STREAM_MEDIA_TYPE,
+                SSE_MEDIA_TYPE if sse else PROTOBUF_STREAM_MEDIA_TYPE,
             )
+            if sse:
+                response.headers["Cache-Control"] = "no-store"
+                response.headers["X-Accel-Buffering"] = "no"
+            return response
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,

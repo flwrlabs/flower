@@ -70,6 +70,18 @@ erDiagram
     VARCHAR state
   }
 
+  control_event {
+    BIGINT id PK
+    CHAR(32) space_id FK "nullable"
+    VARCHAR flwr_aid "nullable"
+    BLOB payload
+  }
+
+  control_event_sequence {
+    INTEGER id PK
+    BIGINT last_id
+  }
+
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -308,6 +320,7 @@ erDiagram
     VARCHAR usage_type
   }
 
+  space ||--o{ control_event : space_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id

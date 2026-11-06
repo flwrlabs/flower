@@ -47,6 +47,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     SpaceMessage,
     SpaceParticipant,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -201,6 +202,8 @@ class InMemoryCoreState(
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
         self.lock_space_store = Lock()
+        self.control_events: list[tuple[str | None, UUID | None, bytes]] = []
+        self.lock_control_events = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -604,6 +607,9 @@ class InMemoryCoreState(
                 updated_at=created_at,
             )
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
+            self._store_control_event(
+                StreamEventsResponse(agent_created=agent), flwr_aid=flwr_aid
+            )
             return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
@@ -965,6 +971,36 @@ class InMemoryCoreState(
             )
         return True
 
+    def _store_control_event(
+        self,
+        event: StreamEventsResponse,
+        *,
+        flwr_aid: str | None = None,
+        space_id: UUID | None = None,
+    ) -> None:
+        """Record a change while the domain mutation's lock remains held."""
+        with self.lock_control_events:
+            event.id = len(self.control_events) + 1
+            event.created_at = now().isoformat()
+            event.space_id = str(space_id) if space_id is not None else ""
+            self.control_events.append((flwr_aid, space_id, event.SerializeToString()))
+
+    def get_control_events(
+        self, flwr_aid: str, *, after_id: int = 0, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read changes using current Space participation, including shared spaces."""
+        if after_id < 0 or limit <= 0:
+            raise ValueError("Cursor must be nonnegative and limit must be positive.")
+        spaces = {UUID(space.id) for space in self.get_spaces(flwr_aid)}
+        with self.lock_control_events:
+            result = []
+            for owner, space_id, payload in self.control_events[after_id:]:
+                if owner == flwr_aid or space_id in spaces:
+                    result.append(StreamEventsResponse.FromString(payload))
+                    if len(result) == limit:
+                        break
+            return result
+
     def create_space(
         self,
         *,
@@ -997,6 +1033,9 @@ class InMemoryCoreState(
             )
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
+            self._store_control_event(
+                StreamEventsResponse(space_created=space), space_id=space_id
+            )
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
@@ -1030,6 +1069,9 @@ class InMemoryCoreState(
                 content=content,
             )
             self.space_message_store[space_id].append(message)
+            self._store_control_event(
+                StreamEventsResponse(message_created=message), space_id=space_id
+            )
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
@@ -1627,6 +1669,7 @@ class InMemoryCoreState(
                 active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
+            self._on_task_status_changed(task_id)
             return token
 
     def activate_task(self, task_id: int) -> bool:
@@ -1650,6 +1693,7 @@ class InMemoryCoreState(
                 record.active_until = activated_at + timedelta(
                     seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
                 )
+            self._on_task_status_changed(task_id)
             return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
@@ -1683,6 +1727,7 @@ class InMemoryCoreState(
             # Revoke any existing task token now that the task is finished.
             if (record := self.task_token_store.pop(task_id, None)) is not None:
                 self.task_token_to_task_id.pop(record.token, None)
+            self._on_task_status_changed(task_id)
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -1833,6 +1878,8 @@ class InMemoryCoreState(
                 task_events.append(event)
                 self._next_task_event_id += 1
 
+            self._on_task_events_stored(events)
+
         return True
 
     def get_task_events(  # pylint: disable=too-many-arguments
@@ -1911,6 +1958,8 @@ class InMemoryCoreState(
                     expired_tasks.append(expired_task)
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
+                if task is not None:
+                    self._on_task_status_changed(task_id)
 
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)

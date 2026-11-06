@@ -156,6 +156,37 @@ message SendSpaceMessageRequest {
 }
 message SendSpaceMessageResponse { SpaceMessage message = 1; }
 
+// User-wide changes to owned agents and participating spaces.
+// Fetch initial state separately; this feed records changes after deployment.
+// POST /v1/control/stream-events uses the authenticated account, without user
+// IDs or subscriptions supplied by the caller. All participating spaces share
+// one cursor. Accept: text/event-stream selects SSE with protobuf JSON in each
+// data field. Otherwise the response uses the existing binary protobuf stream
+// framing. After reconnecting, resume after the last processed ID. Events can
+// be replayed; consumers should deduplicate by ID.
+message StreamEventsRequest {
+  // Exclusive cursor. Absent replays all available events, or uses
+  // Last-Event-ID.
+  optional uint64 after_event_id = 1;
+}
+message SpaceRunStatus {
+  uint64 run_id = 1;
+  TaskStatus status = 2;
+}
+message StreamEventsResponse {
+  // Durable cursor.
+  uint64 id = 1;
+  string created_at = 2;
+  string space_id = 3;
+  oneof event {
+    Agent agent_created = 4;
+    Space space_created = 5;
+    SpaceMessage message_created = 6;
+    TaskEvent task_event = 7;
+    SpaceRunStatus run_status = 8;
+  }
+}
+
 message ListRunSeriesRequest {
   optional string updated_before = 1;
   optional uint32 limit = 2;

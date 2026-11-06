@@ -144,6 +144,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -934,6 +936,51 @@ def _stream_logs(
             break
 
         time.sleep(LOG_STREAM_INTERVAL)
+
+
+def stream_events(
+    request: StreamEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool] | None = None,
+    *,
+    last_event_id: str | None = None,
+) -> Generator[StreamEventsResponse, None, None]:
+    """Stream changes to the caller's agents and participating Spaces."""
+    try:
+        cursor = (
+            request.after_event_id
+            if request.HasField("after_event_id")
+            else int(last_event_id or "0")
+        )
+        if not 0 <= cursor < 2**63:
+            raise ValueError("Cursor is outside the event ID range.")
+    except ValueError as exc:
+        raise FlowerError(
+            ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
+            "Invalid event cursor.",
+            public_details="Event cursor must be a nonnegative signed 64-bit integer.",
+        ) from exc
+    return _stream_events(account.flwr_aid, cursor, state, is_active)
+
+
+def _stream_events(
+    flwr_aid: str,
+    cursor: int,
+    state: LinkState,
+    is_active: Callable[[], bool] | None,
+) -> Generator[StreamEventsResponse, None, None]:
+    """Replay journal batches and stay connected until the client disconnects."""
+    while is_active is None or is_active():
+        events = state.get_control_events(flwr_aid, after_id=cursor, limit=100)
+        for event in events:
+            if is_active is not None and not is_active():
+                return
+            cursor = event.id
+            yield event
+        if events:
+            continue
+        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
 def stream_run_events(

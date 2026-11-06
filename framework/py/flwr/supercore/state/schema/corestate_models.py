@@ -264,6 +264,37 @@ class SpaceMessage(FlwrBase):
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class ControlEventSequence(FlwrBase):
+    """Allocate event cursors in transaction commit order."""
+
+    __tablename__ = "control_event_sequence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    last_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class ControlEvent(FlwrBase):
+    """Retain a Control change visible to an account or a space's members."""
+
+    __tablename__ = "control_event"
+    __table_args__ = (
+        CheckConstraint(
+            "(flwr_aid IS NOT NULL AND space_id IS NULL) OR "
+            "(flwr_aid IS NULL AND space_id IS NOT NULL)",
+            name="ck_control_event_scope",
+        ),
+        Index("idx_control_event_account_id", "flwr_aid", "id"),
+        Index("idx_control_event_space_id", "space_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    space_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("space.id", ondelete="CASCADE"), nullable=True
+    )
+    payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
 class SeriesContext(FlwrBase):
     """Represent context data for a run series."""
 
