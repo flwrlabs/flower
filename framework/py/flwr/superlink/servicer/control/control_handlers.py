@@ -27,6 +27,7 @@ from logging import ERROR, WARNING
 from threading import Thread
 from typing import Any, cast
 from uuid import UUID
+from zipfile import BadZipFile
 
 import requests
 
@@ -1370,23 +1371,67 @@ def get_space_messages(
     return GetSpaceMessagesResponse(messages=messages)
 
 
+def _prepare_space_agent_app(app_spec: str, state: LinkState) -> tuple[str, str, str]:
+    """Resolve and store an AgentApp, returning its FAB ID, version, and hash."""
+    fab_file, verifications, _ = _get_remote_fab(app_spec)
+    try:
+        if len(fab_file) > FAB_MAX_SIZE:
+            raise ValueError("AgentApp FAB exceeds the maximum allowed size.")
+        fab_config = get_fab_config(fab_file)
+        if _get_app_type(fab_config) != TaskType.AGENT_APP:
+            raise ValueError("Space agents require an AgentApp FAB.")
+        fab_id, fab_version = get_metadata_from_config(fab_config)
+        app_id, app_version = parse_app_spec(app_spec)
+        if app_id != f"@{fab_id}" or (app_version and app_version != fab_version):
+            raise ValueError(
+                "Downloaded AgentApp does not match its app specification."
+            )
+    except (ValueError, BadZipFile, KeyError) as exc:
+        raise FlowerError(ApiErrorCode.INVALID_RUN_CONFIG, str(exc)) from exc
+    fab = Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verifications)
+    state.store_fab(fab)
+    return fab_id, fab_version, fab.hash_str
+
+
 def send_space_message(
     request: SendSpaceMessageRequest, account: AccountInfo, state: LinkState
 ) -> SendSpaceMessageResponse:
-    """Persist a message authored by the authenticated account."""
+    """Persist a user message and queue an AgentApp run for each assigned agent."""
     try:
-        message = state.create_space_message(
-            UUID(request.space_id),
-            SpaceParticipant(flwr_aid=account.flwr_aid),
-            request.content,
-        )
+        space_id = UUID(request.space_id)
+        if not request.content.strip():
+            raise ValueError("Message content must be nonempty")
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc
-    if message is None:
+    agents = state.get_space_agents(space_id, account.flwr_aid)
+    if agents is None:
         raise FlowerError(
             ApiErrorCode.SPACE_NOT_FOUND,
             "Space not found or account is not a participant.",
         )
+
+    # Resolve every AgentApp before accepting the message. Reuse one resolution
+    # when several agents use the same app, while still creating a run per agent.
+    resolved_apps: dict[str, tuple[str, str, str]] = {}
+    apps = []
+    for agent in agents:
+        app_spec = agent.config.app_spec
+        if app_spec not in resolved_apps:
+            resolved_apps[app_spec] = _prepare_space_agent_app(app_spec, state)
+        apps.append(resolved_apps[app_spec])
+
+    result = state.create_space_message_and_runs(
+        space_id, account.flwr_aid, request.content, apps
+    )
+    if result is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    message, run_ids = result
+    if run_ids:
+        for run in state.get_run_info(run_ids=run_ids):
+            extensions.notify_run_started(run, "unknown")
     return SendSpaceMessageResponse(message=message)
 
 

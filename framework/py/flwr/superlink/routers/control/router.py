@@ -242,7 +242,7 @@ def send_space_message(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> SendSpaceMessageResponse:
-    """Send space message."""
+    """Send a user message and trigger the Space's participating agents."""
     return control_handlers.send_space_message(request, account, linkstate)
 
 

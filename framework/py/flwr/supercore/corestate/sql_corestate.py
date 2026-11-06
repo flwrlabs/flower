@@ -1265,6 +1265,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     space.participants.add(agent_id=member_agent_id)
             return list(spaces.values())
 
+    def get_space_agents(self, space_id: UUID, flwr_aid: str) -> Sequence[Agent] | None:
+        """Resolve assigned agents through the caller's Space membership."""
+        viewer = SpaceParticipantTable.alias("viewer")
+        query = (
+            select(AgentModel)
+            .select_from(viewer)
+            .outerjoin(
+                SpaceParticipantTable,
+                and_(
+                    SpaceParticipantTable.c.space_id == viewer.c.space_id,
+                    SpaceParticipantTable.c.agent_id.is_not(None),
+                ),
+            )
+            .outerjoin(
+                AgentModel, AgentModel.agent_id == SpaceParticipantTable.c.agent_id
+            )
+            .where(viewer.c.space_id == space_id, viewer.c.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            models = session.scalars(query).all()
+            return (
+                [_agent_from_model(model) for model in models if model is not None]
+                if models
+                else None
+            )
+
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:

@@ -200,7 +200,7 @@ class InMemoryCoreState(
         self.space_store: dict[UUID, Space] = {}
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
-        self.lock_space_store = Lock()
+        self.lock_space_store = RLock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -1010,6 +1010,28 @@ class InMemoryCoreState(
             ]
             spaces.sort(key=lambda item: item.created_at, reverse=True)
             return spaces
+
+    def get_space_agents(self, space_id: UUID, flwr_aid: str) -> Sequence[Agent] | None:
+        """Resolve assigned agents only for a participating user."""
+        with self.lock_space_store, self.lock_agent_store:
+            space = self.space_store.get(space_id)
+            if (
+                space is None
+                or SpaceParticipant(flwr_aid=flwr_aid) not in space.participants
+            ):
+                return None
+            agent_ids = {
+                member.agent_id for member in space.participants if member.agent_id
+            }
+            return sorted(
+                [
+                    agent
+                    for agents in self.agent_store.values()
+                    for agent_id, agent in agents.items()
+                    if agent_id in agent_ids
+                ],
+                key=lambda agent: agent.id,
+            )
 
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str

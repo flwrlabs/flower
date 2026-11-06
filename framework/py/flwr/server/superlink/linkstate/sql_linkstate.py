@@ -38,6 +38,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import SpaceMessage  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -490,6 +491,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         log(ERROR, "Unexpected run creation failure.")
         return 0
+
+    def create_space_message_and_runs(
+        self,
+        space_id: UUID,
+        flwr_aid: str,
+        content: str,
+        apps: Sequence[tuple[str, str, str]],
+    ) -> tuple[SpaceMessage, list[int]] | None:
+        """Commit the message, runs, primary tasks, and prompts together."""
+        with self.session():
+            return super().create_space_message_and_runs(
+                space_id, flwr_aid, content, apps
+            )
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,

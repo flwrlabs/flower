@@ -35,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import SpaceMessage  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -453,6 +454,42 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
 
             return run_id
+
+    def create_space_message_and_runs(
+        self,
+        space_id: UUID,
+        flwr_aid: str,
+        content: str,
+        apps: Sequence[tuple[str, str, str]],
+    ) -> tuple[SpaceMessage, list[int]] | None:
+        """Publish the message and pending tasks together, reverting failed batches."""
+        with (
+            self.lock_task_store,
+            self.lock,
+            self._lock_object_push_sessions,
+            self.lock_message_store,
+            self.lock_space_store,
+        ):
+            previous_runs = set(self.run_ids)
+            message_count = len(self.space_message_store.get(space_id, []))
+            try:
+                return super().create_space_message_and_runs(
+                    space_id, flwr_aid, content, apps
+                )
+            except Exception:
+                if space_id in self.space_message_store:
+                    del self.space_message_store[space_id][message_count:]
+                for run_id in self.run_ids.keys() - previous_runs:
+                    self.cleanup_run(run_id)
+                    record = self.run_ids.pop(run_id)
+                    self.task_store.pop(cast(int, record.run.primary_task_id), None)
+                    self.flwr_aid_to_run_ids[flwr_aid].discard(run_id)
+                    with self.lock_run_connector_store:
+                        self.run_connector_store.pop(run_id, None)
+                    for message_id, stored in list(self.message_store.items()):
+                        if stored.metadata.run_id == run_id:
+                            del self.message_store[message_id]
+                raise
 
     def get_run_info(
         self,
