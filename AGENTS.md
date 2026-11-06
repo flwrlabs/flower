@@ -28,15 +28,17 @@ When reviewing or generating code, apply this checklist:
 ## Comments for PR review
 
 For every PR, add or update concise source comments explaining each logical block
-introduced or materially changed in non-test code. Write for a reviewer unfamiliar
-with the change: explain the block's purpose and any important decisions,
+introduced or materially changed in handwritten non-test code. Write for a reviewer
+unfamiliar with the change: explain the block's purpose and any important decisions,
 assumptions, invariants, or side effects. Avoid merely paraphrasing individual
 statements.
 
 Keep explanations next to the code they describe. Reuse clear existing comments
 or docstrings instead of duplicating them, and update explanations when behavior
-changes. This requirement excludes test files. Before opening or updating a PR,
-review the full diff for missing, misleading, or stale explanations.
+changes. This requirement excludes test files and generated output. For generated
+code changes, place needed explanations in the source schema, generator, or
+template instead of hand-editing generated artifacts. Before opening or updating
+a PR, review the full diff for missing, misleading, or stale explanations.
 
 ## Review output format
 
