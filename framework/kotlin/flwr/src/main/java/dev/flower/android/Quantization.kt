@@ -3,7 +3,6 @@ package dev.flower.android
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -49,6 +48,8 @@ data class QuantizedBuffer(
  */
 object Quantization {
 
+    private const val MIN_NORMAL_POSITIVE_FLOAT = 1.17549435e-38f
+
     /**
      * Quantize a FloatArray into packed INT4 nibbles with per-block scaling.
      *
@@ -71,9 +72,10 @@ object Quantization {
             )
         }
 
-        val numBlocks = (totalElements + blockSize - 1) / blockSize
+        // Avoid integer overflow in ceiling division
+        val numBlocks = totalElements / blockSize + if (totalElements % blockSize != 0) 1 else 0
         val scales = FloatArray(numBlocks)
-        val packedBytesCount = (totalElements + 1) / 2
+        val packedBytesCount = totalElements / 2 + (totalElements % 2)
         val packedBytes = ByteArray(packedBytesCount)
 
         var byteIdx = 0
@@ -89,9 +91,17 @@ object Quantization {
                 if (a > maxAbs) maxAbs = a
             }
 
-            val scale = if (maxAbs > 1e-8f) maxAbs / 7.0f else 1.0f
+            // Zero-safe scale preserving low-magnitude blocks down to numerical limits
+            val scale: Float
+            val invScale: Float
+            if (maxAbs == 0.0f || maxAbs < MIN_NORMAL_POSITIVE_FLOAT) {
+                scale = 0.0f
+                invScale = 0.0f
+            } else {
+                scale = maxAbs / 7.0f
+                invScale = 7.0f / maxAbs
+            }
             scales[blockIdx] = scale
-            val invScale = 1.0f / scale
 
             var i = blockStart
             while (i < blockEnd) {
@@ -122,25 +132,42 @@ object Quantization {
      *
      * @param quantized [QuantizedBuffer] containing packed bytes and block scales.
      * @return Reconstructed FloatArray.
+     * @throws IllegalArgumentException If the buffer is truncated or metadata is inconsistent.
      */
     fun dequantizeFromInt4(quantized: QuantizedBuffer): FloatArray {
         val totalElements = quantized.originalLength
         if (totalElements == 0) return FloatArray(0)
 
+        require(totalElements > 0) {
+            "originalLength must be positive, got $totalElements"
+        }
+        val blockSize = quantized.blockSize
+        require(blockSize > 0 && blockSize % 2 == 0) {
+            "blockSize must be a positive even integer, got $blockSize"
+        }
+
+        val expectedBytes = totalElements / 2 + (totalElements % 2)
+        val remainingBytes = quantized.buffer.remaining()
+        require(remainingBytes >= expectedBytes) {
+            "Truncated packed buffer: expected at least $expectedBytes bytes for $totalElements elements, got $remainingBytes"
+        }
+
+        val expectedBlocks = totalElements / blockSize + if (totalElements % blockSize != 0) 1 else 0
+        require(quantized.scales.size >= expectedBlocks) {
+            "Insufficient scales: expected at least $expectedBlocks block scales, got ${quantized.scales.size}"
+        }
+
         val restored = FloatArray(totalElements)
         val buffer = quantized.buffer.duplicate()
-        buffer.rewind()
 
-        val blockSize = quantized.blockSize
-        val scales = quantized.scales
         var elemIdx = 0
         var blockIdx = 0
 
-        while (elemIdx < totalElements && buffer.hasRemaining()) {
-            val scale = scales[blockIdx]
+        while (elemIdx < totalElements) {
+            val scale = quantized.scales[blockIdx]
             val blockEnd = minOf((blockIdx + 1) * blockSize, totalElements)
 
-            while (elemIdx < blockEnd && buffer.hasRemaining()) {
+            while (elemIdx < blockEnd) {
                 val b = buffer.get().toInt()
                 val q0 = ((b shr 4) and 0x0F) - 8
                 restored[elemIdx++] = q0 * scale

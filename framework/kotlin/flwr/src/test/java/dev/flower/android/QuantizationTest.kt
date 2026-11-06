@@ -1,5 +1,6 @@
 package dev.flower.android
 
+import java.nio.ByteBuffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -29,6 +30,55 @@ class QuantizationTest {
         assertEquals(zeros.size, restored.size)
         for (i in zeros.indices) {
             assertEquals(0.0f, restored[i], 1e-6f)
+        }
+    }
+
+    @Test
+    fun testLowMagnitudeNonzeroBlocksPreserved() {
+        // Values below previous 1e-8f threshold must not round to zero
+        val lowValues = FloatArray(64) { 1e-9f }
+        val quantized = lowValues.quantizeInt4(blockSize = 64)
+        val restored = quantized.dequantize()
+
+        assertEquals(lowValues.size, restored.size)
+        for (i in lowValues.indices) {
+            assertTrue("Expected nonzero value, got ${restored[i]}", restored[i] > 0.0f)
+            assertEquals(1e-9f, restored[i], 1e-10f)
+        }
+    }
+
+    @Test
+    fun testLargeBlockSizeNoIntegerOverflow() {
+        // Test ceiling calculation does not overflow when blockSize is near Int.MAX_VALUE
+        val data = FloatArray(3) { 1.0f }
+        val largeEvenBlockSize = (Int.MAX_VALUE - 1) // 2147483646, positive even integer
+        val quantized = data.quantizeInt4(blockSize = largeEvenBlockSize)
+        assertEquals(1, quantized.scales.size)
+        assertEquals(3, quantized.originalLength)
+
+        val restored = quantized.dequantize()
+        assertEquals(3, restored.size)
+        for (i in data.indices) {
+            assertEquals(1.0f, restored[i], 0.2f)
+        }
+    }
+
+    @Test
+    fun testTruncatedBufferRejected() {
+        val original = FloatArray(64) { 1.0f }
+        val quantized = original.quantizeInt4(blockSize = 64)
+
+        // Provide a truncated buffer with fewer bytes than required (32 required, give 10)
+        val truncatedBuffer = ByteBuffer.allocate(10)
+        val invalidQuantized = QuantizedBuffer(
+            buffer = truncatedBuffer,
+            scales = quantized.scales,
+            originalLength = 64,
+            blockSize = 64
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            Quantization.dequantizeFromInt4(invalidQuantized)
         }
     }
 
