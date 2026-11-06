@@ -259,6 +259,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def create_agent_with_space(
+        self, flwr_aid: str, config: AgentConfig
+    ) -> Agent | None:
+        """Atomically create an agent and an untitled Space with its owner.
+
+        Return None for invalid agent configuration, as in create_agent.
+        """
+
+    @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order.
 

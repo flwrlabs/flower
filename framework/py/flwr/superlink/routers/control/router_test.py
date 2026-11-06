@@ -388,6 +388,11 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert agent.config == config
     assert agent.created_at and agent.updated_at == agent.created_at
     assert state.list_agents(_ACCOUNT.flwr_aid) == [agent]
+    spaces = state.get_spaces(_ACCOUNT.flwr_aid)
+    assert len(spaces) == 1
+    assert len(spaces[0].participants) == 2
+    assert SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid) in spaces[0].participants
+    assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
     response = client.post(
         "/v1/control/list-agents",
@@ -455,7 +460,7 @@ def test_agent_creation_rejects_invalid_requests(
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_AGENT_REQUEST.value
     assert detail in response.json()["extra"].lower()
-    state.create_agent.assert_not_called()
+    state.create_agent_with_space.assert_not_called()
 
 
 @pytest.mark.parametrize(

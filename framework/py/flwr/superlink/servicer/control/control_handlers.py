@@ -216,7 +216,7 @@ class InvalidAgentRequestError(FlowerError):
 def create_agent(
     request: CreateAgentRequest, account: AccountInfo, state: LinkState
 ) -> CreateAgentResponse:
-    """Create an agent owned by the authenticated account."""
+    """Create an agent and its initial Space with the authenticated account."""
     if not request.HasField("config"):
         raise InvalidAgentRequestError("Agent configuration is required.")
     config = request.config
@@ -233,7 +233,7 @@ def create_agent(
     except ValueError as exc:
         raise InvalidAgentRequestError(str(exc)) from exc
 
-    agent = state.create_agent(flwr_aid=account.flwr_aid, config=config)
+    agent = state.create_agent_with_space(flwr_aid=account.flwr_aid, config=config)
     if agent is None:
         raise InvalidAgentRequestError(
             "Unable to create agent with the supplied values."
