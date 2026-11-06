@@ -15,6 +15,8 @@
 """Ray-based Flower Actor and ActorPool implementation."""
 
 
+import glob
+import os
 import threading
 from abc import ABC
 from collections.abc import Callable
@@ -83,6 +85,75 @@ class ClientAppActor(VirtualClientEngineActor):
             on_actor_init_fn()
 
 
+def _log_kfd_diagnostics() -> None:
+    """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
+
+    Split out of `pool_size_from_resources` purely to keep that function's branch
+    count manageable; this covers only the no-GPU-detected diagnostic path.
+    """
+    if not os.path.exists("/dev/kfd"):
+        return
+
+    if not os.access("/dev/kfd", os.R_OK | os.W_OK):
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
+            "process cannot open it (no read/write access). This is a "
+            "permissions issue, not a missing or misplaced "
+            "`librocm_smi64.so`: the current user is likely missing from "
+            "the `render` (and `video`) group that owns `/dev/kfd` -- the "
+            "`/dev/dri/renderD*` node ROCm also needs is commonly owned by "
+            "the same group and likely affected too -- or "
+            "the container was started without `--device=/dev/kfd "
+            "--device=/dev/dri --group-add render --group-add video`. "
+            "Both Ray and the ML framework will report zero GPUs until "
+            "device access is fixed; pointing ROCM_PATH at the SMI "
+            "library will not help.",
+        )
+        return
+
+    # /dev/kfd alone is not sufficient: ROCm also reaches the GPU through a
+    # /dev/dri/renderD* node, which a container or host can pass through (or
+    # permission) independently of /dev/kfd. If no such node is usable, pointing
+    # ROCM_PATH at the SMI library -- the fix for the common case below -- would
+    # not help at all.
+    render_nodes = glob.glob("/dev/dri/renderD*")
+    accessible_render_nodes = [
+        node for node in render_nodes if os.access(node, os.R_OK | os.W_OK)
+    ]
+    if accessible_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), so "
+            "an AMD GPU is likely present on this host. If Ray's GPU "
+            "resources were not limited deliberately, check that Ray "
+            "can enumerate it: Ray finds AMD GPUs by opening "
+            "`$ROCM_PATH/lib/librocm_smi64.so` (ROCM_PATH defaults to "
+            "/opt/rocm) under that *unversioned* name. Ensure "
+            "ROCM_PATH points at a ROCm root containing the "
+            "`librocm_smi64.so` symlink rather than only a versioned "
+            "`librocm_smi64.so.<N>`.",
+        )
+    else:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), but no accessible `/dev/dri/renderD*` node "
+            "was found (%s). ROCm reaches the GPU through both "
+            "`/dev/kfd` and a render node, so pointing ROCM_PATH at "
+            "the SMI library will not help here -- Ray and the ML "
+            "framework will both keep reporting zero GPUs until the "
+            "render node itself is present and accessible. This is "
+            "usually the same permissions issue as missing `/dev/kfd` "
+            "access, just affecting the other device node: the "
+            "current user is likely missing from the `render` group "
+            "that owns it, or a container was started with "
+            "`--device=/dev/kfd` but without `--device=/dev/dri "
+            "--group-add render`.",
+            ", ".join(render_nodes) if render_nodes else "none found",
+        )
+
+
 def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     """Calculate number of Actors that fit in the cluster.
 
@@ -90,6 +161,21 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     client.
     """
     total_num_actors = 0
+    # Bound before the loop: `ray.nodes()` can return no usable node (empty list, or
+    # every node reporting empty resources), and both are read in the error path below.
+    num_cpus: int | float = 0
+    num_gpus: int | float = 0
+    # `num_gpus` above only retains the last node's value, so it cannot answer "does
+    # this cluster have a GPU at all?". Track that separately across every node.
+    cluster_num_gpus: int | float = 0
+    # Best case (across all nodes) of how many actors CPU alone could host, ignoring
+    # the GPU requirement. If this is 0, no node has enough CPUs for even one client,
+    # so GPU-lowering advice alone would still leave the pool empty.
+    max_actors_by_cpu = 0
+    # `num_cpus` above only retains the last node's value, which misreports "the best
+    # node" when node order doesn't match node capacity. Track the actual best alongside
+    # `max_actors_by_cpu` so the two stay consistent.
+    max_num_cpus: int | float = 0
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -110,7 +196,10 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         # e.g.: node without GPU; head node set up not to run tasks (zero resources)
         num_cpus = node_resources.get("CPU", 0)
         num_gpus = node_resources.get("GPU", 0)
+        cluster_num_gpus = max(cluster_num_gpus, num_gpus)
+        max_num_cpus = max(max_num_cpus, num_cpus)
         num_actors = int(num_cpus / client_resources["num_cpus"])
+        max_actors_by_cpu = max(max_actors_by_cpu, num_actors)
 
         # If a GPU is present and client resources do require one
         if "num_gpus" in client_resources.keys() and client_resources["num_gpus"] > 0.0:
@@ -124,15 +213,55 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         total_num_actors += num_actors
 
     if total_num_actors == 0:
-        log(
-            WARNING,
-            "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
-            "does not meet the criteria to host at least one client with resources:"
-            " %s. Lowering these resources could help.",
-            num_cpus,
-            num_gpus,
-            client_resources,
-        )
+        requested_gpus = client_resources.get("num_gpus", 0)
+        if requested_gpus > 0 and not cluster_num_gpus:
+            # No node in the cluster reported a GPU while each client asks for a
+            # fraction of one. Only `num_gpus=0` is satisfiable here, so the generic
+            # "lower your resources" advice does not describe the fix. Zero advertised
+            # GPUs does not by itself mean discovery failed, though: `ray.init()` can
+            # be configured (e.g. `--init-args-num-gpus 0`) to hide GPUs that are
+            # otherwise healthy, and that must not be reported as a discovery failure.
+            # A cluster that does have a GPU somewhere, just not enough of one, falls
+            # through to the generic warning instead.
+            log(
+                WARNING,
+                "Ray reports no GPU resources (GPUs=%s) but each client requests "
+                "num_gpus=%s, which no node can satisfy. This does not by itself mean "
+                "GPU discovery failed: the cluster may have no GPU, or Ray's GPU "
+                "resources may have been limited deliberately (for example "
+                "`--init-args-num-gpus 0`). Set `num_gpus=0` if no GPU is expected, "
+                "otherwise review that limit before suspecting discovery. Compare "
+                "what Ray actually detects with "
+                '`python -c "import ray; ray.init(); print(ray.cluster_resources())"`. '
+                "Note that an ML framework reporting a usable GPU (for instance "
+                "`torch.cuda.is_available()` returning True) does not imply Ray found "
+                "one -- they discover devices independently.",
+                cluster_num_gpus,
+                requested_gpus,
+            )
+            if max_actors_by_cpu == 0:
+                # Setting num_gpus=0 would not be enough either: no node has the CPUs
+                # this client needs, so the pool would still end up empty.
+                log(
+                    WARNING,
+                    "In addition, no node has enough CPUs for even one client: each "
+                    "client requests num_cpus=%s but the best node only reports "
+                    "CPUs=%s. Setting `num_gpus=0` alone will not fix this -- also "
+                    "lower `num_cpus` or add CPU capacity to the cluster.",
+                    client_resources.get("num_cpus"),
+                    max_num_cpus,
+                )
+            _log_kfd_diagnostics()
+        else:
+            log(
+                WARNING,
+                "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
+                "does not meet the criteria to host at least one client with resources:"
+                " %s. Lowering these resources could help.",
+                num_cpus,
+                num_gpus,
+                client_resources,
+            )
         raise ValueError(
             "ActorPool is empty. Stopping Simulation. "
             "Check `num_cpus` and/or `num_gpus` passed to the simulation engine"
