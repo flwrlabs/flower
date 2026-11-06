@@ -119,6 +119,20 @@ class QuantizationTest {
     }
 
     @Test
+    fun testSmallMagnitudeWithZeroValues() {
+        // Values in range [Float.MIN_NORMAL, 7f / Float.MAX_VALUE] alongside zeros
+        // must not produce Infinity or NaN in scaling
+        val data = floatArrayOf(1.5e-38f, 0.0f, -1.5e-38f, 0.0f)
+        val quantized = data.quantizeInt4(blockSize = 64)
+        val restored = quantized.dequantize()
+        assertEquals(4, restored.size)
+        assertEquals(1.5e-38f, restored[0], 1e-39f)
+        assertEquals(0.0f, restored[1], 1e-45f)
+        assertEquals(-1.5e-38f, restored[2], 1e-39f)
+        assertEquals(0.0f, restored[3], 1e-45f)
+    }
+
+    @Test
     fun testCompressionPayloadRatio() {
         val count = 1024
         val rawBytes = count * 4 // float32 = 4 bytes per float -> 4096 bytes

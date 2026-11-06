@@ -48,8 +48,6 @@ data class QuantizedBuffer(
  */
 object Quantization {
 
-    private const val MIN_NORMAL_POSITIVE_FLOAT = 1.17549435e-38f
-
     /**
      * Quantize a FloatArray into packed INT4 nibbles with per-block scaling.
      *
@@ -91,23 +89,29 @@ object Quantization {
                 if (a > maxAbs) maxAbs = a
             }
 
-            // Zero-safe scale preserving low-magnitude blocks down to numerical limits
-            val scale: Float
-            val invScale: Float
-            if (maxAbs == 0.0f || maxAbs < MIN_NORMAL_POSITIVE_FLOAT) {
-                scale = 0.0f
-                invScale = 0.0f
+            // Zero-safe scale with double-precision reciprocal to prevent overflow to Infinity/NaN
+            // when maxAbs is between Float.MIN_VALUE and 7f / Float.MAX_VALUE (e.g. 1.5e-38f).
+            val scale = maxAbs / 7.0f
+            val invScaleDouble = if (scale == 0.0f || maxAbs == 0.0f || maxAbs.isNaN()) {
+                0.0
             } else {
-                scale = maxAbs / 7.0f
-                invScale = 7.0f / maxAbs
+                7.0 / maxAbs.toDouble()
             }
             scales[blockIdx] = scale
 
             var i = blockStart
             while (i < blockEnd) {
-                val q0 = ((floats[i] * invScale).roundToInt().coerceIn(-8, 7) + 8) and 0x0F
+                val q0 = if (scale == 0.0f) {
+                    8
+                } else {
+                    ((floats[i].toDouble() * invScaleDouble).roundToInt().coerceIn(-7, 7) + 8) and 0x0F
+                }
                 val q1 = if (i + 1 < blockEnd) {
-                    ((floats[i + 1] * invScale).roundToInt().coerceIn(-8, 7) + 8) and 0x0F
+                    if (scale == 0.0f) {
+                        8
+                    } else {
+                        ((floats[i + 1].toDouble() * invScaleDouble).roundToInt().coerceIn(-7, 7) + 8) and 0x0F
+                    }
                 } else {
                     8
                 }
