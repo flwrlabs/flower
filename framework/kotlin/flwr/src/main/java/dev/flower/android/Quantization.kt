@@ -85,14 +85,18 @@ object Quantization {
 
             var maxAbs = 0.0f
             for (i in blockStart until blockEnd) {
-                val a = abs(floats[i])
+                val v = floats[i]
+                require(v.isFinite()) {
+                    "Cannot quantize non-finite value at index $i: $v"
+                }
+                val a = abs(v)
                 if (a > maxAbs) maxAbs = a
             }
 
             // Zero-safe scale with double-precision reciprocal to prevent overflow to Infinity/NaN
             // when maxAbs is between Float.MIN_VALUE and 7f / Float.MAX_VALUE (e.g. 1.5e-38f).
             val scale = maxAbs / 7.0f
-            val invScaleDouble = if (scale == 0.0f || maxAbs == 0.0f || maxAbs.isNaN()) {
+            val invScaleDouble = if (scale == 0.0f || maxAbs == 0.0f) {
                 0.0
             } else {
                 7.0 / maxAbs.toDouble()
@@ -169,6 +173,9 @@ object Quantization {
 
         while (elemIdx < totalElements) {
             val scale = quantized.scales[blockIdx]
+            require(scale.isFinite()) {
+                "Scale at block $blockIdx is non-finite: $scale"
+            }
             val blockEnd = minOf((blockIdx + 1) * blockSize, totalElements)
 
             while (elemIdx < blockEnd) {

@@ -97,6 +97,24 @@ class QuantizationTest {
     }
 
     @Test
+    fun testNonFiniteValuesRejected() {
+        val nanData = floatArrayOf(Float.NaN, 0.0f)
+        assertThrows(IllegalArgumentException::class.java) {
+            nanData.quantizeInt4()
+        }
+
+        val infData = floatArrayOf(Float.POSITIVE_INFINITY, 1.0f)
+        assertThrows(IllegalArgumentException::class.java) {
+            infData.quantizeInt4()
+        }
+
+        val negInfData = floatArrayOf(0.5f, Float.NEGATIVE_INFINITY)
+        assertThrows(IllegalArgumentException::class.java) {
+            negInfData.quantizeInt4()
+        }
+    }
+
+    @Test
     fun testOddAndEvenLengthsFidelity() {
         val rng = Random(42)
         val testSizes = intArrayOf(1, 2, 63, 64, 65, 128, 257)
