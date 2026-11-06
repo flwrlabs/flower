@@ -35,6 +35,7 @@ from flwr.common import (
     Array,
     ArrayRecord,
     ConfigRecord,
+    DEFAULT_TTL,
     GRPC_MAX_MESSAGE_LENGTH,
     Message,
     MessageType,
@@ -493,6 +494,16 @@ class FedAvgStreaming(FedAvg):
         self._chunks_per_message = DEFAULT_LAYERWISE_CHUNKS_PER_MESSAGE
         self._download_pipeline_depth = DEFAULT_LAYERWISE_DOWNLOAD_PIPELINE_DEPTH
         self._updates_are_deltas = False
+        self._instruction_ttl = DEFAULT_TTL
+
+    def _construct_messages(
+        self, record: RecordDict, node_ids: list[int], message_type: str
+    ) -> Iterable[Message]:
+        """Give instructions enough time for the round's transfer and training."""
+        messages = list(super()._construct_messages(record, node_ids, message_type))
+        for message in messages:
+            message.metadata.ttl = self._instruction_ttl
+        return messages
 
     def _download_layers_to_clients(
         self,
@@ -1391,6 +1402,7 @@ class FedAvgStreaming(FedAvg):
         evaluate_fn: Callable[[int, ArrayRecord], MetricRecord | None] | None = None,
     ) -> Result:
         """Execute the federated learning strategy with layer-wise aggregation."""
+        self._instruction_ttl = max(DEFAULT_TTL, 3 * timeout)
         log(INFO, "Starting %s strategy:", self.__class__.__name__)
         log_strategy_start_info(
             num_rounds, initial_arrays, train_config, evaluate_config

@@ -82,6 +82,24 @@ Follow this [how-to guide](https://flower.ai/docs/framework/how-to-run-flower-wi
 
 If you are already familiar with how the Deployment Engine works, you may want to learn how to run it using Docker. Check out the [Flower with Docker](https://flower.ai/docs/framework/docker/index.html) documentation.
 
+### Long-Running HPC Jobs
+
+For long 70B training runs, set `FLWR_HEARTBEAT_PROFILE=slow` in the
+SuperLink startup environment. With the updated framework, this allows a 24-hour
+gap between node heartbeats and a 24-hour renewed ClientApp token lease. Updated
+SuperNodes receive the policy when connecting; automatically launched SuperExec
+and ClientApp workers inherit the RPC settings. Restart the SuperLink and reconnect
+the SuperNodes after updating the policy. Failed processes can take up to 24 hours
+to be detected under this profile.
+
+Also include `strategy.timeout=86400` in the existing `flwr run --run-config`
+configuration. This allows up to 24 hours for each strategy operation, including
+layer download, training (queueing and conversion included), and layer upload.
+Instruction messages have a lifetime of at least three times this timeout so that
+instructions created before the model download remain valid through training and
+reply delivery. The regular heartbeat profile and strategy timeout defaults are
+unchanged. Scheduler job wall-time limits must also cover the allocated work.
+
 ### 70B Aggregation-Only (Deployment Engine)
 
 This mode is intended to validate that a 70B model can be aggregated layer-by-layer

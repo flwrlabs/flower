@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from flwr.common import ConfigRecord, MetricRecord, RecordDict
+from flwr.common import ArrayRecord, ConfigRecord, DEFAULT_TTL, MetricRecord, RecordDict
 from flwr.common.message import Message
 from flwr.common.profiling import (
     ProfileRecorder,
@@ -27,6 +27,28 @@ from flowertune_llm.fedavgstreaming import (  # noqa: E402
     _record_network_profile,
     _record_profile_replies,
 )
+
+
+@pytest.mark.parametrize(
+    "timeout, expected_ttl", [(3600, DEFAULT_TTL), (86400, 259200)]
+)
+def test_instruction_ttl_follows_strategy_timeout(
+    timeout: float, expected_ttl: float
+) -> None:
+    """Train and both layerwise instructions outlive long operations."""
+    strategy = FedAvgStreaming(initial_state_dict={})
+    strategy.start(
+        grid=MagicMock(), initial_arrays=ArrayRecord(), num_rounds=0, timeout=timeout
+    )
+    for message_type in (
+        "train",
+        "train.layer_wise_download",
+        "train.layer_wise_communication",
+    ):
+        messages = list(
+            strategy._construct_messages(RecordDict(), [1, 2], message_type)
+        )
+        assert [message.metadata.ttl for message in messages] == [expected_ttl] * 2
 
 
 def test_batch_entries_by_size_groups_multiple_layers() -> None:

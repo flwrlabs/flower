@@ -52,7 +52,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             interval=60.0,
             rpc_timeout=45.0,
             app_rpc_timeout=180.0,
-            clientapp_token_lease=3600,
+            clientapp_token_lease=86400,
         )
 
         with patch.dict(os.environ, {}, clear=False):
@@ -62,7 +62,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             self.assertEqual(os.environ["FLWR_HEARTBEAT_RPC_TIMEOUT_S"], "45.0")
             self.assertEqual(os.environ["FLWR_APP_HEARTBEAT_RPC_TIMEOUT_S"], "180.0")
 
-        self.mock_state.set_clientapp_token_lease.assert_called_once_with(3600)
+        self.mock_state.set_clientapp_token_lease.assert_called_once_with(86400)
 
     def test_pull_and_store_message_no_message(self) -> None:
         """Test that no message is pulled when there are no messages."""

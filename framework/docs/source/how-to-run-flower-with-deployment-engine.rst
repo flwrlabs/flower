@@ -219,9 +219,10 @@ version on the SuperLink and SuperNodes, but no per-site heartbeat environment s
 Central policy propagation currently applies to the gRPC Fleet transports
 (``grpc-rere`` and ``grpc-adapter``).
 The ``slow`` profile uses a 60-second heartbeat interval, a 45-second SuperNode
-heartbeat RPC timeout, a 180-second ClientApp heartbeat RPC timeout, a 20-minute
-SuperNode offline threshold, and a 1-hour ClientApp token lease. It delays detection of
-genuinely failed nodes and apps, so use it only when long transfer stalls are expected.
+heartbeat RPC timeout, a 180-second ClientApp heartbeat RPC timeout, a 24-hour
+SuperNode offline threshold, and a 24-hour renewed ClientApp token lease. It delays
+detection of genuinely failed nodes and apps, so use it only when long transfer
+stalls are expected.
 This is a service-level setting, not a ``flwr run --run-config`` option; set it before
 starting the SuperLink.
 

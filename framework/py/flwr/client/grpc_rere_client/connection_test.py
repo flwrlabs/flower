@@ -27,7 +27,7 @@ def test_heartbeat_config_adopts_superlink_profile() -> None:
             heartbeat_interval=60,
             heartbeat_rpc_timeout=45,
             app_heartbeat_rpc_timeout=180,
-            clientapp_token_lease=3600,
+            clientapp_token_lease=86400,
         ).SerializeToString()
     )
 
@@ -35,5 +35,5 @@ def test_heartbeat_config_adopts_superlink_profile() -> None:
         interval=60,
         rpc_timeout=45,
         app_rpc_timeout=180,
-        clientapp_token_lease=3600,
+        clientapp_token_lease=86400,
     )

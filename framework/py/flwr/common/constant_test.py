@@ -67,7 +67,7 @@ class TestHeartbeatEnvironmentConfiguration(unittest.TestCase):
             }
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "60 45 180 20 3600")
+        self.assertEqual(result.stdout.strip(), "60 45 180 1440 86400")
 
     def test_clientapp_timeout_can_be_injected_by_supernode(self) -> None:
         """A SuperNode can pass the centrally negotiated timeout to its worker."""
@@ -80,7 +80,7 @@ class TestHeartbeatEnvironmentConfiguration(unittest.TestCase):
             }
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "90 30 240 20 3600")
+        self.assertEqual(result.stdout.strip(), "90 30 240 1440 86400")
 
     def test_unknown_profile_is_rejected(self) -> None:
         """Reject misspelled profiles to avoid silently using short defaults."""

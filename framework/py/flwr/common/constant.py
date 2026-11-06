@@ -71,8 +71,8 @@ _HEARTBEAT_PROFILES = {
         "interval": 60,
         "rpc_timeout": 45,
         "app_rpc_timeout": 180,
-        "patience": 20,
-        "token_lease": 3600,
+        "patience": 1440,  # 24 hours at the 60-second heartbeat interval.
+        "token_lease": 86400,
     },
 }
 _heartbeat_profile_name = os.getenv("FLWR_HEARTBEAT_PROFILE", "default").lower()
