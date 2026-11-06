@@ -239,7 +239,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create an agent owned by a Flower account.
+        """Create an agent and its initial Space atomically.
+
+        The untitled Space contains the agent and its owning account.
 
         Parameters
         ----------
