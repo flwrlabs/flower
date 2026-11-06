@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the anonymous Parallel MCP adapter (recorded responses)."""
+"""Tests for the anonymous Parallel MCP adapter (synthetic responses)."""
 
 import json
 
@@ -25,7 +25,12 @@ import requests
 
 from flwr.supercore.version import package_name, package_version
 
-from .parallel import PARALLEL_MCP_URL, ParallelWebSearchProvider, _parse_results
+from .parallel import (
+    PARALLEL_MCP_URL,
+    ParallelWebSearchProvider,
+    _parse_results,
+    _read_messages,
+)
 
 
 @pytest.mark.parametrize("sse", [True, False])
@@ -219,5 +224,70 @@ def test_network_error_is_surfaced(monkeypatch: pytest.MonkeyPatch) -> None:
     send = Mock(side_effect=requests.Timeout())
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
     with pytest.raises(RuntimeError, match="request failed"):
+        ParallelWebSearchProvider().search("Flower")
+    send.assert_called_once()
+
+
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\u2029"])
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n", "\r", None])
+@pytest.mark.parametrize("multiline", [False, True])
+def test_response_preserves_unicode_excerpts(
+    separator: str, line_ending: str | None, multiline: bool
+) -> None:
+    """Only protocol line endings separate SSE fields, even inside UTF-8 JSON."""
+    excerpt = "before" + separator + "after"
+    payload = {"results": [{"excerpts": [excerpt]}]}
+    data = json.dumps(payload, ensure_ascii=False, indent=2 if multiline else None)
+    assert separator in data
+    response = requests.Response()
+    if line_ending is None:
+        response.headers["Content-Type"] = "application/json"
+    else:
+        response.headers["Content-Type"] = "text/event-stream"
+        data = line_ending.join(
+            [
+                ": heartbeat",
+                "event: message",
+                *[f"data: {line}" for line in data.split("\n")],
+                "",
+                "",
+            ]
+        )
+    response._content = data.encode("utf-8")
+
+    assert _read_messages(response) == [{"results": [{"excerpts": [excerpt]}]}]
+
+
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n", "\r"])
+@pytest.mark.parametrize(
+    "payload,message",
+    [
+        ({"id": 1, "error": {"code": -32000}}, "RPC error"),
+        ({"id": 2, "result": {}}, "no matching result"),
+        (None, "invalid JSON"),
+    ],
+)
+def test_sse_errors_are_surfaced(
+    monkeypatch: pytest.MonkeyPatch,
+    line_ending: str,
+    payload: dict[str, object] | None,
+    message: str,
+) -> None:
+    """SSE RPC, mismatched reply and JSON errors propagate for each line ending."""
+    data = json.dumps(payload, indent=2) if payload is not None else "{invalid-json"
+    response = requests.Response()
+    response.status_code = 200
+    response.headers["Content-Type"] = "text/event-stream"
+    response._content = line_ending.join(
+        [
+            *[f"data: {line}" for line in data.split("\n")],
+            "",
+            "",
+        ]
+    ).encode("utf-8")
+    send = Mock(return_value=response)
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
+
+    with pytest.raises(RuntimeError, match=message):
         ParallelWebSearchProvider().search("Flower")
     send.assert_called_once()

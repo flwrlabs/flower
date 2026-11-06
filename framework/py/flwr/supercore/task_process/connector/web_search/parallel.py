@@ -141,9 +141,11 @@ def _read_messages(response: requests.Response) -> list[JSONValue]:
         return [cast(JSONValue, response.json())]
     response.encoding = "utf-8"
     messages: list[JSONValue] = []
-    for event in response.text.replace("\r\n", "\n").split("\n\n"):
+    # Only CR and LF delimit SSE lines; Unicode separators may occur in JSON.
+    text = response.text.replace("\r\n", "\n").replace("\r", "\n")
+    for event in text.split("\n\n"):
         data = [
-            line[5:].lstrip() for line in event.splitlines() if line.startswith("data:")
+            line[5:].lstrip() for line in event.split("\n") if line.startswith("data:")
         ]
         if data:
             messages.append(json.loads("\n".join(data)))
