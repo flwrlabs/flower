@@ -161,12 +161,17 @@ def test_space_routes(
     )
     assert listed.status_code == 200
     assert list(ListSpacesResponse.FromString(listed.content).spaces) == [space]
-    response = client.post(
-        "/v1/control/send-space-message",
-        content=SendSpaceMessageRequest(
-            space_id=space.id, content="Hello"
-        ).SerializeToString(),
-    )
+    with patch.object(
+        control_handlers,
+        "_prepare_space_agent_app",
+        return_value=("flower/research", "1.0.0", "hash"),
+    ):
+        response = client.post(
+            "/v1/control/send-space-message",
+            content=SendSpaceMessageRequest(
+                space_id=space.id, content="Hello"
+            ).SerializeToString(),
+        )
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
@@ -178,7 +183,8 @@ def test_space_routes(
     assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
         message
     ]
-    assert not state.get_run_series() and not state.get_tasks()
+    assert not state.get_run_series()
+    assert len(state.get_tasks()) == 1
 
 
 def test_create_space_rejects_invalid_participants(

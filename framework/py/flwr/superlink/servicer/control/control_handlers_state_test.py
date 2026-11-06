@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, Mock, patch
+from uuid import uuid4
 
 from parameterized import parameterized
 
@@ -42,6 +43,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationResponse,
     AddNodeToFederationRequest,
     AddNodeToFederationResponse,
+    Agent,
+    AgentConfig,
     ArchiveFederationRequest,
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
@@ -63,8 +66,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAccountFromFederationResponse,
     RemoveNodeFromFederationRequest,
     RemoveNodeFromFederationResponse,
+    SendSpaceMessageRequest,
     ShowFederationRequest,
     ShowFederationResponse,
+    SpaceMessage,
     StartRunRequest,
     StopRunRequest,
     StreamLogsRequest,
@@ -77,7 +82,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
@@ -172,6 +177,54 @@ def get_current_account_info() -> AccountInfo:
 
 class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
     """Test the shared Control API handlers with real state."""
+
+    def test_send_space_message_queues_assigned_agents(self) -> None:
+        """Resolve a shared app once and submit one run per assigned agent."""
+        state = Mock(spec=LinkState)
+        account = AccountInfo(flwr_aid="alice", account_name="Alice")
+        space_id = uuid4()
+        state.get_space_agents.return_value = [
+            Agent(id=index, config=AgentConfig(app_spec="@flower/research"))
+            for index in (1, 2)
+        ]
+        message = SpaceMessage(id=1, space_id=str(space_id), content="Hello")
+        state.create_space_message_and_runs.return_value = (message, [])
+        app = ("flower/research", "1.0.0", "hash")
+        with patch.object(
+            control_handlers, "_prepare_space_agent_app", return_value=app
+        ) as prepare:
+            response = control_handlers.send_space_message(
+                SendSpaceMessageRequest(space_id=str(space_id), content="Hello"),
+                account,
+                state,
+            )
+        assert response.message == message
+        prepare.assert_called_once_with("@flower/research", state)
+        state.get_space_agents.assert_called_once_with(space_id, account.flwr_aid)
+        state.create_space_message_and_runs.assert_called_once_with(
+            space_id, account.flwr_aid, "Hello", [app, app]
+        )
+
+    def test_send_space_message_rejects_unavailable_app(self) -> None:
+        """An app download failure does not accept the message or create runs."""
+        state = Mock(spec=LinkState)
+        account = AccountInfo(flwr_aid="alice", account_name="Alice")
+        state.get_space_agents.return_value = [
+            Agent(id=1, config=AgentConfig(app_spec="@flower/research"))
+        ]
+        with patch.object(
+            control_handlers,
+            "_get_remote_fab",
+            side_effect=FlowerError(ApiErrorCode.FAB_DOWNLOAD_FAILURE, "Unavailable"),
+        ):
+            with self.assertRaises(FlowerError) as error:
+                control_handlers.send_space_message(
+                    SendSpaceMessageRequest(space_id=str(uuid4()), content="Hello"),
+                    account,
+                    state,
+                )
+        assert error.exception.code == ApiErrorCode.FAB_DOWNLOAD_FAILURE
+        state.create_space_message_and_runs.assert_not_called()
 
     def test_derive_run_series_description(self) -> None:
         """Test normalizing, clipping, and omitting the user prompt."""

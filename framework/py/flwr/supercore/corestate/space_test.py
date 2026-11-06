@@ -71,6 +71,10 @@ def test_create_and_list_spaces(state: CoreState) -> None:
         member in state.get_spaces("bob")[0].participants
         for member in [alice, bob, agent_participant]
     )
+    assert state.get_space_agents(UUID(first.id), "bob") == [agent]
+    assert state.get_space_agents(UUID(second.id), "alice") == []
+    assert state.get_space_agents(UUID(first.id), "charlie") is None
+    assert state.get_space_agents(uuid4(), "alice") is None
 
 
 def test_participation_controls_message_access(state: CoreState) -> None:

@@ -31,7 +31,7 @@ from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import DEFAULT, Mock, patch
 from uuid import UUID, uuid4
 
 from google.protobuf.message import DecodeError
@@ -50,7 +50,10 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    SpaceParticipant,
+    StartRunRequest,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -464,6 +467,48 @@ class StateTest(CoreStateTest):
                 ]
             )[0]
         filter_nodes.assert_not_called()
+
+    @parameterized.expand([(0,), (2,)])  # type: ignore[untyped-decorator]
+    def test_create_space_message_and_runs(self, agent_count: int) -> None:
+        """Persist one message and the requested Space runs together."""
+        state = self.state_factory()
+        space_id = UUID(
+            state.create_space(participants=[SpaceParticipant(flwr_aid="alice")]).id
+        )
+        result = state.create_space_message_and_runs(
+            space_id,
+            "alice",
+            "Hello",
+            [("flower/research", "1.0.0", "hash")] * agent_count,
+        )
+        assert result is not None
+        message, run_ids = result
+        assert message.content == "Hello"
+        assert state.get_space_messages(space_id, "alice") == [message]
+        assert len(run_ids) == agent_count
+        assert len(state.get_tasks()) == agent_count
+        assert not state.get_run_series()
+
+    def test_create_space_message_and_runs_rolls_back(self) -> None:
+        """A failed second run leaves no accepted message, run, task, or prompt."""
+        state = self.state_factory()
+        space_id = UUID(
+            state.create_space(participants=[SpaceParticipant(flwr_aid="alice")]).id
+        )
+        with patch.object(
+            state, "create_run", wraps=state.create_run, side_effect=[DEFAULT, 0]
+        ):
+            with self.assertRaises(FlowerError) as error:
+                state.create_space_message_and_runs(
+                    space_id,
+                    "alice",
+                    "Hello",
+                    [("flower/research", "1.0.0", "hash")] * 2,
+                )
+        assert error.exception.code == ApiErrorCode.FAILED_TO_CREATE_RUN
+        assert state.get_space_messages(space_id, "alice") == []
+        assert not state.get_run_info() and not state.get_tasks()
+        assert not state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
 
     def test_create_run_rejects_invalid_scope(self) -> None:
         """Reject missing/mixed scopes and non-AgentApp Space runs before writes."""

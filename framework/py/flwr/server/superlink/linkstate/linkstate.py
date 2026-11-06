@@ -23,10 +23,16 @@ from uuid import UUID
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    SpaceMessage,
+    SpaceParticipant,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
@@ -324,6 +330,45 @@ class LinkState(CoreState):  # pylint: disable=R0904
         This method will not verify if the account has permission to create
         a run in the federation or space. Invalid scope combinations raise ValueError.
         """
+
+    def create_space_message_and_runs(
+        self,
+        space_id: UUID,
+        flwr_aid: str,
+        content: str,
+        apps: Sequence[tuple[str, str, str]],
+    ) -> tuple[SpaceMessage, list[int]] | None:
+        """Persist a user message and runs for resolved AgentApps.
+
+        Each app tuple contains its FAB ID, version, and hash. Implementations
+        wrap this operation in a transaction or hold their state locks.
+        """
+        message = self.create_space_message(
+            space_id, SpaceParticipant(flwr_aid=flwr_aid), content
+        )
+        if message is None:
+            return None
+        run_ids = []
+        for fab_id, fab_version, fab_hash in apps:
+            run_id = self.create_run(
+                fab_id=fab_id,
+                fab_version=fab_version,
+                fab_hash=fab_hash,
+                override_config={},
+                federation_id=None,
+                federation_config=None,
+                flwr_aid=flwr_aid,
+                primary_task_type=TaskType.AGENT_APP,
+                user_prompt=content,
+                space_id=space_id,
+            )
+            if not run_id:
+                raise FlowerError(
+                    ApiErrorCode.FAILED_TO_CREATE_RUN,
+                    "Failed to create a Space run.",
+                )
+            run_ids.append(run_id)
+        return message, run_ids
 
     @abc.abstractmethod
     def get_run_info(  # pylint: disable=too-many-arguments

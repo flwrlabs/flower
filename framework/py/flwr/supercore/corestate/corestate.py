@@ -679,6 +679,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List spaces the user participates in."""
 
     @abstractmethod
+    def get_space_agents(self, space_id: UUID, flwr_aid: str) -> Sequence[Agent] | None:
+        """Return participating agents, or None if the user cannot access the space."""
+
+    @abstractmethod
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
