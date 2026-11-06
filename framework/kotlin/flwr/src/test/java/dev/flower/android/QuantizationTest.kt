@@ -115,12 +115,24 @@ class QuantizationTest {
     }
 
     @Test
-    fun testOverflowingScaleRejectedInDequantize() {
-        // A scale near Float.MAX_VALUE would overflow Float when multiplied by non-zero nibbles
-        val buffer = ByteBuffer.wrap(byteArrayOf(0xFF.toByte()))
+    fun testMaxFiniteInputRoundtrips() {
+        // Blocks with Float.MAX_VALUE must quantize and dequantize cleanly without false rejection
+        val data = floatArrayOf(Float.MAX_VALUE, -Float.MAX_VALUE, 0.0f)
+        val quantized = data.quantizeInt4()
+        val restored = quantized.dequantize()
+        assertEquals(3, restored.size)
+        assertTrue(restored[0].isFinite())
+        assertTrue(restored[1].isFinite())
+        assertEquals(0.0f, restored[2], 0.0f)
+    }
+
+    @Test
+    fun testOverflowingDecodedProductRejected() {
+        // A scale near Float.MAX_VALUE / 7 overflows when multiplied by nibble -8
+        val buffer = ByteBuffer.wrap(byteArrayOf(0x00.toByte())) // q0 = -8, q1 = -8
         val invalidQuantized = QuantizedBuffer(
             buffer = buffer,
-            scales = floatArrayOf(Float.MAX_VALUE),
+            scales = floatArrayOf(Float.MAX_VALUE / 7.0f),
             originalLength = 2,
             blockSize = 64
         )

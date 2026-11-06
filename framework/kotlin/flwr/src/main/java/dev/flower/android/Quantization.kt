@@ -173,8 +173,8 @@ object Quantization {
 
         while (elemIdx < totalElements) {
             val scale = quantized.scales[blockIdx]
-            require(scale.isFinite() && scale <= Float.MAX_VALUE / 8.0f) {
-                "Scale at block $blockIdx is invalid or causes overflow: $scale"
+            require(scale.isFinite() && scale >= 0.0f) {
+                "Scale at block $blockIdx is non-finite or negative: $scale"
             }
             val blockEnd = minOf((blockIdx + 1) * blockSize, totalElements)
 
