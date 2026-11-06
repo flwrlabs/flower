@@ -80,7 +80,6 @@ class SuperLinkLifespanConfig:  # pylint: disable=too-many-instance-attributes
     database: str
     isolation: str
     runtime_dependency_install: bool
-    run_events_stream_interval: float | None = None
 
 
 def get_license_plugin() -> LicensePlugin | None:

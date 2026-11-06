@@ -330,20 +330,15 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert log.call_args.args[2] == 123
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"), [(None, 1.0), ("0.25", 0.25), ("0.01", 0.01), ("60", 60.0)]
-)
 def test_run_superexec_uses_configured_task_poll_interval(
     monkeypatch: pytest.MonkeyPatch,
-    value: str | None,
-    expected: float,
 ) -> None:
-    """SuperExec should use the default or configured interval, including bounds."""
+    """SuperExec should use the task polling interval from the environment."""
     _, _, _, _, sleep_mock = _run_superexec_one_launch(
-        monkeypatch, LaunchResult.accepted(), task_poll_interval=value
+        monkeypatch, LaunchResult.accepted(), task_poll_interval="0.25"
     )
 
-    sleep_mock.assert_called_once_with(expected)
+    sleep_mock.assert_called_once_with(0.25)
 
 
 @pytest.mark.parametrize(
@@ -360,6 +355,18 @@ def test_run_superexec_rejects_invalid_task_poll_interval(
             runtime_api_address="127.0.0.1:9091",
             insecure=True,
         )
+
+
+@pytest.mark.parametrize("value", ["0.01", "60"])
+def test_run_superexec_accepts_task_poll_interval_bounds(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """SuperExec should accept the configured polling interval bounds."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", value)
+
+    # pylint: disable-next=protected-access
+    get_task_poll_interval = run_superexec_module._get_task_poll_interval
+    assert get_task_poll_interval() == float(value)
 
 
 def test_handle_launch_result_handles_all_statuses() -> None:

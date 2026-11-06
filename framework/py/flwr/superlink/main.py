@@ -28,10 +28,8 @@ from fastapi.routing import APIRoute, iter_route_contexts
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from flwr.common.constant import RUN_EVENTS_STREAM_INTERVAL
 from flwr.supercore import log
 from flwr.supercore.auth import load_superexec_auth_secret
-from flwr.supercore.config import load_poll_interval
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.error import ApiErrorCode, http_error_translator
@@ -121,11 +119,6 @@ def create_app(  # pylint: disable=too-many-statements
     superlink_lifespan_class: type[SuperLinkLifespan] | None = None,
 ) -> FastAPI:
     """Create the SuperLink FastAPI app and its shared lifespan resources."""
-    run_events_stream_interval = load_poll_interval(
-        "FLWR_RUN_EVENTS_STREAM_INTERVAL",
-        RUN_EVENTS_STREAM_INTERVAL,
-        value=config.run_events_stream_interval if config is not None else None,
-    )
     if config is None:
         is_simulation = False
         database = get_ee_linkstate_db()
@@ -200,7 +193,6 @@ def create_app(  # pylint: disable=too-many-statements
         middleware=_get_middleware(),
     )
     fastapi_app.state.superlink_lifespan = superlink_lifespan
-    fastapi_app.state.run_events_stream_interval = run_events_stream_interval
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.enable_supernode_auth = (
         config.enable_supernode_auth if config else False

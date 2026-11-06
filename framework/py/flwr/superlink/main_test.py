@@ -123,42 +123,6 @@ def test_get_ee_linkstate_db_uses_explicit_database(monkeypatch: MonkeyPatch) ->
     assert main.get_ee_linkstate_db() == "sqlite:///state.db"
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [(None, 0.5), ("0.1", 0.1), ("0.01", 0.01), ("60", 60.0)],
-)
-def test_create_app_configures_run_event_polling(
-    monkeypatch: MonkeyPatch, value: str | None, expected: float
-) -> None:
-    """Read the environment when constructing each app, not during import."""
-    monkeypatch.delenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", raising=False)
-    default_app = _create_app(monkeypatch)
-    if value is not None:
-        monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
-
-    app = _create_app(monkeypatch)
-
-    assert app.state.run_events_stream_interval == expected
-    assert default_app.state.run_events_stream_interval == 0.5
-
-
-@pytest.mark.parametrize(
-    "value", ["", "invalid", "0", "-1", "0.009", "60.1", "nan", "inf", "-inf"]
-)
-def test_create_app_rejects_invalid_run_event_polling(
-    monkeypatch: MonkeyPatch, value: str
-) -> None:
-    """Reject invalid polling configuration before initializing app resources."""
-    monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
-    state_factory = Mock()
-    monkeypatch.setattr(main, "get_objectstore_linkstate_factories", state_factory)
-
-    with pytest.raises(ValueError, match="FLWR_RUN_EVENTS_STREAM_INTERVAL"):
-        main.create_app()
-
-    state_factory.assert_not_called()
-
-
 @pytest.mark.parametrize("secret", [None, b"superexec-secret\n"])
 def test_create_app_superexec_auth_from_environment(
     monkeypatch: MonkeyPatch, tmp_path: Path, secret: bytes | None
@@ -223,15 +187,11 @@ def test_create_app_places_extension_middleware_before_control_middleware(
     ]
 
 
-@pytest.mark.parametrize(
-    ("interval", "env_value", "expected"), [(None, "0.1", 0.1), (0.2, "invalid", 0.2)]
-)
 def test_create_app_exposes_configured_dependencies(
-    monkeypatch: MonkeyPatch, interval: float | None, env_value: str, expected: float
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """Expose lifespan configuration to HTTP dependencies and middleware."""
     monkeypatch.setenv("FLWR_SUPEREXEC_AUTH_SECRET_FILE", "/nonexistent/secret")
-    monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", env_value)
     monkeypatch.setattr(extensions, "get_middleware", lambda: ())
     monkeypatch.setattr(extensions, "configure_app", lambda _: None)
     monkeypatch.setattr(
@@ -249,7 +209,6 @@ def test_create_app_exposes_configured_dependencies(
         authn_plugin=Mock(),
         event_log_plugin=None,
         fleet_event_log_plugin=fleet_event_log_plugin,
-        run_events_stream_interval=interval,
     )
     lifespan_class = Mock()
 
@@ -258,5 +217,4 @@ def test_create_app_exposes_configured_dependencies(
     assert app.state.superexec_auth_secret is None
     assert app.state.artifact_provider is artifact_provider
     assert app.state.fleet_event_log_plugin is fleet_event_log_plugin
-    assert app.state.run_events_stream_interval == expected
     lifespan_class.assert_called_once()

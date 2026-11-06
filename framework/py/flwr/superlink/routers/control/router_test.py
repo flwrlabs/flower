@@ -305,7 +305,6 @@ def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
     authn_plugin = authn_plugin or Mock()
     authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
     app = FastAPI()
-    app.state.run_events_stream_interval = 0.5
     app.state.account_access_dep = AccountAccessDependency(authn_plugin)
     app.include_router(router)
     app.add_middleware(ProtobufTranslationMiddleware)
@@ -1187,10 +1186,7 @@ def test_stream_logs_returns_framed_protobuf_responses() -> None:
     assert response.content == b"".join(frame_message(message) for message in expected)
 
 
-@pytest.mark.parametrize("poll_interval", [0.5, 0.1])
-def test_stream_run_events_returns_framed_protobuf_responses(
-    poll_interval: float,
-) -> None:
+def test_stream_run_events_returns_framed_protobuf_responses() -> None:
     """Serialize every task event as one length-delimited stream frame."""
     linkstate = Mock(spec=LinkState)
     expected = [
@@ -1199,8 +1195,6 @@ def test_stream_run_events_returns_framed_protobuf_responses(
     ]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
-
-    app.state.run_events_stream_interval = poll_interval
 
     with patch(
         "flwr.superlink.routers.control.router.control_handlers.stream_run_events",
@@ -1225,7 +1219,6 @@ def test_stream_run_events_returns_framed_protobuf_responses(
     assert account is _ACCOUNT
     assert state is linkstate
     assert callable(is_active)
-    assert stream.call_args.kwargs == {"poll_interval": poll_interval}
 
 
 def test_stream_logs_returns_missing_run_error_before_streaming() -> None:

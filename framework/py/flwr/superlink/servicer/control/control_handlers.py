@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import json
+import os
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -941,8 +942,6 @@ def stream_run_events(
     account: AccountInfo,
     state: LinkState,
     is_active: Callable[[], bool] | None = None,
-    *,
-    poll_interval: float = RUN_EVENTS_STREAM_INTERVAL,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
     run_id = request.run_id
@@ -971,20 +970,30 @@ def stream_run_events(
         after_task_event_id,
         state,
         is_active,
-        poll_interval=poll_interval,
     )
 
 
-def _stream_run_events(  # pylint: disable=too-many-arguments
+def _stream_run_events(
     run_id: int,
     run: Run,
     after_task_event_id: int | None,
     state: LinkState,
     is_active: Callable[[], bool] | None,
-    *,
-    poll_interval: float,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Yield task events until the run finishes or the stream is cancelled."""
+    raw_interval = os.getenv(
+        "FLWR_RUN_EVENTS_STREAM_INTERVAL", str(RUN_EVENTS_STREAM_INTERVAL)
+    )
+    try:
+        poll_interval = float(raw_interval)
+        if not 0.01 <= poll_interval <= 60:
+            raise ValueError
+    except ValueError as err:
+        raise ValueError(
+            "FLWR_RUN_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
+            f"between 0.01 and 60, got {raw_interval!r}."
+        ) from err
+
     # LinkState creates every run with a primary task, so casting is safe
     primary_task_id = cast(int, run.primary_task_id)
     while is_active is None or is_active():

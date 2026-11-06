@@ -128,7 +128,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
-from flwr.superlink.dependencies.config import get_run_events_stream_interval
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
@@ -321,7 +320,6 @@ def stream_run_events(
     linkstate: LinkStateDependency,
     account: AccountDependency,
     stream_context: ProtobufStreamContextDependency,
-    poll_interval: Annotated[float, Depends(get_run_events_stream_interval)],
 ) -> Iterator[StreamRunEventsResponse]:
     """Stream task events for a run."""
     return control_handlers.stream_run_events(
@@ -329,7 +327,6 @@ def stream_run_events(
         account,
         linkstate,
         stream_context.is_active,
-        poll_interval=poll_interval,
     )
 
 

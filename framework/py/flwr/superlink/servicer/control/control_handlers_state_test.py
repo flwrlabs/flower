@@ -24,8 +24,9 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
+import pytest
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, RecordDict
@@ -1773,37 +1774,6 @@ class TestControlHandlersAuth(unittest.TestCase):
             all(isinstance(message, StreamRunEventsResponse) for message in msgs)
         )
 
-    def test_streamrunevents_uses_configured_poll_interval(self) -> None:
-        """Use the injected interval between event reads while a run is active."""
-        run = Mock(
-            federation_id=NOOP_FEDERATION_ID,
-            primary_task_id=123,
-            status=RunStatus(Status.RUNNING, "", ""),
-        )
-        is_active = Mock(side_effect=[True, False])
-        with (
-            patch.object(self.state, "get_run_info", return_value=[run]),
-            patch.object(self.state, "get_task_events", return_value=[]),
-            patch.object(
-                self.state.federation_manager, "has_member", return_value=True
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.time.sleep"
-            ) as sleep,
-        ):
-            messages = list(
-                control_handlers.stream_run_events(
-                    StreamRunEventsRequest(run_id=789),
-                    AccountInfo(flwr_aid="user-123", account_name="Test user"),
-                    self.state,
-                    is_active,
-                    poll_interval=0.1,
-                )
-            )
-
-        self.assertEqual(messages, [])
-        sleep.assert_called_once_with(0.1)
-
     def test_streamrunevents_stops_when_client_is_inactive(self) -> None:
         """Test StreamRunEvents stops when the client disconnects."""
         run_id = 789
@@ -2065,6 +2035,50 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
                 request, get_current_account_info(), self.state
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(None, 0.5), ("0.1", 0.1), ("0.01", 0.01), ("60", 60.0)]
+)
+def test_stream_run_events_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, expected: float
+) -> None:
+    """Read the interval once per stream and use it for every polling sleep."""
+    monkeypatch.delenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", raising=False)
+    if value is not None:
+        monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
+    run = Mock(primary_task_id=123, status=RunStatus(Status.RUNNING, "", ""))
+    state = Mock()
+    state.get_run_info.return_value = [run]
+    state.get_task_events.return_value = []
+    with patch(
+        "flwr.superlink.servicer.control.control_handlers.time.sleep",
+        side_effect=lambda _: monkeypatch.setenv(
+            "FLWR_RUN_EVENTS_STREAM_INTERVAL", "invalid"
+        ),
+    ) as sleep:
+        # pylint: disable-next=protected-access
+        events = control_handlers._stream_run_events(
+            789, run, None, state, Mock(side_effect=[True, True, False])
+        )
+        assert not list(events)
+
+    assert sleep.call_args_list == [call(expected), call(expected)]
+
+
+@pytest.mark.parametrize(
+    "value", ["", "invalid", "0", "-1", "0.009", "60.1", "nan", "inf", "-inf"]
+)
+def test_stream_run_events_rejects_invalid_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """Reject invalid intervals before polling for events."""
+    monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
+    state = Mock()
+    with pytest.raises(ValueError, match="FLWR_RUN_EVENTS_STREAM_INTERVAL"):
+        # pylint: disable-next=protected-access
+        next(control_handlers._stream_run_events(789, Mock(), None, state, None))
+    state.get_task_events.assert_not_called()
 
 
 def test_format_verification_compact() -> None:
