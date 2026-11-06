@@ -144,6 +144,7 @@ def test_space_routes(
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
+    personal = state.get_spaces(_ACCOUNT.flwr_aid)[0]
     caller = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
     agent_participant = SpaceParticipant(agent_id=agent.id)
     response = client.post(
@@ -160,7 +161,10 @@ def test_space_routes(
         content=ListSpacesRequest().SerializeToString(),
     )
     assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [space]
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
+        space,
+        personal,
+    ]
     response = client.post(
         "/v1/control/send-space-message",
         content=SendSpaceMessageRequest(
@@ -388,6 +392,11 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert agent.config == config
     assert agent.created_at and agent.updated_at == agent.created_at
     assert state.list_agents(_ACCOUNT.flwr_aid) == [agent]
+    spaces = state.get_spaces(_ACCOUNT.flwr_aid)
+    assert len(spaces) == 1
+    assert len(spaces[0].participants) == 2
+    assert SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid) in spaces[0].participants
+    assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
     response = client.post(
         "/v1/control/list-agents",
