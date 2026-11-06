@@ -166,7 +166,7 @@ def create_agent(
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateAgentResponse:
-    """Create an agent."""
+    """Create an agent and a Space containing the agent and its creator."""
     return control_handlers.create_agent(request, account, linkstate)
 
 

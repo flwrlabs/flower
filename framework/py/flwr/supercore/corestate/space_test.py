@@ -49,6 +49,7 @@ def test_create_and_list_spaces(state: CoreState) -> None:
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
+    personal = state.get_spaces("alice")[0]
     alice = SpaceParticipant(flwr_aid="alice")
     bob = SpaceParticipant(flwr_aid="bob")
     agent_participant = SpaceParticipant(agent_id=agent.id)
@@ -64,6 +65,7 @@ def test_create_and_list_spaces(state: CoreState) -> None:
     assert [space.id for space in state.get_spaces("alice")] == [
         second.id,
         first.id,
+        personal.id,
     ]
     assert [space.id for space in state.get_spaces("bob")] == [first.id]
     assert not state.get_spaces(str(agent.id))
