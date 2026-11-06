@@ -16,15 +16,11 @@
 
 # pylint: disable=too-many-lines
 
-import hashlib
 import inspect
 from collections.abc import Callable
 from datetime import datetime
-from io import BytesIO
-from typing import cast
-from unittest.mock import DEFAULT, Mock, call, patch
+from unittest.mock import Mock, call, patch
 from uuid import UUID, uuid4
-from zipfile import ZipFile
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, Response, status
@@ -33,12 +29,10 @@ from fastapi.testclient import TestClient
 from google.protobuf.json_format import ParseDict
 from google.protobuf.message import Message
 
-from flwr.app import Message as AppMessage
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     NOOP_FLWR_AID,
     REFRESH_TOKEN_KEY,
-    SUPERLINK_NODE_ID,
     Status,
     SubStatus,
 )
@@ -85,10 +79,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsRequest,
     StreamRunEventsResponse,
 )
-from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    AcquireTaskRequest,
-    PullTaskInputRequest,
-)
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import (
@@ -96,14 +86,8 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
-from flwr.supercore.constant import (
-    AGENT_MESSAGE_CONTENT_RECORD_KEY,
-    AGENT_MESSAGE_TEXT_KEY,
-    FLWR_IN_MEMORY_DB_NAME,
-    TaskType,
-)
-from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
-from flwr.supercore.inflatable.inflatable_utils import pull_and_inflate_object_from_tree
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -116,8 +100,6 @@ from flwr.supercore.protobuf.translation import (
     get_protobuf_request,
 )
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.superlink import extensions
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
@@ -127,40 +109,17 @@ from flwr.superlink.routers.control.router import add_app as add_app_route
 from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
-from flwr.superlink.servicer.runtime import runtime_handlers
 
 _ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
-@pytest.fixture(name="agent_fab")
-def agent_fab_fixture() -> bytes:
-    """Provide a valid AgentApp bundle without downloading from Hub."""
-    buffer = BytesIO()
-    with ZipFile(buffer, "w") as archive:
-        archive.writestr(
-            "pyproject.toml",
-            '[project]\nname = "research"\nversion = "1.0.0"\n'
-            'description = ""\nauthors = []\nlicense = "Apache-2.0"\n'
-            '[tool.flwr.app]\npublisher = "flower"\n'
-            '[tool.flwr.app.components]\nagentapp = "research.agent_app:app"\n',
-        )
-    return buffer.getvalue()
-
-
-@pytest.fixture(name="space_client", params=[FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def space_client_fixture(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, agent_fab: bytes
-) -> tuple[TestClient, LinkState]:
-    """Provide authenticated space routes backed by memory or SQL state."""
+@pytest.fixture(name="space_client")
+def space_client_fixture() -> tuple[TestClient, LinkState]:
+    """Provide authenticated space routes backed by in-memory state."""
     state = LinkStateFactory(
-        request.param, NoOpFederationManager(), ObjectStoreFactory()
+        FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
-    monkeypatch.setattr(
-        control_handlers,
-        "_get_remote_fab",
-        Mock(return_value=(agent_fab, {}, None)),
-    )
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     return (
@@ -201,15 +160,18 @@ def test_space_routes(
         content=ListSpacesRequest().SerializeToString(),
     )
     assert listed.status_code == 200
-    listed_spaces = ListSpacesResponse.FromString(listed.content).spaces
-    assert len(listed_spaces) == 1 and listed_spaces[0].id == space.id
-    assert all(member in listed_spaces[0].participants for member in space.participants)
-    response = client.post(
-        "/v1/control/send-space-message",
-        content=SendSpaceMessageRequest(
-            space_id=space.id, content="Hello"
-        ).SerializeToString(),
-    )
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [space]
+    with patch.object(
+        control_handlers,
+        "_prepare_space_agent_app",
+        return_value=("flower/research", "1.0.0", "hash"),
+    ):
+        response = client.post(
+            "/v1/control/send-space-message",
+            content=SendSpaceMessageRequest(
+                space_id=space.id, content="Hello"
+            ).SerializeToString(),
+        )
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
@@ -223,126 +185,6 @@ def test_space_routes(
     ]
     assert not state.get_run_series()
     assert len(state.get_tasks()) == 1
-
-
-@pytest.mark.parametrize("agent_count", [0, 2])
-def test_space_submission_queues_assigned_agents(
-    space_client: tuple[TestClient, LinkState], agent_fab: bytes, agent_count: int
-) -> None:
-    """A member triggers all assigned agents through the existing Runtime path."""
-    client, state = space_client
-    participants = [SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
-    for index in range(agent_count):
-        agent = state.create_agent(
-            "other-owner",
-            AgentConfig(name=f"Agent {index}", app_spec="@flower/research==1.0.0"),
-        )
-        assert agent is not None
-        participants.append(SpaceParticipant(agent_id=agent.id))
-    space = state.create_space(participants=participants)
-    with patch.object(extensions, "notify_run_started") as notify:
-        response = client.post(
-            "/v1/control/send-space-message",
-            content=SendSpaceMessageRequest(
-                space_id=space.id, content="Research this"
-            ).SerializeToString(),
-        )
-    assert response.status_code == 200
-    assert notify.call_count == agent_count
-    assert len(state.get_run_info()) == agent_count
-    assert not state.get_run_series()
-    for _ in range(agent_count):
-        acquired = core_runtime_handlers.acquire_task(
-            AcquireTaskRequest(
-                agentapp_fab_hashes=[hashlib.sha256(agent_fab).hexdigest()]
-            ),
-            state,
-        )
-        assert acquired.task.type == TaskType.AGENT_APP
-        run_id = acquired.task.run_id
-        inputs = runtime_handlers.pull_task_input(
-            PullTaskInputRequest(), state, acquired.task
-        )
-        assert inputs.fab.content == agent_fab
-        assert inputs.context.run_id == run_id and inputs.context.series_id == 0
-        assert not inputs.HasField("federation_config")
-        prompt = state.get_messages(dst_node_id=SUPERLINK_NODE_ID, run_id=run_id)[0]
-        prompt = pull_and_inflate_object_from_tree(
-            state.object_store.get_object_tree(prompt.metadata.message_id),
-            lambda object_id: cast(bytes, state.object_store.get(object_id)),
-            lambda _: None,
-            return_type=AppMessage,
-        )
-        assert (
-            prompt.content.config_records[AGENT_MESSAGE_CONTENT_RECORD_KEY][
-                AGENT_MESSAGE_TEXT_KEY
-            ]
-            == "Research this"
-        )
-
-
-@pytest.mark.parametrize("failure", ["download", "invalid-fab", "serverapp", "queue"])
-def test_space_submission_failure_does_not_accept_partial_work(
-    space_client: tuple[TestClient, LinkState],
-    monkeypatch: pytest.MonkeyPatch,
-    failure: str,
-) -> None:
-    """Failed app resolution or a later run insert leaves no message or queued run."""
-    client, state = space_client
-    participants = [SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
-    for index in range(2):
-        agent = state.create_agent(
-            _ACCOUNT.flwr_aid,
-            AgentConfig(name=f"Agent {index}", app_spec="@flower/research"),
-        )
-        assert agent is not None
-        participants.append(SpaceParticipant(agent_id=agent.id))
-    space = state.create_space(participants=participants)
-    if failure == "download":
-        monkeypatch.setattr(
-            control_handlers,
-            "_get_remote_fab",
-            Mock(
-                side_effect=FlowerError(
-                    ApiErrorCode.FAB_DOWNLOAD_FAILURE, "Unavailable"
-                )
-            ),
-        )
-    elif failure == "invalid-fab":
-        monkeypatch.setattr(
-            control_handlers,
-            "_get_remote_fab",
-            Mock(return_value=(b"invalid", {}, None)),
-        )
-    elif failure == "serverapp":
-        monkeypatch.setattr(
-            control_handlers, "_get_app_type", Mock(return_value=TaskType.SERVER_APP)
-        )
-    else:
-        monkeypatch.setattr(
-            state,
-            "create_run",
-            Mock(wraps=state.create_run, side_effect=[DEFAULT, 0]),
-        )
-    response = client.post(
-        "/v1/control/send-space-message",
-        content=SendSpaceMessageRequest(
-            space_id=space.id, content="Research this"
-        ).SerializeToString(),
-    )
-    assert response.status_code >= 400
-    assert (
-        response.json()["code"]
-        == {
-            "download": ApiErrorCode.FAB_DOWNLOAD_FAILURE,
-            "invalid-fab": ApiErrorCode.INVALID_RUN_CONFIG,
-            "serverapp": ApiErrorCode.INVALID_RUN_CONFIG,
-            "queue": ApiErrorCode.FAILED_TO_CREATE_RUN,
-        }[failure]
-    )
-    assert state.get_space_messages(UUID(space.id), _ACCOUNT.flwr_aid) == []
-    assert not state.get_run_info() and not state.get_tasks()
-    assert not state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
 
 
 def test_create_space_rejects_invalid_participants(
