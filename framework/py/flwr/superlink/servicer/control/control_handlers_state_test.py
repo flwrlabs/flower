@@ -2057,9 +2057,11 @@ def test_stream_run_events_poll_interval(
             "FLWR_RUN_EVENTS_STREAM_INTERVAL", "invalid"
         ),
     ) as sleep:
-        # pylint: disable-next=protected-access
-        events = control_handlers._stream_run_events(
-            789, run, None, state, Mock(side_effect=[True, True, False])
+        events = control_handlers.stream_run_events(
+            StreamRunEventsRequest(run_id=789),
+            Mock(),
+            state,
+            Mock(side_effect=[True, True, False]),
         )
         assert not list(events)
 
@@ -2072,12 +2074,14 @@ def test_stream_run_events_poll_interval(
 def test_stream_run_events_rejects_invalid_poll_interval(
     monkeypatch: pytest.MonkeyPatch, value: str
 ) -> None:
-    """Reject invalid intervals before polling for events."""
+    """Reject invalid intervals before returning the event generator."""
     monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
     state = Mock()
+    state.get_run_info.return_value = [Mock()]
     with pytest.raises(ValueError, match="FLWR_RUN_EVENTS_STREAM_INTERVAL"):
-        # pylint: disable-next=protected-access
-        next(control_handlers._stream_run_events(789, Mock(), None, state, None))
+        control_handlers.stream_run_events(
+            StreamRunEventsRequest(run_id=789), Mock(), state
+        )
     state.get_task_events.assert_not_called()
 
 
