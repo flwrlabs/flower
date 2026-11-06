@@ -15,7 +15,6 @@
 """Tests for account-owned agents across CoreState implementations."""
 
 from pathlib import Path
-from unittest.mock import patch
 from uuid import UUID
 
 import pytest
@@ -75,10 +74,10 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert state.list_agents("") == []
 
 
-def test_create_agent_with_space(state: CoreState) -> None:
+def test_create_agent_creates_space(state: CoreState) -> None:
     """Each new agent gets an empty Space containing only itself and its creator."""
     config = AgentConfig(name="Research", app_spec="@flower/research")
-    agents = [state.create_agent_with_space("alice", config) for _ in range(2)]
+    agents = [state.create_agent("alice", config) for _ in range(2)]
     spaces = state.get_spaces("alice")
     assert len(spaces) == 2 and spaces[0].id != spaces[1].id
     for agent in agents:
@@ -109,10 +108,6 @@ def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None
         values[field] = ""
 
     assert state.create_agent(flwr_aid=flwr_aid, config=AgentConfig(**values)) is None
-    assert (
-        state.create_agent_with_space(flwr_aid=flwr_aid, config=AgentConfig(**values))
-        is None
-    )
     assert state.list_agents("alice") == []
     assert state.list_agents("") == []
     assert state.get_spaces("alice") == []

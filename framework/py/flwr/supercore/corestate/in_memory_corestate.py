@@ -587,14 +587,14 @@ class InMemoryCoreState(
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create and return an account's agent."""
+        """Create an agent and its initial Space together."""
         if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
             config.HasField("description") and not config.description
         ):
             return None
-        with self.lock_agent_store:
+        with self.lock_space_store, self.lock_agent_store:
             self.agent_id_counter += 1
             created_at = now().isoformat()
             agent = Agent(
@@ -604,16 +604,6 @@ class InMemoryCoreState(
                 updated_at=created_at,
             )
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
-            return agent
-
-    def create_agent_with_space(
-        self, flwr_aid: str, config: AgentConfig
-    ) -> Agent | None:
-        """Publish an agent and its initial Space together."""
-        with self.lock_space_store, self.lock_agent_store:
-            agent = self.create_agent(flwr_aid, config)
-            if agent is None:
-                return None
             try:
                 self.create_space(
                     participants=[

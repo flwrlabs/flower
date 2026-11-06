@@ -712,7 +712,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create and return an account's agent."""
+        """Create an agent and its initial Space in the same transaction."""
         if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
@@ -732,21 +732,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.add(model)
             session.flush()
-            return _agent_from_model(model)
-
-    def create_agent_with_space(
-        self, flwr_aid: str, config: AgentConfig
-    ) -> Agent | None:
-        """Commit the agent and its initial Space in the same transaction."""
-        with self.session():
-            agent = self.create_agent(flwr_aid, config)
-            if agent is not None:
-                self.create_space(
-                    participants=[
-                        SpaceParticipant(flwr_aid=flwr_aid),
-                        SpaceParticipant(agent_id=agent.id),
-                    ]
-                )
+            agent = _agent_from_model(model)
+            self.create_space(
+                participants=[
+                    SpaceParticipant(flwr_aid=flwr_aid),
+                    SpaceParticipant(agent_id=agent.id),
+                ]
+            )
             return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:

@@ -239,7 +239,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create an agent owned by a Flower account.
+        """Create an agent and its initial Space atomically.
+
+        The untitled Space contains the agent and its owning account.
 
         Parameters
         ----------
@@ -256,15 +258,6 @@ class CoreState(ABC):  # pylint: disable=R0904
             timestamps as ISO-formatted strings, or None if the account ID, a
             required configuration field, or a set optional field is empty.
             Ownership is stored separately and is not part of the returned message.
-        """
-
-    @abstractmethod
-    def create_agent_with_space(
-        self, flwr_aid: str, config: AgentConfig
-    ) -> Agent | None:
-        """Atomically create an agent and an untitled Space with its owner.
-
-        Return None for invalid agent configuration, as in create_agent.
         """
 
     @abstractmethod
