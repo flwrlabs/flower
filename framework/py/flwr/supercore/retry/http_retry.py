@@ -60,6 +60,11 @@ def make_simple_http_retry_invoker(
     on_connection_state : Optional[Callable[[bool], None]] (default: None)
         Optional observer notified of successful or failed connection attempts.
         Observer errors do not affect request handling.
+
+    Returns
+    -------
+    RetryInvoker
+        HTTP retry policy with the optional connection-state observer.
     """
     lock = threading.Lock()
     shutdown_lock = threading.Lock()
