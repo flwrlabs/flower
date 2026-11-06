@@ -1,0 +1,78 @@
+
+name: Rebuild Docker images for the latest Flower version
+
+on:
+  schedule:
+    # At 01:00 on Monday.
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  parameters:
+    if: ${{ github.repository == 'adap/flower' }}
+    name: Collect docker build parameters
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      pip-version: ${{ steps.parameters.outputs.pip-version }}
+      setuptools-version: ${{ steps.parameters.outputs.setuptools-version }}
+      matrix: ${{ steps.parameters.outputs.matrix }}
+    steps:
+      - id: flwr-version
+        run: |
+          FLWR_VERSION=$(pip index versions flwr 2>/dev/null | egrep -o '([0-9]+\.){2}[0-9]+' | head -n 1)
+          echo "flwr-version=$FLWR_VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          ref: v${{ steps.flwr-version.outputs.flwr-version }}
+
+      - uses: ./.github/actions/bootstrap
+        id: tool-versions
+
+      - id: parameters
+        run: |
+          echo "pip-version=${{ steps.tool-versions.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
+          echo "setuptools-version=${{ steps.tool-versions.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
+          python dev/build-docker-image-matrix.py --flwr-version "${{ steps.flwr-version.outputs.flwr-version }}" > matrix.json
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  build-base-images:
+    if: ${{ github.repository == 'adap/flower' }}
+    name: Build base images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: parameters
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parameters.outputs.matrix).base }}
+    with:
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        PYTHON_VERSION=${{ matrix.images.python_version }}
+        PIP_VERSION=${{ needs.parameters.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.parameters.outputs.setuptools-version }}
+        DISTRO=${{ matrix.images.distro.name }}
+        DISTRO_VERSION=${{ matrix.images.distro.version }}
+        FLWR_VERSION=${{ matrix.images.flwr_version }}
+      tags: ${{ matrix.images.tag }}
+    secrets:
+      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  build-binary-images:
+    if: ${{ github.repository == 'adap/flower' }}
+    name: Build binary images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: [parameters, build-base-images]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parameters.outputs.matrix).binary }}
+    with:
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: BASE_IMAGE=${{ matrix.images.base_image }}
+      tags: ${{ matrix.images.tags }}
+    secrets:
+      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
