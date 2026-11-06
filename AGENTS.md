@@ -31,7 +31,8 @@ For every PR, add or update concise source comments explaining each logical bloc
 introduced or materially changed in handwritten non-test code. Write for a reviewer
 unfamiliar with the change: explain the block's purpose and any important decisions,
 assumptions, invariants, or side effects. Avoid merely paraphrasing individual
-statements.
+statements. Prefer one-line comments; use multiple lines only when needed for
+clarity.
 
 Keep explanations next to the code they describe. Reuse clear existing comments
 or docstrings instead of duplicating them, and update explanations when behavior
