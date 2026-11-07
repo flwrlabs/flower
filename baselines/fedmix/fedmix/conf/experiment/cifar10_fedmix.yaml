@@ -1,0 +1,17 @@
+# @package _global_
+defaults:
+  - override /dataset: cifar10
+  - override /strategy: fedmix
+  - override /model: vgg
+
+num_clients: 60
+clients_per_round: 15
+num_rounds: 500
+
+strategy:
+  mixup_ratio: 0.05
+  min_fit_clients: ${clients_per_round}
+  min_available_clients: ${clients_per_round}
+
+client:
+  num_epochs: 2
