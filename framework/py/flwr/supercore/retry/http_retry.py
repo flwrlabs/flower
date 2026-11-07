@@ -18,6 +18,7 @@ import os
 import signal
 import threading
 import time
+from collections.abc import Callable
 from logging import DEBUG, ERROR, INFO, WARNING
 
 import httpx
@@ -49,16 +50,38 @@ _RETRYABLE_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
 )
 
 
-def make_simple_http_retry_invoker() -> RetryInvoker:
-    """Create a simple HTTP retry invoker."""
+def make_simple_http_retry_invoker(
+    *, on_connection_state: Callable[[bool], None] | None = None
+) -> RetryInvoker:
+    """Create a simple HTTP retry invoker.
+
+    Parameters
+    ----------
+    on_connection_state : Optional[Callable[[bool], None]] (default: None)
+        Optional observer notified of successful or failed connection attempts.
+        Observer errors do not affect request handling.
+
+    Returns
+    -------
+    RetryInvoker
+        HTTP retry policy with the optional connection-state observer.
+    """
     lock = threading.Lock()
     shutdown_lock = threading.Lock()
     shutdown_requested = False
     system_healthy = threading.Event()
     system_healthy.set()
 
+    def _notify_connection_state(available: bool) -> None:
+        if on_connection_state is not None:
+            try:
+                on_connection_state(available)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
     def _on_success(retry_state: RetryState) -> None:
         system_healthy.set()
+        _notify_connection_state(True)
         if retry_state.tries > 1:
             log(
                 INFO,
@@ -69,12 +92,14 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
 
     def _on_backoff(retry_state: RetryState) -> None:
         system_healthy.clear()
+        _notify_connection_state(False)
         log(
             DEBUG, "Connection attempt failed with exception: %s", retry_state.exception
         )
 
     def _on_giveup(retry_state: RetryState) -> None:
         system_healthy.clear()
+        _notify_connection_state(False)
         if retry_state.tries > 1:
             log(
                 WARNING,

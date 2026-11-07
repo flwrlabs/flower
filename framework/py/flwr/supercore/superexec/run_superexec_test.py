@@ -15,6 +15,7 @@
 """Tests for SuperExec runtime setup."""
 
 
+import signal
 from logging import ERROR, WARNING
 from typing import Any
 from unittest.mock import Mock
@@ -24,6 +25,7 @@ import pytest
 from flwr.proto.runtime_pb2 import AcquireTaskResponse  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import ExecutorType, TaskType
+from flwr.supercore.exit import exit_handler, signal_handler
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
@@ -31,6 +33,7 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 from flwr.supercore.superexec.plugin import AutoExecPlugin
+from flwr.supercore.superexec.status import SuperExecStatus
 from flwr.supercore.tracing import PhaseTimings
 
 from . import run_superexec as run_superexec_module
@@ -108,6 +111,13 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
     order.attach_mock(executor.reconcile, "reconcile")
     order.attach_mock(executor.get_eligible_capacity, "capacity")
     order.attach_mock(client.AcquireTask, "acquire")
+    status = Mock()
+    order.attach_mock(status.set_phase, "phase")
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(status),
+    )
     publish = Mock()
     monkeypatch.setattr(PhaseTimings, "publish", publish)
     monkeypatch.setattr(
@@ -133,12 +143,31 @@ def test_builtin_kubernetes_uses_capacity_filtered_combined_acquisition(
         )
 
     assert [call[0] for call in order.mock_calls] == [
+        "phase",
         "reconcile",
+        "phase",
         "capacity",
+        "phase",
         "acquire",
+        *(["phase"] if ready_fabs else []),
+        "phase",
+        "phase",
         "capacity",
+        "phase",
         "acquire",
+        "phase",
     ]
+    assert [call.args[0] for call in status.set_phase.call_args_list] == [
+        "initializing",
+        "capacity",
+        "acquiring",
+        *(["dispatching"] if ready_fabs else []),
+        "sleeping",
+        "capacity",
+        "acquiring",
+        "sleeping",
+    ]
+    status.close.assert_called_once_with()
     request = client.AcquireTask.call_args.args[0]
     assert not request.supported_task_types
     assert set(request.agentapp_fab_hashes) == ready_fabs
@@ -176,9 +205,16 @@ def test_run_superexec_adds_runtime_version_interceptor(
     client = Mock()
     client.AcquireTask.side_effect = KeyboardInterrupt()
     captured: dict[str, Any] = {}
+    observer = Mock()
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(observer),
+    )
 
     def _from_server_address(**kwargs: Any) -> Mock:
         captured.update(kwargs)
+        kwargs["retry_invoker"].invoke(Mock(return_value="response"))
         return client
 
     monkeypatch.setattr(
@@ -198,6 +234,7 @@ def test_run_superexec_adds_runtime_version_interceptor(
     assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
         expected_interceptor_types
     )
+    observer.runtime_available.assert_called_once_with(True)
 
 
 @pytest.mark.parametrize(
@@ -253,14 +290,19 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
 ) -> None:
     """Warm Pods are cleaned up when startup fails before handlers are installed."""
     executor = Mock()
+    status = Mock()
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(status),
+    )
     monkeypatch.setattr(
         run_superexec_module,
         "RuntimeHttpClient",
         Mock(from_server_address=Mock(side_effect=RuntimeError("Runtime unavailable"))),
     )
-    monkeypatch.setattr(
-        run_superexec_module, "get_executor", Mock(return_value=executor)
-    )
+    get_executor = Mock(return_value=executor)
+    monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
 
     with pytest.raises(RuntimeError, match="Runtime unavailable"):
         run_superexec_module.run_superexec(
@@ -269,6 +311,136 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
         )
 
     executor.close.assert_called_once_with()
+    status.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize("error", [RuntimeError("poll failed"), KeyboardInterrupt()])
+def test_status_closes_before_runtime_cleanup(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    """Stop status reporting before potentially blocking runtime cleanup."""
+    observer, client, executor = Mock(), Mock(), Mock()
+    cleanup = Mock()
+    cleanup.attach_mock(observer.close, "status")
+    cleanup.attach_mock(client.close, "client")
+    cleanup.attach_mock(executor.close, "executor")
+    flush = Mock()
+    cleanup.attach_mock(flush, "traces")
+    executor.reconcile.side_effect = error
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(observer),
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(run_superexec_module, "flush_traces", flush)
+    with pytest.raises(type(error)) as raised:
+        run_superexec_module.run_superexec("127.0.0.1:9091", True)
+    assert raised.value is error
+    assert [call[0] for call in cleanup.mock_calls] == [
+        "status",
+        "traces",
+        "client",
+        "executor",
+    ]
+
+
+@pytest.mark.parametrize("failure", ["poll_config", "executor_config", "plugin_config"])
+def test_status_closes_on_setup_failure(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """Status cleanup covers configuration failures during setup."""
+    status = Mock()
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(status),
+    )
+    client, executor, plugin = Mock(), Mock(), Mock()
+    get_executor = Mock(return_value=executor)
+    monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
+    monkeypatch.setattr(
+        run_superexec_module, "AutoExecPlugin", Mock(return_value=plugin)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+    handlers = Mock()
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", handlers)
+    monkeypatch.setattr(
+        run_superexec_module, "flwr_exit", Mock(side_effect=SystemExit(1))
+    )
+    monkeypatch.delenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", raising=False)
+    expected: type[BaseException] = SystemExit
+    if failure == "poll_config":
+        monkeypatch.setenv("FLWR_SUPEREXEC_TASK_POLL_INTERVAL", "invalid")
+        expected = ValueError
+    elif failure == "executor_config":
+        get_executor.side_effect = ValueError("invalid executor")
+    elif failure == "plugin_config":
+        plugin.load_config.side_effect = ValueError("invalid plugin")
+    with pytest.raises(expected):
+        run_superexec_module.run_superexec("127.0.0.1:9091", True, plugin_config={})
+    status.close.assert_called_once_with()
+
+
+def test_sigterm_closes_status_before_other_exit_handlers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exercise signal registration and actual LIFO exit-handler execution."""
+    observer, client, executor = Mock(), Mock(), Mock()
+    cleanup = Mock()
+    cleanup.attach_mock(observer.close, "status")
+    cleanup.attach_mock(executor.close, "executor")
+    cleanup.attach_mock(client.close, "client")
+    monkeypatch.setattr(exit_handler, "registered_exit_handlers", [])
+    install_signal = Mock()
+    monkeypatch.setattr(signal, "signal", install_signal)
+
+    def graceful_exit(**kwargs: Any) -> None:
+        assert kwargs["code"] == signal_handler.SIGNAL_TO_EXIT_CODE[signal.SIGTERM]
+        exit_handler.trigger_exit_handlers(run_before_force_exit=True)
+        exit_handler.trigger_exit_handlers(run_before_force_exit=False)
+        raise SystemExit(0)
+
+    monkeypatch.setattr(signal_handler, "flwr_exit", graceful_exit)
+    monkeypatch.setattr(
+        run_superexec_module,
+        "start_superexec_status",
+        lambda: SuperExecStatus(observer),
+    )
+    monkeypatch.setattr(
+        run_superexec_module, "get_executor", Mock(return_value=executor)
+    )
+    monkeypatch.setattr(
+        run_superexec_module,
+        "RuntimeHttpClient",
+        Mock(from_server_address=Mock(return_value=client)),
+    )
+
+    def receive_sigterm(**_kwargs: Any) -> None:
+        installed = next(
+            call.args[1]
+            for call in install_signal.call_args_list
+            if call.args[0] == signal.SIGTERM
+        )
+        installed(signal.SIGTERM, None)
+
+    monkeypatch.setattr(run_superexec_module, "AutoExecPlugin", receive_sigterm)
+    with pytest.raises(SystemExit):
+        run_superexec_module.run_superexec("127.0.0.1:9091", True)
+    assert [call[0] for call in cleanup.mock_calls] == ["status", "executor", "client"]
+    assert not exit_handler.registered_exit_handlers
 
 
 def test_run_superexec_preserves_accepted_launch_behavior(

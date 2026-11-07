@@ -43,6 +43,7 @@ from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
 from .plugin import AutoExecPlugin
+from .status import start_superexec_status
 
 _TASK_POLL_INTERVAL_ENV = "FLWR_SUPEREXEC_TASK_POLL_INTERVAL"
 _MIN_TASK_POLL_INTERVAL_SECONDS = 0.01
@@ -163,121 +164,130 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     executor_config : Optional[ExecutorConfig] (default: None)
         Parsed executor configuration.
     """
-    task_poll_interval = _get_task_poll_interval()
+    with start_superexec_status() as status:
+        status.set_phase("initializing")
+        task_poll_interval = _get_task_poll_interval()
 
-    try:
-        executor = get_executor(
-            executor_type,
-            executor_config=executor_config,
+        try:
+            executor = get_executor(
+                executor_type,
+                executor_config=executor_config,
+                insecure=insecure,
+                root_certificates_path=root_certificates_path,
+            )
+        except ValueError as err:
+            flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
+
+        tracing = RuntimeTracingInterceptor()
+        interceptors: list[ProtobufClientInterceptor] = [
+            tracing,
+            RuntimeVersionHttpInterceptor(component_name="SuperExec"),
+        ]
+        if superexec_auth_secret:
+            interceptors.append(
+                SuperExecAuthHttpInterceptor(
+                    master_secret=superexec_auth_secret,
+                    protected_methods=_SUPEREXEC_AUTH_METHODS,
+                )
+            )
+
+        # Start monitoring the parent process if a PID is provided
+        if parent_pid is not None:
+            start_parent_process_monitor(parent_pid)
+
+        try:
+            client = RuntimeHttpClient.from_server_address(
+                server_address=runtime_api_address,
+                insecure=insecure,
+                root_certificates=validate_and_resolve_root_certificates(
+                    root_certificates_path, insecure
+                ),
+                interceptors=interceptors,
+                retry_invoker=make_simple_http_retry_invoker(
+                    on_connection_state=status.runtime_available
+                ),
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            executor.close()
+            raise
+
+        # Register exit handlers to close the Runtime API client on exit
+        register_signal_handlers(
+            event_type=EventType.RUN_SUPEREXEC_LEAVE,
+            exit_message="SuperExec terminated gracefully.",
+            exit_handlers=[client.close, executor.close, status.close],
+        )
+
+        # Create the SuperExec plugin instance
+        plugin = AutoExecPlugin(
+            runtime_api_address=runtime_api_address,
             insecure=insecure,
             root_certificates_path=root_certificates_path,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
         )
-    except ValueError as err:
-        flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
-    tracing = RuntimeTracingInterceptor()
-    interceptors: list[ProtobufClientInterceptor] = [
-        tracing,
-        RuntimeVersionHttpInterceptor(component_name="SuperExec"),
-    ]
-    if superexec_auth_secret:
-        interceptors.append(
-            SuperExecAuthHttpInterceptor(
-                master_secret=superexec_auth_secret,
-                protected_methods=_SUPEREXEC_AUTH_METHODS,
+        # Load plugin configuration from file if provided
+        try:
+            if plugin_config is not None:
+                plugin.load_config(plugin_config)
+        except (KeyError, ValueError) as e:
+            flwr_exit(
+                code=ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
+                message=f"Invalid plugin config: {e!r}",
             )
-        )
 
-    # Start monitoring the parent process if a PID is provided
-    if parent_pid is not None:
-        start_parent_process_monitor(parent_pid)
-
-    try:
-        client = RuntimeHttpClient.from_server_address(
-            server_address=runtime_api_address,
-            insecure=insecure,
-            root_certificates=validate_and_resolve_root_certificates(
-                root_certificates_path, insecure
-            ),
-            interceptors=interceptors,
-            retry_invoker=make_simple_http_retry_invoker(),
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        executor.close()
-        raise
-
-    # Register exit handlers to close the Runtime API client on exit
-    register_signal_handlers(
-        event_type=EventType.RUN_SUPEREXEC_LEAVE,
-        exit_message="SuperExec terminated gracefully.",
-        exit_handlers=[client.close, executor.close],
-    )
-
-    # Create the SuperExec plugin instance
-    plugin = AutoExecPlugin(
-        runtime_api_address=runtime_api_address,
-        insecure=insecure,
-        root_certificates_path=root_certificates_path,
-        runtime_dependency_install=runtime_dependency_install,
-        executor=executor,
-    )
-
-    # Load plugin configuration from file if provided
-    try:
-        if plugin_config is not None:
-            plugin.load_config(plugin_config)
-    except (KeyError, ValueError) as e:
-        flwr_exit(
-            code=ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
-            message=f"Invalid plugin config: {e!r}",
-        )
-
-    # Start executor maintenance once, independently of task polling.
-    try:
-        executor.reconcile()
-        while True:
-            timings = PhaseTimings()
-            with timings.measure("executor.capacity"):
-                supported_task_types, agentapp_fab_hashes = (
-                    executor.get_eligible_capacity(
-                        set(plugin.supported_task_types),
-                        insecure=insecure,
-                        root_certificates_path=root_certificates_path,
+        # Start executor maintenance once, independently of task polling.
+        try:
+            executor.reconcile()
+            while True:
+                timings = PhaseTimings()
+                status.set_phase("capacity")
+                with timings.measure("executor.capacity"):
+                    supported_task_types, agentapp_fab_hashes = (
+                        executor.get_eligible_capacity(
+                            set(plugin.supported_task_types),
+                            insecure=insecure,
+                            root_certificates_path=root_certificates_path,
+                        )
                     )
-                )
-            with timings.measure("executor.claim"):
-                combined_res = client.AcquireTask(
-                    AcquireTaskRequest(
-                        supported_task_types=supported_task_types,
-                        agentapp_fab_hashes=agentapp_fab_hashes,
+                status.set_phase("acquiring")
+                with timings.measure("executor.claim"):
+                    combined_res = client.AcquireTask(
+                        AcquireTaskRequest(
+                            supported_task_types=supported_task_types,
+                            agentapp_fab_hashes=agentapp_fab_hashes,
+                        )
                     )
-                )
-            if combined_res.HasField("task") and combined_res.token:
-                # Idle polling must not generate an unbounded stream of spans.
-                timings.publish(
-                    "executor.acquire",
-                    {
-                        "flwr.component": "superexec",
-                        "flwr.task_id": str(combined_res.task.task_id),
-                        "flwr.run_id": str(combined_res.task.run_id),
-                    },
-                )
-                with trace_span(
-                    "task.dispatch",
-                    attributes={
-                        "flwr.component": "superexec",
-                        "flwr.task_id": str(combined_res.task.task_id),
-                        "flwr.run_id": str(combined_res.task.run_id),
-                    },
-                ):
-                    launch_result = plugin.launch_task(
-                        token=combined_res.token, task=combined_res.task
+                if combined_res.HasField("task") and combined_res.token:
+                    # Idle polling must not generate an unbounded stream of spans.
+                    timings.publish(
+                        "executor.acquire",
+                        {
+                            "flwr.component": "superexec",
+                            "flwr.task_id": str(combined_res.task.task_id),
+                            "flwr.run_id": str(combined_res.task.run_id),
+                        },
                     )
-                _handle_launch_result(launch_result, combined_res.task)
+                    status.set_phase("dispatching")
+                    with trace_span(
+                        "task.dispatch",
+                        attributes={
+                            "flwr.component": "superexec",
+                            "flwr.task_id": str(combined_res.task.task_id),
+                            "flwr.run_id": str(combined_res.task.run_id),
+                        },
+                    ):
+                        launch_result = plugin.launch_task(
+                            token=combined_res.token, task=combined_res.task
+                        )
+                    _handle_launch_result(launch_result, combined_res.task)
 
-            # Sleep for a while before checking again
-            time.sleep(task_poll_interval)
-    finally:
-        flush_traces()
-        client.close()
-        executor.close()
+                # Sleep for a while before checking again
+                status.set_phase("sleeping")
+                time.sleep(task_poll_interval)
+        finally:
+            status.close()
+            flush_traces()
+            client.close()
+            executor.close()
