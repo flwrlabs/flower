@@ -22708,7 +22708,7 @@ msgstr ""
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:51
 #, fuzzy
 msgid "Configure SuperLink run-event polling"
-msgstr "配置客户端"
+msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:53
 msgid ""
