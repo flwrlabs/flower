@@ -23,7 +23,7 @@ import pytest
 import requests
 
 from ..definition import ConnectorExecutionContext
-from . import search
+from . import CONNECTOR, search
 from .brave import BRAVE_API_KEY_ENV, BRAVE_WEB_SEARCH_URL
 from .proxy import PROXY_WEB_SEARCH_PROVIDER, WEB_SEARCH_ENDPOINT_ENV
 
@@ -115,3 +115,52 @@ def test_search_uses_direct_providers_when_proxy_endpoint_is_absent(
     get_mock.assert_called_once()
     assert get_mock.call_args.args == (BRAVE_WEB_SEARCH_URL,)
     post_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("selected", ["proxy", "brave", "tavily", "exa", "parallel"])
+@pytest.mark.parametrize("fails", [False, True])
+def test_provider_order_and_no_error_fallback(
+    monkeypatch: pytest.MonkeyPatch, selected: str, fails: bool
+) -> None:
+    """Only an absent provider config enables the anonymous last fallback."""
+    names = ["proxy", "brave", "tavily", "exa", "parallel"]
+    classes = ["Proxy", "Brave", "Tavily", "Exa", "Parallel"]
+    envs = [
+        "FLWR_WEB_SEARCH_ENDPOINT",
+        "BRAVE_API_KEY",
+        "TAVILY_API_KEY",
+        "EXA_API_KEY",
+        "",
+    ]
+    mocks = []
+    for index, (name, cls, env) in enumerate(zip(names, classes, envs, strict=True)):
+        provider = Mock()
+        provider.name = name
+        provider.search.return_value = {"results": []}
+        if fails:
+            provider.search.side_effect = RuntimeError("provider failed")
+        constructor = Mock(return_value=provider)
+        constructor.env = env
+        mocks.append(constructor)
+        monkeypatch.setattr(
+            f"flwr.supercore.task_process.connector.web_search.{cls}WebSearchProvider",
+            constructor,
+        )
+        if env:
+            monkeypatch.setenv(
+                env, "configured" if index >= names.index(selected) else " "
+            )
+    recorder = Mock()
+    context = ConnectorExecutionContext({}, {}, recorder)
+    if fails:
+        with pytest.raises(RuntimeError, match="provider failed"):
+            CONNECTOR.executors["web_search"]({"query": "Flower"}, context)
+        recorder.record.assert_not_called()
+    else:
+        assert CONNECTOR.executors["web_search"]({"query": "Flower"}, context) == {
+            "results": []
+        }
+        assert recorder.record.call_args.args[0].provider == selected
+        assert recorder.record.call_args.args[0].usage_type == "web_search"
+    for name, constructor in zip(names, mocks, strict=True):
+        assert constructor.call_count == int(name == selected)
