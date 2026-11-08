@@ -208,6 +208,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
                 ),
             )
         except Exception:  # pylint: disable=broad-exception-caught
+            status.close()
             executor.close()
             raise
 

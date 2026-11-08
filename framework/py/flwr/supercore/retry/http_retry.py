@@ -92,14 +92,12 @@ def make_simple_http_retry_invoker(
 
     def _on_backoff(retry_state: RetryState) -> None:
         system_healthy.clear()
-        _notify_connection_state(False)
         log(
             DEBUG, "Connection attempt failed with exception: %s", retry_state.exception
         )
 
     def _on_giveup(retry_state: RetryState) -> None:
         system_healthy.clear()
-        _notify_connection_state(False)
         if retry_state.tries > 1:
             log(
                 WARNING,
@@ -110,6 +108,7 @@ def make_simple_http_retry_invoker(
 
     def _should_giveup(exc: Exception) -> bool:
         nonlocal shutdown_requested
+        _notify_connection_state(False)
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
             if status_code == httpx.codes.FORBIDDEN:

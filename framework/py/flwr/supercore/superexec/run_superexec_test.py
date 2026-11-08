@@ -291,6 +291,9 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
     """Warm Pods are cleaned up when startup fails before handlers are installed."""
     executor = Mock()
     status = Mock()
+    cleanup = Mock()
+    cleanup.attach_mock(status.close, "status")
+    cleanup.attach_mock(executor.close, "executor")
     monkeypatch.setattr(
         run_superexec_module,
         "start_superexec_status",
@@ -312,6 +315,7 @@ def test_run_superexec_closes_executor_when_runtime_client_setup_fails(
 
     executor.close.assert_called_once_with()
     status.close.assert_called_once_with()
+    assert [call[0] for call in cleanup.mock_calls] == ["status", "executor"]
 
 
 @pytest.mark.parametrize("error", [RuntimeError("poll failed"), KeyboardInterrupt()])

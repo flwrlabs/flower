@@ -113,10 +113,13 @@ def test_other_forbidden_responses_preserve_run_not_running(content: str) -> Non
     error = _http_status_error(httpx.codes.FORBIDDEN)
     error.response = httpx.Response(403, content=content, request=error.request)
     target = Mock(side_effect=error)
+    observer = Mock()
+    invoker = make_simple_http_retry_invoker(on_connection_state=observer)
 
     with pytest.raises(RunNotRunningException):
-        _make_test_invoker().invoke(target)
+        invoker.invoke(target)
     target.assert_called_once_with()
+    observer.assert_called_once_with(False)
 
 
 def test_unavailable_connector_preserves_http_error() -> None:
@@ -138,19 +141,39 @@ def test_unavailable_connector_preserves_http_error() -> None:
     target.assert_called_once_with()
 
 
-def test_unauthorized_response_requests_shutdown() -> None:
-    """Request process shutdown for an authentication failure."""
+@pytest.mark.parametrize("repeated_failure", [False, True])
+def test_unauthorized_response_requests_shutdown(repeated_failure: bool) -> None:
+    """Report authentication failures once each before requesting shutdown."""
     error = _http_status_error(httpx.codes.UNAUTHORIZED)
-    target = Mock(side_effect=[error, "success"])
-    invoker = _make_test_invoker()
+    target = Mock(side_effect=[error, error if repeated_failure else "success"])
+    observer = Mock()
+    invoker = make_simple_http_retry_invoker(on_connection_state=observer)
+    invoker.wait_function = lambda _: None
+    order = Mock()
+    order.attach_mock(observer, "connection")
 
     with (
         patch("flwr.supercore.retry.http_retry.os.kill") as kill,
         patch("flwr.supercore.retry.http_retry.time.sleep"),
     ):
-        assert invoker.invoke(target) == "success"
+        order.attach_mock(kill, "shutdown")
+        if repeated_failure:
+            with pytest.raises(httpx.HTTPStatusError) as raised:
+                invoker.invoke(target)
+            assert raised.value is error
+        else:
+            assert invoker.invoke(target) == "success"
 
     kill.assert_called_once_with(os.getpid(), signal.SIGINT)
+    assert [call[0] for call in order.mock_calls] == [
+        "connection",
+        "shutdown",
+        "connection",
+    ]
+    assert [call.args[0] for call in observer.call_args_list] == [
+        False,
+        not repeated_failure,
+    ]
 
 
 @pytest.mark.parametrize("observer_fails", [False, True])
