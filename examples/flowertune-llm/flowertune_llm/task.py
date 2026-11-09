@@ -13,8 +13,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from logging import INFO
+from logging import INFO, WARNING
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any
 
@@ -1105,6 +1106,11 @@ def run_torchtitan_training(
     separate_dcp_jobs = (
         dcp_enabled and not dcp_convert_on_client and separate_dcp_jobs_requested
     )
+    train_max_retries = int(
+        _config_value(context, "trainer.torchtitan.train-max-retries", 2)
+    )
+    if train_max_retries < 0:
+        raise ValueError("trainer.torchtitan.train-max-retries must be non-negative")
     dcp_train_spec = str(
         _config_value(
             context,
@@ -1494,9 +1500,14 @@ def run_torchtitan_training(
         if dcp_enabled and not cache_available:
             _remove_path(conversion_dir)
 
-    def parse_job_id(result: subprocess.CompletedProcess[str], phase: str) -> str:
+    def parse_job_id(
+        result: subprocess.CompletedProcess[str],
+        phase: str,
+        *,
+        allow_job_failure: bool = False,
+    ) -> str:
         """Return a scheduler job ID or raise with the submission diagnostics."""
-        if result.returncode != 0:
+        if result.returncode != 0 and not allow_job_failure:
             cleanup_failed_scheduler_run()
             raise RuntimeError(
                 f"Failed to submit TorchTitan {phase} job with exit code "
@@ -1526,6 +1537,91 @@ def run_torchtitan_training(
             ),
             stderr="\n".join(result.stderr for result in results if result.stderr),
         )
+
+    def run_separate_dcp_jobs(
+        submit_phase: Callable[..., tuple[str, subprocess.CompletedProcess[str]]],
+    ) -> subprocess.CompletedProcess[str]:
+        """Wait for each phase; retry training before building its dependent job."""
+        results: list[subprocess.CompletedProcess[str]] = []
+        job_ids: list[str] = []
+
+        def run_phase(
+            phase: str, dependency: str | None, *, conversion: bool
+        ) -> tuple[str, subprocess.CompletedProcess[str]]:
+            job_id, phase_result = submit_phase(
+                phase, dependency=dependency, conversion=conversion
+            )
+            results.append(phase_result)
+            job_ids.append(job_id)
+            log(
+                INFO,
+                "[TorchTitan] %s job %s completed: exit_code=%s",
+                phase,
+                job_id,
+                phase_result.returncode,
+            )
+            if phase != "train" and phase_result.returncode != 0:
+                cleanup_failed_scheduler_run()
+                raise RuntimeError(
+                    f"TorchTitan {phase} job {job_id} failed with exit code "
+                    f"{phase_result.returncode}\nstdout:\n{phase_result.stdout}"
+                    f"\nstderr:\n{phase_result.stderr}"
+                )
+            return job_id, phase_result
+
+        conversion_job_id = None
+        if not cache_available:
+            conversion_job_id, _ = run_phase("to_dcp", None, conversion=True)
+        for attempt in range(train_max_retries + 1):
+            # Conversion already completed; its scheduler record may have been
+            # purged by the time a long training attempt needs to be retried.
+            input_dependency = conversion_job_id if attempt == 0 else None
+            log(
+                INFO,
+                "[TorchTitan] training attempt %s/%s: input_dependency=%s",
+                attempt + 1,
+                train_max_retries + 1,
+                input_dependency,
+            )
+            train_job_id, train_result = run_phase(
+                "train", input_dependency, conversion=False
+            )
+            if train_result.returncode == 0:
+                break
+            log(
+                WARNING,
+                "[TorchTitan] training job %s failed on attempt %s/%s: "
+                "exit_code=%s stdout=%s stderr=%s",
+                train_job_id,
+                attempt + 1,
+                train_max_retries + 1,
+                train_result.returncode,
+                train_result.stdout,
+                train_result.stderr,
+            )
+            if attempt == train_max_retries:
+                cleanup_failed_scheduler_run()
+                raise RuntimeError(
+                    f"TorchTitan training failed after {attempt + 1} attempt(s); "
+                    f"last job {train_job_id} exited with {train_result.returncode}"
+                    f"\nstdout:\n{train_result.stdout}\nstderr:\n{train_result.stderr}"
+                )
+            if not os.path.isdir(input_dcp_dir):
+                cleanup_failed_scheduler_run()
+                raise RuntimeError(
+                    "Cannot retry TorchTitan training: converted input DCP is "
+                    f"no longer available at {input_dcp_dir}"
+                )
+            # A failed job may leave a partially written final checkpoint.
+            # Keep the step-0 input, including mock runs with train_steps=0.
+            if final_dcp_dir != step0_dcp_dir:
+                _remove_path(final_dcp_dir)
+            for path in (output_dcp_dir, output_state_path, output_layers_ready):
+                if path:
+                    _remove_path(path)
+
+        run_phase("from_dcp", train_job_id, conversion=True)
+        return completed_pipeline_result(results, job_ids)
 
     def conversion_setting(name: str, fallback: str) -> str:
         """Return a conversion-job resource override, inheriting when empty."""
@@ -1664,7 +1760,6 @@ def run_torchtitan_training(
             phase: str,
             *,
             dependency: str | None = None,
-            wait: bool = False,
             conversion: bool = False,
         ) -> tuple[str, subprocess.CompletedProcess[str]]:
             account = (
@@ -1703,9 +1798,7 @@ def run_torchtitan_training(
                 else scheduler_cpus_per_task
             )
 
-            submit_parts = [slurm_submit, "--parsable"]
-            if wait:
-                submit_parts.append("--wait")
+            submit_parts = [slurm_submit, "--parsable", "--wait"]
             if dependency:
                 submit_parts.append(f"--dependency=afterok:{dependency}")
             # Conversion workers are single-node, single-process Python jobs.
@@ -1734,6 +1827,12 @@ def run_torchtitan_training(
             if conversion and slurm_conversion_extra_args:
                 submit_parts.extend(shlex.split(slurm_conversion_extra_args))
             submit_parts.append(write_scheduler_script("slurm", phase))
+            log(
+                INFO,
+                "[TorchTitan] submitting and waiting for %s job: dependency=%s",
+                phase,
+                dependency,
+            )
             phase_result = subprocess.run(
                 submit_parts,
                 env=env,
@@ -1742,30 +1841,13 @@ def run_torchtitan_training(
                 text=True,
                 check=False,
             )
-            return parse_job_id(phase_result, phase), phase_result
+            return (
+                parse_job_id(phase_result, phase, allow_job_failure=phase == "train"),
+                phase_result,
+            )
 
         if separate_dcp_jobs:
-            slurm_results: list[subprocess.CompletedProcess[str]] = []
-            slurm_job_ids: list[str] = []
-            dependency = None
-            if not cache_available:
-                dependency, phase_result = submit_slurm_phase("to_dcp", conversion=True)
-                slurm_results.append(phase_result)
-                slurm_job_ids.append(dependency)
-            dependency, phase_result = submit_slurm_phase(
-                "train", dependency=dependency
-            )
-            slurm_results.append(phase_result)
-            slurm_job_ids.append(dependency)
-            final_job_id, phase_result = submit_slurm_phase(
-                "from_dcp",
-                dependency=dependency,
-                wait=True,
-                conversion=True,
-            )
-            slurm_results.append(phase_result)
-            slurm_job_ids.append(final_job_id)
-            result = completed_pipeline_result(slurm_results, slurm_job_ids)
+            result = run_separate_dcp_jobs(submit_slurm_phase)
         else:
             submit_parts = [slurm_submit]
             if slurm_wait:
@@ -1856,33 +1938,21 @@ def run_torchtitan_training(
                     text=True,
                     check=False,
                 )
-                return parse_job_id(phase_result, phase), phase_result
+                job_id = parse_job_id(phase_result, phase)
+                log(INFO, "[TorchTitan] waiting for %s job %s", phase, job_id)
+                attach_result = subprocess.run(
+                    [*shlex.split(flux_attach), job_id],
+                    env=env,
+                    cwd=workdir,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                return job_id, completed_pipeline_result(
+                    [phase_result, attach_result], [job_id]
+                )
 
-            flux_results: list[subprocess.CompletedProcess[str]] = []
-            flux_job_ids: list[str] = []
-            dependency = None
-            if not cache_available:
-                dependency, phase_result = submit_flux_phase("to_dcp", conversion=True)
-                flux_results.append(phase_result)
-                flux_job_ids.append(dependency)
-            dependency, phase_result = submit_flux_phase("train", dependency=dependency)
-            flux_results.append(phase_result)
-            flux_job_ids.append(dependency)
-            final_job_id, phase_result = submit_flux_phase(
-                "from_dcp", dependency=dependency, conversion=True
-            )
-            flux_results.append(phase_result)
-            flux_job_ids.append(final_job_id)
-            attach_result = subprocess.run(
-                [*shlex.split(flux_attach), final_job_id],
-                env=env,
-                cwd=workdir,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            flux_results.append(attach_result)
-            result = completed_pipeline_result(flux_results, flux_job_ids)
+            result = run_separate_dcp_jobs(submit_flux_phase)
         else:
             flux_parts = shlex.split(flux_run)
             if (

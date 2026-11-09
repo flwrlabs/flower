@@ -3,6 +3,7 @@
 import json
 import os
 import pickle
+import shlex
 import subprocess
 import sys
 import types
@@ -360,6 +361,7 @@ def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> No
 
     assert result is None
     assert len(submissions) == 3
+    assert all("--parsable" in cmd and "--wait" in cmd for cmd in submissions)
     assert "--nodes=1" in submissions[0]
     assert "--ntasks=1" in submissions[0]
     assert "--mem" in submissions[0] and "256G" in submissions[0]
@@ -516,15 +518,242 @@ def test_layerwise_dcp_submits_dependent_flux_jobs(tmp_path, monkeypatch) -> Non
     )
 
     assert result is None
+    submissions = [cmd for cmd in commands if cmd[:3] != ["flux", "job", "attach"]]
+    assert len(commands) == 6
+    assert "-N1" in submissions[0]
+    assert "-n1" in submissions[0]
+    assert "--queue=high-memory" in submissions[0]
+    assert "--dependency=afterok:f101" in submissions[1]
+    assert "--dependency=afterok:f102" in submissions[2]
+    assert "-N1" in submissions[2]
+    assert "-n1" in submissions[2]
+    assert [cmd[-1] for cmd in commands if cmd[:3] == ["flux", "job", "attach"]] == [
+        "f101",
+        "f102",
+        "f103",
+    ]
+
+
+@pytest.mark.parametrize("backend", ["slurm", "flux"])
+@pytest.mark.parametrize(
+    "case,expected_phases",
+    [
+        ("retry", ["to_dcp", "train", "train", "from_dcp"]),
+        ("exhausted", ["to_dcp", "train", "train", "train"]),
+        ("disabled", ["to_dcp", "train"]),
+        ("conversion_failure", ["to_dcp"]),
+        ("output_conversion_failure", ["to_dcp", "train", "from_dcp"]),
+        ("submission_failure", ["to_dcp", "train"]),
+    ],
+)
+def test_separate_jobs_retry_training(
+    tmp_path, monkeypatch, backend, case, expected_phases
+) -> None:
+    """Retries wait for completion, preserve inputs, and rebuild dependencies."""
+    layer_dir = tmp_path / "layers" / "10" / "20"
+    layer_dir.mkdir(parents=True)
+    layer = layer_dir / "layer.a.pt"
+    _write_layer_file(layer, "layer.a", torch.ones(2))
+    original = layer.read_bytes()
+    config = {
+        "aggregation.layer-write-dir": str(tmp_path / "layers"),
+        "client.workspace": str(tmp_path / "workspace"),
+        "client.train-steps": 5,
+        "model.name": "test/model",
+        "trainer.backend": "torchtitan",
+        "trainer.torchtitan.dcp-enabled": True,
+        "trainer.torchtitan.dcp-separate-jobs": True,
+        "scheduler.backend": backend,
+    }
+    if case == "disabled":
+        config["trainer.torchtitan.train-max-retries"] = 0
+    context = Context(
+        run_id=10, node_id=20, node_config={}, state=RecordDict(), run_config=config
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    submissions = []
+    completed = []
+    jobs = {}
+    attempts = 0
+
+    def execute(phase, env):
+        nonlocal attempts
+        completed.append(phase)
+        input_dir = Path(env["FLWR_TORCHTITAN_INPUT_DCP_DIR"])
+        final_dir = Path(env["FLWR_TORCHTITAN_FINAL_DCP_DIR"])
+        output_dir = Path(env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"])
+        marker = Path(env["FLWR_TORCHTITAN_OUTPUT_LAYERS_READY"])
+        if phase == "to_dcp":
+            if case == "conversion_failure":
+                return 1
+            cache = Path(env["FLWR_TORCHTITAN_DCP_CONVERSION_DIR"])
+            cache.mkdir(parents=True, exist_ok=True)
+            (cache / "input").write_text("original")
+            input_dir.symlink_to(cache)
+        elif phase == "train":
+            attempts += 1
+            assert (input_dir / "input").read_text() == "original"
+            assert layer.read_bytes() == original
+            assert (
+                not final_dir.exists()
+                and not output_dir.exists()
+                and not marker.exists()
+            )
+            final_dir.mkdir(parents=True)
+            if case in {"exhausted", "disabled"} or (case == "retry" and attempts == 1):
+                output_dir.mkdir(parents=True)
+                marker.write_text("stale")
+                return 1
+        else:
+            assert final_dir.is_dir()
+            if case == "output_conversion_failure":
+                return 1
+            output_dir.mkdir(parents=True)
+            marker.write_text("ready")
+        return 0
+
+    def fake_run(args, **kwargs):
+        command = list(map(str, args))
+        if command[:3] == ["flux", "job", "attach"]:
+            assert command[3] == "--read-only"
+            phase, env = jobs[command[-1]]
+            return subprocess.CompletedProcess(args, execute(phase, env), "", "")
+        phase = next(
+            p
+            for p in ("to_dcp", "from_dcp", "train")
+            if command[-1].endswith(f"_{p}.sh")
+        )
+        submissions.append((phase, command))
+        if case == "submission_failure" and phase == "train":
+            return subprocess.CompletedProcess(args, 1, "", "submission failed")
+        job_id = ("f" if backend == "flux" else "") + str(100 + len(submissions))
+        if backend == "flux":
+            jobs[job_id] = (phase, kwargs["env"])
+            return subprocess.CompletedProcess(args, 0, job_id + "\n", "")
+        assert "--wait" in command and "--parsable" in command
+        return subprocess.CompletedProcess(
+            args, execute(phase, kwargs["env"]), job_id + "\n", ""
+        )
+
+    monkeypatch.setattr(task_module.subprocess, "run", fake_run)
+
+    def run():
+        return task_module.run_torchtitan_training(
+            cfg,
+            context,
+            None,
+            server_round=1,
+            layer_paths=[str(layer)],
+            output_layer_dir=str(layer_dir),
+        )
+
+    if case == "retry":
+        assert run() is None
+    else:
+        with pytest.raises(RuntimeError):
+            run()
+    assert [phase for phase, _ in submissions] == expected_phases
+    assert completed == (
+        expected_phases[:-1] if case == "submission_failure" else expected_phases
+    )
+    if case == "exhausted":
+        assert attempts == 3
+    prefix = "f" if backend == "flux" else ""
+    train_commands = [cmd for phase, cmd in submissions if phase == "train"]
+    if train_commands:
+        assert f"--dependency=afterok:{prefix}101" in train_commands[0]
+    for command in train_commands[1:]:
+        assert not any(arg.startswith("--dependency=") for arg in command)
+    if case == "retry":
+        assert f"--dependency=afterok:{prefix}103" in submissions[-1][1]
+
+
+def test_slurm_retry_executes_real_scripts(tmp_path) -> None:
+    """A waited scheduler command reports a failed job ID and retries its script."""
+    layer_dir = tmp_path / "layers" / "10" / "20"
+    layer_dir.mkdir(parents=True)
+    (tmp_path / "workspace").mkdir()
+    layer = layer_dir / "layer.a.pt"
+    _write_layer_file(layer, "layer.a", torch.ones(2))
+    counter = tmp_path / "counter"
+    calls = tmp_path / "calls"
+    attempts = tmp_path / "attempts"
+    scheduler = tmp_path / "sbatch"
+    scheduler.write_text(
+        "#!/bin/bash\nset -u\n"
+        f"counter={shlex.quote(str(counter))}\ncalls={shlex.quote(str(calls))}\n"
+        'id=100; [ ! -f "$counter" ] || id=$(cat "$counter")\n'
+        'id=$((id + 1)); echo "$id" > "$counter"\n'
+        'printf "%s\\n" "$*" >> "$calls"\n'
+        'script="${@: -1}"\nbash "$script" >&2\nstatus=$?\n'
+        'echo "$id"\nexit "$status"\n'
+    )
+    scheduler.chmod(0o755)
+    templates = {}
+    scripts = {
+        "to-dcp": 'mkdir -p "$FLWR_TORCHTITAN_DCP_CONVERSION_DIR"\n'
+        'echo original > "$FLWR_TORCHTITAN_DCP_CONVERSION_DIR/input"\n'
+        'ln -s "$FLWR_TORCHTITAN_DCP_CONVERSION_DIR" "$FLWR_TORCHTITAN_INPUT_DCP_DIR"\n',
+        "train": 'test "$(cat "$FLWR_TORCHTITAN_INPUT_DCP_DIR/input")" = original || exit 9\n'
+        'test ! -e "$FLWR_TORCHTITAN_FINAL_DCP_DIR" || exit 10\n'
+        'test ! -e "$FLWR_TORCHTITAN_OUTPUT_LAYERS_READY" || exit 11\n'
+        f"attempts={shlex.quote(str(attempts))}\n"
+        'mkdir -p "$FLWR_TORCHTITAN_FINAL_DCP_DIR"\n'
+        'if [ ! -f "$attempts" ]; then touch "$attempts" "$FLWR_TORCHTITAN_OUTPUT_LAYERS_READY"; exit 1; fi\n',
+        "from-dcp": 'test -d "$FLWR_TORCHTITAN_FINAL_DCP_DIR" || exit 12\n'
+        'mkdir -p "$FLWR_TORCHTITAN_OUTPUT_DCP_DIR"\n'
+        'touch "$FLWR_TORCHTITAN_OUTPUT_LAYERS_READY"\n',
+    }
+    for name, script in scripts.items():
+        path = tmp_path / (name + ".sh")
+        path.write_text("#!/bin/bash\n" + script)
+        templates[name] = str(path)
+    context = Context(
+        run_id=10,
+        node_id=20,
+        node_config={},
+        state=RecordDict(),
+        run_config={
+            "aggregation.layer-write-dir": str(tmp_path / "layers"),
+            "client.workspace": str(tmp_path / "workspace"),
+            "client.train-steps": 5,
+            "model.name": "test/model",
+            "trainer.backend": "torchtitan",
+            "trainer.torchtitan.dcp-enabled": True,
+            "trainer.torchtitan.dcp-separate-jobs": True,
+            "scheduler.backend": "slurm",
+            "scheduler.slurm.submit-command": str(scheduler),
+            "scheduler.slurm.to-dcp-script-template": templates["to-dcp"],
+            "scheduler.slurm.script-template": templates["train"],
+            "scheduler.slurm.from-dcp-script-template": templates["from-dcp"],
+        },
+    )
+    cfg = types.SimpleNamespace(
+        trainer=types.SimpleNamespace(
+            torchtitan=types.SimpleNamespace(command="true", workdir="")
+        )
+    )
+    assert (
+        task_module.run_torchtitan_training(
+            cfg,
+            context,
+            None,
+            server_round=1,
+            layer_paths=[str(layer)],
+            output_layer_dir=str(layer_dir),
+        )
+        is None
+    )
+    commands = calls.read_text().splitlines()
     assert len(commands) == 4
-    assert "-N1" in commands[0]
-    assert "-n1" in commands[0]
-    assert "--queue=high-memory" in commands[0]
-    assert "--dependency=afterok:f101" in commands[1]
-    assert "--dependency=afterok:f102" in commands[2]
-    assert "-N1" in commands[2]
-    assert "-n1" in commands[2]
-    assert commands[3][-1] == "f103"
+    assert all("--wait" in cmd and "--parsable" in cmd for cmd in commands)
+    assert "--dependency=afterok:101" in commands[1]
+    assert "--dependency=" not in commands[2]
+    assert "--dependency=afterok:103" in commands[3]
 
 
 def test_layerwise_dcp_client_conversion_runs_outside_job(

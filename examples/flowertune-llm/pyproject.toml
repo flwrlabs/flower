@@ -153,6 +153,7 @@ trainer.torchtitan.model-flavor = ""
 trainer.torchtitan.dcp-enabled = false
 trainer.torchtitan.dcp-convert-on-client = false
 trainer.torchtitan.dcp-separate-jobs = false
+trainer.torchtitan.train-max-retries = 2
 trainer.torchtitan.dcp-train-spec = "llama3"
 trainer.torchtitan.dcp-model-args = "auto"
 trainer.torchtitan.dcp-threads = 8

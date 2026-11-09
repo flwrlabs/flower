@@ -100,6 +100,21 @@ instructions created before the model download remain valid through training and
 reply delivery. The regular heartbeat profile and strategy timeout defaults are
 unchanged. Scheduler job wall-time limits must also cover the allocated work.
 
+With `trainer.torchtitan.dcp-separate-jobs=true`, Slurm and Flux wait for input
+conversion and then retry a failed training job up to two times (three total
+attempts). Set `trainer.torchtitan.train-max-retries=0` to disable retries, or set
+another non-negative retry count. Successful input conversion is reused across
+attempts. A retry removes partial final-checkpoint output while retaining the
+converted input and input layers. Custom training scripts must retain that input
+and load the round's step-0 checkpoint when restarted.
+
+Conversion back to layers (or a state dictionary in all-at-once mode) is submitted
+only after training succeeds, with a dependency on the successful training job.
+Conversion failures, rejected submissions, and failures after the retry limit
+return a client error. Combined conversion/training jobs are not retried by this
+setting. The strategy timeout must cover queueing and all attempts; keep
+`strategy.timeout=86400` for long runs.
+
 ### 70B Aggregation-Only (Deployment Engine)
 
 This mode is intended to validate that a 70B model can be aggregated layer-by-layer
