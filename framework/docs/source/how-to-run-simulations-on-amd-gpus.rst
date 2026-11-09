@@ -232,8 +232,11 @@ repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only 
 each value in isolation. Ray 2.55.1 sizes its advertised GPU resources from the length
 of this mask, so a duplicate ordinal creates two schedulable slots that both map to the
 same ROCr-visible device, letting concurrent ClientApps collide on it instead of each
-getting a distinct GPU. The snippet also rejects the mask in that case rather than
-accepting a syntactically-valid-looking duplicate.
+getting a distinct GPU. A duplicate can also hide behind a leading-zero alias -- ``0``
+and ``00`` are the same ordinal to HIP, but two distinct strings to a naive comparison
+-- so the snippet normalizes each value before comparing, rather than comparing the
+spellings it was given. It also rejects the mask in that case rather than accepting a
+syntactically-valid-looking duplicate.
 
 This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and
 ``[[ ... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
@@ -258,13 +261,16 @@ exported, silently leaving Ray's original import failure in place:
             fi
         else
             _bad=0
+            _norm_ids=()
             IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
             for _id in "${_hip_ids[@]}"; do
                 if ! [[ "$_id" =~ ^[0-9]+$ ]] || [ "$_id" -ge "$_n" ]; then
                     _bad=1
+                else
+                    _norm_ids+=("$((10#$_id))")
                 fi
             done
-            _dup=$(printf '%s\n' "${_hip_ids[@]}" | sort | uniq -d | paste -sd ',')
+            _dup=$(printf '%s\n' "${_norm_ids[@]}" | sort -n | uniq -d | paste -sd ',')
             if [ "$_bad" -eq 1 ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "valid selection of ordinals 0..$((_n - 1)) -- the only" \
@@ -275,14 +281,14 @@ exported, silently leaving Ray's original import failure in place:
                      "correct it to ordinals in that range." >&2
             elif [ -n "$_dup" ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
-                     "ordinal(s) $_dup -- Ray sizes its" \
-                     "advertised GPU resources from the length of this mask, so a" \
-                     "repeated ordinal creates two schedulable slots that both map" \
-                     "to the same ROCr-visible device, letting concurrent" \
-                     "ClientApps collide on it. Left unchanged, so remove the" \
-                     "duplicate and re-run this snippet." >&2
+                     "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
+                     "sizes its advertised GPU resources from the length of this" \
+                     "mask, so a repeated ordinal creates two schedulable slots" \
+                     "that both map to the same ROCr-visible device, letting" \
+                     "concurrent ClientApps collide on it. Left unchanged, so" \
+                     "remove the duplicate and re-run this snippet." >&2
             fi
-            unset _hip_ids _id _bad _dup
+            unset _hip_ids _id _bad _dup _norm_ids
         fi
         unset _n
     fi
@@ -311,7 +317,9 @@ exported, silently leaving Ray's original import failure in place:
     that every ordinal it names is ``< n``, and warns instead of silently proceeding
     when one is not, since that is the signature of a physical device ID having been
     copied in rather than a deliberately chosen ordinal. It also rejects a repeated
-    ordinal (``HIP_VISIBLE_DEVICES=0,0``): Ray derives the number of GPU slots it
+    ordinal (``HIP_VISIBLE_DEVICES=0,0``), including one disguised by a leading zero
+    (``HIP_VISIBLE_DEVICES=0,00``) -- the snippet normalizes each value before comparing
+    rather than comparing the strings as spelled: Ray derives the number of GPU slots it
     advertises from the length of this mask, so a duplicate would let two schedulable
     slots map to the same underlying device instead of each naming a distinct one.
 
@@ -469,13 +477,20 @@ on what else it can detect about device access:
   in `Check that ROCm can reach the GPU`_ -- Flower reports a permissions problem and
   states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
   instructions instead, not the ``ROCM_PATH`` steps below.
-- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node is, Flower reports that
-  render-node gap instead -- again stating that ``ROCM_PATH`` will not help, since ROCm
-  needs both device nodes. Fix render-node access the same way as ``/dev/kfd`` access
-  above.
-- Only when both ``/dev/kfd`` and a render node are accessible does Flower name the
-  ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at the ROCm SMI
-  library`_.
+- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node is accessible at all,
+  Flower reports that render-node gap instead -- again stating that ``ROCM_PATH`` will
+  not help, since ROCm needs both device nodes. Fix render-node access the same way as
+  ``/dev/kfd`` access above.
+- If ``/dev/kfd`` and a render node are both accessible, but that render node is not
+  AMD-backed -- for example a hybrid host or container exposing an integrated Intel
+  GPU's ``renderD128`` while the AMD device's own render node is missing or
+  permission-denied -- Flower reports that vendor mismatch instead, again stating that
+  ``ROCM_PATH`` will not help. Fix render-node pass-through/permissions so that an
+  AMD-backed node specifically (identified by its sysfs PCI vendor ID) is accessible,
+  not just any render node.
+- Only when both ``/dev/kfd`` and an AMD-backed render node are accessible does Flower
+  name the ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at the
+  ROCm SMI library`_.
 
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
