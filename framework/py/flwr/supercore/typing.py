@@ -16,37 +16,15 @@
 
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import TypeAlias
-from uuid import UUID, uuid4
 
 from flwr.supercore.constant import RunTime
-from flwr.supercore.date import now
 
 JSONScalar: TypeAlias = bool | float | int | str | None
 JSONArray: TypeAlias = Sequence["JSONValue"]
 JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | JSONArray
 JSONObject: TypeAlias = dict[str, JSONValue]
-
-
-@dataclass(frozen=True)
-class EventRecord:
-    """One immutable logical event, shared by recipient feeds."""
-
-    type: str
-    payload_json: str
-    space_id: UUID | None = None
-    event_id: UUID = field(default_factory=uuid4)
-    created_at: datetime = field(default_factory=now)
-
-
-@dataclass(frozen=True)
-class UserEventRecord:
-    """An event's position in one user's feed."""
-
-    seq: int
-    event: EventRecord
 
 
 @dataclass(frozen=True)

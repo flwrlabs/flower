@@ -67,7 +67,7 @@ class Event(FlwrBase):
 
 
 class UserEventFeed(FlwrBase):
-    """Retain the committed head of a user's feed, including after pruning."""
+    """Track the committed sequence head of each user's append-only feed."""
 
     __tablename__ = "user_event_feeds"
     __table_args__ = (CheckConstraint("last_seq >= 0", name="ck_user_event_feed_seq"),)

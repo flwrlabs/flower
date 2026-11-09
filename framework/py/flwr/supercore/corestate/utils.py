@@ -18,14 +18,18 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from os import urandom
+from uuid import UUID
+
+from google.protobuf.json_format import MessageToDict
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
+from flwr.proto.control_pb2 import Event  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.typing import EventRecord, JSONObject
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
@@ -33,29 +37,26 @@ _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
 
 
 def validate_event(
-    event: EventRecord, recipients: Sequence[str]
+    event: Event, recipients: Sequence[str]
 ) -> tuple[JSONObject, list[str]]:
     """Validate shared event content and order recipient locks consistently."""
-    payload = strict_json_loads(event.payload_json)
-    if not event.type.strip() or not isinstance(payload, dict):
-        raise ValueError("Events require a type and a JSON object payload.")
+    UUID(event.event_id)
+    if event.HasField("space_id"):
+        UUID(event.space_id)
+    if datetime.fromisoformat(event.created_at).tzinfo is None:
+        raise ValueError("Event timestamps must include a timezone.")
+    if not event.type.strip():
+        raise ValueError("Events require a type.")
     if any(not recipient for recipient in recipients):
         raise ValueError("Event recipients must have account IDs.")
-    return payload, sorted(set(recipients))
+    return MessageToDict(event.payload), sorted(set(recipients))
 
 
-def validate_user_event_cursor(
-    after_seq: int, head: int, first_seq: int | None
-) -> None:
-    """Reject future positions and cursors preceding the retained feed prefix."""
+def validate_user_event_cursor(after_seq: int, head: int) -> None:
+    """Require a cursor within the user's committed feed range."""
     if not 0 <= after_seq <= head:
         raise FlowerError(
             ApiErrorCode.INVALID_USER_EVENT_CURSOR, "Cursor is outside the user's feed."
-        )
-    if after_seq < head and first_seq != after_seq + 1:
-        raise FlowerError(
-            ApiErrorCode.USER_EVENT_CURSOR_EXPIRED,
-            "Feed entries were pruned; bootstrap again.",
         )
 
 

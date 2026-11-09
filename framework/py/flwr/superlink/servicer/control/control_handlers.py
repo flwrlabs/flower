@@ -30,7 +30,6 @@ from typing import Any, cast
 from uuid import UUID
 
 import requests
-from google.protobuf.json_format import Parse
 
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
@@ -85,7 +84,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
-    Event,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -250,7 +248,7 @@ def stream_events(
         batch = initial
         while is_active():
             visible_spaces: set[str] = set()
-            if any(entry.event.space_id is not None for entry in batch):
+            if any(entry.event.HasField("space_id") for entry in batch):
                 visible_spaces = {
                     space.id for space in state.get_spaces(account.flwr_aid)
                 }
@@ -259,20 +257,9 @@ def stream_events(
                     return
                 cursor = entry.seq
                 event = entry.event
-                if (
-                    event.space_id is not None
-                    and str(event.space_id) not in visible_spaces
-                ):
+                if event.HasField("space_id") and event.space_id not in visible_spaces:
                     continue
-                payload = Event(
-                    event_id=str(event.event_id),
-                    type=event.type,
-                    created_at=event.created_at.isoformat(),
-                )
-                if event.space_id is not None:
-                    payload.space_id = str(event.space_id)
-                Parse(event.payload_json, payload.payload)
-                yield StreamEventsResponse(seq=entry.seq, event=payload)
+                yield entry
             if not batch:
                 time.sleep(0.5)
             if is_active():

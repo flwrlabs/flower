@@ -63,10 +63,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     BootstrapResponse,
+    Event,
     Space,
     SpaceMessage,
     SpaceParticipant,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -147,12 +149,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
-from flwr.supercore.typing import (
-    ConnectorOAuthSessionRecord,
-    ConnectorRecord,
-    EventRecord,
-    UserEventRecord,
-)
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -729,30 +726,33 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .on_conflict_do_nothing(index_elements=[UserEventFeedModel.user_id])
         )
 
-    def store_event(self, event: EventRecord, recipients: Sequence[str]) -> None:
+    def store_event(self, event: Event, recipients: Sequence[str]) -> None:
         """Commit a logical event and sorted recipient counters with caller writes."""
         payload, users = validate_event(event, recipients)
+        event_id = UUID(event.event_id)
+        space_id = UUID(event.space_id) if event.HasField("space_id") else None
+        created_at = datetime.fromisoformat(event.created_at)
         with self.session() as session:
             inserted = session.scalar(
                 self.dialect_insert(EventModel)
                 .values(
-                    event_id=event.event_id,
+                    event_id=event_id,
                     type=event.type,
-                    space_id=event.space_id,
+                    space_id=space_id,
                     payload=payload,
-                    created_at=event.created_at,
+                    created_at=created_at,
                 )
                 .on_conflict_do_nothing(index_elements=[EventModel.event_id])
                 .returning(EventModel.event_id)
             )
             if inserted is None:
-                previous = session.get(EventModel, event.event_id)
+                previous = session.get(EventModel, event_id)
                 if previous is None or (
                     previous.type,
                     previous.space_id,
                     previous.payload,
                     previous.created_at,
-                ) != (event.type, event.space_id, payload, event.created_at):
+                ) != (event.type, space_id, payload, created_at):
                     raise ValueError(
                         "An event ID cannot be reused with different content."
                     )
@@ -768,13 +768,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 session.execute(
                     insert(UserEventModel).values(
-                        user_id=user_id, seq=seq, event_id=event.event_id
+                        user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
 
     def get_user_events(
         self, flwr_aid: str, *, after_seq: int = 0, limit: int = 100
-    ) -> Sequence[UserEventRecord]:
+    ) -> Sequence[StreamEventsResponse]:
         """Read one recipient's committed entries using its ordered primary key."""
         if limit <= 0:
             raise ValueError("limit must be positive")
@@ -787,11 +787,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 or 0
             )
-            if not 0 <= after_seq <= head:
-                raise FlowerError(
-                    ApiErrorCode.INVALID_USER_EVENT_CURSOR,
-                    "Cursor is outside the user's feed.",
-                )
+            validate_user_event_cursor(after_seq, head)
             rows = session.execute(
                 select(UserEventModel.seq, EventModel)
                 .join(EventModel, EventModel.event_id == UserEventModel.event_id)
@@ -801,32 +797,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .order_by(UserEventModel.seq)
                 .limit(limit)
             ).all()
-            validate_user_event_cursor(after_seq, head, rows[0][0] if rows else None)
             return [
-                UserEventRecord(
-                    seq,
-                    EventRecord(
+                StreamEventsResponse(
+                    seq=seq,
+                    event=Event(
                         type=model.type,
-                        payload_json=json.dumps(model.payload),
-                        space_id=model.space_id,
-                        event_id=model.event_id,
-                        created_at=model.created_at,
+                        payload=model.payload,
+                        space_id=str(model.space_id) if model.space_id else None,
+                        event_id=str(model.event_id),
+                        created_at=model.created_at.isoformat(),
                     ),
                 )
                 for seq, model in rows
             ]
-
-    def prune_user_events(self, flwr_aid: str, through_seq: int) -> None:
-        """Delete a retained prefix without modifying its feed head."""
-        if through_seq < 0:
-            raise ValueError("through_seq must be nonnegative")
-        with self.session() as session:
-            session.execute(
-                delete(UserEventModel).where(
-                    UserEventModel.user_id == flwr_aid,
-                    UserEventModel.seq <= through_seq,
-                )
-            )
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Hold the user's feed barrier while snapshotting visible state and head."""

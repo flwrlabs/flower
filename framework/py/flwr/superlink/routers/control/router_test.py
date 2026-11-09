@@ -1386,11 +1386,11 @@ def test_user_event_stream_sse_has_recipient_id_and_shared_event_id() -> None:
     assert stream.call_args.args[-1] == "100"
 
 
-def test_expired_user_cursor_returns_error_before_sse_headers() -> None:
-    """Require bootstrap after retention rather than silently skipping events."""
+def test_invalid_user_cursor_returns_error_before_sse_headers() -> None:
+    """Reject invalid cursors before opening the SSE response."""
     state = Mock(spec=LinkState)
     state.get_user_events.side_effect = FlowerError(
-        ApiErrorCode.USER_EVENT_CURSOR_EXPIRED, "Pruned"
+        ApiErrorCode.INVALID_USER_EVENT_CURSOR, "Cursor exceeds the feed head"
     )
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
@@ -1403,5 +1403,5 @@ def test_expired_user_cursor_returns_error_before_sse_headers() -> None:
             "accept": "text/event-stream",
         },
     )
-    assert response.status_code == 410
+    assert response.status_code == 400
     assert response.headers["content-type"] == "application/json"

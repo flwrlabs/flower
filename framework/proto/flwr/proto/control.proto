@@ -177,8 +177,8 @@ message Event {
 // POST /v1/control/stream-events. Accept: text/event-stream selects standard
 // SSE with protobuf JSON data; otherwise use the binary protobuf stream
 // framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
-// use their existing separate stream. A pruned cursor returns HTTP 410;
-// bootstrap again.
+// use their existing separate stream. The event journal is append-only;
+// replay cursors do not expire.
 message StreamEventsRequest {
   // Exclusive user-feed cursor. Falls back to Last-Event-ID when absent.
   optional uint64 after_seq = 1;

@@ -44,10 +44,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     BootstrapResponse,
+    Event,
     Space,
     SpaceMessage,
     SpaceParticipant,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -70,12 +72,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import (
-    ConnectorOAuthSessionRecord,
-    ConnectorRecord,
-    EventRecord,
-    UserEventRecord,
-)
+from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -183,7 +180,7 @@ class InMemoryCoreState(
         self.file_store: dict[FileKey, FileRecord] = {}
         self.file_revision_store: dict[FileRevisionKey, FileRevisionRecord] = {}
         self.lock_file_store = Lock()
-        self.event_store: dict[UUID, EventRecord] = {}
+        self.event_store: dict[UUID, Event] = {}
         self.user_event_store: dict[str, list[tuple[int, UUID]]] = {}
         self.user_event_heads: dict[str, int] = {}
         self.lock_user_event_store = RLock()
@@ -594,61 +591,48 @@ class InMemoryCoreState(
                 )
             head.is_deleted = True
 
-    def store_event(self, event: EventRecord, recipients: Sequence[str]) -> None:
+    def store_event(self, event: Event, recipients: Sequence[str]) -> None:
         """Publish one event and all recipient entries under the journal lock."""
-        payload, users = validate_event(event, recipients)
+        _, users = validate_event(event, recipients)
+        event_id = UUID(event.event_id)
         with self.lock_user_event_store:
-            existing = self.event_store.get(event.event_id)
+            existing = self.event_store.get(event_id)
             if existing is not None:
-                previous_payload, _ = validate_event(existing, ())
                 if (
                     existing.type,
                     existing.space_id,
-                    previous_payload,
+                    existing.payload,
                     existing.created_at,
-                ) != (event.type, event.space_id, payload, event.created_at):
+                ) != (event.type, event.space_id, event.payload, event.created_at):
                     raise ValueError(
                         "An event ID cannot be reused with different content."
                     )
                 return
-            self.event_store[event.event_id] = event
+            stored = Event()
+            stored.CopyFrom(event)
+            self.event_store[event_id] = stored
             for user_id in users:
                 seq = self.user_event_heads.get(user_id, 0) + 1
                 self.user_event_heads[user_id] = seq
-                self.user_event_store.setdefault(user_id, []).append(
-                    (seq, event.event_id)
-                )
+                self.user_event_store.setdefault(user_id, []).append((seq, event_id))
 
     def get_user_events(
         self, flwr_aid: str, *, after_seq: int = 0, limit: int = 100
-    ) -> Sequence[UserEventRecord]:
+    ) -> Sequence[StreamEventsResponse]:
         """Read committed events in this account's sequence order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         with self.lock_user_event_store:
+            validate_user_event_cursor(
+                after_seq, self.user_event_heads.get(flwr_aid, 0)
+            )
             feed = self.user_event_store.get(flwr_aid, [])
             start = bisect_right(feed, after_seq, key=lambda entry: entry[0])
             entries = [
-                UserEventRecord(seq, self.event_store[event_id])
+                StreamEventsResponse(seq=seq, event=self.event_store[event_id])
                 for seq, event_id in feed[start : start + limit]
             ]
-            validate_user_event_cursor(
-                after_seq,
-                self.user_event_heads.get(flwr_aid, 0),
-                entries[0].seq if entries else None,
-            )
             return entries
-
-    def prune_user_events(self, flwr_aid: str, through_seq: int) -> None:
-        """Remove old deliveries without resetting the committed head."""
-        if through_seq < 0:
-            raise ValueError("through_seq must be nonnegative")
-        with self.lock_user_event_store:
-            self.user_event_store[flwr_aid] = [
-                (seq, event_id)
-                for seq, event_id in self.user_event_store.get(flwr_aid, [])
-                if seq > through_seq
-            ]
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Snapshot visible state and its cursor while holding mutation locks."""

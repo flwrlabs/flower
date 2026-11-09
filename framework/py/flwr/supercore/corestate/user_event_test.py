@@ -16,27 +16,38 @@
 
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
-from threading import Event
+from threading import Event as ThreadEvent
 from unittest.mock import patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
     AgentConfig,
+    Event,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.typing import EventRecord
 from flwr.superlink.federation import NoOpFederationManager
+
+
+def make_event(**payload: str) -> Event:
+    """Create an application event with a fresh identity."""
+    event = Event(
+        event_id=str(uuid4()),
+        type="agent.updated",
+        created_at=now().isoformat(),
+    )
+    event.payload.update(payload)
+    return event
 
 
 def sql_state(database: str) -> SqlLinkState:
@@ -60,12 +71,9 @@ def event_state(request: pytest.FixtureRequest, tmp_path: Path) -> LinkState:
 
 def test_event_is_shared_and_positions_are_per_user(state: LinkState) -> None:
     """Store shared content once and allocate independent recipient positions."""
-    previous = EventRecord(type="agent.updated", payload_json='{"id": "1"}')
-    shared = EventRecord(
-        type="agent.updated",
-        payload_json='{"id": "2"}',
-        created_at=previous.created_at - timedelta(days=1),
-    )
+    previous = make_event(id="1")
+    shared = make_event(id="2")
+    shared.created_at = (now() - timedelta(days=1)).isoformat()
     state.store_event(previous, ["bob"])
     state.store_event(shared, ["bob", "alice", "alice"])
     state.store_event(shared, ["alice", "bob"])
@@ -76,8 +84,13 @@ def test_event_is_shared_and_positions_are_per_user(state: LinkState) -> None:
     assert alice[0].event.event_id == bob[1].event.event_id == shared.event_id
     assert bob[0].event.created_at > bob[1].event.created_at
     assert not state.get_user_events("outsider")
+    shared.type = "changed"
     with pytest.raises(ValueError, match="different content"):
-        state.store_event(replace(shared, type="changed"), ["alice"])
+        state.store_event(shared, ["alice"])
+    shared.payload["id"] = "mutated input"
+    alice[0].event.payload["id"] = "mutated result"
+    persisted = state.get_user_events("alice")[0].event
+    assert persisted.type == "agent.updated" and persisted.payload["id"] == "2"
     assert state.get_bootstrap("alice").cursor == 1
 
 
@@ -108,10 +121,8 @@ def test_domain_changes_publish_without_task_events(state: LinkState) -> None:
     bob = state.get_user_events("bob", after_seq=1)[0]
     assert alice.event.event_id == bob.event.event_id
     assert alice.seq == 4 and bob.seq == 2
-    assert alice.event.type == "message.created" and alice.event.space_id == UUID(
-        space.id
-    )
-    assert '"Hello"' in alice.event.payload_json
+    assert alice.event.type == "message.created" and alice.event.space_id == space.id
+    assert alice.event.payload["content"] == "Hello"
     assert (
         state.create_space_message(
             UUID(space.id), SpaceParticipant(flwr_aid="outsider"), "Private"
@@ -127,22 +138,26 @@ def test_domain_changes_publish_without_task_events(state: LinkState) -> None:
     assert not state.get_user_events("outsider")
 
 
-def test_pruning_keeps_head_and_requires_bootstrap(state: LinkState) -> None:
-    """Pruned positions stay allocated and expired cursors cannot silently skip data."""
-    first = EventRecord(type="agent.updated", payload_json="{}")
-    second = EventRecord(type="agent.updated", payload_json="{}")
+def test_feed_keeps_all_events_replayable(state: LinkState) -> None:
+    """Appending and replaying events preserves earlier deliveries and positions."""
+    first = make_event()
+    second = make_event()
     state.store_event(first, ["alice"])
     state.store_event(second, ["alice"])
-    state.prune_user_events("alice", through_seq=2)
     assert state.get_bootstrap("alice").cursor == 2
     assert not state.get_user_events("alice", after_seq=2)
-    with pytest.raises(FlowerError) as expired:
-        state.get_user_events("alice", after_seq=0)
-    assert expired.value.code == ApiErrorCode.USER_EVENT_CURSOR_EXPIRED
-    third = EventRecord(type="agent.updated", payload_json="{}")
+    page = state.get_user_events("alice", after_seq=1, limit=1)
+    assert len(page) == 1 and page[0].event.event_id == second.event_id
+    third = make_event()
     state.store_event(third, ["alice"])
     state.store_event(first, ["alice"])
-    assert state.get_user_events("alice", after_seq=2)[0].seq == 3
+    entries = state.get_user_events("alice")
+    assert [entry.seq for entry in entries] == [1, 2, 3]
+    assert [entry.event.event_id for entry in entries] == [
+        first.event_id,
+        second.event_id,
+        third.event_id,
+    ]
     for cursor in (-1, 4, 2**64):
         with pytest.raises(FlowerError) as invalid:
             state.get_user_events("alice", after_seq=cursor)
@@ -160,7 +175,7 @@ def test_sql_rollback_includes_mutation_fanout_and_counters(tmp_path: Path) -> N
     )
     original = state.store_event
 
-    def fail_after_publication(event: EventRecord, recipients: Sequence[str]) -> None:
+    def fail_after_publication(event: Event, recipients: Sequence[str]) -> None:
         original(event, recipients)
         raise RuntimeError("rollback")
 
@@ -181,9 +196,9 @@ def test_sql_feed_commit_order_and_restart(tmp_path: Path) -> None:
     """A later writer cannot commit a recipient position ahead of an earlier writer."""
     database = str(tmp_path / "commits.db")
     first, second, reader = [sql_state(database) for _ in range(3)]
-    entered, release = Event(), Event()
-    early = EventRecord(type="agent.updated", payload_json='{"name":"early"}')
-    late = EventRecord(type="agent.updated", payload_json='{"name":"late"}')
+    entered, release = ThreadEvent(), ThreadEvent()
+    early = make_event(name="early")
+    late = make_event(name="late")
 
     def write_first() -> None:
         with first.session():
@@ -202,15 +217,13 @@ def test_sql_feed_commit_order_and_restart(tmp_path: Path) -> None:
             release.set()
         before.result(timeout=10)
         after.result(timeout=10)
-    reader.prune_user_events("alice", through_seq=2)
     restarted = sql_state(database)
     assert [entry.event.event_id for entry in restarted.get_user_events("bob")] == [
         early.event_id,
         late.event_id,
     ]
-    restarted.store_event(
-        EventRecord(type="agent.updated", payload_json="{}"), ["alice"]
-    )
+    restarted.store_event(make_event(), ["alice"])
+    assert [entry.seq for entry in restarted.get_user_events("alice")] == [1, 2, 3]
     assert restarted.get_user_events("alice", after_seq=2)[0].seq == 3
 
 
@@ -218,7 +231,7 @@ def test_bootstrap_snapshot_and_resume_have_no_gap(tmp_path: Path) -> None:
     """A mutation arriving between bootstrap reads appears entirely in replay."""
     database = str(tmp_path / "snapshot.db")
     reader, writer = sql_state(database), sql_state(database)
-    entered, release = Event(), Event()
+    entered, release = ThreadEvent(), ThreadEvent()
     list_agents = reader.list_agents
 
     def pause(account: str) -> Sequence[Agent]:
