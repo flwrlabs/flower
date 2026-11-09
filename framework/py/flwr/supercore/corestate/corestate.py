@@ -1327,6 +1327,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1340,6 +1341,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_ids : Optional[Sequence[int]] (default: None)
             If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        space_id : Optional[UUID] (default: None)
+            If set, return only events from runs in this space.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
@@ -1358,6 +1361,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[TaskEvent]
             Task events ordered by ID.
         """
+
+    # pylint: disable=unused-argument
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return run IDs associated with a space, if this state stores runs."""
+        return []
 
     @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
