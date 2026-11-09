@@ -18,8 +18,10 @@
 import hashlib
 from datetime import timedelta
 from unittest.mock import patch
+from uuid import uuid4
 
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.corestate.utils_test import create_task_message
@@ -98,6 +100,30 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
 
         # Assert
         self.assertEqual(retrieved, run)
+
+    def test_get_task_events_filters_by_local_space(self) -> None:
+        """Read only local events from runs assigned to the requested Space."""
+        space_id = uuid4()
+        other_space_id = uuid4()
+        for run_id, assigned_space_id in (
+            (1, space_id),
+            (2, other_space_id),
+            (3, space_id),
+            (4, None),
+        ):
+            run = Run.create_empty(run_id)
+            run.space_id = assigned_space_id
+            self.state.store_run(run)
+            self.assertTrue(
+                self.state.store_task_events(
+                    [TaskEvent(run_id=run_id, event="message", data="{}")]
+                )
+            )
+
+        events = self.state.get_task_events(space_id=space_id)
+        self.assertEqual([event.run_id for event in events], [1, 3])
+        self.assertEqual(self.state.get_task_events(space_id=space_id, run_ids=[2]), [])
+        self.assertEqual(self.state.get_task_events(space_id=uuid4()), [])
 
     def test_store_and_get_fab(self) -> None:
         """Test storing and retrieving a FAB."""
