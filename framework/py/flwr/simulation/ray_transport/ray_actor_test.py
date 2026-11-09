@@ -16,9 +16,12 @@
 
 
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
-from flwr.simulation.ray_transport.ray_actor import pool_size_from_resources
+from flwr.simulation.ray_transport.ray_actor import (
+    _is_amd_render_node,
+    pool_size_from_resources,
+)
 
 
 class TestPoolSizeFromResources(TestCase):
@@ -186,6 +189,48 @@ class TestPoolSizeFromResources(TestCase):
         self.assertNotIn("cannot open it", output)
         self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
 
+    def test_kfd_accessible_render_node_non_amd_reports_vendor_mismatch(self) -> None:
+        """Test that an accessible but non-AMD render node is not mistaken for a
+        usable one.
+
+        A hybrid host or container can expose an accessible render node (e.g. an
+        integrated Intel GPU's `renderD128`) while the AMD-backed node is missing or
+        permission-denied. The diagnostic must neither claim device access is
+        complete nor point at ROCM_PATH in that case -- the real problem is that the
+        AMD device itself is not accessible.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.access",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.glob.glob",
+                return_value=["/dev/dri/renderD128"],  # Accessible, but not AMD
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+                return_value=False,
+            ),
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("not AMD-backed", output)
+        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
+
     def test_kfd_accessible_but_no_usable_render_node_reports_render_node(self) -> None:
         """Test that an openable /dev/kfd without a usable render node does not point
         at the SMI library -- it names the missing/inaccessible render node instead."""
@@ -237,3 +282,30 @@ class TestPoolSizeFromResources(TestCase):
                 ):
                     with self.assertRaises(ValueError):
                         pool_size_from_resources(client_resources)
+
+
+class TestIsAmdRenderNode(TestCase):
+    """Tests for the render-node vendor check used by the KFD diagnostic."""
+
+    def test_amd_vendor_id_is_amd(self) -> None:
+        """Test that a node whose sysfs vendor file reads AMD's PCI ID is AMD."""
+        with patch("builtins.open", mock_open(read_data="0x1002\n")):
+            self.assertTrue(_is_amd_render_node("/dev/dri/renderD128"))
+
+    def test_non_amd_vendor_id_is_not_amd(self) -> None:
+        """Test that an Intel-backed render node's sysfs vendor ID is rejected.
+
+        This is the hybrid-host case: an accessible non-AMD render node must not be
+        mistaken for a ROCm-capable one.
+        """
+        with patch("builtins.open", mock_open(read_data="0x8086\n")):
+            self.assertFalse(_is_amd_render_node("/dev/dri/renderD128"))
+
+    def test_missing_sysfs_vendor_file_assumes_amd(self) -> None:
+        """Test that an unreadable sysfs vendor file does not exclude the node.
+
+        Some restricted containers do not mount sysfs; falling back to "assume AMD"
+        there avoids regressing environments that previously worked.
+        """
+        with patch("builtins.open", side_effect=OSError):
+            self.assertTrue(_is_amd_render_node("/dev/dri/renderD128"))

@@ -227,6 +227,14 @@ being broken: ROCr's filter exposes that single device as ordinal ``0``, so
 verification steps later in this guide still report zero GPUs with no indication of
 why.
 
+A value can also be in range and syntactically well-formed while still being wrong: a
+repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only looks at
+each value in isolation. Ray 2.55.1 sizes its advertised GPU resources from the length
+of this mask, so a duplicate ordinal creates two schedulable slots that both map to the
+same ROCr-visible device, letting concurrent ClientApps collide on it instead of each
+getting a distinct GPU. The snippet also rejects the mask in that case rather than
+accepting a syntactically-valid-looking duplicate.
+
 This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and
 ``[[ ... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
 ``bash``, not with ``sh`` or a POSIX-only shell like ``dash`` -- on Debian and Ubuntu in
@@ -256,6 +264,7 @@ exported, silently leaving Ray's original import failure in place:
                     _bad=1
                 fi
             done
+            _dup=$(printf '%s\n' "${_hip_ids[@]}" | sort | uniq -d | paste -sd ',')
             if [ "$_bad" -eq 1 ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "valid selection of ordinals 0..$((_n - 1)) -- the only" \
@@ -264,8 +273,16 @@ exported, silently leaving Ray's original import failure in place:
                      "copied in verbatim; left unchanged, so Ray will see no usable" \
                      "GPU. Unset HIP_VISIBLE_DEVICES and re-run this snippet, or" \
                      "correct it to ordinals in that range." >&2
+            elif [ -n "$_dup" ]; then
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
+                     "ordinal(s) $_dup -- Ray sizes its" \
+                     "advertised GPU resources from the length of this mask, so a" \
+                     "repeated ordinal creates two schedulable slots that both map" \
+                     "to the same ROCr-visible device, letting concurrent" \
+                     "ClientApps collide on it. Left unchanged, so remove the" \
+                     "duplicate and re-run this snippet." >&2
             fi
-            unset _hip_ids _id _bad
+            unset _hip_ids _id _bad _dup
         fi
         unset _n
     fi
@@ -293,7 +310,10 @@ exported, silently leaving Ray's original import failure in place:
     assumed to already be expressed in that renumbered space either: the snippet checks
     that every ordinal it names is ``< n``, and warns instead of silently proceeding
     when one is not, since that is the signature of a physical device ID having been
-    copied in rather than a deliberately chosen ordinal.
+    copied in rather than a deliberately chosen ordinal. It also rejects a repeated
+    ordinal (``HIP_VISIBLE_DEVICES=0,0``): Ray derives the number of GPU slots it
+    advertises from the length of this mask, so a duplicate would let two schedulable
+    slots map to the same underlying device instead of each naming a distinct one.
 
 .. important::
 

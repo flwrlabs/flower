@@ -85,6 +85,27 @@ class ClientAppActor(VirtualClientEngineActor):
             on_actor_init_fn()
 
 
+_AMD_PCI_VENDOR_ID = "0x1002"
+
+
+def _is_amd_render_node(node: str) -> bool:
+    """Return whether a `/dev/dri/renderD*` node is backed by an AMD GPU.
+
+    An accessible render node is not necessarily an AMD one: a hybrid host or
+    container can expose an unrelated node (e.g. an integrated Intel GPU's
+    `renderD128`) that ROCm cannot use. Disambiguate via the PCI vendor ID in
+    sysfs rather than assuming any accessible node is ROCm-capable. If the
+    vendor cannot be determined (sysfs missing, as in some restricted
+    containers), assume AMD rather than silently excluding the node.
+    """
+    vendor_path = f"/sys/class/drm/{os.path.basename(node)}/device/vendor"
+    try:
+        with open(vendor_path, encoding="utf-8") as vendor_file:
+            return vendor_file.read().strip().lower() == _AMD_PCI_VENDOR_ID
+    except OSError:
+        return True
+
+
 def _log_kfd_diagnostics() -> None:
     """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
 
@@ -121,7 +142,14 @@ def _log_kfd_diagnostics() -> None:
     accessible_render_nodes = [
         node for node in render_nodes if os.access(node, os.R_OK | os.W_OK)
     ]
-    if accessible_render_nodes:
+    # A hybrid host or container can expose an accessible render node that ROCm
+    # cannot use (e.g. an integrated Intel GPU's renderD128) while the AMD one is
+    # missing or permission-denied; only an AMD-backed node rules out a device
+    # access problem.
+    amd_accessible_render_nodes = [
+        node for node in accessible_render_nodes if _is_amd_render_node(node)
+    ]
+    if amd_accessible_render_nodes:
         log(
             WARNING,
             "The ROCm kernel driver is loaded (/dev/kfd exists), so "
@@ -133,6 +161,21 @@ def _log_kfd_diagnostics() -> None:
             "ROCM_PATH points at a ROCm root containing the "
             "`librocm_smi64.so` symlink rather than only a versioned "
             "`librocm_smi64.so.<N>`.",
+        )
+    elif accessible_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), and an accessible `/dev/dri/renderD*` node "
+            "exists (%s), but it is not AMD-backed (its PCI vendor "
+            "ID is not `%s`) -- ROCm cannot use it. This usually "
+            "means the AMD GPU's own render node is missing or "
+            "permission-denied on this host or container, not that "
+            "ROCM_PATH needs adjusting: check that `--device=/dev/dri "
+            "--group-add render` passes through and grants access to "
+            "the AMD device specifically, not just any render node.",
+            ", ".join(accessible_render_nodes),
+            _AMD_PCI_VENDOR_ID,
         )
     else:
         log(
