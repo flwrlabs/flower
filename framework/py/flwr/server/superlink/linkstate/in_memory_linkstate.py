@@ -51,17 +51,16 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
 from flwr.supercore.utils import uint64_to_int64
-from flwr.superlink.agent_queue import (
-    AgentRunRequest,
-    AgentRunTarget,
-    validate_agent_app,
-)
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
+    validate_agent_app,
+    validate_agent_run_request,
+    validate_agent_submission,
     validate_run_scope,
 )
 
@@ -471,6 +470,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         targets: Sequence[AgentRunTarget],
     ) -> tuple[SpaceMessage, list[int]]:
         """Accept a user message and all selected pending runs together."""
+        targets = tuple(targets)
+        validate_agent_submission(flwr_aid, content, targets)
         with (
             self.lock_task_store,
             self.lock,
@@ -512,6 +513,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def enqueue_agent_run(self, request: AgentRunRequest) -> int:
         """Accept an explicit user trigger and its primary task together."""
+        validate_agent_run_request(request)
         with (
             self.lock_task_store,
             self.lock,

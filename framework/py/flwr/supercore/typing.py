@@ -14,13 +14,18 @@
 # ==============================================================================
 """Flower SuperCore type definitions."""
 
+from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import TypeAlias
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, TypeAlias
 from uuid import UUID
 
 from flwr.supercore.constant import RunTime
+
+if TYPE_CHECKING:
+    from flwr.app.user_config import UserConfig
+    from flwr.proto.control_pb2 import SpaceMessage  # pylint: disable=E0611
 
 JSONScalar: TypeAlias = bool | float | int | str | None
 JSONArray: TypeAlias = Sequence["JSONValue"]
@@ -37,6 +42,44 @@ class AgentQueueEntry:
     agent_id: int
     message_id: int
     run_id: int
+
+
+@dataclass(frozen=True)
+class AgentRunRequest:  # pylint: disable=too-many-instance-attributes
+    """An explicit user-message target and its server-resolved AgentApp."""
+
+    space_id: UUID
+    agent_id: int
+    message_id: int
+    flwr_aid: str
+    fab_id: str
+    fab_version: str
+    fab_hash: str
+    override_config: UserConfig = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AgentRunTarget:
+    """An explicit agent target with its already resolved AgentApp."""
+
+    agent_id: int
+    fab_id: str
+    fab_version: str
+    fab_hash: str
+    override_config: UserConfig = field(default_factory=dict)
+
+    def request_for(self, message: SpaceMessage, flwr_aid: str) -> AgentRunRequest:
+        """Bind the target to the message accepted in this transaction."""
+        return AgentRunRequest(
+            space_id=UUID(message.space_id),
+            agent_id=self.agent_id,
+            message_id=message.id,
+            flwr_aid=flwr_aid,
+            fab_id=self.fab_id,
+            fab_version=self.fab_version,
+            fab_hash=self.fab_hash,
+            override_config=self.override_config,
+        )
 
 
 @dataclass(frozen=True)

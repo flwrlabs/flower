@@ -66,18 +66,17 @@ from flwr.supercore.state.schema.corestate_tables import create_corestate_metada
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
+from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
 from flwr.supercore.utils import simulation_config_from_json, simulation_config_to_json
-from flwr.superlink.agent_queue import (
-    AgentRunRequest,
-    AgentRunTarget,
-    validate_agent_app,
-)
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
+    validate_agent_app,
+    validate_agent_run_request,
+    validate_agent_submission,
     validate_run_scope,
 )
 
@@ -514,6 +513,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         targets: Sequence[AgentRunTarget],
     ) -> tuple[SpaceMessage, list[int]]:
         """Commit the message, queues, and all selected pending runs together."""
+        targets = tuple(targets)
+        validate_agent_submission(flwr_aid, content, targets)
         created_run_ids: list[int] = []
         try:
             with self.session() as session:
@@ -540,6 +541,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def enqueue_agent_run(self, request: AgentRunRequest) -> int:
         """Accept one persisted trigger with a pending Run and Task."""
+        validate_agent_run_request(request)
         created_run_ids: list[int] = []
         try:
             return self._enqueue_agent_run(request, created_run_ids)

@@ -52,12 +52,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.object_store.in_memory_object_store import InMemoryObjectStore
 from flwr.supercore.object_store.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime.runtime_handlers import acquire_task
-from flwr.superlink.agent_queue import (
-    AgentRunRequest,
-    AgentRunTarget,
-    enqueue_agent_run,
-    submit_agent_message,
-)
+from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -154,16 +149,16 @@ def read_prompt(state: LinkState, run_id: int) -> str:
 def test_acceptance_pins_input_and_deduplicates(state: LinkState) -> None:
     """A replay returns the accepted Run even after failure or new config."""
     request = replace(make_request(state), override_config={"temperature": 0.5})
-    first = enqueue_agent_run(state, request)
+    first = state.enqueue_agent_run(request)
     assert read_prompt(state, first) == "First prompt"
     assert state.finish_task(primary_task(state, first), SubStatus.FAILED, "failed")
     request.override_config["temperature"] = 0.9
-    assert enqueue_agent_run(state, replace(request, fab_version="2.0.0")) == first
+    assert state.enqueue_agent_run(replace(request, fab_version="2.0.0")) == first
     assert state.get_run_info(run_ids=[first])[0].override_config == {
         "temperature": 0.5
     }
 
-    second = enqueue_agent_run(state, follow_up(state, request))
+    second = state.enqueue_agent_run(follow_up(state, request))
     assert second != first
     assert read_prompt(state, second) == "Next prompt"
     assert len(state.get_tasks()) == 2
@@ -176,8 +171,8 @@ def test_acceptance_pins_input_and_deduplicates(state: LinkState) -> None:
 def test_fifo_and_terminal_advancement(state: LinkState, terminal: str) -> None:
     """Pending, starting, and running heads block the next primary task."""
     request = make_request(state)
-    first = primary_task(state, enqueue_agent_run(state, request))
-    second = primary_task(state, enqueue_agent_run(state, follow_up(state, request)))
+    first = primary_task(state, state.enqueue_agent_run(request))
+    second = primary_task(state, state.enqueue_agent_run(follow_up(state, request)))
     assert state.claim_task(second) is None
     assert state.claim_task(first)
     assert state.claim_task(second) is None
@@ -190,7 +185,7 @@ def test_fifo_and_terminal_advancement(state: LinkState, terminal: str) -> None:
 def test_parallel_scopes_and_child_tasks(state: LinkState) -> None:
     """The gate affects only primary tasks for the same agent and Space."""
     request = make_request(state)
-    run_id = enqueue_agent_run(state, request)
+    run_id = state.enqueue_agent_run(request)
     assert state.claim_task(primary_task(state, run_id))
     child = state.create_task(TaskType.CONNECTOR, run_id, connector_ref="tool")
     assert child is not None and state.claim_task(child)
@@ -207,19 +202,19 @@ def test_parallel_scopes_and_child_tasks(state: LinkState) -> None:
         ]
     )
     shared = follow_up(state, replace(request, space_id=UUID(space.id)))
-    other_run = enqueue_agent_run(state, shared)
+    other_run = state.enqueue_agent_run(shared)
     assert state.claim_task(primary_task(state, other_run))
     # Alice can invoke Bob's agent because it participates in the shared Space.
-    parallel = enqueue_agent_run(state, replace(shared, agent_id=other_agent.id))
+    parallel = state.enqueue_agent_run(replace(shared, agent_id=other_agent.id))
     assert state.claim_task(primary_task(state, parallel))
 
 
 def test_child_cleanup_precedes_advancement(state: LinkState) -> None:
     """A successor cannot start between root completion and child cleanup."""
     request = make_request(state)
-    run_id = enqueue_agent_run(state, request)
+    run_id = state.enqueue_agent_run(request)
     head = primary_task(state, run_id)
-    tail = primary_task(state, enqueue_agent_run(state, follow_up(state, request)))
+    tail = primary_task(state, state.enqueue_agent_run(follow_up(state, request)))
     assert state.claim_task(head)
     child = state.create_task(TaskType.CONNECTOR, run_id)
     assert child is not None and state.claim_task(child)
@@ -240,13 +235,13 @@ def test_child_cleanup_precedes_advancement(state: LinkState) -> None:
 def test_warm_worker_cannot_skip_unavailable_head(state: LinkState) -> None:
     """Runtime acquisition respects FIFO even if only the next FAB is warm."""
     request = make_request(state)
-    head = primary_task(state, enqueue_agent_run(state, request))
+    head = primary_task(state, state.enqueue_agent_run(request))
     next_request = replace(
         follow_up(state, request),
         fab_hash=state.store_fab(Fab("", b"next-fab", {})),
         fab_version="2.0.0",
     )
-    tail = primary_task(state, enqueue_agent_run(state, next_request))
+    tail = primary_task(state, state.enqueue_agent_run(next_request))
     acquire = AcquireTaskRequest(agentapp_fab_hashes=[next_request.fab_hash])
     assert not acquire_task(acquire, state).HasField("task")
     assert state.finish_task(head, SubStatus.STOPPED, "cancelled")
@@ -265,6 +260,10 @@ def test_reject_ineligible_triggers(state: LinkState) -> None:
     )
     assert other is not None
     for invalid in (
+        replace(request, flwr_aid=""),
+        replace(request, message_id=0),
+        replace(request, agent_id=0),
+        replace(request, fab_version=""),
         replace(request, flwr_aid="outsider"),
         replace(request, agent_id=other.id),
         replace(request, space_id=uuid4()),
@@ -273,7 +272,7 @@ def test_reject_ineligible_triggers(state: LinkState) -> None:
         replace(request, fab_hash="missing"),
     ):
         with pytest.raises(ValueError):
-            enqueue_agent_run(state, invalid)
+            state.enqueue_agent_run(invalid)
     assert not state.get_tasks()
 
 
@@ -282,7 +281,7 @@ def test_prompt_failure_rolls_back_acceptance(state: LinkState) -> None:
     request = make_request(state)
     with patch.object(state.object_store, "put", side_effect=RuntimeError("upload")):
         with pytest.raises(RuntimeError, match="upload"):
-            enqueue_agent_run(state, request)
+            state.enqueue_agent_run(request)
     assert not state.get_run_info()
     assert not state.get_tasks()
     assert state.get_agent_queue_entry(request.agent_id, request.message_id) is None
@@ -291,7 +290,7 @@ def test_prompt_failure_rolls_back_acceptance(state: LinkState) -> None:
     assert not state.object_store.store
     assert not state.object_store.run_objects_mapping
     assert len(state.get_space_messages(request.space_id, "alice") or []) == 1
-    assert state.claim_task(primary_task(state, enqueue_agent_run(state, request)))
+    assert state.claim_task(primary_task(state, state.enqueue_agent_run(request)))
 
 
 @pytest.mark.parametrize("shared", [False, True])
@@ -314,7 +313,7 @@ def test_sql_objectstore_rollback(tmp_path: Path, shared: bool) -> None:
 
     with patch.object(state, "_store_generated_message", side_effect=fail_after_upload):
         with pytest.raises(RuntimeError, match="after upload"):
-            submit_agent_message(state, space_id, "alice", "First prompt", targets)
+            state.submit_agent_message(space_id, "alice", "First prompt", targets)
     assert not state.get_run_info() and not state.get_tasks()
     assert not state.get_space_messages(space_id, "alice")
     assert len(prompt_ids) == 2
@@ -322,7 +321,7 @@ def test_sql_objectstore_rollback(tmp_path: Path, shared: bool) -> None:
         assert objects.get(prompt_id) is None
         with pytest.raises(NoObjectInStoreError):
             objects.get_object_tree(prompt_id)
-    _, runs = submit_agent_message(state, space_id, "alice", "First prompt", targets)
+    _, runs = state.submit_agent_message(space_id, "alice", "First prompt", targets)
     assert all(read_prompt(state, run_id) == "First prompt" for run_id in runs)
 
 
@@ -330,8 +329,8 @@ def test_sql_objectstore_rollback(tmp_path: Path, shared: bool) -> None:
 def test_worker_expiry_preserves_queue_contract(state: LinkState, active: bool) -> None:
     """Startup expiry retries the head; execution expiry fails and advances it."""
     request = make_request(state)
-    first = primary_task(state, enqueue_agent_run(state, request))
-    second = primary_task(state, enqueue_agent_run(state, follow_up(state, request)))
+    first = primary_task(state, state.enqueue_agent_run(request))
+    second = primary_task(state, state.enqueue_agent_run(follow_up(state, request)))
     fixed_now = now()
     with patch("datetime.datetime") as clock:
         clock.now.return_value = fixed_now
@@ -378,14 +377,14 @@ def test_concurrent_acceptance_and_claim(tmp_path: Path, backend: str) -> None:
 
     def accept(state: LinkState) -> int:
         barrier.wait(timeout=10)
-        return enqueue_agent_run(state, request)
+        return state.enqueue_agent_run(request)
 
     with ThreadPoolExecutor(2) as pool:
         runs = list(pool.map(accept, [first, second]))
     assert runs[0] == runs[1]
     assert len(first.get_tasks()) == 1
     head = primary_task(first, runs[0])
-    tail = primary_task(first, enqueue_agent_run(first, follow_up(first, request)))
+    tail = primary_task(first, first.enqueue_agent_run(follow_up(first, request)))
 
     def claim(item: tuple[LinkState, int]) -> str | None:
         barrier.wait(timeout=10)
@@ -406,8 +405,8 @@ def test_queue_order_survives_sql_restart(tmp_path: Path) -> None:
     state.initialize()
     earlier_message = make_request(state)
     later_message = follow_up(state, earlier_message)
-    first_run = enqueue_agent_run(state, later_message)
-    second_run = enqueue_agent_run(state, earlier_message)
+    first_run = state.enqueue_agent_run(later_message)
+    second_run = state.enqueue_agent_run(earlier_message)
     head = primary_task(state, second_run)
     tail = primary_task(state, first_run)
 
@@ -415,7 +414,7 @@ def test_queue_order_survives_sql_restart(tmp_path: Path) -> None:
         database, NoOpFederationManager(), ObjectStoreFactory(database).store()
     )
     restarted.initialize()
-    assert enqueue_agent_run(restarted, earlier_message) == second_run
+    assert restarted.enqueue_agent_run(earlier_message) == second_run
     assert restarted.claim_task(tail) is None
     assert restarted.claim_task(head)
     assert read_prompt(restarted, first_run) == "Next prompt"
@@ -429,8 +428,8 @@ def test_timestamp_ties_preserve_message_order(state: LinkState) -> None:
     fixed_now = now()
     with patch("datetime.datetime") as clock:
         clock.now.return_value = fixed_now
-        later_task = primary_task(state, enqueue_agent_run(state, later))
-        earlier_task = primary_task(state, enqueue_agent_run(state, earlier))
+        later_task = primary_task(state, state.enqueue_agent_run(later))
+        earlier_task = primary_task(state, state.enqueue_agent_run(earlier))
         assert state.claim_task(later_task) is None
         assert state.claim_task(earlier_task)
         assert state.claim_task(later_task) is None
@@ -445,10 +444,10 @@ def test_backdated_submission_waits_for_active_execution(state: LinkState) -> No
     fixed_now = now()
     with patch("datetime.datetime") as clock:
         clock.now.return_value = fixed_now
-        head = primary_task(state, enqueue_agent_run(state, request))
+        head = primary_task(state, state.enqueue_agent_run(request))
         assert state.claim_task(head)
         clock.now.return_value = fixed_now - timedelta(seconds=10)
-        tail = primary_task(state, enqueue_agent_run(state, later))
+        tail = primary_task(state, state.enqueue_agent_run(later))
         assert state.claim_task(tail) is None
         assert state.finish_task(head, SubStatus.STOPPED, "")
         assert state.claim_task(tail)
@@ -457,8 +456,8 @@ def test_backdated_submission_waits_for_active_execution(state: LinkState) -> No
 def test_submission_creates_message_and_pending_runs(state: LinkState) -> None:
     """One acceptance publishes a message and records all pending executions."""
     space_id, targets = shared_targets(state)
-    message, runs = submit_agent_message(
-        state, space_id, "alice", "Both agents", targets
+    message, runs = state.submit_agent_message(
+        space_id, "alice", "Both agents", targets
     )
     assert state.get_space_messages(space_id, "alice") == [message]
     assert len(runs) == 2
@@ -477,8 +476,8 @@ def test_submission_creates_message_and_pending_runs(state: LinkState) -> None:
 def test_empty_targets_do_not_implicitly_trigger_participants(state: LinkState) -> None:
     """An explicit empty target list stores only the message."""
     request = make_request(state)
-    message, runs = submit_agent_message(
-        state, request.space_id, "alice", "Chat only", []
+    message, runs = state.submit_agent_message(
+        request.space_id, "alice", "Chat only", []
     )
     assert not runs and not state.get_tasks()
     assert (state.get_space_messages(request.space_id, "alice") or [])[-1] == message
@@ -507,7 +506,7 @@ def test_submission_rolls_back_every_target(
     )
     with patch.object(state, "_store_generated_message", side_effect=upload_then_fail):
         with pytest.raises((ValueError, RuntimeError)):
-            submit_agent_message(state, space_id, "alice", "Rollback", failing)
+            state.submit_agent_message(space_id, "alice", "Rollback", failing)
     assert uploads == (2 if after_upload else 1)
     assert not state.get_space_messages(space_id, "alice")
     assert not state.get_run_info() and not state.get_tasks()
@@ -515,7 +514,7 @@ def test_submission_rolls_back_every_target(
     assert not state.object_store.store and not state.object_store.run_objects_mapping
     if isinstance(state, InMemoryLinkState):
         assert not state.agent_queue
-    message, runs = submit_agent_message(state, space_id, "alice", "Retry", targets)
+    message, runs = state.submit_agent_message(space_id, "alice", "Retry", targets)
     assert state.get_space_messages(space_id, "alice") == [message]
     assert len(runs) == 2
 
@@ -525,16 +524,16 @@ def test_overtaken_assignment_is_rejected(state: LinkState, finished: bool) -> N
     """A late assignment cannot insert work before an execution already started."""
     older = make_request(state)
     newer = follow_up(state, older)
-    run_id = enqueue_agent_run(state, newer)
+    run_id = state.enqueue_agent_run(newer)
     task = primary_task(state, run_id)
     assert state.claim_task(task)
     if finished:
         assert state.finish_task(task, SubStatus.FAILED, "")
     with pytest.raises(ValueError, match="newer message"):
-        enqueue_agent_run(state, older)
+        state.enqueue_agent_run(older)
     assert state.get_agent_queue_entry(older.agent_id, older.message_id) is None
     assert len(state.get_tasks()) == 1
-    assert enqueue_agent_run(state, newer) == run_id
+    assert state.enqueue_agent_run(newer) == run_id
 
 
 # pylint: disable-next=too-many-locals
@@ -567,8 +566,7 @@ def test_concurrent_submission_is_atomic_and_ordered(
     with patch.object(first, "create_space_message", side_effect=pause_after_insert):
         with ThreadPoolExecutor(2) as pool:
             earlier = pool.submit(
-                submit_agent_message,
-                first,
+                first.submit_agent_message,
                 request.space_id,
                 "alice",
                 "Earlier",
@@ -579,8 +577,7 @@ def test_concurrent_submission_is_atomic_and_ordered(
                 history = second.get_space_messages(request.space_id, "alice")
                 assert history is not None and len(history) == 1
                 later = pool.submit(
-                    submit_agent_message,
-                    second,
+                    second.submit_agent_message,
                     request.space_id,
                     "alice",
                     "Later",
