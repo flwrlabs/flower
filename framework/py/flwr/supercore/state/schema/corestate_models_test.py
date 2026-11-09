@@ -31,6 +31,7 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "agent_queue",
     "space",
     "space_participant",
     "space_message",
