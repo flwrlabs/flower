@@ -64,10 +64,7 @@ message GetSpaceMessagesResponse {
 message SendSpaceMessageRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
   string space_id = 1;
-  // Control uses the authenticated account as the author.
+  // The author is resolved from the authenticated account or task.
   string content = 2;
-  // Required by Runtime: author must be an agent participant in the task's
-  // Space. Control always uses the authenticated account instead.
-  optional uint64 agent_id = 3;
 }
 message SendSpaceMessageResponse { SpaceMessage message = 1; }

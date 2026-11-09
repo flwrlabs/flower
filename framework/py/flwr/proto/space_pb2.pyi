@@ -220,25 +220,17 @@ class SendSpaceMessageRequest(google.protobuf.message.Message):
 
     SPACE_ID_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
-    AGENT_ID_FIELD_NUMBER: builtins.int
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
     content: builtins.str
-    """Control uses the authenticated account as the author."""
-    agent_id: builtins.int
-    """Required by Runtime: author must be an agent participant in the task's
-    Space. Control always uses the authenticated account instead.
-    """
+    """The author is resolved from the authenticated account or task."""
     def __init__(
         self,
         *,
         space_id: builtins.str = ...,
         content: builtins.str = ...,
-        agent_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_agent_id", b"_agent_id", "agent_id", b"agent_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_agent_id", b"_agent_id", "agent_id", b"agent_id", "content", b"content", "space_id", b"space_id"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_agent_id", b"_agent_id"]) -> typing.Literal["agent_id"] | None: ...
+    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
 
 global___SendSpaceMessageRequest = SendSpaceMessageRequest
 
