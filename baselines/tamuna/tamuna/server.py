@@ -43,7 +43,7 @@ def gen_evaluate_fn(
         """Use the entire MNIST test set for evaluation."""
         net = instantiate(model)
         params_dict = zip(net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         net.load_state_dict(state_dict, strict=True)
         net.to(device)
 
