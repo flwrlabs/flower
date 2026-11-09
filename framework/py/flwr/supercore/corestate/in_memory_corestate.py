@@ -180,7 +180,7 @@ class InMemoryCoreState(
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
         self.agent_id_counter = 0
-        self.lock_agent_store = Lock()
+        self.lock_agent_store = RLock()
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
@@ -200,7 +200,7 @@ class InMemoryCoreState(
         self.space_store: dict[UUID, Space] = {}
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
-        self.lock_space_store = Lock()
+        self.lock_space_store = RLock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -587,14 +587,14 @@ class InMemoryCoreState(
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create and return an account's agent."""
+        """Create an agent and its initial Space together."""
         if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
             config.HasField("description") and not config.description
         ):
             return None
-        with self.lock_agent_store:
+        with self.lock_space_store, self.lock_agent_store:
             self.agent_id_counter += 1
             created_at = now().isoformat()
             agent = Agent(
@@ -604,6 +604,16 @@ class InMemoryCoreState(
                 updated_at=created_at,
             )
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
+            try:
+                self.create_space(
+                    participants=[
+                        SpaceParticipant(flwr_aid=flwr_aid),
+                        SpaceParticipant(agent_id=agent.id),
+                    ]
+                )
+            except Exception:
+                del self.agent_store[flwr_aid][agent.id]
+                raise
             return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:

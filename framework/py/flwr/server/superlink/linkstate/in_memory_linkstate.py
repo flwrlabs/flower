@@ -50,7 +50,11 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
-from .utils import create_user_prompt_message, generate_rand_int_from_bytes
+from .utils import (
+    create_user_prompt_message,
+    generate_rand_int_from_bytes,
+    validate_run_scope,
+)
 
 
 @dataclass
@@ -58,8 +62,8 @@ class RunRecord:  # pylint: disable=R0902
     """The record of a specific run, including its status and timestamps."""
 
     run: Run
-    space_id: UUID | None = None
     federation_config: SimulationConfig | None = None
+    space_id: UUID | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
     usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -275,6 +279,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 return set()
+            if self.run_ids[run_id].space_id is not None:
+                return set()
             federation_id = self.run_ids[run_id].run.federation_id
             node_ids = {
                 node.node_id
@@ -338,7 +344,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -347,14 +353,28 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
     ) -> int:
         """Create a new run."""
+        validate_run_scope(
+            federation_id=federation_id,
+            space_id=space_id,
+            series_id=series_id,
+            federation_config=federation_config,
+            series_description=series_description,
+            connector_ids=connector_ids,
+            primary_task_type=primary_task_type,
+        )
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
             except ValueError:
                 return 0
         with self.lock_task_store, self.lock, self.lock_task_event_store:
+            if space_id is not None:
+                with self.lock_space_store:
+                    if space_id not in self.space_store:
+                        return 0
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -364,20 +384,20 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 exclude=set(self.task_store),
             )
             current = now().isoformat()
-            resolved_series_id = self.store_run_in_series(
-                run_id=run_id,
-                federation_id=federation_id,
-                is_agent=primary_task_type == TaskType.AGENT_APP,
-                series_id=series_id,
-                description=series_description,
-            )
-            if resolved_series_id is None:
-                log(ERROR, "Unexpected run series membership failure.")
-                return 0
-            self._refresh_run_series_context(
-                run_id=run_id,
-                series_id=resolved_series_id,
-            )
+            resolved_series_id: int | None = None
+            if space_id is None:
+                assert federation_id is not None
+                resolved_series_id = self.store_run_in_series(
+                    run_id=run_id,
+                    federation_id=federation_id,
+                    is_agent=primary_task_type == TaskType.AGENT_APP,
+                    series_id=series_id,
+                    description=series_description,
+                )
+                if resolved_series_id is None:
+                    log(ERROR, "Unexpected run series membership failure.")
+                    return 0
+                self._refresh_run_series_context(run_id, resolved_series_id)
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -395,15 +415,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         details="",
                     ),
                     flwr_aid=flwr_aid if flwr_aid else "",
-                    federation_id=federation_id,
+                    federation_id=federation_id or "",
                     primary_task_id=task_id,
                     bytes_sent=0,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
                     primary_task_type=primary_task_type,
-                    series_id=resolved_series_id,
+                    series_id=resolved_series_id or 0,
                 ),
                 federation_config=federation_config,
+                space_id=space_id,
             )
             self.run_ids[run_id] = run_record
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
@@ -573,7 +594,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         sub_status=finish_sub_status,
                         details=finish_details,
                     )
-            self.federation_manager.report_run_usage()
+            if self.run_ids[self.task_store[task_id].run_id].space_id is None:
+                self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
@@ -596,7 +618,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
-        self.federation_manager.report_run_usage()
+        if any(self.run_ids[run_id].space_id is None for run_id, _ in pairs):
+            self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
