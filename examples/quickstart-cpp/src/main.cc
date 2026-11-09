@@ -1,12 +1,14 @@
 #include "simple_client.h"
-#include "start.h"
+#include "supernode_client.h"
+
+#include <exception>
 
 int main(int argc, char **argv) {
   if (argc != 3) {
     std::cout << "Client takes 2 mandatory arguments as follows: " << std::endl;
     std::cout << "./client  CLIENT_ID  SERVER_URL" << std::endl;
-    std::cout << "Example: ./flwr_client 0 '127.0.0.1:8080'" << std::endl;
-    return 0;
+    std::cout << "Example: ./flwr_client 0 '127.0.0.1:9092'" << std::endl;
+    return 1;
   }
 
   // Parsing arguments
@@ -39,7 +41,12 @@ int main(int argc, char **argv) {
   std::string server_add = SERVER_URL;
 
   std::cout << "Starting rere client" << std::endl;
-  start::start_client(server_add, &client);
+  try {
+    flwr_quickstart::start_client(server_add, &client);
+  } catch (const std::exception &e) {
+    std::cerr << "[flwr-cpp] fatal: " << e.what() << std::endl;
+    return 1;
+  }
 
   return 0;
 }
