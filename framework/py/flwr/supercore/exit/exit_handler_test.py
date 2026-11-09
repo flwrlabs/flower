@@ -20,6 +20,7 @@ from collections.abc import Iterator
 import pytest
 
 from .exit_handler import (
+    _lock_handlers,
     add_exit_handler,
     registered_exit_handlers,
     trigger_exit_handlers,
@@ -112,3 +113,30 @@ def test_trigger_exit_handlers_ignores_exceptions() -> None:
 
     # Assert - all handlers should have been called in LIFO order
     assert execution_order == [3, 2, 1]
+
+
+def test_trigger_exit_handlers_does_not_run_handler_twice() -> None:
+    """A nested trigger does not invoke an already-snapshotted handler again."""
+    execution_order = []
+
+    def handler() -> None:
+        execution_order.append(1)
+        trigger_exit_handlers(run_before_force_exit=False)
+        execution_order.append(2)
+
+    add_exit_handler(handler)
+
+    trigger_exit_handlers(run_before_force_exit=False)
+
+    assert execution_order == [1, 2]
+
+
+def test_exit_handler_registry_lock_is_reentrant() -> None:
+    """The registry lock supports same-thread re-entry."""
+    with _lock_handlers:
+        # pylint: disable-next=consider-using-with
+        reacquired = _lock_handlers.acquire(blocking=False)
+        if reacquired:
+            _lock_handlers.release()
+
+    assert reacquired
