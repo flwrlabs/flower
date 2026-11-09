@@ -28,9 +28,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Space,
-    SpaceMessage,
-    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -38,6 +35,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
