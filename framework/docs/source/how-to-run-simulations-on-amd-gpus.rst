@@ -225,9 +225,16 @@ both variables -- for example ``ROCR_VISIBLE_DEVICES=3`` alongside
 being broken: ROCr's filter exposes that single device as ordinal ``0``, so
 ``HIP_VISIBLE_DEVICES=3`` asks for an ordinal that no longer exists, and the
 verification steps later in this guide still report zero GPUs with no indication of
-why:
+why.
 
-.. code-block:: shell
+This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and
+``[[ ... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
+``bash``, not with ``sh`` or a POSIX-only shell like ``dash`` -- on Debian and Ubuntu in
+particular, ``/bin/sh`` is ``dash``, so pasting this directly into a ``#!/bin/sh``
+script or a ``sh -c "..."`` invocation fails before ``HIP_VISIBLE_DEVICES`` is ever
+exported, silently leaving Ray's original import failure in place:
+
+.. code-block:: bash
 
     if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ]; then
