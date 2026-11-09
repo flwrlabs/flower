@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -61,6 +62,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     Space,
     SpaceMessage,
     SpaceParticipant,
@@ -101,6 +103,7 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import Event as EventModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -138,9 +141,18 @@ from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventM
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
+from flwr.supercore.state.schema.corestate_models import UserEvent as UserEventModel
+from flwr.supercore.state.schema.corestate_models import (
+    UserEventFeed as UserEventFeedModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+    EventRecord,
+    UserEventRecord,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -149,9 +161,11 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_event,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
+    validate_user_event_cursor,
 )
 
 # Define SQL conditions for task statuses to ensure consistency across queries
@@ -707,6 +721,132 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     "File revision precondition failed.",
                 )
 
+    def _ensure_user_event_feed(self, session: Session, user_id: str) -> None:
+        """Initialize an account's feed without replacing its committed head."""
+        session.execute(
+            self.dialect_insert(UserEventFeedModel)
+            .values(user_id=user_id, last_seq=0)
+            .on_conflict_do_nothing(index_elements=[UserEventFeedModel.user_id])
+        )
+
+    def store_event(self, event: EventRecord, recipients: Sequence[str]) -> None:
+        """Commit a logical event and sorted recipient counters with caller writes."""
+        payload, users = validate_event(event, recipients)
+        with self.session() as session:
+            inserted = session.scalar(
+                self.dialect_insert(EventModel)
+                .values(
+                    event_id=event.event_id,
+                    type=event.type,
+                    space_id=event.space_id,
+                    payload=payload,
+                    created_at=event.created_at,
+                )
+                .on_conflict_do_nothing(index_elements=[EventModel.event_id])
+                .returning(EventModel.event_id)
+            )
+            if inserted is None:
+                previous = session.get(EventModel, event.event_id)
+                if previous is None or (
+                    previous.type,
+                    previous.space_id,
+                    previous.payload,
+                    previous.created_at,
+                ) != (event.type, event.space_id, payload, event.created_at):
+                    raise ValueError(
+                        "An event ID cannot be reused with different content."
+                    )
+                return
+            for user_id in users:
+                self._ensure_user_event_feed(session, user_id)
+                # This UPDATE holds the recipient row lock until the outer commit.
+                seq = session.scalar(
+                    update(UserEventFeedModel)
+                    .where(UserEventFeedModel.user_id == user_id)
+                    .values(last_seq=UserEventFeedModel.last_seq + 1)
+                    .returning(UserEventFeedModel.last_seq)
+                )
+                session.execute(
+                    insert(UserEventModel).values(
+                        user_id=user_id, seq=seq, event_id=event.event_id
+                    )
+                )
+
+    def get_user_events(
+        self, flwr_aid: str, *, after_seq: int = 0, limit: int = 100
+    ) -> Sequence[UserEventRecord]:
+        """Read one recipient's committed entries using its ordered primary key."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with self.session() as session:
+            head = (
+                session.scalar(
+                    select(UserEventFeedModel.last_seq).where(
+                        UserEventFeedModel.user_id == flwr_aid
+                    )
+                )
+                or 0
+            )
+            if not 0 <= after_seq <= head:
+                raise FlowerError(
+                    ApiErrorCode.INVALID_USER_EVENT_CURSOR,
+                    "Cursor is outside the user's feed.",
+                )
+            rows = session.execute(
+                select(UserEventModel.seq, EventModel)
+                .join(EventModel, EventModel.event_id == UserEventModel.event_id)
+                .where(
+                    UserEventModel.user_id == flwr_aid, UserEventModel.seq > after_seq
+                )
+                .order_by(UserEventModel.seq)
+                .limit(limit)
+            ).all()
+            validate_user_event_cursor(after_seq, head, rows[0][0] if rows else None)
+            return [
+                UserEventRecord(
+                    seq,
+                    EventRecord(
+                        type=model.type,
+                        payload_json=json.dumps(model.payload),
+                        space_id=model.space_id,
+                        event_id=model.event_id,
+                        created_at=model.created_at,
+                    ),
+                )
+                for seq, model in rows
+            ]
+
+    def prune_user_events(self, flwr_aid: str, through_seq: int) -> None:
+        """Delete a retained prefix without modifying its feed head."""
+        if through_seq < 0:
+            raise ValueError("through_seq must be nonnegative")
+        with self.session() as session:
+            session.execute(
+                delete(UserEventModel).where(
+                    UserEventModel.user_id == flwr_aid,
+                    UserEventModel.seq <= through_seq,
+                )
+            )
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Hold the user's feed barrier while snapshotting visible state and head."""
+        with self.session() as session:
+            self._ensure_user_event_feed(session, flwr_aid)
+            # Start SQLite's transaction and block event-producing commits for
+            # this account until all snapshot reads have completed.
+            head = session.scalar(
+                update(UserEventFeedModel)
+                .where(UserEventFeedModel.user_id == flwr_aid)
+                .values(last_seq=UserEventFeedModel.last_seq)
+                .returning(UserEventFeedModel.last_seq)
+            )
+            assert head is not None
+            return BootstrapResponse(
+                agents=self.list_agents(flwr_aid),
+                spaces=self.get_spaces(flwr_aid),
+                cursor=head,
+            )
+
     def create_agent(
         self,
         flwr_aid: str,
@@ -739,6 +879,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     SpaceParticipant(agent_id=agent.id),
                 ]
             )
+            self._record_event("agent.updated", agent, [flwr_aid])
             return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
@@ -1238,6 +1379,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 space = _space_from_model(model)
                 space.participants.extend(members)
+                self._record_event(
+                    "space.updated",
+                    space,
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                    model.id,
+                )
                 return space
         except IntegrityError as exc:
             raise ValueError("Invalid space participants") from exc
@@ -1307,7 +1454,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _space_message_from_model(model)
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            recipients = session.scalars(
+                select(SpaceParticipantTable.c.flwr_aid).where(
+                    SpaceParticipantTable.c.space_id == space_id,
+                    SpaceParticipantTable.c.flwr_aid.is_not(None),
+                )
+            ).all()
+            self._record_event("message.created", message, recipients, space_id)
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,

@@ -42,6 +42,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
@@ -51,6 +53,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
+    Event,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -74,6 +77,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     SpaceParticipant,
     StartRunRequest,
     StartRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -87,11 +92,12 @@ from flwr.supercore.auth.typing import (
     AccountInfo,
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
+    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.translation import (
@@ -337,6 +343,7 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
     stream_paths = {
         "/v1/control/stream-logs",
         "/v1/control/stream-run-events",
+        "/v1/control/stream-events",
     }
 
     assert control_routes
@@ -357,7 +364,10 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
         assert request_body["content"] == {
             PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
         }
-        assert set(success_content) == {expected_media_type}
+        expected_types = {expected_media_type}
+        if route.path in stream_paths:
+            expected_types.add(SSE_MEDIA_TYPE)
+        assert set(success_content) == expected_types
         assert success_content[expected_media_type]["schema"] == {
             "type": "string",
             "format": "binary",
@@ -1319,3 +1329,79 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
         "detail": "ControlServicer initialized without artifact provider.",
         "code": ApiErrorCode.NO_ARTIFACT_PROVIDER.value,
     }
+
+
+def test_bootstrap_uses_authenticated_account() -> None:
+    """Serialize the account's state and committed feed head together."""
+    state = Mock(spec=LinkState)
+    state.get_bootstrap.return_value = BootstrapResponse(cursor=42)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    response = TestClient(app).post(
+        "/v1/control/bootstrap",
+        content=BootstrapRequest().SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+        },
+    )
+    assert response.status_code == 200
+    assert BootstrapResponse.FromString(response.content).cursor == 42
+    state.get_bootstrap.assert_called_once_with(_ACCOUNT.flwr_aid)
+
+
+def test_user_event_stream_sse_has_recipient_id_and_shared_event_id() -> None:
+    """Serve standard SSE frames and forward the reconnect cursor to the handler."""
+    state = Mock(spec=LinkState)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    event_id = str(uuid4())
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.stream_events",
+        return_value=iter(
+            [
+                StreamEventsResponse(
+                    seq=101, event=Event(event_id=event_id, type="agent.updated")
+                )
+            ]
+        ),
+    ) as stream:
+        response = TestClient(app).post(
+            "/v1/control/stream-events",
+            content=StreamEventsRequest().SerializeToString(),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": PROTOBUF_MEDIA_TYPE,
+                "accept": "text/event-stream",
+                "Last-Event-ID": "100",
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.text.startswith("id: 101\ndata: ") and response.text.endswith(
+        "\n\n"
+    )
+    assert event_id in response.text
+    assert stream.call_args.args[1] is _ACCOUNT
+    assert stream.call_args.args[-1] == "100"
+
+
+def test_expired_user_cursor_returns_error_before_sse_headers() -> None:
+    """Require bootstrap after retention rather than silently skipping events."""
+    state = Mock(spec=LinkState)
+    state.get_user_events.side_effect = FlowerError(
+        ApiErrorCode.USER_EVENT_CURSOR_EXPIRED, "Pruned"
+    )
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    response = TestClient(app).post(
+        "/v1/control/stream-events",
+        content=StreamEventsRequest(after_seq=3).SerializeToString(),
+        headers={
+            "authorization": "Bearer access-token",
+            "content-type": PROTOBUF_MEDIA_TYPE,
+            "accept": "text/event-stream",
+        },
+    )
+    assert response.status_code == 410
+    assert response.headers["content-type"] == "application/json"

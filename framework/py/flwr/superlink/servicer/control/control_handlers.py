@@ -30,6 +30,7 @@ from typing import Any, cast
 from uuid import UUID
 
 import requests
+from google.protobuf.json_format import Parse
 
 from flwr.cli.utils import validate_federation_name
 from flwr.common.config import (
@@ -67,6 +68,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
@@ -82,6 +85,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
+    Event,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -145,6 +149,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -203,6 +209,76 @@ from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 from .conversation_title import start_title_generation
+
+
+def bootstrap(
+    request: BootstrapRequest, account: AccountInfo, state: LinkState
+) -> BootstrapResponse:
+    """Read visible Agents, Spaces, and the feed head from one snapshot."""
+    del request
+    return state.get_bootstrap(account.flwr_aid)
+
+
+def stream_events(
+    request: StreamEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool],
+    last_event_id: str | None = None,
+) -> Generator[StreamEventsResponse, None, None]:
+    """Validate replay before starting the authenticated account's stream."""
+    after_seq = request.after_seq if request.HasField("after_seq") else 0
+    if not request.HasField("after_seq") and last_event_id is not None:
+        try:
+            if not last_event_id.isascii() or not last_event_id.isdecimal():
+                raise ValueError
+            after_seq = int(last_event_id)
+        except ValueError as exc:
+            raise FlowerError(
+                ApiErrorCode.INVALID_USER_EVENT_CURSOR,
+                "Last-Event-ID must be a nonnegative integer.",
+            ) from exc
+    if not 0 <= after_seq <= INT64_MAX_VALUE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_USER_EVENT_CURSOR,
+            "Cursor exceeds the supported feed range.",
+        )
+    initial = state.get_user_events(account.flwr_aid, after_seq=after_seq)
+
+    def generate() -> Generator[StreamEventsResponse, None, None]:
+        cursor = after_seq
+        batch = initial
+        while is_active():
+            visible_spaces: set[str] = set()
+            if any(entry.event.space_id is not None for entry in batch):
+                visible_spaces = {
+                    space.id for space in state.get_spaces(account.flwr_aid)
+                }
+            for entry in batch:
+                if not is_active():
+                    return
+                cursor = entry.seq
+                event = entry.event
+                if (
+                    event.space_id is not None
+                    and str(event.space_id) not in visible_spaces
+                ):
+                    continue
+                payload = Event(
+                    event_id=str(event.event_id),
+                    type=event.type,
+                    created_at=event.created_at.isoformat(),
+                )
+                if event.space_id is not None:
+                    payload.space_id = str(event.space_id)
+                Parse(event.payload_json, payload.payload)
+                yield StreamEventsResponse(seq=entry.seq, event=payload)
+            if not batch:
+                time.sleep(0.5)
+            if is_active():
+                batch = state.get_user_events(account.flwr_aid, after_seq=cursor)
+
+    return generate()
 
 
 class InvalidAgentRequestError(FlowerError):

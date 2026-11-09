@@ -21,10 +21,20 @@ from threading import Event
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
+from google.protobuf.json_format import MessageToJson
+from google.protobuf.message import Message
 from starlette._utils import create_collapsing_task_group
 from starlette.types import Receive, Scope, Send
 
 _STREAM_CONTEXT_STATE_KEY = "protobuf_stream_context"
+
+
+def encode_sse_message(message: Message) -> bytes:
+    """Encode protobuf JSON with a user-specific sequence as the SSE cursor."""
+    seq = getattr(message, "seq", None)
+    prefix = f"id: {seq}\n" if isinstance(seq, int) and seq > 0 else ""
+    payload = MessageToJson(message, indent=None, ensure_ascii=False)
+    return f"{prefix}data: {payload}\n\n".encode()
 
 
 class ProtobufStreamContext:

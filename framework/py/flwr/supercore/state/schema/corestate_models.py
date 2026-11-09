@@ -18,6 +18,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -38,15 +39,60 @@ from sqlalchemy import (
     column,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from flwr.supercore.state.schema.types import UInt64, UTCDateTime
+from flwr.supercore.typing import JSONObject
 
 
 class FlwrBase(DeclarativeBase):
     """Base class for Flower OSS state models."""
 
     metadata = MetaData()
+
+
+class Event(FlwrBase):
+    """Store a logical application event once, without a global sequence."""
+
+    __tablename__ = "events"
+
+    event_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    space_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("space.id"))
+    payload: Mapped[JSONObject] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class UserEventFeed(FlwrBase):
+    """Retain the committed head of a user's feed, including after pruning."""
+
+    __tablename__ = "user_event_feeds"
+    __table_args__ = (CheckConstraint("last_seq >= 0", name="ck_user_event_feed_seq"),)
+
+    # Accounts are owned by the authentication provider, outside CoreState.
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+class UserEvent(FlwrBase):
+    """Order shared events independently for each recipient."""
+
+    __tablename__ = "user_events"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_user_event"),
+        CheckConstraint("seq > 0", name="ck_user_event_seq"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("user_event_feeds.user_id"), primary_key=True
+    )
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    event_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("events.event_id"), nullable=False
+    )
 
 
 class NonceStore(FlwrBase):

@@ -30,6 +30,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
     BeginConnectorOAuthRequest,
+    BootstrapRequest,
     CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
     CreateAgentRequest,
@@ -68,6 +69,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamEventsRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
@@ -117,17 +119,21 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
+    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
+    encode_sse_message,
     get_protobuf_stream_context,
 )
 
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/control/bootstrap"): BootstrapRequest,
+    ("POST", "/v1/control/stream-events"): StreamEventsRequest,
     ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
     ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
     ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
@@ -269,7 +275,12 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         result = request.state.protobuf_response
         protobuf_response = self._response_for(
-            result, get_protobuf_stream_context(request)
+            result,
+            get_protobuf_stream_context(request),
+            use_sse=any(
+                value.partition(";")[0].strip().lower() == SSE_MEDIA_TYPE
+                for value in request.headers.get("accept", "").split(",")
+            ),
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
@@ -305,7 +316,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _response_for(
-        result: object, stream_context: ProtobufStreamContext
+        result: object, stream_context: ProtobufStreamContext, *, use_sse: bool = False
     ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
@@ -318,6 +329,18 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterator):
+            if use_sse:
+                response = CancellableProtobufStreamingResponse(
+                    (
+                        encode_sse_message(message)
+                        for message in cast(Iterator[Message], result)
+                    ),
+                    stream_context,
+                    SSE_MEDIA_TYPE,
+                )
+                response.headers["Cache-Control"] = "no-cache"
+                response.headers["X-Accel-Buffering"] = "no"
+                return response
             content = (
                 frame_message(message) for message in cast(Iterator[Message], result)
             )

@@ -27,6 +27,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
@@ -103,6 +105,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -119,6 +123,26 @@ from flwr.supercore.protobuf.client import ProtobufClient
 # pylint: disable=invalid-name
 class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Control API."""
+
+    def Bootstrap(self, request: BootstrapRequest) -> BootstrapResponse:
+        """Snapshot visible Agents, Spaces, and the user feed cursor."""
+        return self._unary_unary(
+            path="/v1/control/bootstrap",
+            rpc_method="/flwr.proto.Control/Bootstrap",
+            request=request,
+            response_type=BootstrapResponse,
+        )
+
+    def StreamEvents(
+        self, request: StreamEventsRequest
+    ) -> Generator[StreamEventsResponse, None, None]:
+        """Replay application events after a recipient-specific sequence."""
+        return self._unary_stream(
+            path="/v1/control/stream-events",
+            rpc_method="/flwr.proto.Control/StreamEvents",
+            request=request,
+            response_type=StreamEventsResponse,
+        )
 
     def CreateAgent(self, request: CreateAgentRequest) -> CreateAgentResponse:
         """Create an agent."""

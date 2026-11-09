@@ -43,6 +43,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     Space,
     SpaceMessage,
     SpaceParticipant,
@@ -69,15 +70,22 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+    EventRecord,
+    UserEventRecord,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
+    validate_event,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
+    validate_user_event_cursor,
 )
 
 FileKey = tuple[str, str]
@@ -175,6 +183,10 @@ class InMemoryCoreState(
         self.file_store: dict[FileKey, FileRecord] = {}
         self.file_revision_store: dict[FileRevisionKey, FileRevisionRecord] = {}
         self.lock_file_store = Lock()
+        self.event_store: dict[UUID, EventRecord] = {}
+        self.user_event_store: dict[str, list[tuple[int, UUID]]] = {}
+        self.user_event_heads: dict[str, int] = {}
+        self.lock_user_event_store = RLock()
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
@@ -582,6 +594,71 @@ class InMemoryCoreState(
                 )
             head.is_deleted = True
 
+    def store_event(self, event: EventRecord, recipients: Sequence[str]) -> None:
+        """Publish one event and all recipient entries under the journal lock."""
+        payload, users = validate_event(event, recipients)
+        with self.lock_user_event_store:
+            existing = self.event_store.get(event.event_id)
+            if existing is not None:
+                previous_payload, _ = validate_event(existing, ())
+                if (
+                    existing.type,
+                    existing.space_id,
+                    previous_payload,
+                    existing.created_at,
+                ) != (event.type, event.space_id, payload, event.created_at):
+                    raise ValueError(
+                        "An event ID cannot be reused with different content."
+                    )
+                return
+            self.event_store[event.event_id] = event
+            for user_id in users:
+                seq = self.user_event_heads.get(user_id, 0) + 1
+                self.user_event_heads[user_id] = seq
+                self.user_event_store.setdefault(user_id, []).append(
+                    (seq, event.event_id)
+                )
+
+    def get_user_events(
+        self, flwr_aid: str, *, after_seq: int = 0, limit: int = 100
+    ) -> Sequence[UserEventRecord]:
+        """Read committed events in this account's sequence order."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with self.lock_user_event_store:
+            feed = self.user_event_store.get(flwr_aid, [])
+            start = bisect_right(feed, after_seq, key=lambda entry: entry[0])
+            entries = [
+                UserEventRecord(seq, self.event_store[event_id])
+                for seq, event_id in feed[start : start + limit]
+            ]
+            validate_user_event_cursor(
+                after_seq,
+                self.user_event_heads.get(flwr_aid, 0),
+                entries[0].seq if entries else None,
+            )
+            return entries
+
+    def prune_user_events(self, flwr_aid: str, through_seq: int) -> None:
+        """Remove old deliveries without resetting the committed head."""
+        if through_seq < 0:
+            raise ValueError("through_seq must be nonnegative")
+        with self.lock_user_event_store:
+            self.user_event_store[flwr_aid] = [
+                (seq, event_id)
+                for seq, event_id in self.user_event_store.get(flwr_aid, [])
+                if seq > through_seq
+            ]
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Snapshot visible state and its cursor while holding mutation locks."""
+        with self.lock_space_store, self.lock_agent_store, self.lock_user_event_store:
+            return BootstrapResponse(
+                agents=self.list_agents(flwr_aid),
+                spaces=self.get_spaces(flwr_aid),
+                cursor=self.user_event_heads.get(flwr_aid, 0),
+            )
+
     def create_agent(
         self,
         flwr_aid: str,
@@ -594,7 +671,7 @@ class InMemoryCoreState(
             config.HasField("description") and not config.description
         ):
             return None
-        with self.lock_space_store, self.lock_agent_store:
+        with self.lock_space_store, self.lock_agent_store, self.lock_user_event_store:
             self.agent_id_counter += 1
             created_at = now().isoformat()
             agent = Agent(
@@ -614,6 +691,7 @@ class InMemoryCoreState(
             except Exception:
                 del self.agent_store[flwr_aid][agent.id]
                 raise
+            self._record_event("agent.updated", agent, [flwr_aid])
             return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
@@ -981,22 +1059,24 @@ class InMemoryCoreState(
         participants: Sequence[SpaceParticipant],
     ) -> Space:
         """Create a space and its initial membership atomically."""
-        members: list[SpaceParticipant] = []
-        for participant in participants:
-            if not (participant.flwr_aid or participant.agent_id):
-                raise ValueError("Space participants must have a nonempty identity")
-            if participant not in members:
-                members.append(participant)
-        with self.lock_agent_store:
-            known_agent_ids = {
-                agent_id for agents in self.agent_store.values() for agent_id in agents
-            }
-            if any(
-                member.agent_id and member.agent_id not in known_agent_ids
-                for member in members
-            ):
-                raise ValueError("Agent participant does not exist")
-        with self.lock_space_store:
+        with self.lock_space_store, self.lock_user_event_store:
+            members: list[SpaceParticipant] = []
+            for participant in participants:
+                if not (participant.flwr_aid or participant.agent_id):
+                    raise ValueError("Space participants must have a nonempty identity")
+                if participant not in members:
+                    members.append(participant)
+            with self.lock_agent_store:
+                known_agent_ids = {
+                    agent_id
+                    for agents in self.agent_store.values()
+                    for agent_id in agents
+                }
+                if any(
+                    member.agent_id and member.agent_id not in known_agent_ids
+                    for member in members
+                ):
+                    raise ValueError("Agent participant does not exist")
             space_id = uuid4()
             if space_id in self.space_store:
                 raise ValueError("Space ID already exists")
@@ -1007,6 +1087,12 @@ class InMemoryCoreState(
             )
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
+            self._record_event(
+                "space.updated",
+                space,
+                [member.flwr_aid for member in members if member.flwr_aid],
+                space_id,
+            )
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
@@ -1027,7 +1113,7 @@ class InMemoryCoreState(
         """Store a participant's message atomically with its membership check."""
         if not content.strip():
             raise ValueError("Message content must be nonempty")
-        with self.lock_space_store:
+        with self.lock_space_store, self.lock_user_event_store:
             space = self.space_store.get(space_id)
             if space is None or author not in space.participants:
                 return None
@@ -1040,6 +1126,12 @@ class InMemoryCoreState(
                 content=content,
             )
             self.space_message_store[space_id].append(message)
+            self._record_event(
+                "message.created",
+                message,
+                [member.flwr_aid for member in space.participants if member.flwr_aid],
+                space_id,
+            )
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments

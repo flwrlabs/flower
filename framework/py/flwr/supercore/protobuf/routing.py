@@ -29,6 +29,7 @@ from starlette.concurrency import run_in_threadpool
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
+    SSE_MEDIA_TYPE,
 )
 
 _HTTP_REQUEST_PARAMETER = "_protobuf_http_request"
@@ -61,6 +62,8 @@ def _configure_openapi(
         "description": "Successful Response",
         "content": {response_media_type: {"schema": _BINARY_SCHEMA}},
     }
+    if get_origin(response_annotation) is Iterator:
+        responses[200]["content"][SSE_MEDIA_TYPE] = {"schema": {"type": "string"}}
     kwargs["responses"] = responses
 
 

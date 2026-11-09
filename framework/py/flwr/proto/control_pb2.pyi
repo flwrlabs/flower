@@ -31,6 +31,7 @@ import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
+import google.protobuf.struct_pb2
 import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
@@ -721,6 +722,118 @@ class SendSpaceMessageResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
 
 global___SendSpaceMessageResponse = SendSpaceMessageResponse
+
+@typing.final
+class BootstrapRequest(google.protobuf.message.Message):
+    """Agents and Spaces only. Message history is fetched through GetSpaceMessages."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___BootstrapRequest = BootstrapRequest
+
+@typing.final
+class BootstrapResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENTS_FIELD_NUMBER: builtins.int
+    SPACES_FIELD_NUMBER: builtins.int
+    CURSOR_FIELD_NUMBER: builtins.int
+    cursor: builtins.int
+    """Feed head from the same snapshot as agents and spaces."""
+    @property
+    def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Agent]: ...
+    @property
+    def spaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Space]: ...
+    def __init__(
+        self,
+        *,
+        agents: collections.abc.Iterable[global___Agent] | None = ...,
+        spaces: collections.abc.Iterable[global___Space] | None = ...,
+        cursor: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agents", b"agents", "cursor", b"cursor", "spaces", b"spaces"]) -> None: ...
+
+global___BootstrapResponse = BootstrapResponse
+
+@typing.final
+class Event(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_ID_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
+    PAYLOAD_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    event_id: builtins.str
+    type: builtins.str
+    space_id: builtins.str
+    created_at: builtins.str
+    @property
+    def payload(self) -> google.protobuf.struct_pb2.Struct: ...
+    def __init__(
+        self,
+        *,
+        event_id: builtins.str = ...,
+        type: builtins.str = ...,
+        space_id: builtins.str | None = ...,
+        payload: google.protobuf.struct_pb2.Struct | None = ...,
+        created_at: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_space_id", b"_space_id", "payload", b"payload", "space_id", b"space_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_space_id", b"_space_id", "created_at", b"created_at", "event_id", b"event_id", "payload", b"payload", "space_id", b"space_id", "type", b"type"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_space_id", b"_space_id"]) -> typing.Literal["space_id"] | None: ...
+
+global___Event = Event
+
+@typing.final
+class StreamEventsRequest(google.protobuf.message.Message):
+    """POST /v1/control/stream-events. Accept: text/event-stream selects standard
+    SSE with protobuf JSON data; otherwise use the binary protobuf stream
+    framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
+    use their existing separate stream. A pruned cursor returns HTTP 410;
+    bootstrap again.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_SEQ_FIELD_NUMBER: builtins.int
+    after_seq: builtins.int
+    """Exclusive user-feed cursor. Falls back to Last-Event-ID when absent."""
+    def __init__(
+        self,
+        *,
+        after_seq: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_seq", b"_after_seq", "after_seq", b"after_seq"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_seq", b"_after_seq", "after_seq", b"after_seq"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_seq", b"_after_seq"]) -> typing.Literal["after_seq"] | None: ...
+
+global___StreamEventsRequest = StreamEventsRequest
+
+@typing.final
+class StreamEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    EVENT_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Position in the authenticated user's feed, also used as the SSE id."""
+    @property
+    def event(self) -> global___Event: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        event: global___Event | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["event", b"event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["event", b"event", "seq", b"seq"]) -> None: ...
+
+global___StreamEventsResponse = StreamEventsResponse
 
 @typing.final
 class ListRunSeriesRequest(google.protobuf.message.Message):

@@ -22,12 +22,16 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from google.protobuf.json_format import MessageToJson
+from google.protobuf.message import Message as ProtobufMessage
+
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     Space,
     SpaceMessage,
     SpaceParticipant,
@@ -46,7 +50,12 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+    EventRecord,
+    UserEventRecord,
+)
 
 from ..constant import AutomationStatus
 from ..object_store import ObjectStore
@@ -54,6 +63,51 @@ from ..object_store import ObjectStore
 
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
+
+    def _record_event(
+        self,
+        event_type: str,
+        payload: ProtobufMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> None:
+        """Record a domain change inside its caller's transaction or locks."""
+        self.store_event(
+            EventRecord(
+                type=event_type,
+                payload_json=MessageToJson(
+                    payload,
+                    preserving_proto_field_name=True,
+                    indent=None,
+                    sort_keys=True,
+                ),
+                space_id=space_id,
+            ),
+            recipients,
+        )
+
+    @abstractmethod
+    def store_event(self, event: EventRecord, recipients: Sequence[str]) -> None:
+        """Store one event and its ordered recipient deliveries atomically.
+
+        The first write fixes recipients. Repeating the same event is idempotent.
+        Callers authorize recipients.
+        SQL callers can include this operation in a larger state transaction.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, *, after_seq: int = 0, limit: int = 100
+    ) -> Sequence[UserEventRecord]:
+        """Read a feed in sequence order, rejecting invalid or pruned cursors."""
+
+    @abstractmethod
+    def prune_user_events(self, flwr_aid: str, through_seq: int) -> None:
+        """Prune a feed prefix while retaining its sequence allocation head."""
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Snapshot visible agents, Spaces, and the user's committed feed head."""
 
     @abstractmethod
     def get_node_id(self) -> int:
