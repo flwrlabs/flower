@@ -212,9 +212,11 @@ an empty string to hide every device, and that case must still satisfy Ray's imp
 guard by propagating an equally empty ``HIP_VISIBLE_DEVICES`` -- counting entries in an
 empty string would otherwise synthesize ``HIP_VISIBLE_DEVICES=0`` and wrongly reveal a
 device. The same applies to the nonempty ``-1`` sentinel some schedulers use for "no
-device": it contains no comma, so the comma-counting branch would otherwise read it as
-one listed GPU and export ``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and schedule
-onto a device ROCr never actually exposed.
+device", and to Slurm's own ``NoDevFiles`` sentinel -- documented for its GPU GRES
+integration -- which it exports instead when an allocation has no bound GPU device
+files: both contain no comma, so the comma-counting branch would otherwise read either
+one as one listed GPU and export ``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and
+schedule onto a device ROCr never actually exposed.
 
 When ``HIP_VISIBLE_DEVICES`` is already set, do not simply trust it, either: validate
 that every value it names is actually an ordinal ROCr's filtering leaves available,
@@ -256,7 +258,8 @@ exported, silently leaving Ray's original import failure in place:
 .. code-block:: bash
 
     if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
-        if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ]; then
+        if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
+            [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
             _n=0
         else
             _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))

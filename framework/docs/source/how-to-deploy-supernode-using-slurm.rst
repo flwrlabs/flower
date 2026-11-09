@@ -206,16 +206,18 @@ Create ``superexec-clientapp-gpu.sbatch``:
 
     # Slurm names the assigned devices per vendor: CUDA_VISIBLE_DEVICES on NVIDIA,
     # ROCR_VISIBLE_DEVICES on AMD. Some Slurm AMD GRES setups express a no-device
-    # allocation as ROCR_VISIBLE_DEVICES=-1 rather than leaving it unset or empty
-    # (see the AMD simulation guide's discussion of that same "-1" sentinel), so check
-    # each variable on its own instead of concatenating them -- concatenation would
-    # let that nonempty "-1" masquerade as an assigned device and pass a plain
-    # emptiness check.
+    # allocation as ROCR_VISIBLE_DEVICES=-1 rather than leaving it unset or empty, and
+    # Slurm's GPU GRES integration documents a "NoDevFiles" sentinel for the case where
+    # an allocation has no bound GPU device files (see the AMD simulation guide's
+    # discussion of both sentinels), so check each variable on its own instead of
+    # concatenating them -- concatenation would let either nonempty sentinel masquerade
+    # as an assigned device and pass a plain emptiness check.
     no_gpu=1
     if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
         no_gpu=0
     fi
-    if [[ -n "${ROCR_VISIBLE_DEVICES:-}" && "${ROCR_VISIBLE_DEVICES}" != "-1" ]]; then
+    if [[ -n "${ROCR_VISIBLE_DEVICES:-}" && "${ROCR_VISIBLE_DEVICES}" != "-1" \
+            && "${ROCR_VISIBLE_DEVICES}" != "NoDevFiles" ]]; then
         no_gpu=0
     fi
     if [[ "$no_gpu" -eq 1 ]]; then
