@@ -105,7 +105,7 @@ Thanks to using Hugging Face's ``datasets`` used under the hood, Flower Datasets
 Here are a few of the ``Partitioners`` that are available: (for a full list see `link <ref-api/flwr_datasets.partitioner.html#module-flwr_datasets.partitioner>`_ )
 
 * Partitioner (the abstract base class) ``Partitioner``
-* IID partitioning ``IidPartitioner(num_partitions)``
+* IID partitioning ``IidPartitioner(num_partitions, shuffle=False, seed=42)``
 * Dirichlet partitioning ``DirichletPartitioner(num_partitions, partition_by, alpha)``
 * Distribution partitioning ``DistributionPartitioner(distribution_array, num_partitions, num_unique_labels_per_partition, partition_by, preassigned_num_samples_per_label, rescale)``
 * InnerDirichlet partitioning ``InnerDirichletPartitioner(partition_sizes, partition_by, alpha)``
