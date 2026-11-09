@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -199,6 +200,24 @@ def build_protoc_command(config: ProtocConfig, proto_files: list[Path]) -> list[
     return command
 
 
+def _remove_grpc_message_reexports(output_dir: Path) -> None:
+    """Remove message re-exports absent from the generated gRPC runtime modules."""
+    for stub in output_dir.rglob("*_pb2_grpc.pyi"):
+        source = stub.read_text(encoding="utf-8")
+        lines = source.splitlines(keepends=True)
+        for node in reversed(ast.parse(source).body):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module is not None
+                and node.module.endswith("_pb2")
+                and all(alias.name == alias.asname for alias in node.names)
+            ):
+                del lines[node.lineno - 1 : node.end_lineno]
+        updated = "".join(lines)
+        if updated != source:
+            stub.write_text(updated, encoding="utf-8")
+
+
 def compile_project(project_dir: Path) -> None:
     """Compile protobufs for the configured project."""
     config = load_protoc_config(project_dir)
@@ -209,6 +228,7 @@ def compile_project(project_dir: Path) -> None:
         raise ProtocExecutionError(
             f"`grpc_tools.protoc` failed with exit code {exit_code}"
         )
+    _remove_grpc_message_reexports(config.outputs.mypy_grpc)
 
 
 def parse_args() -> argparse.Namespace:

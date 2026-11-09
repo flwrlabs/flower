@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import grpc_tools
@@ -169,3 +170,43 @@ def test_compile_project_uses_loaded_protoc(
     assert calls[0][0] == "grpc_tools.protoc"
     assert f"--proto_path={tmp_path / 'grpc' / '_proto'}" in calls[0]
     assert str(proto_file.resolve()) in calls[0]
+
+
+@pytest.mark.parametrize("with_service", [False, True])
+def test_public_imports_only_reexport_messages_from_pb2(
+    tmp_path: Path, with_service: bool
+) -> None:
+    """Keep public message exports while retaining valid gRPC service annotations."""
+    proto_dir = tmp_path / "proto" / "flwr"
+    proto_dir.mkdir(parents=True)
+    (tmp_path / "third_party" / "proto").mkdir(parents=True)
+    (tmp_path / "py").mkdir()
+    _write_pyproject(tmp_path)
+    (proto_dir / "shared.proto").write_text(
+        'syntax = "proto3"; package example; message Shared { string content = 1; }',
+        encoding="utf-8",
+    )
+    service = (
+        "service Example { rpc Echo(Shared) returns (Shared); }" if with_service else ""
+    )
+    (proto_dir / "api.proto").write_text(
+        'syntax = "proto3"; package example; import public "flwr/shared.proto";'
+        + service,
+        encoding="utf-8",
+    )
+
+    protoc.compile_project(tmp_path)
+
+    output = tmp_path / "py" / "flwr"
+    assert "Shared as Shared" in (output / "api_pb2.pyi").read_text(encoding="utf-8")
+    assert "from flwr.shared_pb2 import *" in (output / "api_pb2.py").read_text(
+        encoding="utf-8"
+    )
+    grpc_stub = (output / "api_pb2_grpc.pyi").read_text(encoding="utf-8")
+    assert not any(
+        isinstance(node, ast.ImportFrom) and node.module == "flwr.shared_pb2"
+        for node in ast.parse(grpc_stub).body
+    )
+    if with_service:
+        assert "import flwr.shared_pb2" in grpc_stub
+        assert "flwr.shared_pb2.Shared" in grpc_stub
