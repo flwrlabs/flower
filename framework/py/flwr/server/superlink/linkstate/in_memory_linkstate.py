@@ -102,10 +102,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
-        run = self.run_ids[run_id].run
+        record = self.run_ids[run_id]
+        run = record.run
         task = self.task_store[cast(int, run.primary_task_id)]
         return replace(
             run,
+            space_id=record.space_id,
             pending_at=task.pending_at,
             starting_at=task.starting_at,
             running_at=task.running_at,

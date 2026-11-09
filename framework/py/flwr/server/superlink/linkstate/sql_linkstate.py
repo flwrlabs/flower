@@ -872,4 +872,5 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=run.series_id or 0,
+        space_id=run.space_id,
     )
