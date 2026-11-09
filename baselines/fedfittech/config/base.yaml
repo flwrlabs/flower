@@ -1,0 +1,23 @@
+---
+min_available_clients: 10    
+Total_Clients: 24
+LEARNING_RATE: 0.001 # 0.3 | 0.1 | 0.01 | 0.001 | # 0.0001
+LOCAL_EPOCH: 1 # 1 | 2 | 4 | 8 | 16
+BATCH_SIZE: 32 # 8 | 16 | 32 | 64 | 128
+OPTIMIZER: 'Adam' # 'SGD' | 'Adam'
+WINDOW_SIZE: 100 # 50, 100
+GLOBAL_ROUND: 100 # 100
+NUM_FEATURES: 12
+NUM_FILTERS: 24   # 24
+preference_for_NULL: '1' # '1'= Yes, '0' = No
+labels_set: {'NULL': 0, 'jogging': 1, 'jogging (rotating arms)': 2, 'jogging (skipping)': 3, 
+            'jogging (sidesteps)': 4, 'jogging (butt-kicks)': 5, 'stretching (triceps)': 6, 
+            'stretching (lunging)': 7, 'stretching (shoulders)': 8, 'stretching (hamstrings)': 9, 
+            'stretching (lumbar rotation)': 10, 'push-ups': 11, 'push-ups (complex)': 12, 'sit-ups': 13, 
+            'sit-ups (complex)': 14, 'burpees': 15, 'lunges': 16, 'lunges (complex)': 17,
+            'bench-dips': 18}
+fraction_fit: 1.0
+fraction_evaluate: 1.0
+Early_stopping: '0'  # '1'= Yes, '0' = No
+Data_download_path: "https://ubi29.informatik.uni-siegen.de/wear_dataset/raw/inertial/50hz/"
+
