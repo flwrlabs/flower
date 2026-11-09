@@ -688,6 +688,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         request.fab.content = b"admission guard FAB"
         events: list[str] = []
         persist_run = self.state.create_run
+        persist_app = self.state.store_app
 
         @contextmanager
         def admission() -> Iterator[None]:
@@ -707,6 +708,10 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 )
             return persist_run(*args, **kwargs)
 
+        def store_app(*args: Any, **kwargs: Any) -> str:
+            events.append("store_app")
+            return persist_app(*args, **kwargs)
+
         with (
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
@@ -722,6 +727,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 return_value=admission(),
             ) as guard,
             patch.object(self.state, "create_run", side_effect=create_run),
+            patch.object(self.state, "store_app", side_effect=store_app),
         ):
             if outcome == "allowed":
                 response = control_handlers.start_run(
@@ -734,13 +740,19 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                         request, get_current_account_info(), self.state
                     )
                 self.assertEqual(list(self.state.get_run_info()), [])
+                if outcome == "denied":
+                    self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
         guard.assert_called_once_with(
             flwr_aid=self.aid, federation_id=NOOP_FEDERATION_ID
         )
         self.assertEqual(
             events,
-            ["enter"] if outcome == "denied" else ["enter", "persist", "exit"],
+            (
+                ["enter"]
+                if outcome == "denied"
+                else ["enter", "store_app", "persist", "exit"]
+            ),
         )
 
     def test_start_run_raises_if_create_run_fails(self) -> None:

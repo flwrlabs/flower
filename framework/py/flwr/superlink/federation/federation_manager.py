@@ -249,11 +249,12 @@ class FederationManager(ABC):
     def run_admission(
         self, *, flwr_aid: str, federation_id: str
     ) -> AbstractContextManager[None]:
-        """Guard admission until a run has been persisted.
+        """Guard admission while associating an app and persisting its run.
 
         Managers with mutable access policies can override this method to recheck
-        authorization and hold the required locks through run creation. The
-        default implementation preserves existing admission behavior.
+        authorization before app association and hold the required locks through
+        run creation. The default implementation preserves existing admission
+        behavior.
 
         Parameters
         ----------
@@ -265,7 +266,7 @@ class FederationManager(ABC):
         Returns
         -------
         AbstractContextManager[None]
-            The context surrounding persistence of the new run.
+            The context surrounding app association and persistence of the new run.
         """
         # Managers without transactional admission require no additional guard.
         _ = flwr_aid, federation_id

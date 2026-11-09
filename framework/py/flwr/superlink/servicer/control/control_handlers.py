@@ -806,29 +806,29 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app and not is_cached_hub_app:
-            metadata = get_app_presentation_metadata(fab_config)
-            state.store_app(
-                fab=fab,
-                federation_id=federation_id,
-                app_id=app_id,
-                app_type=app_type,
-                added_by=flwr_aid,
-                is_hub_app=is_hub_app,
-                display_name=metadata.display_name,
-                description=metadata.description,
-                color=metadata.color,
-            )
-
-        series_id = request.series_id if request.HasField("series_id") else None
-        series_description: str | None = None
-        if primary_task_type == TaskType.AGENT_APP and series_id is None:
-            series_description = _derive_run_series_description(user_prompt) or None
-
-        # Allow the manager to recheck access while the run is persisted.
+        # Allow the manager to guard app association and run persistence together.
         with state.federation_manager.run_admission(
             flwr_aid=flwr_aid, federation_id=federation_id
         ):
+            if not is_stored_app and not is_cached_hub_app:
+                metadata = get_app_presentation_metadata(fab_config)
+                state.store_app(
+                    fab=fab,
+                    federation_id=federation_id,
+                    app_id=app_id,
+                    app_type=app_type,
+                    added_by=flwr_aid,
+                    is_hub_app=is_hub_app,
+                    display_name=metadata.display_name,
+                    description=metadata.description,
+                    color=metadata.color,
+                )
+
+            series_id = request.series_id if request.HasField("series_id") else None
+            series_description: str | None = None
+            if primary_task_type == TaskType.AGENT_APP and series_id is None:
+                series_description = _derive_run_series_description(user_prompt) or None
+
             run_id = state.create_run(
                 fab_id,
                 fab_version,
