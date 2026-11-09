@@ -18,8 +18,9 @@
 import abc
 from collections.abc import Collection, Sequence
 from typing import Literal
+from uuid import UUID
 
-from flwr.app import Context, Message, RecordDict
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -28,6 +29,8 @@ from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
+
+from .utils import create_run_context
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
@@ -64,6 +67,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_nodes: dict[str, set[int]] = {}
         for message in messages:
             if (run := runs.get(message.metadata.run_id)) is not None:
+                if not run.federation_id:
+                    continue
                 federation_nodes.setdefault(run.federation_id, set()).update(
                     (message.metadata.src_node_id, message.metadata.dst_node_id)
                 )
@@ -82,7 +87,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
                 results.append(False)
                 continue
             node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
-            results.append(node_ids <= federation_nodes[run.federation_id])
+            if not run.federation_id:
+                results.append(node_ids == {SUPERLINK_NODE_ID})
+            else:
+                results.append(node_ids <= federation_nodes[run.federation_id])
         return results
 
     def store_messages(self, messages: Sequence[Message]) -> list[bool]:
@@ -256,7 +264,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -265,6 +273,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
     ) -> int:
         """Create a new run.
 
@@ -278,8 +287,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
-        federation_id : str
-            The federation ID this run belongs to.
+        federation_id : str | None
+            The federation ID for a legacy run. Must be None for a Space run.
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
@@ -301,6 +310,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
         user_prompt : str | None (default: None)
             User prompt to store as a Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
+        space_id : UUID | None (default: None)
+            Space for an AgentApp run with a fresh context. Cannot be combined
+            with federation configuration, a series, or federation connectors.
 
         Returns
         -------
@@ -310,7 +322,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         Notes
         -----
         This method will not verify if the account has permission to create
-        a run in the federation.
+        a run in the federation or space. Invalid scope combinations raise ValueError.
         """
 
     @abc.abstractmethod
@@ -445,14 +457,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id: int,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-            series_id=series_id,
-        )
+        context = create_run_context(run_id, series_id)
         if existing_context := self.get_run_series_context(series_id):
             context.state = existing_context.state
         self.set_run_series_context(series_id=series_id, context=context)

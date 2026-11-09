@@ -48,6 +48,26 @@ superexec:
       value: "0.25"
 ```
 
+## Configure SuperLink run-event polling
+
+SuperLink polls for new run events every 0.5 seconds per open Control API event
+stream by default. Set `FLWR_RUN_EVENTS_STREAM_INTERVAL` in the SuperLink
+environment to change this interval without rebuilding the image. The value is
+in seconds and must be finite and between 0.01 and 60, inclusive. Invalid values
+fail when the event stream starts. The setting is read once per stream, before
+polling begins. Restart SuperLink after changing its environment.
+
+```yaml
+superlink:
+  env:
+    - name: FLWR_RUN_EVENTS_STREAM_INTERVAL
+      value: "0.1"
+```
+
+Shorter intervals can reduce event-delivery latency but increase database polling
+per open stream. This setting does not change SuperExec task acquisition or event
+publishing batches.
+
 ## Run simulations in Kubernetes using the Simulation Plugin
 
 For more details, visit the [Run simulations](../how-to-run-simulations.rst) guide.

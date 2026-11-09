@@ -24,8 +24,9 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
+import pytest
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, RecordDict
@@ -2034,6 +2035,54 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
                 request, get_current_account_info(), self.state
             )
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(None, 0.5), ("0.1", 0.1), ("0.01", 0.01), ("60", 60.0)]
+)
+def test_stream_run_events_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, expected: float
+) -> None:
+    """Read the interval once per stream and use it for every polling sleep."""
+    monkeypatch.delenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", raising=False)
+    if value is not None:
+        monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
+    run = Mock(primary_task_id=123, status=RunStatus(Status.RUNNING, "", ""))
+    state = Mock()
+    state.get_run_info.return_value = [run]
+    state.get_task_events.return_value = []
+    with patch(
+        "flwr.superlink.servicer.control.control_handlers.time.sleep",
+        side_effect=lambda _: monkeypatch.setenv(
+            "FLWR_RUN_EVENTS_STREAM_INTERVAL", "invalid"
+        ),
+    ) as sleep:
+        events = control_handlers.stream_run_events(
+            StreamRunEventsRequest(run_id=789),
+            Mock(),
+            state,
+            Mock(side_effect=[True, True, False]),
+        )
+        assert not list(events)
+
+    assert sleep.call_args_list == [call(expected), call(expected)]
+
+
+@pytest.mark.parametrize(
+    "value", ["", "invalid", "0", "-1", "0.009", "60.1", "nan", "inf", "-inf"]
+)
+def test_stream_run_events_rejects_invalid_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """Reject invalid intervals before returning the event generator."""
+    monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
+    state = Mock()
+    state.get_run_info.return_value = [Mock()]
+    with pytest.raises(ValueError, match="FLWR_RUN_EVENTS_STREAM_INTERVAL"):
+        control_handlers.stream_run_events(
+            StreamRunEventsRequest(run_id=789), Mock(), state
+        )
+    state.get_task_events.assert_not_called()
 
 
 def test_format_verification_compact() -> None:

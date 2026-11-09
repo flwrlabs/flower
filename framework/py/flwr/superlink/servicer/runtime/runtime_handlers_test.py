@@ -25,14 +25,16 @@ import threading
 import unittest
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import pytest
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
-from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartAutomationResponse,
@@ -113,6 +115,93 @@ def test_get_nodes_returns_metadata() -> None:
             NodeInfo(node_id=22),
         ]
     )
+
+
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
+    """Give Space tasks fresh contexts and discard their output contexts."""
+    database = (
+        FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
+    )
+    stores = ObjectStoreFactory()
+    state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
+    space_id = UUID(state.create_space(participants=[]).id)
+    fab_hash = state.store_fab(
+        Fab(hashlib.sha256(b"agentapp-fab").hexdigest(), b"agentapp-fab", {})
+    )
+    run_ids = [
+        state.create_run(
+            "publisher/app",
+            "1.0",
+            fab_hash,
+            {},
+            None,
+            None,
+            "account",
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            user_prompt="Hello",
+        )
+        for _ in range(2)
+    ]
+    # The same FAB and TaskType are used by the existing warm executor.
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
+        state,
+    )
+    assert acquired.task.run_id in run_ids
+    run_id = acquired.task.run_id
+    with (
+        patch.object(state, "get_run_series_context", side_effect=AssertionError),
+        patch.object(state, "set_run_series_context", side_effect=AssertionError),
+        patch.object(state, "get_federation_config", side_effect=AssertionError),
+        patch.object(
+            state.federation_manager, "report_run_usage", side_effect=AssertionError
+        ),
+    ):
+        response = runtime_handlers.pull_task_input(
+            PullTaskInputRequest(),
+            state,
+            acquired.task,
+        )
+        assert response.run.run_id == run_id
+        assert response.context.run_id == run_id and response.context.series_id == 0
+        assert not context_from_proto(response.context).state
+        assert response.fab.hash_str == fab_hash
+        assert not response.HasField("federation_config")
+        assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
+        output = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            run_config={},
+            series_id=123,
+            state=RecordDict({"result": ConfigRecord({"answer": "Done"})}),
+        )
+        runtime_handlers.push_task_output(
+            PushTaskOutputRequest(
+                context=context_to_proto(output),
+                sub_status=SubStatus.COMPLETED,
+            ),
+            state,
+            acquired.task,
+        )
+    assert state.get_run_status({run_id})[run_id].sub_status == SubStatus.COMPLETED
+    if backend == "sqlite":
+        state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
+    # A subsequent run gets fresh context even after output supplied state.
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
+        state,
+    )
+    assert acquired.task.run_id in run_ids and acquired.task.run_id != run_id
+    response = runtime_handlers.pull_task_input(
+        PullTaskInputRequest(), state, acquired.task
+    )
+    assert response.context.run_id == acquired.task.run_id
+    assert response.context.series_id == 0
+    assert not context_from_proto(response.context).state
+    assert state.get_run_series() == []
 
 
 def test_push_empty_messages_returns_empty_response() -> None:
