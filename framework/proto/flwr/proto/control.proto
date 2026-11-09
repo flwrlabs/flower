@@ -17,7 +17,6 @@ syntax = "proto3";
 
 package flwr.proto;
 
-import public "flwr/proto/space.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
