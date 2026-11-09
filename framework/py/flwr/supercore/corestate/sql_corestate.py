@@ -2482,8 +2482,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
-        if expired_tasks:
-            self._on_task_tokens_expired(expired_tasks)
+            if expired_tasks:
+                self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""

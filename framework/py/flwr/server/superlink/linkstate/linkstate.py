@@ -29,7 +29,7 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
+from flwr.supercore.typing import AgentRunTarget
 from flwr.superlink.federation import FederationManager
 
 from .utils import create_run_context
@@ -338,15 +338,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """Publish a message, queue entries, and pending executions atomically.
 
         Only explicit targets execute. A failure rolls back the entire submission.
-        """
-
-    @abc.abstractmethod
-    def enqueue_agent_run(self, request: AgentRunRequest) -> int:
-        """Atomically accept an authorized user trigger for an assigned agent.
-
-        Deduplicate by agent/message and store the exact trigger prompt. Reject
-        late assignments overtaken by a newer execution. New submissions should
-        use submit_agent_message. Legacy create_run calls are not agent-bound.
         """
 
     @abc.abstractmethod

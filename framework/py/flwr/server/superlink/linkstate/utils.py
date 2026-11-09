@@ -32,7 +32,7 @@ from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
 from flwr.supercore.date import now
-from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
+from flwr.supercore.typing import AgentRunTarget
 from flwr.supercore.utils import parse_app_spec
 
 
@@ -45,30 +45,16 @@ def validate_agent_submission(
     if len({target.agent_id for target in targets}) != len(targets):
         raise ValueError("Each agent may be targeted only once.")
     for target in targets:
-        _validate_agent_target(target)
+        if not 0 < target.agent_id < 2**63:
+            raise ValueError("Agent IDs must be positive signed 64-bit integers.")
+        if not all((target.fab_id, target.fab_version, target.fab_hash)):
+            raise ValueError("A resolved AgentApp is required.")
 
 
-def validate_agent_run_request(request: AgentRunRequest) -> None:
-    """Require an account, persisted message identity, and resolved agent target."""
-    if not request.flwr_aid or not 0 < request.message_id < 2**63:
-        raise ValueError(
-            "An account and positive signed 64-bit message ID are required."
-        )
-    _validate_agent_target(request)
-
-
-def _validate_agent_target(target: AgentRunTarget | AgentRunRequest) -> None:
-    """Require a persisted agent identity and resolved FAB coordinates."""
-    if not 0 < target.agent_id < 2**63:
-        raise ValueError("Agent IDs must be positive signed 64-bit integers.")
-    if not all((target.fab_id, target.fab_version, target.fab_hash)):
-        raise ValueError("A resolved AgentApp is required.")
-
-
-def validate_agent_app(request: AgentRunRequest, app_spec: str) -> None:
+def validate_agent_app(target: AgentRunTarget, app_spec: str) -> None:
     """Require the accepted FAB to match the selected agent's configuration."""
     app_id, version = parse_app_spec(app_spec)
-    if app_id != f"@{request.fab_id}" or (version and version != request.fab_version):
+    if app_id != f"@{target.fab_id}" or (version and version != target.fab_version):
         raise ValueError("The resolved AgentApp does not match the selected agent.")
 
 

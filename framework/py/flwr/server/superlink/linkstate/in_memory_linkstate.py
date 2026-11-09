@@ -51,7 +51,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
+from flwr.supercore.typing import AgentRunTarget
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
@@ -59,7 +59,6 @@ from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
     validate_agent_app,
-    validate_agent_run_request,
     validate_agent_submission,
     validate_run_scope,
 )
@@ -472,13 +471,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Accept a user message and all selected pending runs together."""
         targets = tuple(targets)
         validate_agent_submission(flwr_aid, content, targets)
-        with (
-            self.lock_task_store,
-            self.lock,
-            self._lock_object_push_sessions,
-            self.lock_message_store,
-            self.lock_space_store,
-        ):
+        with self.lock_task_store, self.lock, self.lock_space_store:
             message = self.create_space_message(
                 space_id, SpaceParticipant(flwr_aid=flwr_aid), content
             )
@@ -487,109 +480,73 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             run_ids: list[int] = []
             try:
                 for target in targets:
-                    run_ids.append(
-                        self.enqueue_agent_run(target.request_for(message, flwr_aid))
+                    with self.lock_agent_store:
+                        agent = next(
+                            (
+                                agents[target.agent_id]
+                                for agents in self.agent_store.values()
+                                if target.agent_id in agents
+                            ),
+                            None,
+                        )
+                        if agent is None:
+                            raise ValueError("Agent does not exist.")
+                        validate_agent_app(target, agent.config.app_spec)
+                    if self.get_fab(target.fab_hash) is None:
+                        raise ValueError(
+                            "The resolved AgentApp FAB must be stored first."
+                        )
+                    run_id = self.create_run(
+                        fab_id=target.fab_id,
+                        fab_version=target.fab_version,
+                        fab_hash=target.fab_hash,
+                        override_config=target.override_config.copy(),
+                        federation_id=None,
+                        federation_config=None,
+                        flwr_aid=flwr_aid,
+                        primary_task_type=TaskType.AGENT_APP,
+                        space_id=space_id,
+                    )
+                    if not run_id:
+                        raise ValueError("Failed to create the agent run.")
+                    run_ids.append(run_id)
+                    self.create_agent_queue_entry(
+                        space_id, target.agent_id, message.id, run_id
                     )
                 return message, run_ids
             except Exception:
                 for run_id in run_ids:
-                    self._discard_unpublished_agent_run(run_id)
+                    record = self.run_ids.pop(run_id)
+                    self.task_store.pop(cast(int, record.run.primary_task_id))
+                    self.agent_queue.pop(run_id, None)
+                    self.flwr_aid_to_run_ids[flwr_aid].discard(run_id)
+                    with self.lock_run_connector_store:
+                        self.run_connector_store.pop(run_id, None)
                 self.space_message_store[space_id].pop()
                 raise
 
-    def _discard_unpublished_agent_run(self, run_id: int) -> None:
-        """Remove failed acceptance data while all submission locks are held."""
-        record = self.run_ids[run_id]
-        self.cleanup_run(run_id)
-        del self.run_ids[run_id]
-        self.task_store.pop(cast(int, record.run.primary_task_id))
-        self.agent_queue.pop(run_id, None)
-        self.flwr_aid_to_run_ids[record.run.flwr_aid].discard(run_id)
-        with self.lock_run_connector_store:
-            self.run_connector_store.pop(run_id, None)
-        for message_id, stored in list(self.message_store.items()):
-            if stored.metadata.run_id == run_id:
-                del self.message_store[message_id]
-
-    def enqueue_agent_run(self, request: AgentRunRequest) -> int:
-        """Accept an explicit user trigger and its primary task together."""
-        validate_agent_run_request(request)
-        with (
-            self.lock_task_store,
-            self.lock,
-            self._lock_object_push_sessions,
-            self.lock_message_store,
-            self.lock_space_store,
-        ):
-            space = self.space_store.get(request.space_id)
-            if (
-                space is None
-                or SpaceParticipant(flwr_aid=request.flwr_aid) not in space.participants
-                or SpaceParticipant(agent_id=request.agent_id) not in space.participants
-            ):
-                raise ValueError("The caller and agent must participate in the Space.")
+    def activate_task(self, task_id: int) -> bool:
+        """Start prompt delivery when a queued primary Task begins execution."""
+        if not super().activate_task(task_id):
+            return False
+        if not self._is_primary_task(task_id):
+            return True
+        task = self.task_store[task_id]
+        with self.lock_space_store:
+            entry = self.agent_queue.get(task.run_id)
+            if entry is None:
+                return True
             source = next(
-                (
-                    message
-                    for message in self.space_message_store[request.space_id]
-                    if message.id == request.message_id
-                    and message.author.flwr_aid == request.flwr_aid
-                ),
-                None,
+                message
+                for message in self.space_message_store[entry.space_id]
+                if message.id == entry.message_id
             )
-            if source is None:
-                raise ValueError("The trigger must be a Space message from the caller.")
-            existing = self.get_agent_queue_entry(request.agent_id, request.message_id)
-            if existing is not None:
-                return existing.run_id
-            for entry in self.agent_queue.values():
-                if (
-                    entry.space_id != request.space_id
-                    or entry.agent_id != request.agent_id
-                    or entry.message_id <= request.message_id
-                ):
-                    continue
-                newer_run = self.run_ids[entry.run_id].run
-                newer_task = self.task_store[cast(int, newer_run.primary_task_id)]
-                if newer_task.starting_at or newer_task.finished_at:
-                    raise ValueError("A newer message's execution has already started.")
-            with self.lock_agent_store:
-                agent = next(
-                    agents[request.agent_id]
-                    for agents in self.agent_store.values()
-                    if request.agent_id in agents
-                )
-                validate_agent_app(request, agent.config.app_spec)
-            if self.get_fab(request.fab_hash) is None:
-                raise ValueError("The resolved AgentApp FAB must be stored first.")
-            run_id = self.create_run(
-                fab_id=request.fab_id,
-                fab_version=request.fab_version,
-                fab_hash=request.fab_hash,
-                override_config=request.override_config.copy(),
-                federation_id=None,
-                federation_config=None,
-                flwr_aid=request.flwr_aid,
-                primary_task_type=TaskType.AGENT_APP,
-                space_id=request.space_id,
-            )
-            if not run_id:
-                raise ValueError("Failed to create the agent run.")
-            try:
-                self.create_agent_queue_entry(
-                    request.space_id,
-                    request.agent_id,
-                    request.message_id,
-                    run_id,
-                )
-                prompt = create_user_prompt_message(run_id, source.content)
-                if not self.store_messages([prompt])[0]:
-                    raise ValueError("Failed to store the agent input.")
-                self._store_generated_message(prompt)
-            except Exception:
-                self._discard_unpublished_agent_run(run_id)
-                raise
-            return run_id
+            content = source.content
+        prompt = create_user_prompt_message(task.run_id, content)
+        if not self.store_messages([prompt])[0]:
+            raise ValueError("Failed to store the agent input.")
+        self._store_generated_message(prompt)
+        return True
 
     def claim_task(self, task_id: int) -> str | None:
         """Apply orchestration eligibility before the generic task claim."""

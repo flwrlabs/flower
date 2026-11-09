@@ -59,14 +59,13 @@ from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import (
     SpaceMessage as SpaceMessageModel,
 )
-from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.typing import AgentRunRequest, AgentRunTarget
+from flwr.supercore.typing import AgentRunTarget
 from flwr.supercore.utils import simulation_config_from_json, simulation_config_to_json
 from flwr.superlink.federation import FederationManager
 
@@ -75,7 +74,6 @@ from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
     validate_agent_app,
-    validate_agent_run_request,
     validate_agent_submission,
     validate_run_scope,
 )
@@ -512,122 +510,68 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         content: str,
         targets: Sequence[AgentRunTarget],
     ) -> tuple[SpaceMessage, list[int]]:
-        """Commit the message, queues, and all selected pending runs together."""
+        """Commit the message, queue entries, and pending runs together."""
         targets = tuple(targets)
         validate_agent_submission(flwr_aid, content, targets)
-        created_run_ids: list[int] = []
-        try:
-            with self.session() as session:
-                if not self._lock_space(session, space_id):
-                    raise ValueError("Space does not exist.")
-                message = self.create_space_message(
-                    space_id, SpaceParticipant(flwr_aid=flwr_aid), content
-                )
-                if message is None:
-                    raise ValueError("The caller must participate in the Space.")
-                run_ids = [
-                    self._enqueue_agent_run(
-                        target.request_for(message, flwr_aid), created_run_ids
-                    )
-                    for target in targets
-                ]
-                return message, run_ids
-        except Exception:
-            # Run IDs are recorded before object writes, including partial runs.
-            # Shared SQL objects roll back; independent stores need cleanup here.
-            for run_id in created_run_ids:
-                self.object_store.delete_objects_in_run(run_id)
-            raise
-
-    def enqueue_agent_run(self, request: AgentRunRequest) -> int:
-        """Accept one persisted trigger with a pending Run and Task."""
-        validate_agent_run_request(request)
-        created_run_ids: list[int] = []
-        try:
-            return self._enqueue_agent_run(request, created_run_ids)
-        except Exception:
-            for run_id in created_run_ids:
-                self.object_store.delete_objects_in_run(run_id)
-            raise
-
-    def _enqueue_agent_run(
-        self, request: AgentRunRequest, created_run_ids: list[int]
-    ) -> int:
-        """Accept a target within the caller-owned submission transaction."""
         with self.session() as session:
-            if not self._lock_space(session, request.space_id):
+            if not self._lock_space(session, space_id):
                 raise ValueError("Space does not exist.")
-            viewer = SpaceParticipantTable.alias("viewer")
-            target = SpaceParticipantTable.alias("target")
+            message = self.create_space_message(
+                space_id, SpaceParticipant(flwr_aid=flwr_aid), content
+            )
+            if message is None:
+                raise ValueError("The caller must participate in the Space.")
+            run_ids: list[int] = []
+            for target in targets:
+                app_spec = session.scalar(
+                    select(AgentModel.app_spec).where(
+                        AgentModel.agent_id == target.agent_id
+                    )
+                )
+                if app_spec is None:
+                    raise ValueError("Agent does not exist.")
+                validate_agent_app(target, app_spec)
+                if self.get_fab(target.fab_hash) is None:
+                    raise ValueError("The resolved AgentApp FAB must be stored first.")
+                run_id = self.create_run(
+                    fab_id=target.fab_id,
+                    fab_version=target.fab_version,
+                    fab_hash=target.fab_hash,
+                    override_config=target.override_config.copy(),
+                    federation_id=None,
+                    federation_config=None,
+                    flwr_aid=flwr_aid,
+                    primary_task_type=TaskType.AGENT_APP,
+                    space_id=space_id,
+                )
+                if not run_id:
+                    raise ValueError("Failed to create the agent run.")
+                self.create_agent_queue_entry(
+                    space_id, target.agent_id, message.id, run_id
+                )
+                run_ids.append(run_id)
+            return message, run_ids
+
+    def activate_task(self, task_id: int) -> bool:
+        """Start prompt delivery when a queued primary Task begins execution."""
+        with self.session() as session:
+            if not super().activate_task(task_id):
+                return False
             source = session.execute(
-                select(AgentModel.app_spec, SpaceMessageModel.content)
-                .join(target, target.c.agent_id == AgentModel.agent_id)
-                .join(viewer, viewer.c.space_id == target.c.space_id)
+                select(AgentQueueModel.run_id, SpaceMessageModel.content)
                 .join(
                     SpaceMessageModel,
-                    SpaceMessageModel.space_id == target.c.space_id,
+                    SpaceMessageModel.id == AgentQueueModel.message_id,
                 )
-                .where(
-                    AgentModel.agent_id == request.agent_id,
-                    target.c.space_id == request.space_id,
-                    viewer.c.flwr_aid == request.flwr_aid,
-                    SpaceMessageModel.id == request.message_id,
-                    SpaceMessageModel.flwr_aid == request.flwr_aid,
-                )
-            ).one_or_none()
-            if source is None:
-                raise ValueError(
-                    "The user message and agent must belong to an accessible Space."
-                )
-            existing = self.get_agent_queue_entry(request.agent_id, request.message_id)
-            if existing is not None:
-                return existing.run_id
-            newer = session.scalar(
-                select(TaskModel.task_id)
-                .select_from(AgentQueueModel)
                 .join(RunModel, RunModel.run_id == AgentQueueModel.run_id)
-                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
-                .where(
-                    AgentQueueModel.space_id == request.space_id,
-                    AgentQueueModel.agent_id == request.agent_id,
-                    AgentQueueModel.message_id > request.message_id,
-                    or_(
-                        TaskModel.starting_at.is_not(None),
-                        TaskModel.finished_at.is_not(None),
-                    ),
-                )
-                .limit(1)
-            )
-            if newer is not None:
-                raise ValueError("A newer message's execution has already started.")
-            validate_agent_app(request, source.app_spec)
-            if self.get_fab(request.fab_hash) is None:
-                raise ValueError("The resolved AgentApp FAB must be stored first.")
-            run_id = self.create_run(
-                fab_id=request.fab_id,
-                fab_version=request.fab_version,
-                fab_hash=request.fab_hash,
-                override_config=request.override_config.copy(),
-                federation_id=None,
-                federation_config=None,
-                flwr_aid=request.flwr_aid,
-                primary_task_type=TaskType.AGENT_APP,
-                space_id=request.space_id,
-            )
-            if not run_id:
-                raise ValueError("Failed to create the agent run.")
-            created_run_ids.append(run_id)
-            self.create_agent_queue_entry(
-                request.space_id,
-                request.agent_id,
-                request.message_id,
-                run_id,
-            )
-            prompt = create_user_prompt_message(run_id, source.content)
-            if not self.store_messages([prompt])[0]:
-                raise ValueError("Failed to store the agent input.")
-            self._store_generated_message(prompt)
-        return run_id
+                .where(RunModel.primary_task_id == task_id)
+            ).first()
+            if source is not None:
+                prompt = create_user_prompt_message(source.run_id, source.content)
+                if not self.store_messages([prompt])[0]:
+                    raise ValueError("Failed to store the agent input.")
+                self._store_generated_message(prompt)
+            return True
 
     def claim_task(self, task_id: int) -> str | None:
         """Apply queue eligibility atomically with the generic task claim."""
@@ -809,34 +753,30 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             session.execute(stmt)
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
-        """Move an unfinished task to finished."""
-        result = super().finish_task(task_id, sub_status, details)
-        if result:
-            # Check whether this task is referenced as a run's primary task
-            with self.session() as session:
-                run = session.execute(
-                    select(RunModel.run_id, RunModel.space_id).where(
-                        RunModel.primary_task_id == task_id
-                    )
-                ).first()
+        """Finish the primary Task and its children in one transaction."""
+        with self.session() as session:
+            if not super().finish_task(task_id, sub_status, details):
+                return False
+            run = session.execute(
+                select(RunModel.run_id, RunModel.space_id).where(
+                    RunModel.primary_task_id == task_id
+                )
+            ).first()
             if run is not None:
-                run_id, space_id = run
-                # Stop all tasks of the run when the run is stopped
                 if sub_status == SubStatus.STOPPED:
                     finish_sub_status = SubStatus.STOPPED
                     finish_details = "Task stopped because the run was stopped"
-                # Otherwise, fail all tasks of the run
                 else:
                     finish_sub_status = SubStatus.FAILED
                     finish_details = "Task failed because the run finished"
                 self._finish_run_tasks(
-                    [(run_id, task_id)],
+                    [(run.run_id, task_id)],
                     sub_status=finish_sub_status,
                     details=finish_details,
                 )
-                if space_id is None:
-                    self.federation_manager.report_run_usage()
-        return result
+        if run is not None and run.space_id is None:
+            self.federation_manager.report_run_usage()
+        return True
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
