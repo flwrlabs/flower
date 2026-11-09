@@ -301,11 +301,19 @@ def get_space_events(
     state: NodeState,
     task: Task,
 ) -> GetSpaceEventsResponse:
-    """Reject Space event requests on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "This endpoint is only available to SuperLink Space tasks.",
-    )
+    """Get locally available events from the authenticated task's Space."""
+    run = state.get_run(task.run_id)
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND,
+            f"Run {task.run_id} not found in NodeState.",
+        )
+    if run.space_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint is only available to Space tasks.",
+        )
+    return core_runtime_handlers.get_space_events(request, state, run.space_id)
 
 
 def get_compacted_contexts(

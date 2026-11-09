@@ -16,6 +16,7 @@
 
 import unittest
 from unittest.mock import Mock
+from uuid import UUID
 
 from parameterized import parameterized
 
@@ -38,6 +39,7 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -387,8 +389,32 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.state.get_tasks.assert_not_called()
         self.state.get_task_events.assert_not_called()
 
-    def test_get_space_events_is_unavailable(self) -> None:
-        """SuperNode has no Space membership to authorize event reads."""
+    def test_get_space_events_uses_authenticated_run_space(self) -> None:
+        """Read only local events from the authenticated run's Space."""
+        space_id = UUID("12345678-1234-5678-1234-567812345678")
+        run = Run.create_empty(run_id=10)
+        run.space_id = space_id
+        self.state.get_run.return_value = run
+        event = TaskEvent(id=11, run_id=10, event="message", data="{}")
+        self.state.get_task_events.return_value = [event]
+        request = GetSpaceEventsRequest(after_event_id=5, last_n=1)
+
+        response = runtime_handlers.get_space_events(
+            request, self.state, Task(run_id=10)
+        )
+
+        self.assertEqual(response, GetSpaceEventsResponse(events=[event]))
+        self.state.get_run.assert_called_once_with(10)
+        self.state.get_task_events.assert_called_once_with(
+            space_id=space_id,
+            after_task_event_id=5,
+            before_task_event_id=None,
+            last_n=1,
+        )
+
+    def test_get_space_events_rejects_non_space_run(self) -> None:
+        """A federation task cannot read Space events."""
+        self.state.get_run.return_value = Run.create_empty(run_id=10)
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
@@ -397,6 +423,17 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.assertEqual(
             error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
         )
+        self.state.get_task_events.assert_not_called()
+
+    def test_get_space_events_rejects_unknown_run(self) -> None:
+        """An unknown authenticated run cannot read Space events."""
+        self.state.get_run.return_value = None
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_space_events(
+                GetSpaceEventsRequest(), self.state, Task(run_id=10)
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_ID_NOT_FOUND)
         self.state.get_task_events.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:

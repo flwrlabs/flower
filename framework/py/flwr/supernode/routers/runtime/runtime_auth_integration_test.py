@@ -15,6 +15,7 @@
 """SuperNode Runtime HTTP authentication integration tests."""
 
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -33,6 +34,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PushTaskEventsRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -225,3 +228,37 @@ def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
     assert events[0].task_id == task_id
     assert events[0].event == task_event.event
     assert events[0].data == task_event.data
+
+
+def test_space_events_return_only_local_events_in_authenticated_space(
+    client: TestClient, state: NodeState
+) -> None:
+    """A task token reads local events only from its run's Space."""
+    run = Run.create_empty(run_id=99)
+    run.space_id = uuid4()
+    other_run = Run.create_empty(run_id=100)
+    other_run.space_id = uuid4()
+    for current_run in (run, other_run):
+        state.store_run(current_run)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=current_run.run_id
+        )
+        assert task_id is not None
+        assert state.store_task_events(
+            [
+                TaskEvent(
+                    run_id=current_run.run_id,
+                    task_id=task_id,
+                    event="message",
+                    data="{}",
+                )
+            ]
+        )
+
+    token = state.claim_task(state.get_tasks(run_ids=[run.run_id])[0].task_id)
+    assert token is not None
+    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
+
+    assert response.status_code == 200
+    events = GetSpaceEventsResponse.FromString(response.content).events
+    assert [event.run_id for event in events] == [run.run_id]

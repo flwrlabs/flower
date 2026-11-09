@@ -428,7 +428,6 @@ class StateTest(CoreStateTest):
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
-        assert state.get_run_space_id(run_id) is None
 
     def test_get_task_events_filters_by_space(self) -> None:
         """Return events only from runs assigned to the requested space."""
@@ -451,8 +450,6 @@ class StateTest(CoreStateTest):
                         .where(RunModel.run_id == assigned_run_id)
                         .values(space_id=assigned_space_id)
                     )
-            self.assertEqual(state.get_run_space_id(assigned_run_id), assigned_space_id)
-        self.assertIsNone(state.get_run_space_id(0))
         task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         other_task_id = state.create_task(
             task_type=TaskType.AGENT_APP, run_id=other_run_id
@@ -496,7 +493,6 @@ class StateTest(CoreStateTest):
                 space_id=space_id,
                 user_prompt="Hello",
             )
-            assert state.get_run_space_id(run_id) == space_id
             run = state.get_run_info(run_ids=[run_id])[0]
             assert run.space_id == space_id
             assert run.federation_id == "" and run.series_id == 0

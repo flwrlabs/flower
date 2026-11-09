@@ -115,24 +115,18 @@ def get_space_events(
     task: Task,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    log(DEBUG, "Runtime.GetSpaceEvents")
-    space_id = state.get_run_space_id(task.run_id)
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    space_id = runs[0].space_id
     if space_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             "This endpoint is only available to Space tasks.",
         )
-    events = state.get_task_events(
-        space_id=space_id,
-        after_task_event_id=(
-            request.after_event_id if request.HasField("after_event_id") else None
-        ),
-        before_task_event_id=(
-            request.before_event_id if request.HasField("before_event_id") else None
-        ),
-        last_n=request.last_n or None,
-    )
-    return GetSpaceEventsResponse(events=events)
+    return core_runtime_handlers.get_space_events(request, state, space_id)
 
 
 def get_compacted_contexts(

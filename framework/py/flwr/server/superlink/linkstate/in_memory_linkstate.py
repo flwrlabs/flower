@@ -135,12 +135,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if record.space_id == space_id
             ]
 
-    def get_run_space_id(self, run_id: int) -> UUID | None:
-        """Return the Space ID for a run, or None if it is not a Space run."""
-        with self.lock:
-            record = self.run_ids.get(run_id)
-            return record.space_id if record is not None else None
-
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
