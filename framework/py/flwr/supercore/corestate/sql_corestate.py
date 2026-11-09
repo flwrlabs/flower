@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -93,6 +94,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentQueue as AgentQueueModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -140,7 +142,11 @@ from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMess
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    AgentQueueEntry,
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -1293,6 +1299,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             SpaceParticipantTable.c[field] == identity,
         )
         with self.session() as session:
+            if not self._lock_space(session, space_id):
+                return None
             model = session.scalars(
                 insert(SpaceMessageModel)
                 .from_select(
@@ -1355,6 +1363,77 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 if model is not None
             ]
             return messages if forward else list(reversed(messages))
+
+    def get_agent_queue_entry(
+        self, agent_id: int, message_id: int
+    ) -> AgentQueueEntry | None:
+        """Return the accepted queue entry for an agent/message pair."""
+        with self.session() as session:
+            entry = session.scalar(
+                select(AgentQueueModel).where(
+                    AgentQueueModel.agent_id == agent_id,
+                    AgentQueueModel.message_id == message_id,
+                )
+            )
+            return _agent_queue_entry_from_model(entry) if entry is not None else None
+
+    def _lock_space(self, session: Session, space_id: UUID) -> bool:
+        """Serialize message writes, queue acceptance, and claims until commit."""
+        return (
+            session.scalar(
+                update(SpaceModel)
+                .where(SpaceModel.id == space_id)
+                .values(id=SpaceModel.id)
+                .returning(SpaceModel.id)
+            )
+            is not None
+        )
+
+    def create_agent_queue_entry(
+        self, space_id: UUID, agent_id: int, message_id: int, run_id: int
+    ) -> AgentQueueEntry:
+        """Store one trigger assignment without changing Task state."""
+        try:
+            with self.session() as session:
+                if not self._lock_space(session, space_id):
+                    raise ValueError("Space does not exist.")
+                source = session.scalar(
+                    select(SpaceMessageModel.id)
+                    .join(
+                        SpaceParticipantTable,
+                        SpaceParticipantTable.c.space_id == SpaceMessageModel.space_id,
+                    )
+                    .where(
+                        SpaceMessageModel.id == message_id,
+                        SpaceMessageModel.space_id == space_id,
+                        SpaceMessageModel.flwr_aid.is_not(None),
+                        SpaceParticipantTable.c.agent_id == agent_id,
+                    )
+                )
+                if source is None:
+                    raise ValueError(
+                        "The user message and agent must belong to the Space."
+                    )
+                existing = self.get_agent_queue_entry(agent_id, message_id)
+                if existing is not None:
+                    if existing.run_id != run_id:
+                        raise ValueError(
+                            "The trigger is already assigned to another run."
+                        )
+                    return existing
+                entry = session.scalars(
+                    insert(AgentQueueModel)
+                    .values(
+                        space_id=space_id,
+                        agent_id=agent_id,
+                        message_id=message_id,
+                        run_id=run_id,
+                    )
+                    .returning(AgentQueueModel)
+                ).one()
+                return _agent_queue_entry_from_model(entry)
+        except IntegrityError as exc:
+            raise ValueError("The run already has a queue entry.") from exc
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2548,6 +2627,13 @@ def task_from_model(model: TaskModel) -> Task:
         model_ref=model.model_ref,
         connector_ref=model.connector_ref,
         connector_id=model.connector_id,
+    )
+
+
+def _agent_queue_entry_from_model(model: AgentQueueModel) -> AgentQueueEntry:
+    """Convert persisted queue identity to a CoreState record."""
+    return AgentQueueEntry(
+        model.id, model.space_id, model.agent_id, model.message_id, model.run_id
     )
 
 

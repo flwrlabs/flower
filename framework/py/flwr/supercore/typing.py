@@ -18,6 +18,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeAlias
+from uuid import UUID
 
 from flwr.supercore.constant import RunTime
 
@@ -25,6 +26,17 @@ JSONScalar: TypeAlias = bool | float | int | str | None
 JSONArray: TypeAlias = Sequence["JSONValue"]
 JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | JSONArray
 JSONObject: TypeAlias = dict[str, JSONValue]
+
+
+@dataclass(frozen=True)
+class AgentQueueEntry:
+    """Persisted agent trigger and its position in the execution queue."""
+
+    id: int
+    space_id: UUID
+    agent_id: int
+    message_id: int
+    run_id: int
 
 
 @dataclass(frozen=True)

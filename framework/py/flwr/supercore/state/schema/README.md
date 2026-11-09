@@ -21,6 +21,14 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  agent_queue {
+    BIGINT id PK
+    BIGINT agent_id FK
+    BIGINT message_id FK
+    CHAR(32) space_id FK
+    BIGINT run_id UK
+  }
+
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
@@ -308,6 +316,9 @@ erDiagram
     VARCHAR usage_type
   }
 
+  space ||--o{ agent_queue : space_id
+  agent ||--o{ agent_queue : agent_id
+  space_message ||--o{ agent_queue : message_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id

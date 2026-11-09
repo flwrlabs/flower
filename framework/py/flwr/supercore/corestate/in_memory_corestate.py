@@ -69,7 +69,11 @@ from flwr.supercore.constant import (
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    AgentQueueEntry,
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+)
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -201,6 +205,8 @@ class InMemoryCoreState(
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
         self.lock_space_store = RLock()
+        self.agent_queue: dict[int, AgentQueueEntry] = {}
+        self.agent_queue_id_counter = 0
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -1068,6 +1074,53 @@ class InMemoryCoreState(
                 and (after_id is None or message.id > after_id)
             ]
             return messages[:limit] if after_id is not None else messages[-limit:]
+
+    def get_agent_queue_entry(
+        self, agent_id: int, message_id: int
+    ) -> AgentQueueEntry | None:
+        """Return the accepted queue entry for an agent/message pair."""
+        with self.lock_space_store:
+            return next(
+                (
+                    entry
+                    for entry in self.agent_queue.values()
+                    if entry.agent_id == agent_id and entry.message_id == message_id
+                ),
+                None,
+            )
+
+    def create_agent_queue_entry(
+        self, space_id: UUID, agent_id: int, message_id: int, run_id: int
+    ) -> AgentQueueEntry:
+        """Store one trigger assignment without changing Task state."""
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if (
+                space is None
+                or SpaceParticipant(agent_id=agent_id) not in space.participants
+                or not any(
+                    message.id == message_id and message.author.flwr_aid
+                    for message in self.space_message_store[space_id]
+                )
+            ):
+                raise ValueError("The user message and agent must belong to the Space.")
+            existing = self.get_agent_queue_entry(agent_id, message_id)
+            if existing is not None:
+                if existing.run_id != run_id:
+                    raise ValueError("The trigger is already assigned to another run.")
+                return existing
+            if run_id in self.agent_queue:
+                raise ValueError("The run already has a queue entry.")
+            self.agent_queue_id_counter += 1
+            entry = AgentQueueEntry(
+                self.agent_queue_id_counter,
+                space_id,
+                agent_id,
+                message_id,
+                run_id,
+            )
+            self.agent_queue[run_id] = entry
+            return entry
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,

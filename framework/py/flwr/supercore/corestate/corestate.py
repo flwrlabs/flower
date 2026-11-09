@@ -46,7 +46,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
+from flwr.supercore.typing import (
+    AgentQueueEntry,
+    ConnectorOAuthSessionRecord,
+    ConnectorRecord,
+)
 
 from ..constant import AutomationStatus
 from ..object_store import ObjectStore
@@ -701,6 +705,26 @@ class CoreState(ABC):  # pylint: disable=R0904
         Bounds are exclusive. With after_id, select the earliest matching page;
         otherwise select the latest. Return None for missing spaces or
         nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
+        """
+
+    @abstractmethod
+    def get_agent_queue_entry(
+        self, agent_id: int, message_id: int
+    ) -> AgentQueueEntry | None:
+        """Return the accepted queue entry for an agent/message pair.
+
+        Callers authorize access before reading the entry.
+        """
+
+    @abstractmethod
+    def create_agent_queue_entry(
+        self, space_id: UUID, agent_id: int, message_id: int, run_id: int
+    ) -> AgentQueueEntry:
+        """Persist an agent's user-message trigger and execution reference.
+
+        The agent and user message must belong to the Space. Repeating the same
+        assignment returns its entry. Conflicting assignments raise ValueError.
+        This operation neither creates nor claims Tasks.
         """
 
     @abstractmethod

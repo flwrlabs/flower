@@ -264,6 +264,33 @@ class SpaceMessage(FlwrBase):
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class AgentQueue(FlwrBase):
+    """Persist agent orchestration independently of worker Tasks."""
+
+    __tablename__ = "agent_queue"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "message_id", name="uq_agent_queue_message"),
+        Index(
+            "idx_agent_queue_space_agent_message", "space_id", "agent_id", "message_id"
+        ),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("agent.agent_id"), nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("space_message.id"), nullable=False
+    )
+    run_id: Mapped[int] = mapped_column(UInt64(), unique=True, nullable=False)
+
+
 class SeriesContext(FlwrBase):
     """Represent context data for a run series."""
 
