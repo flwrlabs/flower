@@ -179,6 +179,10 @@ class TestPoolSizeFromResources(TestCase):
                 "flwr.simulation.ray_transport.ray_actor.glob.glob",
                 return_value=["/dev/dri/renderD128"],  # A usable render node exists
             ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+                return_value=True,
+            ),
         ):
             with self.assertLogs("flwr", level="WARNING") as logs:
                 with self.assertRaises(ValueError):

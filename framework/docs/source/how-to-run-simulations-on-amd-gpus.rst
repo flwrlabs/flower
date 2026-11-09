@@ -238,6 +238,14 @@ and ``00`` are the same ordinal to HIP, but two distinct strings to a naive comp
 spellings it was given. It also rejects the mask in that case rather than accepting a
 syntactically-valid-looking duplicate.
 
+A trailing comma is a similar trap: Bash's ``read -ra`` silently drops a single empty
+field left by a trailing separator, so ``HIP_VISIBLE_DEVICES=0,1,`` parses to the same
+two values as ``0,1`` and would otherwise pass every check above unchanged. Ray does not
+make that same allowance -- it splits the raw string itself and sizes its GPU resources
+from the resulting field count, including the empty one -- so it can advertise a slot
+that no ordinal maps to. The snippet checks the raw string for a trailing comma before
+trusting what ``read -ra`` parsed from it, and rejects the mask if one is present.
+
 This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and
 ``[[ ... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
 ``bash``, not with ``sh`` or a POSIX-only shell like ``dash`` -- on Debian and Ubuntu in
@@ -261,6 +269,12 @@ exported, silently leaving Ray's original import failure in place:
             fi
         else
             _bad=0
+            if [[ "$HIP_VISIBLE_DEVICES" == *, ]]; then
+                # A trailing comma leaves `read -ra` one field short of what Ray
+                # gets from splitting the raw string itself, so check the raw
+                # string before trusting the parsed array's field count.
+                _bad=1
+            fi
             _norm_ids=()
             IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
             for _id in "${_hip_ids[@]}"; do
@@ -275,10 +289,13 @@ exported, silently leaving Ray's original import failure in place:
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "valid selection of ordinals 0..$((_n - 1)) -- the only" \
                      "ordinals ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES exposes" \
-                     "after filtering. This usually means a physical device ID was" \
-                     "copied in verbatim; left unchanged, so Ray will see no usable" \
+                     "after filtering -- or it has a stray leading, trailing, or" \
+                     "doubled comma. This usually means a physical device ID was" \
+                     "copied in verbatim, or a separator was left over from" \
+                     "editing the list; left unchanged, so Ray will see no usable" \
                      "GPU. Unset HIP_VISIBLE_DEVICES and re-run this snippet, or" \
-                     "correct it to ordinals in that range." >&2
+                     "correct it to ordinals in that range with no stray" \
+                     "separators." >&2
             elif [ -n "$_dup" ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
                      "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
@@ -321,7 +338,11 @@ exported, silently leaving Ray's original import failure in place:
     (``HIP_VISIBLE_DEVICES=0,00``) -- the snippet normalizes each value before comparing
     rather than comparing the strings as spelled: Ray derives the number of GPU slots it
     advertises from the length of this mask, so a duplicate would let two schedulable
-    slots map to the same underlying device instead of each naming a distinct one.
+    slots map to the same underlying device instead of each naming a distinct one. The
+    same reasoning applies to a trailing comma (``HIP_VISIBLE_DEVICES=0,1,``): Bash's
+    ``read -ra`` silently drops the resulting empty field, but Ray splits the raw string
+    itself and would still size its GPU resources from it, so the snippet checks the raw
+    string for a trailing comma rather than trusting what ``read -ra`` parsed.
 
 .. important::
 
