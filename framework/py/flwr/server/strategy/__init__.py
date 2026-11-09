@@ -38,6 +38,7 @@ from .fedavg_android import FedAvgAndroid as FedAvgAndroid
 from .fedavgm import FedAvgM as FedAvgM
 from .fedmedian import FedMedian as FedMedian
 from .fedopt import FedOpt as FedOpt
+from .meamed import MeaMed as MeaMed
 from .fedprox import FedProx as FedProx
 from .fedtrimmedavg import FedTrimmedAvg as FedTrimmedAvg
 from .fedxgb_bagging import FedXgbBagging as FedXgbBagging
@@ -71,6 +72,7 @@ __all__ = [
     "FedXgbNnAvg",
     "FedYogi",
     "Krum",
+    "MeaMed",
     "QFedAvg",
     "Strategy",
 ]
