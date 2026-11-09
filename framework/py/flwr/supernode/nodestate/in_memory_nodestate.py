@@ -15,9 +15,11 @@
 """In-memory NodeState implementation."""
 
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import ERROR
 from threading import Lock
+from uuid import UUID
 
 from flwr.app import Message
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -89,6 +91,15 @@ class InMemoryNodeState(
         """Retrieve a run by its ID."""
         with self.lock_run_store:
             return self.run_store.get(run_id)
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of locally stored runs in the given Space."""
+        with self.lock_run_store:
+            return [
+                run_id
+                for run_id, run in self.run_store.items()
+                if run.space_id == space_id
+            ]
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""
