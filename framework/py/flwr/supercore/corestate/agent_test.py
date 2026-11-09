@@ -19,10 +19,8 @@ from uuid import UUID
 
 import pytest
 
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    AgentConfig,
-    SpaceParticipant,
-)
+from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
