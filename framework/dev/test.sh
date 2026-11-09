@@ -62,7 +62,11 @@ python -m mypy py
 echo "- mypy: done"
 
 echo "- pylint: start"
-python -m pylint --ignore=py/flwr/proto py/flwr
+pylint_args=(--ignore=py/flwr/proto)
+if [[ -n "${PYLINT_IGNORE_PATHS:-}" ]]; then
+    pylint_args+=(--ignore-paths="${PYLINT_IGNORE_PATHS}")
+fi
+python -m pylint "${pylint_args[@]}" py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
