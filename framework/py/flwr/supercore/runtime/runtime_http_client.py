@@ -47,6 +47,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -232,6 +234,15 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetRunSeriesEvents",
             request=request,
             response_type=GetRunSeriesEventsResponse,
+        )
+
+    def GetSpaceEvents(self, request: GetSpaceEventsRequest) -> GetSpaceEventsResponse:
+        """Get events from the authenticated AgentApp task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-events",
+            rpc_method="/flwr.proto.Runtime/GetSpaceEvents",
+            request=request,
+            response_type=GetSpaceEventsResponse,
         )
 
     def GetCompactedContexts(

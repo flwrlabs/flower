@@ -51,6 +51,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -105,6 +107,32 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
+
+
+def get_space_events(
+    request: GetSpaceEventsRequest,
+    state: LinkState,
+    task: Task,
+) -> GetSpaceEventsResponse:
+    """Get events from the authenticated task's Space."""
+    log(DEBUG, "Runtime.GetSpaceEvents")
+    space_id = state.get_run_space_id(task.run_id)
+    if space_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint is only available to Space tasks.",
+        )
+    events = state.get_task_events(
+        space_id=space_id,
+        after_task_event_id=(
+            request.after_event_id if request.HasField("after_event_id") else None
+        ),
+        before_task_event_id=(
+            request.before_event_id if request.HasField("before_event_id") else None
+        ),
+        last_n=request.last_n or None,
+    )
+    return GetSpaceEventsResponse(events=events)
 
 
 def get_compacted_contexts(

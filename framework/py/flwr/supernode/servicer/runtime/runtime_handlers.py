@@ -49,6 +49,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -292,6 +294,18 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
+
+
+def get_space_events(
+    request: GetSpaceEventsRequest,
+    state: NodeState,
+    task: Task,
+) -> GetSpaceEventsResponse:
+    """Reject Space event requests on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "This endpoint is only available to SuperLink Space tasks.",
+    )
 
 
 def get_compacted_contexts(

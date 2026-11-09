@@ -41,6 +41,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -138,6 +140,14 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         task: Task,
     ) -> GetRunSeriesEventsResponse:
         """Get events from the authenticated task's run series."""
+
+    def get_space_events(
+        self,
+        request: GetSpaceEventsRequest,
+        state: StateT_contra,
+        task: Task,
+    ) -> GetSpaceEventsResponse:
+        """Get events from the authenticated task's Space."""
 
     def get_compacted_contexts(
         self, request: GetCompactedContextsRequest, state: StateT_contra, task: Task

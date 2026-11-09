@@ -60,6 +60,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -312,6 +314,41 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
         before_task_event_id=None,
         last_n=None,
     )
+
+
+def test_get_space_events_uses_authenticated_task_space() -> None:
+    """Read only events from the authenticated task's Space."""
+    state = Mock(spec=LinkState)
+    space_id = UUID("12345678-1234-5678-1234-567812345678")
+    state.get_run_space_id.return_value = space_id
+    expected_event = TaskEvent(id=11, run_id=123, event="message", data="{}")
+    state.get_task_events.return_value = [expected_event]
+    request = GetSpaceEventsRequest(after_event_id=10, before_event_id=20, last_n=1)
+
+    response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
+
+    assert response == GetSpaceEventsResponse(events=[expected_event])
+    state.get_run_space_id.assert_called_once_with(123)
+    state.get_task_events.assert_called_once_with(
+        space_id=space_id,
+        after_task_event_id=10,
+        before_task_event_id=20,
+        last_n=1,
+    )
+
+
+def test_get_space_events_rejects_non_space_run() -> None:
+    """A federation task cannot use the Space event endpoint."""
+    state = Mock(spec=LinkState)
+    state.get_run_space_id.return_value = None
+
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.get_space_events(
+            GetSpaceEventsRequest(), state, Task(run_id=123)
+        )
+
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_task_events.assert_not_called()
 
 
 def test_get_compacted_contexts_uses_authenticated_series() -> None:

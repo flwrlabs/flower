@@ -37,6 +37,7 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
     PullAppMessagesRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -384,6 +385,18 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
         self.assertEqual(error.exception.code, ApiErrorCode.RUN_ID_NOT_FOUND)
         self.state.get_tasks.assert_not_called()
+        self.state.get_task_events.assert_not_called()
+
+    def test_get_space_events_is_unavailable(self) -> None:
+        """SuperNode has no Space membership to authorize event reads."""
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_space_events(
+                GetSpaceEventsRequest(), self.state, Task(run_id=10)
+            )
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+        )
         self.state.get_task_events.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:

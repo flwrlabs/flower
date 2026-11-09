@@ -326,6 +326,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return the Space ID for a run, or None if it is not a Space run."""
+
+    @abc.abstractmethod
     def get_run_info(  # pylint: disable=too-many-arguments
         self,
         *,

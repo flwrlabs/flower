@@ -91,6 +91,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if run_id is not None
             ]
 
+    def get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return the Space ID for a run, or None if it is not a Space run."""
+        with self.session() as session:
+            return session.scalar(
+                select(RunModel.space_id).where(RunModel.run_id == run_id)
+            )
+
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""
         # Start with linkstate tables
