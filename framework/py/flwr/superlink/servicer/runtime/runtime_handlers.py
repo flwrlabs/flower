@@ -64,6 +64,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
+from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
@@ -315,16 +316,21 @@ def pull_task_input(
     runs = state.get_run_info(run_ids=[run_id])
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
-    series_context = None
-    if run and run.series_id:
-        series_context = state.get_run_series_context(run.series_id)
-    if run and fab and series_context and state.activate_task(task.task_id):
+    context = None
+    if run:
+        if not run.federation_id:
+            context = create_run_context(run_id)
+        elif run.series_id:
+            context = state.get_run_series_context(run.series_id)
+    if run and fab and context and state.activate_task(task.task_id):
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
-            context=context_to_proto(series_context),
+            context=context_to_proto(context),
             run=run_to_proto(run),
             fab=fab_to_proto(fab),
-            federation_config=state.get_federation_config(run_id),
+            federation_config=(
+                state.get_federation_config(run_id) if run.federation_id else None
+            ),
             task_id=task.task_id,
         )
 
@@ -355,8 +361,7 @@ def push_task_output(
             run = runs[0] if runs else None
             if run and run.series_id and run.primary_task_id == task.task_id:
                 state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
+                    run.series_id, context_from_proto(request.context)
                 )
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
@@ -376,6 +381,11 @@ def start_automation(
         )
 
     run = state.get_run_info(run_ids=[task.run_id])[0]
+    if not run.federation_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
+            "Space runs do not support federation automations.",
+        )
     del request.start_run_request.connector_refs[:]
     del request.start_run_request.connector_ids[:]
     request.start_run_request.connector_ids.extend(

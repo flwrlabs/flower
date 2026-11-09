@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -27,6 +28,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -235,7 +239,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create an agent owned by a Flower account.
+        """Create an agent and its initial Space atomically.
+
+        The untitled Space contains the agent and its owning account.
 
         Parameters
         ----------
@@ -660,6 +666,41 @@ class CoreState(ABC):  # pylint: disable=R0904
             A tuple containing a boolean indicating whether the Message was
             stored and a list of object IDs that still need to be pushed. If
             storing the Message fails, returns `(False, [])`.
+        """
+
+    @abstractmethod
+    def create_space(
+        self,
+        *,
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+
+    @abstractmethod
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """List spaces the user participates in."""
+
+    @abstractmethod
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
+        """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def get_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        flwr_aid: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[SpaceMessage] | None:
+        """Return a message page in ascending ID order.
+
+        Bounds are exclusive. With after_id, select the earliest matching page;
+        otherwise select the latest. Return None for missing spaces or
+        nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
         """
 
     @abstractmethod
@@ -1286,6 +1327,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1299,6 +1341,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_ids : Optional[Sequence[int]] (default: None)
             If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        space_id : Optional[UUID] (default: None)
+            If set, return only events from runs in this space.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
@@ -1317,6 +1361,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[TaskEvent]
             Task events ordered by ID.
         """
+
+    # pylint: disable=unused-argument
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return run IDs associated with a space, if this state stores runs."""
+        return []
 
     @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

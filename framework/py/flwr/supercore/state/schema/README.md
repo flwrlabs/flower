@@ -90,6 +90,22 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  file {
+    VARCHAR key PK
+    VARCHAR scope PK
+    BOOLEAN is_deleted
+    BIGINT latest_revision
+    BIGINT size_bytes
+  }
+
+  file_revision {
+    VARCHAR key PK
+    BIGINT revision PK
+    VARCHAR scope PK
+    TIMESTAMP created_at
+    BLOB data
+  }
+
   message {
     VARCHAR message_id PK
     VARCHAR reply_to_message_id FK "nullable"
@@ -165,6 +181,7 @@ erDiagram
   }
 
   run {
+    CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
@@ -209,6 +226,27 @@ erDiagram
     INTEGER id PK
     BIGINT run_id UK
     BIGINT series_id
+  }
+
+  space {
+    CHAR(32) id PK
+    TIMESTAMP created_at
+    VARCHAR title
+  }
+
+  space_message {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
+  }
+
+  space_participant {
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    VARCHAR flwr_aid "nullable"
   }
 
   task {
@@ -275,7 +313,12 @@ erDiagram
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
+  space ||--o{ run : space_id
   objects ||--o| run_objects : object_id
+  space ||--o{ space_message : space_id
+  agent ||--o{ space_message : agent_id
+  space ||--o{ space_participant : space_id
+  agent ||--o{ space_participant : agent_id
   task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id

@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import UUID
 
 from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -55,16 +56,15 @@ from flwr.supercore.state.schema.corestate_tables import create_corestate_metada
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.utils import (
-    int64_to_uint64,
-    simulation_config_from_json,
-    simulation_config_to_json,
-    uint64_to_int64,
-)
+from flwr.supercore.utils import simulation_config_from_json, simulation_config_to_json
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
-from .utils import create_user_prompt_message, generate_rand_int_from_bytes
+from .utils import (
+    create_user_prompt_message,
+    generate_rand_int_from_bytes,
+    validate_run_scope,
+)
 
 
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
@@ -79,6 +79,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.session() as session:
+            return [
+                run_id
+                for run_id in session.scalars(
+                    select(RunModel.run_id).where(RunModel.space_id == space_id)
+                )
+                if run_id is not None
+            ]
 
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""
@@ -143,19 +154,16 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
         # Sample a random uint64 as node_id
-        uint64_node_id = generate_rand_int_from_bytes(
+        node_id = generate_rand_int_from_bytes(
             NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
-
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_node_id = uint64_to_int64(uint64_node_id)
 
         # Mark the node online until now().timestamp() + heartbeat_interval
         try:
             with self.session() as session:
                 session.execute(
                     insert(NodeModel).values(
-                        node_id=sint64_node_id,
+                        node_id=node_id,
                         owner_aid=owner_aid,
                         owner_name=owner_name,
                         status=NodeStatus.REGISTERED,
@@ -185,17 +193,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             log(ERROR, "Unexpected node registration failure.")
             return 0
 
-        # Note: we need to return the uint64 value of the node_id
-        return uint64_node_id
+        return node_id
 
     def delete_node(self, owner_aid: str, node_id: int) -> None:
         """Delete a node."""
-        sint64_node_id = uint64_to_int64(node_id)
         current = now()
         stmt = (
             update(NodeModel)
             .where(
-                NodeModel.node_id == sint64_node_id,
+                NodeModel.node_id == node_id,
                 NodeModel.status != NodeStatus.UNREGISTERED,
                 NodeModel.owner_aid == owner_aid,
             )
@@ -223,11 +229,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         # Only activate if the node is currently registered or offline
         current_dt = now()
-        sint64_node_id = uint64_to_int64(node_id)
         stmt = (
             update(NodeModel)
             .where(
-                NodeModel.node_id == sint64_node_id,
+                NodeModel.node_id == node_id,
                 NodeModel.status.in_([NodeStatus.REGISTERED, NodeStatus.OFFLINE]),
             )
             .values(
@@ -251,7 +256,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         stmt = (
             update(NodeModel)
             .where(
-                NodeModel.node_id == uint64_to_int64(node_id),
+                NodeModel.node_id == node_id,
                 NodeModel.status == NodeStatus.ONLINE,
             )
             .values(
@@ -273,12 +278,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         an empty `Set` MUST be returned.
         """
         with self.session() as session:
-            # Convert the uint64 value to sint64 for SQLite
-            sint64_run_id = uint64_to_int64(run_id)
-
             # Validate run ID
             federation_id = session.scalar(
-                select(RunModel.federation_id).where(RunModel.run_id == sint64_run_id)
+                select(RunModel.federation_id).where(RunModel.run_id == run_id)
             )
             if federation_id is None:
                 return set()
@@ -301,8 +303,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if node_ids is not None:
             if not node_ids:
                 return
-            sint64_node_ids = [uint64_to_int64(nid) for nid in node_ids]
-            stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
+            stmt = stmt.where(NodeModel.node_id.in_(node_ids))
 
         # Select candidate node_ids first so `last_deactivated_at` can preserve the
         # expiry time without relying on database-specific epoch formatting functions
@@ -358,8 +359,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             stmt = select(NodeModel).execution_options(populate_existing=True)
             if node_ids is not None:
-                sint64_node_ids = [uint64_to_int64(node_id) for node_id in node_ids]
-                stmt = stmt.where(NodeModel.node_id.in_(sint64_node_ids))
+                stmt = stmt.where(NodeModel.node_id.in_(node_ids))
             if owner_aids is not None:
                 stmt = stmt.where(NodeModel.owner_aid.in_(owner_aids))
             if statuses is not None:
@@ -377,12 +377,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             NodeModel.status != NodeStatus.UNREGISTERED,
         )
         with self.session() as session:
-            node_id = session.scalar(stmt)
-        if node_id is None:
-            return None
-
-        # Convert sint64 node_id to uint64
-        return int64_to_uint64(node_id)
+            return session.scalar(stmt)
 
     def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
@@ -390,7 +385,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -399,8 +394,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
     ) -> int:
         """Create a new run."""
+        validate_run_scope(
+            federation_id=federation_id,
+            space_id=space_id,
+            series_id=series_id,
+            federation_config=federation_config,
+            series_description=series_description,
+            connector_ids=connector_ids,
+            primary_task_type=primary_task_type,
+        )
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
@@ -417,38 +422,37 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             existing_run_id = session.scalar(
-                select(RunModel.run_id).where(
-                    RunModel.run_id == uint64_to_int64(run_id)
-                )
+                select(RunModel.run_id).where(RunModel.run_id == run_id)
             )
             if existing_run_id is None:
                 current = now()
-                resolved_series_id = self.store_run_in_series(
-                    run_id=run_id,
-                    federation_id=federation_id,
-                    is_agent=primary_task_type == TaskType.AGENT_APP,
-                    series_id=series_id,
-                    description=series_description,
-                )
-                if resolved_series_id is None:
-                    log(ERROR, "Unexpected run series membership failure.")
-                    return 0
-                self._refresh_run_series_context(
-                    run_id=run_id,
-                    series_id=resolved_series_id,
-                )
+                resolved_series_id = None
+                if space_id is None:
+                    assert federation_id is not None
+                    resolved_series_id = self.store_run_in_series(
+                        run_id=run_id,
+                        federation_id=federation_id,
+                        is_agent=primary_task_type == TaskType.AGENT_APP,
+                        series_id=series_id,
+                        description=series_description,
+                    )
+                    if resolved_series_id is None:
+                        log(ERROR, "Unexpected run series membership failure.")
+                        return 0
+                    self._refresh_run_series_context(run_id, resolved_series_id)
                 session.execute(
                     insert(RunModel).values(
-                        run_id=uint64_to_int64(run_id),
+                        run_id=run_id,
                         fab_id=fab_id or "",
                         fab_version=fab_version or "",
                         fab_hash=fab_hash or "",
                         override_config=override_config_json,
                         federation_id=federation_id,
-                        primary_task_id=uint64_to_int64(task_id),
+                        primary_task_id=task_id,
                         federation_config=fed_config_json,
                         usage_reported_at="",
-                        series_id=uint64_to_int64(resolved_series_id),
+                        series_id=resolved_series_id,
+                        space_id=space_id,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -457,9 +461,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
                 session.execute(
                     insert(TaskModel).values(
-                        task_id=uint64_to_int64(task_id),
+                        task_id=task_id,
                         type=primary_task_type,
-                        run_id=uint64_to_int64(run_id),
+                        run_id=run_id,
                         fab_hash=fab_hash,
                         model_ref=None,
                         connector_ref=None,
@@ -483,8 +487,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     session.execute(
                         insert(TaskEventModel).values(
                             timestamp=current,
-                            run_id=uint64_to_int64(run_id),
-                            task_id=uint64_to_int64(task_id),
+                            run_id=run_id,
+                            task_id=task_id,
                             event=initial_task_event.event,
                             data=initial_task_event.data,
                         )
@@ -522,8 +526,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            stmt = stmt.where(RunModel.run_id.in_(sint64_run_ids))
+            stmt = stmt.where(RunModel.run_id.in_(run_ids))
 
         # Filter by statuses
         if statuses is not None:
@@ -579,28 +582,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not run_ids:
             return {}
 
-        sint64_run_ids = [uint64_to_int64(rid) for rid in run_ids]
         stmt = (
             select(RunModel.run_id, TaskModel)
             .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
-            .where(RunModel.run_id.in_(sint64_run_ids))
+            .where(RunModel.run_id.in_(run_ids))
             .execution_options(populate_existing=True)
         )
         with self.session() as session:
             rows = session.execute(stmt).all()
             return {
-                int64_to_uint64(cast(int, run_id)): _run_status_from_task_model(task)
+                cast(int, run_id): _run_status_from_task_model(task)
                 for run_id, task in rows
             }
 
     def get_federation_config(self, run_id: int) -> SimulationConfig | None:
         """Get the resolved federation configuration for the specified `run_id`."""
-        sint64_run_id = uint64_to_int64(run_id)
         with self.session() as session:
             row = session.execute(
-                select(RunModel.federation_config).where(
-                    RunModel.run_id == sint64_run_id
-                )
+                select(RunModel.federation_config).where(RunModel.run_id == run_id)
             ).one_or_none()
         if row is None:
             log(ERROR, "`run_id` invalid for fetching resolved federation config")
@@ -616,19 +615,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> None:
         """Finish all unfinished tasks of the run for the given run/primary-task pairs.
 
-        The IDs must be sint64 DB values. Each task's ``finished_at`` is copied from
-        its run's primary task.
+        Each task's ``finished_at`` is copied from its run's primary task.
         """
         if not run_primary_pairs:
             return
 
-        sint_run_ids = [pair[0] for pair in run_primary_pairs]
-        sint_task_ids = [pair[1] for pair in run_primary_pairs]
+        run_ids = [pair[0] for pair in run_primary_pairs]
+        task_ids = [pair[1] for pair in run_primary_pairs]
         primary_task = aliased(TaskModel)
         primary_finished_at = (
             select(primary_task.finished_at)
             .where(
-                primary_task.task_id.in_(sint_task_ids),
+                primary_task.task_id.in_(task_ids),
                 primary_task.run_id == TaskModel.run_id,
             )
             .correlate(TaskModel)
@@ -637,7 +635,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         stmt = (
             update(TaskModel)
             .where(
-                TaskModel.run_id.in_(sint_run_ids),
+                TaskModel.run_id.in_(run_ids),
                 TaskModel.finished_at.is_(None),
             )
             .values(
@@ -655,15 +653,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result:
-            sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
             with self.session() as session:
-                run_id = session.scalar(
-                    select(RunModel.run_id).where(
-                        RunModel.primary_task_id == sint64_task_id
+                run = session.execute(
+                    select(RunModel.run_id, RunModel.space_id).where(
+                        RunModel.primary_task_id == task_id
                     )
-                )
-            if run_id is not None:
+                ).first()
+            if run is not None:
+                run_id, space_id = run
                 # Stop all tasks of the run when the run is stopped
                 if sub_status == SubStatus.STOPPED:
                     finish_sub_status = SubStatus.STOPPED
@@ -673,11 +671,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     finish_sub_status = SubStatus.FAILED
                     finish_details = "Task failed because the run finished"
                 self._finish_run_tasks(
-                    [(run_id, sint64_task_id)],
+                    [(run_id, task_id)],
                     sub_status=finish_sub_status,
                     details=finish_details,
                 )
-                self.federation_manager.report_run_usage()
+                if space_id is None:
+                    self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
@@ -691,25 +690,29 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         # Check if any of the expired tasks is referenced as a run's primary task.
-        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
+        task_ids = [task.task_id for task in tasks]
         with self.session() as session:
             rows = session.execute(
-                select(RunModel.run_id, RunModel.primary_task_id).where(
-                    RunModel.primary_task_id.in_(task_ids)
-                )
+                select(
+                    RunModel.run_id, RunModel.primary_task_id, RunModel.space_id
+                ).where(RunModel.primary_task_id.in_(task_ids))
             ).all()
         if not rows:
             return
 
         # Fail any remaining tasks for expired runs
         self._finish_run_tasks(
-            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
+            [
+                (cast(int, run_id), primary_task_id)
+                for run_id, primary_task_id, _ in rows
+            ],
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
 
         # Report usage for the run
-        self.federation_manager.report_run_usage()
+        if any(space_id is None for _, _, space_id in rows):
+            self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -721,13 +724,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         HEARTBEAT_PATIENCE = N allows for N-1 missed heartbeat before
         the node is marked as offline.
         """
-        sint64_node_id = uint64_to_int64(node_id)
-
         current_dt = now()
         stmt = (
             update(NodeModel)
             .where(
-                NodeModel.node_id == sint64_node_id,
+                NodeModel.node_id == node_id,
                 NodeModel.status != NodeStatus.UNREGISTERED,
             )
             .values(
@@ -762,11 +763,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 f"Both bytes_sent and bytes_recv cannot be zero for run {run_id}"
             )
 
-        sint64_run_id = uint64_to_int64(run_id)
-
         stmt = (
             update(RunModel)
-            .where(RunModel.run_id == sint64_run_id)
+            .where(RunModel.run_id == run_id)
             .values(
                 bytes_sent=RunModel.bytes_sent + bytes_sent,
                 bytes_recv=RunModel.bytes_recv + bytes_recv,
@@ -779,10 +778,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
-        sint64_run_id = uint64_to_int64(run_id)
         stmt = (
             update(RunModel)
-            .where(RunModel.run_id == sint64_run_id)
+            .where(RunModel.run_id == run_id)
             .values(
                 clientapp_runtime=RunModel.clientapp_runtime + runtime,
             )
@@ -824,14 +822,13 @@ def _run_status_from_task_model(task: TaskModel) -> RunStatus:
                 return RunStatus(status=Status.RUNNING, sub_status="", details="")
             return RunStatus(status=Status.STARTING, sub_status="", details="")
         return RunStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(task.task_id)
-    raise ValueError(f"The task {task_id} does not have a valid status.")
+    raise ValueError(f"The task {task.task_id} does not have a valid status.")
 
 
 def _node_info_from_model(model: NodeModel) -> NodeInfo:
     """Convert a node model to a NodeInfo message."""
     return NodeInfo(
-        node_id=int64_to_uint64(cast(int, model.node_id)),
+        node_id=cast(int, model.node_id),
         owner_aid=cast(str, model.owner_aid),
         owner_name=cast(str, model.owner_name),
         status=cast(str, model.status),
@@ -850,7 +847,7 @@ def _node_info_from_model(model: NodeModel) -> NodeInfo:
 def _run_from_models(run: RunModel, task: TaskModel) -> Run:
     """Convert a run and its primary task models to a Run object."""
     return Run(
-        run_id=int64_to_uint64(cast(int, run.run_id)),
+        run_id=cast(int, run.run_id),
         fab_id=cast(str, run.fab_id),
         fab_version=cast(str, run.fab_version),
         fab_hash=cast(str, run.fab_hash),
@@ -861,11 +858,12 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         finished_at=timestamp_to_iso(task.finished_at),
         status=_run_status_from_task_model(task),
         flwr_aid=cast(str, run.flwr_aid),
-        federation_id=cast(str, run.federation_id),
-        primary_task_id=int64_to_uint64(run.primary_task_id),
+        federation_id=run.federation_id or "",
+        primary_task_id=run.primary_task_id,
         bytes_sent=cast(int, run.bytes_sent),
         bytes_recv=cast(int, run.bytes_recv),
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
-        series_id=int64_to_uint64(run.series_id) if run.series_id else 0,
+        series_id=run.series_id or 0,
+        space_id=run.space_id,
     )

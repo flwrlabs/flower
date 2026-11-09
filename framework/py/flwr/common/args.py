@@ -15,16 +15,34 @@
 """Common Flower arguments."""
 
 import argparse
-import re
 import sys
-from io import BufferedReader
 from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
 from typing import cast
 
-from flwr.common.constant import FLWR_TASK_TOKEN_LENGTH, RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.supercore import log
+from flwr.supercore.task_worker_protocol import read_task_token_from_stdin
+
+
+def add_args_removed_health_server(parser: argparse.ArgumentParser) -> None:
+    """Warn about the unused gRPC health server option without showing it in help."""
+    parser.add_argument(
+        "--health-server-address",
+        type=_warn_unused_health_server_address,
+        nargs="?",
+        const="",
+        help=argparse.SUPPRESS,
+    )
+
+
+def _warn_unused_health_server_address(_value: str) -> None:
+    log(
+        WARN,
+        "The `--health-server-address` argument is no longer used. "
+        "Use the `/health` HTTP endpoint instead.",
+    )
 
 
 def add_args_runtime_dependency_install(
@@ -97,7 +115,7 @@ def add_args_flwr_app_common(
         "--insecure",
         action="store_true",
         help="Run the server without HTTPS, regardless of whether certificate "
-        "paths are provided. Data transmitted between the gRPC client and server "
+        "paths are provided. Data transmitted between the client and server "
         "is not encrypted. By default, the server runs with HTTPS enabled. "
         "Use this flag only if you understand the risks.",
     )
@@ -122,7 +140,7 @@ def add_args_flwr_app_common(
 def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     """Validate and return the token from a CLI argument, file, or standard input."""
     if bool(getattr(args, "token_stdin", False)):
-        return _try_obtain_flwr_app_token_from_stdin()
+        return read_task_token_from_stdin()
 
     token = cast(str | None, getattr(args, "token", None))
     if token is not None:
@@ -146,38 +164,9 @@ def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     return token
 
 
-_TASK_TOKEN_PATTERN = re.compile(rf"[0-9a-f]{{{FLWR_TASK_TOKEN_LENGTH * 2}}}")
-_TOKEN_STDIN_READ_LIMIT = FLWR_TASK_TOKEN_LENGTH * 2 + 2
-
-
-def _try_obtain_flwr_app_token_from_stdin() -> str:
-    """Return one bounded task token received over standard input."""
-    try:
-        token_bytes = bytearray()
-        token_stdin = cast(BufferedReader, sys.stdin.buffer)
-        while b"\n" not in token_bytes and len(token_bytes) < _TOKEN_STDIN_READ_LIMIT:
-            chunk = token_stdin.read1(_TOKEN_STDIN_READ_LIMIT - len(token_bytes))
-            if not chunk:
-                break
-            token_bytes.extend(chunk)
-        token_input = token_bytes.decode("ascii")
-    except (AttributeError, OSError, UnicodeError):
-        sys.exit("Standard input does not contain exactly one valid task token.")
-    finally:
-        try:
-            sys.stdin.close()
-        except OSError:
-            pass
-
-    token = token_input.removesuffix("\n")
-    if _TASK_TOKEN_PATTERN.fullmatch(token) is None:
-        sys.exit("Standard input does not contain exactly one valid task token.")
-    return token
-
-
 def try_obtain_root_certificates(
     args: argparse.Namespace,
-    grpc_server_address: str,
+    server_address: str,
 ) -> bytes | str | None:
     """Validate and return the root certificates."""
     root_cert_path: str | None = args.root_certificates
@@ -192,7 +181,7 @@ def try_obtain_root_certificates(
         log(
             WARN,
             "Option `--insecure` was set. Starting insecure channel to %s.",
-            grpc_server_address,
+            server_address,
         )
         root_certificates = None
     else:
@@ -209,7 +198,7 @@ def try_obtain_root_certificates(
             DEBUG,
             "Starting secure HTTPS channel to %s "
             "with the following certificates: %s.",
-            grpc_server_address,
+            server_address,
             root_cert_path,
         )
     return root_certificates

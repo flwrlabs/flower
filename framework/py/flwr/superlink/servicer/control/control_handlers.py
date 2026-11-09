@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import json
+import os
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -26,6 +27,7 @@ from datetime import UTC, datetime, timedelta
 from logging import ERROR, WARNING
 from threading import Thread
 from typing import Any, cast
+from uuid import UUID
 
 import requests
 
@@ -45,7 +47,6 @@ from flwr.common.constant import (
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
 from flwr.common.serde import (
@@ -77,6 +78,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -85,6 +88,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -107,6 +112,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -123,10 +130,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
+    SpaceParticipant,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -207,7 +217,7 @@ class InvalidAgentRequestError(FlowerError):
 def create_agent(
     request: CreateAgentRequest, account: AccountInfo, state: LinkState
 ) -> CreateAgentResponse:
-    """Create an agent owned by the authenticated account."""
+    """Create an agent and its initial Space with the authenticated account."""
     if not request.HasField("config"):
         raise InvalidAgentRequestError("Agent configuration is required.")
     config = request.config
@@ -614,13 +624,12 @@ def _refresh_hub_app_in_thread(
     federation_id: str,
     app_id: str,
     previous_fab_hash: str,
-    fleet_api_type: str | None,
 ) -> None:
     """Refresh a Hub app in a daemon thread."""
 
     def refresh() -> None:
         try:
-            fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, app_id)
+            fab_file, verification_dict, _ = _get_remote_fab(app_id)
             if len(fab_file) > FAB_MAX_SIZE:
                 raise ValueError("Downloaded FAB exceeds the maximum size")
             fab_config = get_fab_config(fab_file)
@@ -647,7 +656,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     request: StartRunRequest,
     account: AccountInfo,
     state: LinkState,
-    fleet_api_type: str | None,
     *,
     source: RunSource = "unknown",
 ) -> StartRunResponse:
@@ -724,9 +732,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         is_cached_hub_app = True
     # Start a run using a remote app
     elif request.app_spec:
-        fab_file, verification_dict, note = _get_remote_fab(
-            fleet_api_type, request.app_spec
-        )
+        fab_file, verification_dict, note = _get_remote_fab(request.app_spec)
         is_hub_app = True
     # Start a run using the provided app
     else:
@@ -869,7 +875,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 federation_id,
                 app_id,
                 cached_fab.hash_str,
-                fleet_api_type,
             )
     return response
 
@@ -959,21 +964,37 @@ def stream_run_events(
     after_task_event_id = None
     if request.HasField("after_task_event_id"):
         after_task_event_id = request.after_task_event_id
+
+    raw_interval = os.getenv(
+        "FLWR_RUN_EVENTS_STREAM_INTERVAL", str(RUN_EVENTS_STREAM_INTERVAL)
+    )
+    try:
+        poll_interval = float(raw_interval)
+        if not 0.01 <= poll_interval <= 60:
+            raise ValueError
+    except ValueError as err:
+        raise ValueError(
+            "FLWR_RUN_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
+            f"between 0.01 and 60, got {raw_interval!r}."
+        ) from err
+
     return _stream_run_events(
         run_id,
         run,
         after_task_event_id,
         state,
         is_active,
+        poll_interval,
     )
 
 
-def _stream_run_events(
+def _stream_run_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     run_id: int,
     run: Run,
     after_task_event_id: int | None,
     state: LinkState,
     is_active: Callable[[], bool] | None,
+    poll_interval: float,
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Yield task events until the run finishes or the stream is cancelled."""
     # LinkState creates every run with a primary task, so casting is safe
@@ -1003,7 +1024,7 @@ def _stream_run_events(
         if run.status.status == Status.FINISHED:
             continue
 
-        time.sleep(RUN_EVENTS_STREAM_INTERVAL)
+        time.sleep(poll_interval)
 
 
 def start_automation(  # pylint: disable=too-many-branches,too-many-locals
@@ -1154,7 +1175,6 @@ def dispatch_automation(
             request,
             AccountInfo(flwr_aid=flwr_aid, account_name=""),
             state,
-            None,
             source="automation",
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -1297,6 +1317,94 @@ def list_runs(
         run_dict={run.run_id: run_to_proto(run) for run in runs},
         now=now().isoformat(),
     )
+
+
+class InvalidSpaceRequestError(FlowerError):
+    """Exception raised when a space request is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            ApiErrorCode.INVALID_SPACE_REQUEST, reason, public_details=reason
+        )
+
+
+def create_space(
+    request: CreateSpaceRequest, account: AccountInfo, state: LinkState
+) -> CreateSpaceResponse:
+    """Create an untitled space and enroll the authenticated account."""
+    agent_ids = {
+        participant.agent_id
+        for participant in request.participants
+        if participant.agent_id
+    }
+    if agent_ids and not agent_ids.issubset(
+        {agent.id for agent in state.list_agents(account.flwr_aid)}
+    ):
+        raise InvalidSpaceRequestError(
+            "Agent participants must belong to your account."
+        )
+    try:
+        space = state.create_space(
+            participants=[
+                SpaceParticipant(flwr_aid=account.flwr_aid),
+                *request.participants,
+            ]
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    return CreateSpaceResponse(space=space)
+
+
+def list_spaces(
+    request: ListSpacesRequest, account: AccountInfo, state: LinkState
+) -> ListSpacesResponse:
+    """List spaces the authenticated account participates in."""
+    _ = request
+    return ListSpacesResponse(spaces=state.get_spaces(account.flwr_aid))
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, account: AccountInfo, state: LinkState
+) -> GetSpaceMessagesResponse:
+    """Read a participating user's message history with an exclusive ID cursor."""
+    limit = request.limit if request.HasField("limit") else 50
+    if limit > 100:
+        raise InvalidSpaceRequestError("limit must be at most 100.")
+    try:
+        messages = state.get_space_messages(
+            UUID(request.space_id),
+            account.flwr_aid,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if messages is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return GetSpaceMessagesResponse(messages=messages)
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, account: AccountInfo, state: LinkState
+) -> SendSpaceMessageResponse:
+    """Persist a message authored by the authenticated account."""
+    try:
+        message = state.create_space_message(
+            UUID(request.space_id),
+            SpaceParticipant(flwr_aid=account.flwr_aid),
+            request.content,
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if message is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return SendSpaceMessageResponse(message=message)
 
 
 def list_run_series(
@@ -1760,12 +1868,11 @@ def add_app(
     request: AddAppRequest,
     account: AccountInfo,
     state: LinkState,
-    fleet_api_type: str | None,
 ) -> AddAppResponse:
     """Add a Hub app to a federation."""
     federation_id = request.federation_id
     _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
-    fab_file, verification_dict, _ = _get_remote_fab(fleet_api_type, request.app_id)
+    fab_file, verification_dict, _ = _get_remote_fab(request.app_id)
     try:
         fab_config = get_fab_config(fab_file)
         app_type = _get_app_type(fab_config)
@@ -2249,17 +2356,9 @@ def _get_app_type(fab_config: dict[str, Any]) -> str:
 
 
 def _get_remote_fab(
-    fleet_api_type: str | None,
     app_spec: str,
 ) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
-    if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-        raise FlowerError(
-            ApiErrorCode.UNSUPPORTED_FAB_HUB_TRANSPORT,
-            "The selected SuperLink transport type is not "
-            "supported for connecting to Flower Hub.",
-        )
-
     # Parse and validate app specification
     try:
         app_id, app_version = parse_app_spec(app_spec)

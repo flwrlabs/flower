@@ -14,14 +14,26 @@
 # ==============================================================================
 """Tests for CoreState declarative models."""
 
+from datetime import UTC, datetime
+from uuid import UUID
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
+
 from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 
 CORESTATE_TABLE_NAMES = {
     "nonce_store",
     "fab",
+    "file",
+    "file_revision",
     "message",
     "agent",
+    "space",
+    "space_participant",
+    "space_message",
     "run_series",
     "compacted_contexts",
     "series_context",
@@ -72,3 +84,34 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables
     assert TaskLogsTable.primary_key.columns.values() == []
+
+
+@pytest.mark.parametrize("table_name", ["space_participant", "space_message"])
+@pytest.mark.parametrize(
+    ("flwr_aid", "agent_id", "valid"),
+    [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
+)
+def test_space_requires_exactly_one_identity(
+    table_name: str,
+    flwr_aid: str | None,
+    agent_id: int | None,
+    valid: bool,
+) -> None:
+    """Accept either identity and reject both or neither in both tables."""
+    table = FlwrBase.metadata.tables[table_name]
+    engine = create_engine("sqlite:///:memory:")
+    table.create(engine)
+    values: dict[str, object] = {
+        "space_id": UUID(int=1),
+        "flwr_aid": flwr_aid,
+        "agent_id": agent_id,
+    }
+    if table_name == "space_message":
+        values.update(content="Hello", created_at=datetime.now(UTC))
+
+    with engine.begin() as conn:
+        if valid:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
+                conn.execute(table.insert().values(**values))

@@ -51,7 +51,7 @@ class HeartbeatSender:
     ----------
     heartbeat_fn : Callable[[], bool]
         Function used to send a heartbeat signal. It should return True if the heartbeat
-        succeeds, or False if it fails. Any internal exceptions (e.g., gRPC errors)
+        succeeds, or False if it fails. Any internal exceptions (e.g., HTTP errors)
         should be handled within this function to ensure boolean return values.
     """
 

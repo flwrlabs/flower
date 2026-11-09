@@ -29,7 +29,10 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.common.constant import (
+    FLWR_TASK_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 
 from . import task_worker, task_worker_protocol
 
@@ -113,6 +116,12 @@ def test_protocol_rejects_invalid_messages() -> None:
 
         def write(self, data: Any, /) -> int:
             return super().write(data[:3])
+
+    assert task_worker_protocol.FLWR_TASK_TOKEN_LENGTH == FLWR_TASK_TOKEN_LENGTH
+    assert (
+        task_worker_protocol.FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+        == FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+    )
 
     channel = ShortWriteChannel()
     task_worker_protocol.send_message(channel, {"value": "\ud800"})
