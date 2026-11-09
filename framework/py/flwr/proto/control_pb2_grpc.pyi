@@ -22,6 +22,19 @@ import collections.abc
 import grpc
 import grpc.aio
 import typing
+from flwr.proto.space_pb2 import (
+    CreateSpaceRequest as CreateSpaceRequest,
+    CreateSpaceResponse as CreateSpaceResponse,
+    GetSpaceMessagesRequest as GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse as GetSpaceMessagesResponse,
+    ListSpacesRequest as ListSpacesRequest,
+    ListSpacesResponse as ListSpacesResponse,
+    SendSpaceMessageRequest as SendSpaceMessageRequest,
+    SendSpaceMessageResponse as SendSpaceMessageResponse,
+    Space as Space,
+    SpaceMessage as SpaceMessage,
+    SpaceParticipant as SpaceParticipant,
+)
 
 _T = typing.TypeVar("_T")
 

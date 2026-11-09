@@ -32,6 +32,19 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 import typing
+from flwr.proto.space_pb2 import (
+    CreateSpaceRequest as CreateSpaceRequest,
+    CreateSpaceResponse as CreateSpaceResponse,
+    GetSpaceMessagesRequest as GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse as GetSpaceMessagesResponse,
+    ListSpacesRequest as ListSpacesRequest,
+    ListSpacesResponse as ListSpacesResponse,
+    SendSpaceMessageRequest as SendSpaceMessageRequest,
+    SendSpaceMessageResponse as SendSpaceMessageResponse,
+    Space as Space,
+    SpaceMessage as SpaceMessage,
+    SpaceParticipant as SpaceParticipant,
+)
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
