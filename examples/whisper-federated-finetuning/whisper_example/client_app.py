@@ -15,7 +15,7 @@ from flwr.app import (
 from flwr.clientapp import ClientApp
 from torch.utils.data import DataLoader
 
-from whisper_example.dataset import load_data
+from whisper_example.dataset import load_data, with_torch_transform
 from whisper_example.model import construct_balanced_sampler, get_model, train_one_epoch
 
 torch.set_float32_matmul_precision(
@@ -58,13 +58,13 @@ def train(msg: Message, context: Context):
         partition_id=partition_id,
         remove_cols=context.run_config["remove-cols"],
     )
-    trainset = partition.with_format("torch", columns=["data", "targets"])
     torch.set_num_threads(og_threads)
 
     # construct sampler in order to have balanced batches
     sampler = None
-    if len(trainset) > batch_size:
-        sampler = construct_balanced_sampler(trainset)
+    if len(partition) > batch_size:
+        sampler = construct_balanced_sampler(partition)
+    trainset = with_torch_transform(partition)
 
     # Construct dataloader
     train_loader = DataLoader(

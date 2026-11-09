@@ -6,7 +6,11 @@ from datasets import concatenate_datasets, load_dataset
 from torch.utils.data import DataLoader
 from transformers import WhisperProcessor
 
-from whisper_example.dataset import get_encoding_fn, prepare_silences_dataset
+from whisper_example.dataset import (
+    get_encoding_fn,
+    prepare_silences_dataset,
+    with_torch_transform,
+)
 from whisper_example.model import (
     construct_balanced_sampler,
     eval_model,
@@ -80,13 +84,13 @@ def main():
     sampler = construct_balanced_sampler(full_train_dataset)
 
     # Prepare dataloaders
-    train_dataset = full_train_dataset.with_format("torch", columns=["data", "targets"])
+    train_dataset = with_torch_transform(full_train_dataset)
     train_loader = DataLoader(
         train_dataset, batch_size=64, shuffle=False, num_workers=4, sampler=sampler
     )
-    val_encoded = val_encoded.with_format("torch", columns=["data", "targets"])
+    val_encoded = with_torch_transform(val_encoded)
     val_loader = DataLoader(val_encoded, batch_size=64, num_workers=4)
-    test_dataset = test_encoded.with_format("torch", columns=["data", "targets"])
+    test_dataset = with_torch_transform(test_encoded)
     test_loader = DataLoader(test_dataset, batch_size=64, num_workers=4)
 
     # Model to cuda, set criterion, classification layer to train and optimiser
