@@ -182,7 +182,6 @@ from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
-    CreateFederationContext,
     CreateInvitationContext,
     RegisterSupernodeContext,
     StartRunContext,
@@ -826,20 +825,24 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         if primary_task_type == TaskType.AGENT_APP and series_id is None:
             series_description = _derive_run_series_description(user_prompt) or None
 
-        run_id = state.create_run(
-            fab_id,
-            fab_version,
-            fab.hash_str,
-            override_config,
-            federation_id,
-            resolved_federation_config,
-            flwr_aid,
-            primary_task_type,
-            user_prompt=user_prompt or None,
-            series_id=series_id,
-            series_description=series_description,
-            connector_ids=connector_ids,
-        )
+        # Allow the manager to recheck access while the run is persisted.
+        with state.federation_manager.run_admission(
+            flwr_aid=flwr_aid, federation_id=federation_id
+        ):
+            run_id = state.create_run(
+                fab_id,
+                fab_version,
+                fab.hash_str,
+                override_config,
+                federation_id,
+                resolved_federation_config,
+                flwr_aid,
+                primary_task_type,
+                user_prompt=user_prompt or None,
+                series_id=series_id,
+                series_description=series_description,
+                connector_ids=connector_ids,
+            )
 
         if run_id == 0:
             raise FlowerError(
@@ -1980,25 +1983,27 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Construct federation ID
+    # Reject delimiters and invisible characters before composing a federation ID.
+    handle = request.handle if request.HasField("handle") else account.account_name
+    if request.HasField("handle") and (
+        not handle
+        or any(
+            char in "/@" or char.isspace() or not char.isprintable() for char in handle
+        )
+    ):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must be a nonempty bare component.",
+        )
+
+    # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation_id = f"@{account.account_name}/{request.federation_name}"
-
-    runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
-    state.federation_manager.can_execute(
-        flwr_aid,
-        ActionType.CREATE_FEDERATION,
-        CreateFederationContext(
-            federation_id=federation_id,
-            runtime=runtime,
-            visibility="private",
-        ),
-    )
-
-    # Create federation
-    federation = state.federation_manager.create_federation(
-        federation_id=federation_id,
+    federation = state.federation_manager.create_federation_in_namespace(
+        caller_handle=account.account_name,
+        handle=handle,
+        federation_name=request.federation_name,
         description=request.description,
         flwr_aid=flwr_aid,
         simulation=request.simulation,

@@ -20,6 +20,8 @@ import hashlib
 import json
 import os
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -677,6 +679,70 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].type, TaskType.SIMULATION)
         self.assertEqual(apps[0].app_type, TaskType.SERVER_APP)
 
+    @parameterized.expand(
+        ["allowed", "denied", "persist_failure"]
+    )  # type: ignore[untyped-decorator]
+    def test_start_run_admission_guard(self, outcome: str) -> None:
+        """Hold admission through persistence and release it on failure."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.content = b"admission guard FAB"
+        events: list[str] = []
+        persist_run = self.state.create_run
+
+        @contextmanager
+        def admission() -> Iterator[None]:
+            events.append("enter")
+            if outcome == "denied":
+                raise FlowerError(ApiErrorCode.NO_PERMISSIONS, "Admission denied")
+            try:
+                yield
+            finally:
+                events.append("exit")
+
+        def create_run(*args: Any, **kwargs: Any) -> int:
+            events.append("persist")
+            if outcome == "persist_failure":
+                raise FlowerError(
+                    ApiErrorCode.FAILED_TO_CREATE_RUN, "Persistence failed"
+                )
+            return persist_run(*args, **kwargs)
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config",
+                return_value=("flwr/demo", "v1.0.0"),
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "run_admission",
+                return_value=admission(),
+            ) as guard,
+            patch.object(self.state, "create_run", side_effect=create_run),
+        ):
+            if outcome == "allowed":
+                response = control_handlers.start_run(
+                    request, get_current_account_info(), self.state
+                )
+                self.assertTrue(self.state.get_run_info(run_ids=[response.run_id]))
+            else:
+                with self.assertRaises(FlowerError):
+                    control_handlers.start_run(
+                        request, get_current_account_info(), self.state
+                    )
+                self.assertEqual(list(self.state.get_run_info()), [])
+
+        guard.assert_called_once_with(
+            flwr_aid=self.aid, federation_id=NOOP_FEDERATION_ID
+        )
+        self.assertEqual(
+            events,
+            ["enter"] if outcome == "denied" else ["enter", "persist", "exit"],
+        )
+
     def test_start_run_raises_if_create_run_fails(self) -> None:
         """Test StartRun raises if the initial task cannot be created."""
         fab_content = b"test FAB content task failure"
@@ -1246,7 +1312,8 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
 
-    def test_create_federation_success(self) -> None:
+    @parameterized.expand([(None,), (NOOP_ACCOUNT_NAME,)])  # type: ignore[untyped-decorator]
+    def test_create_federation_success(self, handle: str | None) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
         works."""
         # Prepare
@@ -1258,6 +1325,13 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             description=description,
             simulation=True,
         )
+        if handle is not None:
+            request.handle = handle
+        request = CreateFederationRequest.FromString(request.SerializeToString())
+        self.assertEqual(request.HasField("handle"), handle is not None)
+        self.state_factory.federation_manager = NoOpFederationManager()
+        self.state_factory.state_instance = None
+        self.state = self.state_factory.state()
         mock_members = [
             Member(account=Account(id=self.aid), role="owner"),
         ]
@@ -1351,6 +1425,9 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             simulation=False,
         )
         Mock()
+        self.state_factory.federation_manager = NoOpFederationManager()
+        self.state_factory.state_instance = None
+        self.state = self.state_factory.state()
 
         with (
             patch.object(
@@ -1373,6 +1450,77 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             cm.exception.public_details, "Create federation not permitted."
         )
         self.assertEqual(cm.exception.entitlement_code, 103)
+
+    def test_create_federation_rejects_other_namespace_by_default(self) -> None:
+        """A permissive entitlement check cannot authorize another namespace."""
+        with self.assertRaises(FlowerError) as error:
+            control_handlers.create_federation(
+                CreateFederationRequest(federation_name="demo", handle="another"),
+                get_current_account_info(),
+                self.state,
+            )
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION
+        )
+        cast(Mock, self.state.federation_manager).create_federation.assert_not_called()
+
+    def test_create_federation_dispatches_namespace_policy(self) -> None:
+        """Custom managers receive the actor and selected namespace together."""
+        manager = cast(Mock, self.state.federation_manager)
+        federation = SimpleNamespace(
+            id="@team/demo",
+            description="Team federation",
+            members=[],
+            member_count=0,
+            simulation=True,
+            can_invite_members=True,
+            can_add_supernodes=True,
+        )
+        request = CreateFederationRequest(
+            federation_name="demo",
+            description="Team federation",
+            simulation=True,
+            handle="team",
+        )
+        request = CreateFederationRequest.FromString(request.SerializeToString())
+        self.assertTrue(request.HasField("handle"))
+        with patch.object(
+            manager, "create_federation_in_namespace", return_value=federation
+        ) as create:
+            response = control_handlers.create_federation(
+                request,
+                get_current_account_info(),
+                self.state,
+            )
+
+        create.assert_called_once_with(
+            flwr_aid=self.aid,
+            caller_handle=NOOP_ACCOUNT_NAME,
+            handle="team",
+            federation_name="demo",
+            description="Team federation",
+            simulation=True,
+        )
+        manager.can_execute.assert_not_called()
+        self.assertEqual(response.federation.name, "@team/demo")
+
+    @parameterized.expand(
+        ["", "@owner", "owner/name", "two words", "x\n", "x\x00", "x\u200b"]
+    )  # type: ignore[untyped-decorator]
+    def test_create_federation_rejects_malformed_handle(self, handle: str) -> None:
+        """Reject malformed selectors before initializing or creating federations."""
+        with self.assertRaises(FlowerError) as error:
+            control_handlers.create_federation(
+                CreateFederationRequest(federation_name="demo", handle=handle),
+                get_current_account_info(),
+                self.state,
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_FEDERATION_NAME)
+        manager = cast(Mock, self.state.federation_manager)
+        manager.ensure_default_federations_exist.assert_not_called()
+        manager.create_federation_in_namespace.assert_not_called()
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation raises when federation name is invalid."""
