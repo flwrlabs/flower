@@ -17,6 +17,7 @@
 # pylint: disable=too-many-lines
 
 import importlib
+import json
 import logging
 import subprocess
 import sys
@@ -38,7 +39,6 @@ from flwr.common.constant import (
 from flwr.supercore.constant import TaskType
 from flwr.supercore.warm_executor_constants import (
     WARM_AGENTAPP_EXECUTOR_MODULE,
-    WARM_CONNECTOR_EXECUTOR_MODULE,
     WARM_CONNECTOR_EXECUTOR_SOCKET,
     WARM_EXECUTOR_BUSY_FILE,
     WARM_EXECUTOR_READY_DIRECTORY,
@@ -205,17 +205,14 @@ def test_fab_specific_agentapp_pool_uses_prestarted_worker() -> None:
         None,
         specific_key,
     )
-    assert dispatch_command[:4] == [
+    assert dispatch_command[:3] == [
         "python",
         "-m",
-        WARM_AGENTAPP_EXECUTOR_MODULE,
-        "dispatch",
+        "flwr.supercore.task_worker_protocol",
     ]
-    assert dispatch_command[-3:] == [
-        "--fab-hash",
-        _FAB_HASH,
-        "--insecure",
-    ]
+    invocation = json.loads(dispatch_command[-1])
+    assert invocation["fab_hash"] == _FAB_HASH
+    assert invocation["insecure"] is True
     assert "--allow-runtime-dependency-installation" not in dispatch_command
 
 
@@ -786,25 +783,26 @@ def test_warm_launch_requests_background_replenishment(
         },
     )
     client.create_namespaced_pod.assert_not_called()
-    worker_module = {
-        TaskType.CONNECTOR: WARM_CONNECTOR_EXECUTOR_MODULE,
-    }.get(task_type)
     assert stream.call_args.args[0] is exec_client.connect_get_namespaced_pod_exec
     assert stream.call_args.kwargs["container"] == "taskexecutor"
-    expected_dispatch_command = (
-        ["python", "-m", worker_module, "dispatch"]
-        if worker_module is not None
-        else [task_command]
-    )
-    expected_dispatch_command.extend(
-        [
+    command = stream.call_args.kwargs["command"]
+    if task_type == TaskType.CONNECTOR:
+        assert command[:3] == ["python", "-m", "flwr.supercore.task_worker_protocol"]
+        assert json.loads(command[-1]) == {
+            "socket_path": WARM_CONNECTOR_EXECUTOR_SOCKET,
+            "task_name": "Connector",
+            "runtime_api_address": "appio.example.com:9092",
+            "insecure": insecure,
+            "root_certificates_path": None if insecure else transport_args[1],
+        }
+    else:
+        assert command == [
+            task_command,
             "--runtime-api-address",
             "appio.example.com:9092",
             "--token-stdin",
             *transport_args,
         ]
-    )
-    assert stream.call_args.kwargs["command"] == expected_dispatch_command
     assert "task-token" not in stream.call_args.kwargs["command"]
     assert len(started) == 1
     dispatch = cast(
@@ -819,6 +817,27 @@ def test_warm_launch_requests_background_replenishment(
     request_maintenance.assert_called_once_with()
     client.create_namespaced_pod.assert_not_called()
     assert stream.return_value.is_open()
+
+
+def test_prestarted_dispatch_entrypoint() -> None:
+    """The module entry point uses the bounded stdin token reader."""
+    command = warm_executor_dispatch.warm_executor_command(
+        _execution_spec(task_type=TaskType.CONNECTOR, insecure=True), None
+    )
+    result = subprocess.run(
+        [sys.executable, *command[1:]],
+        input="invalid-token\n",
+        text=True,
+        capture_output=True,
+        cwd=Path(__file__).resolve().parents[4],
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        "Standard input does not contain exactly one valid task token.\n"
+    )
 
 
 @pytest.mark.parametrize(

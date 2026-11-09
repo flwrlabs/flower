@@ -37,6 +37,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    CreateSpaceRequest,
+    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -45,6 +47,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -67,6 +71,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -83,6 +89,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -197,6 +205,46 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListRuns",
             request=request,
             response_type=ListRunsResponse,
+        )
+
+    def CreateSpace(self, request: CreateSpaceRequest) -> CreateSpaceResponse:
+        """Create space."""
+        return self._unary_unary(
+            path="/v1/control/create-space",
+            rpc_method="/flwr.proto.Control/CreateSpace",
+            request=request,
+            response_type=CreateSpaceResponse,
+        )
+
+    def ListSpaces(self, request: ListSpacesRequest) -> ListSpacesResponse:
+        """List spaces."""
+        return self._unary_unary(
+            path="/v1/control/list-spaces",
+            rpc_method="/flwr.proto.Control/ListSpaces",
+            request=request,
+            response_type=ListSpacesResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Get space messages."""
+        return self._unary_unary(
+            path="/v1/control/get-space-messages",
+            rpc_method="/flwr.proto.Control/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
+        )
+
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Send space message."""
+        return self._unary_unary(
+            path="/v1/control/send-space-message",
+            rpc_method="/flwr.proto.Control/SendSpaceMessage",
+            request=request,
+            response_type=SendSpaceMessageResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:

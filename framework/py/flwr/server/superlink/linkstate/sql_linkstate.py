@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from logging import ERROR
 from typing import Any, Literal, cast
+from uuid import UUID
 
 from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -59,7 +60,11 @@ from flwr.supercore.utils import simulation_config_from_json, simulation_config_
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
-from .utils import create_user_prompt_message, generate_rand_int_from_bytes
+from .utils import (
+    create_user_prompt_message,
+    generate_rand_int_from_bytes,
+    validate_run_scope,
+)
 
 
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
@@ -74,6 +79,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.session() as session:
+            return [
+                run_id
+                for run_id in session.scalars(
+                    select(RunModel.run_id).where(RunModel.space_id == space_id)
+                )
+                if run_id is not None
+            ]
 
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""
@@ -369,7 +385,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -378,8 +394,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
     ) -> int:
         """Create a new run."""
+        validate_run_scope(
+            federation_id=federation_id,
+            space_id=space_id,
+            series_id=series_id,
+            federation_config=federation_config,
+            series_description=series_description,
+            connector_ids=connector_ids,
+            primary_task_type=primary_task_type,
+        )
         if initial_task_event is not None:
             try:
                 validate_task_event_data(initial_task_event.data)
@@ -400,20 +426,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             if existing_run_id is None:
                 current = now()
-                resolved_series_id = self.store_run_in_series(
-                    run_id=run_id,
-                    federation_id=federation_id,
-                    is_agent=primary_task_type == TaskType.AGENT_APP,
-                    series_id=series_id,
-                    description=series_description,
-                )
-                if resolved_series_id is None:
-                    log(ERROR, "Unexpected run series membership failure.")
-                    return 0
-                self._refresh_run_series_context(
-                    run_id=run_id,
-                    series_id=resolved_series_id,
-                )
+                resolved_series_id = None
+                if space_id is None:
+                    assert federation_id is not None
+                    resolved_series_id = self.store_run_in_series(
+                        run_id=run_id,
+                        federation_id=federation_id,
+                        is_agent=primary_task_type == TaskType.AGENT_APP,
+                        series_id=series_id,
+                        description=series_description,
+                    )
+                    if resolved_series_id is None:
+                        log(ERROR, "Unexpected run series membership failure.")
+                        return 0
+                    self._refresh_run_series_context(run_id, resolved_series_id)
                 session.execute(
                     insert(RunModel).values(
                         run_id=run_id,
@@ -426,6 +452,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         federation_config=fed_config_json,
                         usage_reported_at="",
                         series_id=resolved_series_id,
+                        space_id=space_id,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -628,10 +655,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if result:
             # Check whether this task is referenced as a run's primary task
             with self.session() as session:
-                run_id = session.scalar(
-                    select(RunModel.run_id).where(RunModel.primary_task_id == task_id)
-                )
-            if run_id is not None:
+                run = session.execute(
+                    select(RunModel.run_id, RunModel.space_id).where(
+                        RunModel.primary_task_id == task_id
+                    )
+                ).first()
+            if run is not None:
+                run_id, space_id = run
                 # Stop all tasks of the run when the run is stopped
                 if sub_status == SubStatus.STOPPED:
                     finish_sub_status = SubStatus.STOPPED
@@ -645,7 +675,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     sub_status=finish_sub_status,
                     details=finish_details,
                 )
-                self.federation_manager.report_run_usage()
+                if space_id is None:
+                    self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
@@ -662,22 +693,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         task_ids = [task.task_id for task in tasks]
         with self.session() as session:
             rows = session.execute(
-                select(RunModel.run_id, RunModel.primary_task_id).where(
-                    RunModel.primary_task_id.in_(task_ids)
-                )
+                select(
+                    RunModel.run_id, RunModel.primary_task_id, RunModel.space_id
+                ).where(RunModel.primary_task_id.in_(task_ids))
             ).all()
         if not rows:
             return
 
         # Fail any remaining tasks for expired runs
         self._finish_run_tasks(
-            [(cast(int, run_id), primary_task_id) for run_id, primary_task_id in rows],
+            [
+                (cast(int, run_id), primary_task_id)
+                for run_id, primary_task_id, _ in rows
+            ],
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
 
         # Report usage for the run
-        self.federation_manager.report_run_usage()
+        if any(space_id is None for _, _, space_id in rows):
+            self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -823,11 +858,12 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         finished_at=timestamp_to_iso(task.finished_at),
         status=_run_status_from_task_model(task),
         flwr_aid=cast(str, run.flwr_aid),
-        federation_id=cast(str, run.federation_id),
+        federation_id=run.federation_id or "",
         primary_task_id=run.primary_task_id,
         bytes_sent=cast(int, run.bytes_sent),
         bytes_recv=cast(int, run.bytes_recv),
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=run.series_id or 0,
+        space_id=run.space_id,
     )

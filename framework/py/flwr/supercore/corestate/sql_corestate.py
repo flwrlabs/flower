@@ -712,7 +712,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create and return an account's agent."""
+        """Create an agent and its initial Space in the same transaction."""
         if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
@@ -732,7 +732,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.add(model)
             session.flush()
-            return _agent_from_model(model)
+            agent = _agent_from_model(model)
+            self.create_space(
+                participants=[
+                    SpaceParticipant(flwr_aid=flwr_aid),
+                    SpaceParticipant(agent_id=agent.id),
+                ]
+            )
+            return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
@@ -2259,6 +2266,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -2268,6 +2276,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return task-produced run events matching the filters."""
         if last_n is not None and last_n < 0:
             raise ValueError("last_n must be non-negative")
+        if space_id is not None:
+            space_run_ids = set(self._get_run_ids_for_space(space_id))
+            run_ids = list(
+                space_run_ids
+                if run_ids is None
+                else space_run_ids.intersection(run_ids)
+            )
         cursor = after_task_event_id if after_task_event_id is not None else 0
         query = select(TaskEventModel).where(TaskEventModel.id > cursor)
         if before_task_event_id is not None:
