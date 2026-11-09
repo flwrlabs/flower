@@ -61,9 +61,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Space,
-    SpaceMessage,
-    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
@@ -75,6 +72,11 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
