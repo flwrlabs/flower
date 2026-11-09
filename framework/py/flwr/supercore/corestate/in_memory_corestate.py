@@ -1849,6 +1849,7 @@ class InMemoryCoreState(
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1858,6 +1859,13 @@ class InMemoryCoreState(
         """Return task-produced run events matching the filters."""
         if last_n is not None and last_n < 0:
             raise ValueError("last_n must be non-negative")
+        if space_id is not None:
+            space_run_ids = set(self._get_run_ids_for_space(space_id))
+            run_ids = list(
+                space_run_ids
+                if run_ids is None
+                else space_run_ids.intersection(run_ids)
+            )
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
             if run_ids is not None and not run_ids:

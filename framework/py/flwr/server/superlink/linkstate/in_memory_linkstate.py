@@ -124,6 +124,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.lock:
+            return [
+                run_id
+                for run_id, record in self.run_ids.items()
+                if record.space_id == space_id
+            ]
+
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
