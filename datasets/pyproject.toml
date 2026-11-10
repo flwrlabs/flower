@@ -53,7 +53,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vision = ["pillow>=12.2.0"]
+vision = ["pillow>=13.0.0"]
 audio = ["torch>=2.10.0", "torchcodec>=0.7.0"]
 
 [project.scripts]
