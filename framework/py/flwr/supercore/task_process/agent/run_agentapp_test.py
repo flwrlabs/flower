@@ -24,12 +24,15 @@ import threading
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import pytest
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SubStatus
+from flwr.common.serde import run_to_proto
+from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -572,3 +575,52 @@ def test_run_agentapp_keeps_cold_process_behavior(
             "success": False,
         },
     )
+
+
+def test_space_worker_invokes_agentapp_once_without_transport_prompt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Space AgentApps poll Runtime inside their invocation, including warm workers."""
+    run = Run.create_empty(456)
+    run.space_id = uuid4()
+    response = PullTaskInputResponse(run=run_to_proto(run), task_id=123)
+    response.context.run_id = run.run_id
+    grid = Mock()
+    grid._runtime_client.PullTaskInput.return_value = response
+    monkeypatch.setattr(run_agentapp_module, "HttpGrid", Mock(return_value=grid))
+    for name in (
+        "HeartbeatSender",
+        "start_log_uploader",
+        "RuntimeAgentEvents",
+        "RuntimeAgentGrid",
+        "AgentRuntime",
+        "RuntimeAgentSession",
+        "event",
+        "_set_runtime_environment",
+    ):
+        monkeypatch.setattr(run_agentapp_module, name, Mock())
+    pull = Mock(side_effect=AssertionError("Space Runs have no transport prompt"))
+    monkeypatch.setattr(run_agentapp_module, "pull_prompt", pull)
+    monkeypatch.setattr(
+        run_agentapp_module, "get_fused_config_from_dir", Mock(return_value={})
+    )
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=False,
+        preloaded=None,
+    )
+    app = Mock(spec=AgentApp)
+    monkeypatch.setattr(
+        lifecycle, "_prepare_task_app", Mock(return_value=(tmp_path, app, None))
+    )
+    assert lifecycle.run() == ExitCode.SUCCESS
+    pull.assert_not_called()
+    app.assert_called_once()
+    run_agentapp_module.RuntimeAgentSession.assert_called_once()
+    assert run_agentapp_module.RuntimeAgentSession.call_args.kwargs["prompt"] == ""
+    run_agentapp_module.RuntimeAgentEvents.return_value.emit.assert_not_called()

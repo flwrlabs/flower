@@ -54,6 +54,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -140,6 +144,15 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         task: Task,
     ) -> GetRunSeriesEventsResponse:
         """Get events from the authenticated task's run series."""
+
+    def get_space_messages(
+        self,
+        request: GetSpaceMessagesRequest,
+        state: StateT_contra,
+        task: Task,
+        task_token: str,
+    ) -> GetSpaceMessagesResponse:
+        """Read messages and advance the authenticated agent's seen cursor."""
 
     def get_space_events(
         self,

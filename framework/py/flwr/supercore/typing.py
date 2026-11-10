@@ -14,17 +14,43 @@
 # ==============================================================================
 """Flower SuperCore type definitions."""
 
+from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import TypeAlias
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, TypeAlias
+from uuid import UUID
 
 from flwr.supercore.constant import RunTime
+
+if TYPE_CHECKING:
+    from flwr.app.user_config import UserConfig
 
 JSONScalar: TypeAlias = bool | float | int | str | None
 JSONArray: TypeAlias = Sequence["JSONValue"]
 JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | JSONArray
 JSONObject: TypeAlias = dict[str, JSONValue]
+
+
+@dataclass(frozen=True)
+class AgentRunCandidate:
+    """An agent/Space pair with unseen user input and no open Run."""
+
+    space_id: UUID
+    agent_id: int
+    flwr_aid: str
+    app_spec: str
+
+
+@dataclass(frozen=True)
+class AgentRunTarget:
+    """An explicit agent target with its already resolved AgentApp."""
+
+    agent_id: int
+    fab_id: str
+    fab_version: str
+    fab_hash: str
+    override_config: UserConfig = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

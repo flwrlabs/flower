@@ -41,6 +41,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -1295,6 +1296,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             SpaceParticipantTable.c[field] == identity,
         )
         with self.session() as session:
+            if not self._lock_space(session, space_id):
+                return None
             model = session.scalars(
                 insert(SpaceMessageModel)
                 .from_select(
@@ -1314,21 +1317,29 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Read messages and advance the participant's seen cursor atomically."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        forward = after_id is not None
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
+        if unseen_only:
+            message_conditions.append(
+                SpaceMessageModel.id > SpaceParticipantTable.c.seen_through_message_id
+            )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             message_conditions.append(SpaceMessageModel.id < before_id)
@@ -1340,14 +1351,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .outerjoin(SpaceMessageModel, and_(*message_conditions))
             .where(
                 SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c.flwr_aid == flwr_aid,
+                SpaceParticipantTable.c[field] == identity,
             )
             .order_by(
-                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
+                SpaceMessageModel.id.asc()
+                if unseen_only or after_id is not None
+                else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
         with self.session() as session:
+            if not self._lock_space(session, space_id):
+                return None
             models = list(session.scalars(query))
             if not models:
                 return None
@@ -1356,7 +1371,34 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for model in models
                 if model is not None
             ]
-            return messages if forward else list(reversed(messages))
+            if messages:
+                seen_through = max(message.id for message in messages)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.seen_through_message_id < seen_through,
+                    )
+                    .values(seen_through_message_id=seen_through)
+                )
+            return (
+                messages
+                if unseen_only or after_id is not None
+                else list(reversed(messages))
+            )
+
+    def _lock_space(self, session: Session, space_id: UUID) -> bool:
+        """Serialize Space message writes, cursor reads, and Run creation."""
+        return (
+            session.scalar(
+                update(SpaceModel)
+                .where(SpaceModel.id == space_id)
+                .values(id=SpaceModel.id)
+                .returning(SpaceModel.id)
+            )
+            is not None
+        )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2413,8 +2455,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
-        if expired_tasks:
-            self._on_task_tokens_expired(expired_tasks)
+            if expired_tasks:
+                self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""

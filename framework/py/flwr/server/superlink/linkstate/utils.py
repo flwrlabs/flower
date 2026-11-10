@@ -32,6 +32,15 @@ from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
 from flwr.supercore.date import now
+from flwr.supercore.typing import AgentRunTarget
+from flwr.supercore.utils import parse_app_spec
+
+
+def validate_agent_app(target: AgentRunTarget, app_spec: str) -> None:
+    """Require the accepted FAB to match the selected agent's configuration."""
+    app_id, version = parse_app_spec(app_spec)
+    if app_id != f"@{target.fab_id}" or (version and version != target.fab_version):
+        raise ValueError("The resolved AgentApp does not match the selected agent.")
 
 
 def validate_run_scope(  # pylint: disable=too-many-arguments

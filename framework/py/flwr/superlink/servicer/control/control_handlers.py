@@ -184,6 +184,7 @@ from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
+    AgentRunTarget,
     CreateFederationContext,
     CreateInvitationContext,
     RegisterSupernodeContext,
@@ -1197,6 +1198,37 @@ def dispatch_automation(
     )
 
 
+def process_pending_agent_runs(state: LinkState, *, limit: int) -> None:
+    """Resolve eligible AgentApps before atomically opening execution windows."""
+    for candidate in state.get_pending_agent_runs(limit=limit):
+        try:
+            fab_file, verifications, _ = _get_remote_fab(candidate.app_spec)
+            config = get_fab_config(fab_file)
+            if _get_app_type(config) != TaskType.AGENT_APP:
+                raise ValueError("The participating agent must use an AgentApp.")
+            fab_id, version = get_metadata_from_config(config)
+            fab_hash = state.store_fab(
+                Fab(hashlib.sha256(fab_file).hexdigest(), fab_file, verifications)
+            )
+            state.create_agent_run(
+                candidate,
+                AgentRunTarget(
+                    candidate.agent_id,
+                    fab_id,
+                    version,
+                    fab_hash,
+                ),
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log(
+                ERROR,
+                "Unable to start agent %d in Space %s: %s",
+                candidate.agent_id,
+                candidate.space_id,
+                exc,
+            )
+
+
 def process_due_automations(
     state: LinkState,
     *,
@@ -1375,9 +1407,10 @@ def get_space_messages(
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
-            account.flwr_aid,
+            SpaceParticipant(flwr_aid=account.flwr_aid),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unseen_only=request.unseen_only,
         )
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc

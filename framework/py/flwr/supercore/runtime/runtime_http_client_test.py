@@ -44,6 +44,7 @@ _UNARY_UNARY_PATHS = (
     "push-task-events",
     "get-run-series-events",
     "get-space-events",
+    "get-space-messages",
     "get-compacted-contexts",
     "put-compacted-context",
     "pull-task-message",

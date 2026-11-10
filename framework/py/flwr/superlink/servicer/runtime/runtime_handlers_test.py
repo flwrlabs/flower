@@ -264,7 +264,7 @@ def test_ack_rejects_run_id_mismatch() -> None:
 def test_get_run_series_events_uses_authenticated_task_series() -> None:
     """GetRunSeriesEvents should derive the series from task authentication."""
     state = Mock(spec=LinkState)
-    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
+    current_run = Mock(run_id=123, series_id=456, primary_task_id=789, space_id=None)
     series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
     state.get_run_info.side_effect = [[current_run], series_runs]
     state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
