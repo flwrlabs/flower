@@ -851,14 +851,14 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 connector_ids=connector_ids,
             )
 
-        if run_id == 0:
-            raise FlowerError(
-                ApiErrorCode.FAILED_TO_CREATE_RUN,
-                "Failed to create or initialize run for "
-                f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
-                f"fab_id={fab_id}, fab_version={fab_version}, "
-                f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
-            )
+            if run_id == 0:
+                raise FlowerError(
+                    ApiErrorCode.FAILED_TO_CREATE_RUN,
+                    "Failed to create or initialize run for "
+                    f"flwr_aid={flwr_aid}, federation_id={federation_id}, "
+                    f"fab_id={fab_id}, fab_version={fab_version}, "
+                    f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
+                )
 
         run = state.get_run_info(run_ids=[run_id])[0]
         series_id = run.series_id

@@ -682,7 +682,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
     @parameterized.expand(
         [
             (outcome, runtime)
-            for outcome in ["allowed", "denied", "persist_failure"]
+            for outcome in ["allowed", "denied", "persist_failure", "zero_run_id"]
             for runtime in [RunTime.DEPLOYMENT, RunTime.SIMULATION]
         ]
     )  # type: ignore[untyped-decorator]
@@ -701,6 +701,9 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 raise FlowerError(ApiErrorCode.NO_PERMISSIONS, "Admission denied")
             try:
                 yield
+            except FlowerError:
+                events.append("abort")
+                raise
             finally:
                 events.append("exit")
 
@@ -710,6 +713,8 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 raise FlowerError(
                     ApiErrorCode.FAILED_TO_CREATE_RUN, "Persistence failed"
                 )
+            if outcome == "zero_run_id":
+                return 0
             return persist_run(*args, **kwargs)
 
         def store_app(*args: Any, **kwargs: Any) -> str:
@@ -767,7 +772,9 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             (
                 ["enter"]
                 if outcome == "denied"
-                else ["enter", "store_app", "persist", "exit"]
+                else ["enter", "store_app", "persist"]
+                + (["abort"] if outcome != "allowed" else [])
+                + ["exit"]
             ),
         )
 
