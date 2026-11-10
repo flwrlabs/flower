@@ -1493,11 +1493,14 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         )
         cast(Mock, self.state.federation_manager).create_federation.assert_not_called()
 
-    def test_create_federation_dispatches_namespace_policy(self) -> None:
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        ["team", "Team_01-test", "t" * 100]
+    )
+    def test_create_federation_dispatches_namespace_policy(self, handle: str) -> None:
         """Custom managers receive the actor and selected namespace together."""
         manager = cast(Mock, self.state.federation_manager)
         federation = SimpleNamespace(
-            id="@team/demo",
+            id=f"@{handle}/demo",
             description="Team federation",
             members=[],
             member_count=0,
@@ -1509,7 +1512,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             federation_name="demo",
             description="Team federation",
             simulation=True,
-            handle="team",
+            handle=handle,
         )
         request = CreateFederationRequest.FromString(request.SerializeToString())
         self.assertTrue(request.HasField("handle"))
@@ -1525,16 +1528,27 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         create.assert_called_once_with(
             flwr_aid=self.aid,
             caller_handle=NOOP_ACCOUNT_NAME,
-            handle="team",
+            handle=handle,
             federation_name="demo",
             description="Team federation",
             simulation=True,
         )
         manager.can_execute.assert_not_called()
-        self.assertEqual(response.federation.name, "@team/demo")
+        self.assertEqual(response.federation.name, f"@{handle}/demo")
 
     @parameterized.expand(
-        ["", "@owner", "owner/name", "two words", "x\n", "x\x00", "x\u200b"]
+        [
+            "",
+            "@owner",
+            "owner/name",
+            "two words",
+            "x\n",
+            "x\x00",
+            "x\u200b",
+            "team.name",
+            "team:name",
+            "téam",
+        ]
     )  # type: ignore[untyped-decorator]
     def test_create_federation_rejects_malformed_handle(self, handle: str) -> None:
         """Reject malformed selectors before initializing or creating federations."""

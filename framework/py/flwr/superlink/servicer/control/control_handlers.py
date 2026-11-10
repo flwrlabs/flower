@@ -189,6 +189,7 @@ from flwr.supercore.typing import (
     StartRunContext,
 )
 from flwr.supercore.utils import (
+    check_federation_format,
     get_metadata_str,
     parse_app_spec,
     request_download_link,
@@ -1988,19 +1989,18 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Reject delimiters and invisible characters before composing a federation ID.
+    # Keep explicitly selected namespaces compatible with federation ID consumers.
     handle = request.handle if request.HasField("handle") else account.account_name
-    if request.HasField("handle") and (
-        not handle
-        or any(
-            char in "/@" or char.isspace() or not char.isprintable() for char in handle
-        )
-    ):
-        raise FlowerError(
-            ApiErrorCode.INVALID_FEDERATION_NAME,
-            "Invalid namespace handle in CreateFederation request.",
-            public_details="Namespace must be a nonempty bare component.",
-        )
+    if request.HasField("handle"):
+        try:
+            check_federation_format(f"@{handle}/{request.federation_name}")
+        except ValueError as exc:
+            raise FlowerError(
+                ApiErrorCode.INVALID_FEDERATION_NAME,
+                "Invalid namespace handle in CreateFederation request.",
+                public_details="Namespace must contain only ASCII letters, digits, "
+                "hyphens, or underscores.",
+            ) from exc
 
     # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
