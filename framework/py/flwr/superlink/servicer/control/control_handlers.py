@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -1989,10 +1990,20 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Construct federation ID
+    # Keep explicitly selected namespaces compatible with federation ID consumers.
+    handle = request.handle if request.HasField("handle") else account.account_name
+    if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must contain only ASCII letters, digits, "
+            "hyphens, or underscores.",
+        )
+
+    # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation_id = f"@{account.account_name}/{request.federation_name}"
+    federation_id = f"@{handle}/{request.federation_name}"
 
     runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
     state.federation_manager.can_execute(
@@ -2005,7 +2016,7 @@ def create_federation(
         ),
     )
 
-    # Create federation
+    # The manager authorizes the selected namespace for the authenticated actor.
     federation = state.federation_manager.create_federation(
         federation_id=federation_id,
         description=request.description,

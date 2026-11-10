@@ -1437,17 +1437,23 @@ class CreateFederationRequest(google.protobuf.message.Message):
     FEDERATION_NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     SIMULATION_FIELD_NUMBER: builtins.int
+    HANDLE_FIELD_NUMBER: builtins.int
     federation_name: builtins.str
     description: builtins.str
     simulation: builtins.bool
+    handle: builtins.str
+    """Bare namespace handle. Omission selects the authenticated caller's handle."""
     def __init__(
         self,
         *,
         federation_name: builtins.str = ...,
         description: builtins.str = ...,
         simulation: builtins.bool = ...,
+        handle: builtins.str | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "federation_name", b"federation_name", "simulation", b"simulation"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_handle", b"_handle", "handle", b"handle"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_handle", b"_handle", "description", b"description", "federation_name", b"federation_name", "handle", b"handle", "simulation", b"simulation"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_handle", b"_handle"]) -> typing.Literal["handle"] | None: ...
 
 global___CreateFederationRequest = CreateFederationRequest
 

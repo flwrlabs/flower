@@ -161,10 +161,14 @@ class FederationManager(ABC):
     ) -> Federation:
         """Create a new federation.
 
+        Implementations must authorize the namespace in ``federation_id`` for the
+        authenticated actor identified by ``flwr_aid`` at creation time. The actor
+        remains the requesting account when selecting another namespace.
+
         Parameters
         ----------
         flwr_aid : str
-            The ID of the account creating the federation.
+            The ID of the authenticated account creating the federation.
         federation_id : str
             The federation ID.
         description : str
