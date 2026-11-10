@@ -158,8 +158,7 @@ dev = [
 [tool.uv]
 default-groups = ["dev"]
 # shortcut: dp-accounting caps attrs<24; remove when upstream relaxes the bound.
-# shortcut: browser-use pins Pillow 12.x; remove when upstream supports Pillow 13.
-override-dependencies = ["attrs>=24.1.0", "pillow>=13.0.0"]
+override-dependencies = ["attrs>=24.1.0"]
 
 [tool.uv.sources]
 devtool = { path = "../dev", editable = true }
