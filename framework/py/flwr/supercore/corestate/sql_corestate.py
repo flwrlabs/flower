@@ -815,7 +815,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, event: Event, recipients: Sequence[str]
     ) -> tuple[Event, Sequence[str]]:
         """Persist an immutable event and its deliveries in the current transaction."""
-        users = tuple(sorted(set(recipients)))
         event_id = UUID(event.event_id)
         with self.session() as session:
             inserted = session.scalar(
@@ -833,8 +832,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(EventModel.event_id)
             )
             if inserted is None:
-                model = session.get(EventModel, event_id)
-                assert model is not None
+                model = session.scalars(
+                    select(EventModel).where(EventModel.event_id == event_id)
+                ).one()
                 original = _event_from_model(model)
                 if original != event:
                     raise ValueError("Event ID already exists with different content")
@@ -847,14 +847,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 return original, original_users
 
-            positions = self._lock_event_feeds(session, users, increment=1)
+            positions = self._lock_event_feeds(session, recipients, increment=1)
             for user_id, seq in positions.items():
                 session.execute(
                     insert(UserEventModel).values(
                         user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
-            return event, users
+            return event, tuple(positions)
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100

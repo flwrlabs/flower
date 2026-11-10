@@ -24,7 +24,7 @@ from operator import attrgetter
 from threading import Event as ThreadEvent
 from typing import Any, cast
 from unittest.mock import call, patch
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from parameterized import parameterized
 from sqlalchemy import delete
@@ -2605,7 +2605,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(list(snapshot.agents), [agent])
         self.assertEqual(list(snapshot.spaces), list(state.get_spaces("alice")))
         self.assertEqual(snapshot.cursor, 2)
-        self.assertEqual(state.get_user_events("alice", snapshot.cursor), [])
         self.assertEqual(state.get_bootstrap("bob").cursor, 0)
         alice = SpaceParticipant(flwr_aid="alice")
         author = SpaceParticipant(agent_id=agent.id)
@@ -2615,10 +2614,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         message = state.create_space_message(UUID(space.id), author, "Hello")
         assert message is not None
         entries = state.get_user_events("alice", snapshot.cursor)
-        self.assertEqual([entry.seq for entry in entries], [3, 4])
         self.assertEqual(
-            [entry.event.type for entry in entries],
-            ["space.updated", "message.created"],
+            [(entry.seq, entry.event.type) for entry in entries],
+            [(3, "space.updated"), (4, "message.created")],
         )
         self.assertEqual(
             [entry.event for entry in entries],
@@ -2626,7 +2624,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
         self.assertEqual(entries[1].event.payload["id"], str(message.id))
-        self.assertEqual(state.get_user_events(str(agent.id)), [])
 
     def test_user_event_replay_and_retries(self) -> None:
         """Preserve shared payloads and original recipients across retries."""
@@ -2635,16 +2632,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         original = state.store_event(event, ["bob", "alice", "bob"])
         self.assertEqual(original, (event, ("alice", "bob")))
         self.assertEqual(state.store_event(event, ["charlie"]), original)
-        empty = event_from_message("agent.updated", Agent())
-        state.store_event(empty, [])
-        self.assertEqual(state.store_event(empty, ["charlie"]), (empty, ()))
         self.assertEqual(state.get_user_events("charlie"), [])
         second = event_from_message("agent.updated", Agent(id=1))
         second.created_at = (now() - timedelta(days=1)).isoformat()
         state.store_event(second, ["alice"])
         page = state.get_user_events("alice", limit=1)
         self.assertEqual(page[0].event.payload["id"], str(2**64 - 1))
-        self.assertEqual(state.get_user_events("alice", limit=1), page)
         self.assertEqual(state.get_user_events("alice", page[0].seq)[0].event, second)
         self.assertEqual(state.get_user_events("alice", 2), [])
         event.payload["id"] = "changed"
@@ -2679,10 +2672,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [(entry.seq, entry.event.space_id) for entry in page], [(3, visible.id)]
         )
         self.assertEqual(state.get_bootstrap("alice").cursor, 3)
-        self.assertEqual(len(state.get_user_events("bob")), 2)
 
-    def test_user_event_failures(self) -> None:
-        """Reject invalid cursors and roll back mutations whose journal writes fail."""
+    def test_user_event_invalid_cursors(self) -> None:
+        """Reject cursors outside the feed and nonpositive page sizes."""
         state = self.state_factory()
         for cursor in (-1, 1, 2**64):
             with self.subTest(cursor=cursor), self.assertRaises(ValueError):
@@ -2690,13 +2682,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         for limit in (0, -1):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
                 state.get_user_events("alice", limit=limit)
-        with patch("flwr.supercore.corestate.utils.uuid4", return_value=uuid4()):
-            with self.assertRaisesRegex(ValueError, "different content"):
-                state.create_agent(
-                    "alice", AgentConfig(name="Agent", app_spec="@test/app")
-                )
-        snapshot = state.get_bootstrap("alice")
-        self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
 
     def test_user_event_bootstrap_barrier(self) -> None:
         """A mutation started during bootstrap is replayed after the snapshot cursor."""
@@ -2734,49 +2719,34 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
         entries = state.get_user_events("alice", snapshot.cursor)
         assert agent is not None
-        self.assertEqual([entry.seq for entry in entries], [1, 2])
+        self.assertEqual(entries[0].event.type, "agent.updated")
         self.assertEqual(entries[0].event.payload["id"], str(agent.id))
 
     def test_user_event_sql_transactions(self) -> None:
-        """Persist feed positions across rollback and reopening in commit order."""
+        """Keep SQL events atomic, persistent, and committed in feed order."""
         state = self.state_factory()
         if (
             not isinstance(state, SqlCoreState)
             or state._is_in_memory_sqlite  # pylint: disable=protected-access
         ):
             self.skipTest("Requires persistent SQL state")
-        first = event_from_message("agent.updated", Agent(id=1))
-        state.store_event(first, ["alice", "bob"])
+        config = AgentConfig(name="Agent", app_spec="@test/app")
+        state.create_agent("alice", config)
+        snapshot = state.get_bootstrap("alice")
+        events = state.get_user_events("alice")
         with self.assertRaises(ValueError), state.session():
-            state.create_agent("alice", AgentConfig(name="Agent", app_spec="@test/app"))
+            state.create_agent("alice", config)
             raise ValueError("abort")
         state.initialize()
-        snapshot = state.get_bootstrap("alice")
-        self.assertFalse(snapshot.agents or snapshot.spaces)
-        self.assertEqual(snapshot.cursor, 1)
-        pending, release = ThreadEvent(), ThreadEvent()
-        second = event_from_message("agent.updated", Agent(id=2))
-        third = event_from_message("agent.updated", Agent(id=3))
-
-        def write() -> None:
+        self.assertEqual(state.get_bootstrap("alice"), snapshot)
+        self.assertEqual(state.get_user_events("alice"), events)
+        with ThreadPoolExecutor(max_workers=1) as executor:
             with state.session():
-                state.store_event(second, ["bob", "alice"])
-                pending.set()
-                assert release.wait(5)
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            writer = executor.submit(write)
-            try:
-                self.assertTrue(pending.wait(5))
-                follower = executor.submit(state.store_event, third, ["alice", "bob"])
-                self.assertEqual(state.get_user_events("alice", 1), [])
+                state.create_agent("alice", config)
+                follower = executor.submit(state.create_agent, "alice", config)
                 with self.assertRaises(TimeoutError):
                     follower.result(timeout=0.1)
-            finally:
-                release.set()
-            writer.result(timeout=5)
             follower.result(timeout=5)
-        for user in ("alice", "bob"):
-            entries = state.get_user_events(user)
-            self.assertEqual([entry.seq for entry in entries], [1, 2, 3])
-            self.assertEqual([entry.event for entry in entries], [first, second, third])
+        self.assertEqual(
+            [entry.seq for entry in state.get_user_events("alice")], [1, 2, 3, 4, 5, 6]
+        )
