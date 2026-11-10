@@ -648,8 +648,6 @@ class InMemoryCoreState(
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Snapshot visible state and its feed head under the mutation barrier."""
-        if not flwr_aid:
-            raise ValueError("Account ID must be nonempty")
         with self.lock_space_store:
             return BootstrapResponse(
                 agents=self.list_agents(flwr_aid),
@@ -676,8 +674,6 @@ class InMemoryCoreState(
         The caller holds lock_space_store and publishes application state
         before releasing it. New Spaces need not be in space_store yet.
         """
-        if any(not user_id for user_id in recipients):
-            raise ValueError("Recipient IDs must be nonempty")
         users = tuple(sorted(set(recipients)))
         pending: dict[UUID, Event] = {}
         for event in events:
@@ -699,8 +695,6 @@ class InMemoryCoreState(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
     ) -> Sequence[StreamEventsResponse]:
         """Return a non-consuming page, filtering current Space access."""
-        if not flwr_aid:
-            raise ValueError("Account ID must be nonempty")
         with self.lock_space_store:
             feed = self.user_event_store.get(flwr_aid, [])
             validate_event_cursor(after_seq, len(feed), limit)

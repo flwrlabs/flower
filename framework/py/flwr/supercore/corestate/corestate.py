@@ -282,65 +282,27 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
-        """Read owned Agents, participating Spaces, and a consistent feed head.
-
-        Parameters
-        ----------
-        flwr_aid : str
-            Nonempty authenticated account ID.
-
-        Returns
-        -------
-        BootstrapResponse
-            Visible state and its cursor, captured under the feed's write barrier.
-        """
+        """Return owned Agents, participating Spaces, and their consistent feed head."""
 
     @abstractmethod
     def store_event(
         self, event: Event, recipients: Sequence[str]
     ) -> tuple[Event, Sequence[str]]:
-        """Append a shared event and allocate each recipient's next feed position.
+        """Store a shared event and allocate ordered recipient positions atomically.
 
-        SQL callers can use an enclosing session to commit application changes
-        and events together. Agent, Space, and message creation already do this.
-
-        Parameters
-        ----------
-        event : Event
-            Event with a UUID, nonempty type, JSON payload, and aware timestamp.
-            A set Space ID must reference an existing Space.
-        recipients : Sequence[str]
-            Nonempty account IDs. Duplicates are ignored.
-
-        Returns
-        -------
-        tuple[Event, Sequence[str]]
-            Stored event and original recipients in sorted order. Reusing an ID
-            with identical content returns these without allocating positions;
-            changed content raises ValueError. New recipients on a retry are ignored.
+        Identical retries return the original event and sorted recipients;
+        changed content raises ValueError. SQL callers can use an enclosing session
+        to commit application changes with the event.
         """
 
     @abstractmethod
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
     ) -> Sequence[StreamEventsResponse]:
-        """Replay accessible events in ascending, exclusive user-feed order.
+        """Replay accessible events after an exclusive cursor in user-feed order.
 
-        Parameters
-        ----------
-        flwr_aid : str
-            Nonempty authenticated account ID.
-        after_seq : int, (default: 0)
-            Exclusive cursor, between zero and the committed feed head.
-            Invalid cursors raise ValueError.
-        limit : int, (default: 100)
-            Positive maximum number of accessible events to return.
-
-        Returns
-        -------
-        Sequence[StreamEventsResponse]
-            Committed entries, excluding events for currently inaccessible Spaces.
-            Reading never consumes entries or advances a shared cursor.
+        Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        Reading does not consume entries or advance a shared cursor.
         """
 
     @abstractmethod

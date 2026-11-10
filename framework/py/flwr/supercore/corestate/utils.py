@@ -37,22 +37,7 @@ _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
 def event_from_message(
     event_type: str, payload: ProtoMessage, space_id: UUID | None = None
 ) -> Event:
-    """Snapshot a protobuf payload, preserving field names and uint64 strings.
-
-    Parameters
-    ----------
-    event_type : str
-        Application event type.
-    payload : ProtoMessage
-        Message to capture as protobuf JSON.
-    space_id : UUID | None, (default: None)
-        Space whose current membership governs delivery, if applicable.
-
-    Returns
-    -------
-    Event
-        Event with a new UUID and UTC timestamp.
-    """
+    """Snapshot a protobuf payload, preserving field names and uint64 strings."""
     event = Event(
         event_id=str(uuid4()),
         type=event_type,
@@ -66,46 +51,20 @@ def event_from_message(
 
 
 def normalize_event(event: Event) -> Event:
-    """Validate event metadata and copy it into a canonical representation.
-
-    Parameters
-    ----------
-    event : Event
-        Event with a UUID, type, payload, and timezone-aware timestamp.
-
-    Returns
-    -------
-    Event
-        Independent copy with canonical UUIDs and UTC timestamp.
-    """
+    """Copy an event with canonical UUIDs and a UTC timestamp."""
     normalized = Event()
     normalized.CopyFrom(event)
     normalized.event_id = str(UUID(event.event_id))
     if event.HasField("space_id"):
         normalized.space_id = str(UUID(event.space_id))
-    if not event.type or not event.HasField("payload"):
-        raise ValueError("Event type and payload must be set")
-    # Struct permits non-finite numbers, which cannot be represented as JSON.
-    MessageToDict(event.payload)
-    created_at = datetime.fromisoformat(event.created_at)
-    if created_at.tzinfo is None:
-        raise ValueError("Event timestamp must include a timezone")
-    normalized.created_at = created_at.astimezone(UTC).isoformat()
+    normalized.created_at = (
+        datetime.fromisoformat(event.created_at).astimezone(UTC).isoformat()
+    )
     return normalized
 
 
 def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
-    """Reject cursors outside the committed feed and invalid page sizes.
-
-    Parameters
-    ----------
-    after_seq : int
-        Exclusive uint64 replay cursor.
-    head : int
-        Committed user-feed head.
-    limit : int
-        Positive maximum number of events to return.
-    """
+    """Reject cursors outside the committed feed and invalid page sizes."""
     if not 0 <= after_seq <= head:
         raise ValueError("after_seq must be between zero and the feed head")
     if limit <= 0:

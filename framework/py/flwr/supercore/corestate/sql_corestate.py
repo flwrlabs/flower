@@ -804,8 +804,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Read visible state while preventing this user's feed from committing."""
-        if not flwr_aid:
-            raise ValueError("Account ID must be nonempty")
         with self.session() as session:
             head = self._lock_event_feeds(session, [flwr_aid])[flwr_aid]
             return BootstrapResponse(
@@ -819,16 +817,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> tuple[Event, Sequence[str]]:
         """Persist an immutable event and its deliveries in the current transaction."""
         event = normalize_event(event)
-        if any(not user_id for user_id in recipients):
-            raise ValueError("Recipient IDs must be nonempty")
         users = tuple(sorted(set(recipients)))
         event_id = UUID(event.event_id)
         with self.session() as session:
-            if (
-                event.HasField("space_id")
-                and session.get(SpaceModel, UUID(event.space_id)) is None
-            ):
-                raise ValueError("Event Space does not exist")
             inserted = session.scalar(
                 self.dialect_insert(EventModel)
                 .values(
@@ -844,11 +835,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(EventModel.event_id)
             )
             if inserted is None:
-                original = _event_from_model(
-                    session.scalars(
-                        select(EventModel).where(EventModel.event_id == event_id)
-                    ).one()
-                )
+                model = session.get(EventModel, event_id)
+                assert model is not None
+                original = _event_from_model(model)
                 if original != event:
                     raise ValueError("Event ID already exists with different content")
                 original_users = tuple(
@@ -873,22 +862,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
     ) -> Sequence[StreamEventsResponse]:
         """Read a non-consuming page with access filtering before pagination."""
-        if not flwr_aid:
-            raise ValueError("Account ID must be nonempty")
         accessible = exists().where(
             SpaceParticipantTable.c.space_id == EventModel.space_id,
             SpaceParticipantTable.c.flwr_aid == flwr_aid,
         )
         with self.session() as session:
-            head = (
-                session.scalar(
-                    select(UserEventFeedModel.last_seq).where(
-                        UserEventFeedModel.user_id == flwr_aid
-                    )
-                )
-                or 0
-            )
-            validate_event_cursor(after_seq, head, limit)
+            feed = session.get(UserEventFeedModel, flwr_aid, populate_existing=True)
+            validate_event_cursor(after_seq, feed.last_seq if feed else 0, limit)
             query = (
                 select(UserEventModel.seq, EventModel)
                 .join(EventModel, EventModel.event_id == UserEventModel.event_id)
