@@ -43,8 +43,12 @@ def validate_run_scope(  # pylint: disable=too-many-arguments
     series_description: str | None,
     connector_ids: Sequence[int],
     primary_task_type: str,
+    agent_id: int | None = None,
 ) -> None:
     """Require either a federation run or a Space AgentApp run."""
+    if agent_id is not None:
+        if space_id is None:
+            raise ValueError("agent_id requires a Space run.")
     if space_id is None:
         if not federation_id:
             raise ValueError("A run requires a federation_id or space_id.")
