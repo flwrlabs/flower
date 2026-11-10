@@ -20,7 +20,7 @@ from uuid import UUID
 
 from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import INT64_MAX_VALUE, SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
@@ -43,8 +43,14 @@ def validate_run_scope(  # pylint: disable=too-many-arguments
     series_description: str | None,
     connector_ids: Sequence[int],
     primary_task_type: str,
+    agent_id: int | None = None,
 ) -> None:
     """Require either a federation run or a Space AgentApp run."""
+    if agent_id is not None:
+        if not 0 < agent_id <= INT64_MAX_VALUE:
+            raise ValueError("agent_id is outside the supported range.")
+        if space_id is None:
+            raise ValueError("agent_id requires a Space run.")
     if space_id is None:
         if not federation_id:
             raise ValueError("A run requires a federation_id or space_id.")

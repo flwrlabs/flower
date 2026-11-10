@@ -659,6 +659,8 @@ def run_to_proto(run: Run) -> ProtoRun:
         proto.primary_task_id = run.primary_task_id
     if run.space_id is not None:
         proto.space_id = str(run.space_id)
+    if run.agent_id is not None:
+        proto.agent_id = run.agent_id
     return proto
 
 
@@ -687,6 +689,7 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         series_id=run_proto.series_id,
         account_name=run_proto.account_name,
         space_id=(UUID(run_proto.space_id) if run_proto.HasField("space_id") else None),
+        agent_id=(run_proto.agent_id if run_proto.HasField("agent_id") else None),
     )
     return run
 

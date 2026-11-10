@@ -258,7 +258,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
@@ -274,6 +274,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -313,6 +314,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
         space_id : UUID | None (default: None)
             Space for an AgentApp run with a fresh context. Cannot be combined
             with federation configuration, a series, or federation connectors.
+        agent_id : int | None (default: None)
+            Executing agent assigned by the server for a Space run. The agent
+            must participate in the Space; otherwise creation returns 0.
 
         Returns
         -------
