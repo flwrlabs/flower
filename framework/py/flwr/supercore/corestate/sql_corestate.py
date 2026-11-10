@@ -1322,6 +1322,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Read messages and advance the participant's seen cursor atomically."""
         if limit <= 0:
@@ -1332,12 +1333,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
         identity = participant.flwr_aid or participant.agent_id
-        forward = after_id is not None
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
-        if participant.agent_id and before_id is None and after_id is None:
-            forward = True
+        if unseen_only:
             message_conditions.append(
                 SpaceMessageModel.id > SpaceParticipantTable.c.seen_through_message_id
             )
@@ -1355,7 +1354,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SpaceParticipantTable.c[field] == identity,
             )
             .order_by(
-                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
+                SpaceMessageModel.id.asc()
+                if unseen_only or after_id is not None
+                else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
@@ -1381,7 +1382,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .values(seen_through_message_id=seen_through)
                 )
-            return messages if forward else list(reversed(messages))
+            return (
+                messages
+                if unseen_only or after_id is not None
+                else list(reversed(messages))
+            )
 
     def _lock_space(self, session: Session, space_id: UUID) -> bool:
         """Serialize Space message writes, cursor reads, and Run creation."""

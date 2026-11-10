@@ -94,12 +94,12 @@ def test_run_window_accepts_followups(state: LinkState) -> None:
     assert not state.get_run_info()  # Submission does not create a Run.
     task_id, token = _start(state, target)
     assert not state.get_pending_agent_runs()
-    assert state.get_agent_space_messages(token, limit=1) == [first]
+    assert state.get_agent_space_messages(token, unseen_only=True, limit=1) == [first]
     assert second is not None
     assert state.get_agent_space_messages(token, before_id=second.id) == [first]
     third = state.create_space_message(space_id, user, "Follow-up")
-    assert state.get_agent_space_messages(token) == [second, third]
-    assert state.get_agent_space_messages(token) == []
+    assert state.get_agent_space_messages(token, unseen_only=True) == [second, third]
+    assert state.get_agent_space_messages(token, unseen_only=True) == []
     assert len(state.get_run_info()) == 1
     assert state.finish_task(task_id, SubStatus.COMPLETED, "")
     assert not state.get_pending_agent_runs()
@@ -178,7 +178,7 @@ def test_concurrent_schedulers_and_reads_serialize(state: LinkState) -> None:
 
     def consume(backend: LinkState) -> object:
         barrier.wait(timeout=5)
-        return backend.get_agent_space_messages(token, limit=1)
+        return backend.get_agent_space_messages(token, unseen_only=True, limit=1)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         pages = list(pool.map(consume, (state, other)))
@@ -194,6 +194,9 @@ def test_runtime_consumes_with_task_identity(state: LinkState) -> None:
     space_id, _ = _setup(state)
     message = state.create_space_message(
         space_id, SpaceParticipant(flwr_aid="alice"), "Input"
+    )
+    followup = state.create_space_message(
+        space_id, SpaceParticipant(flwr_aid="alice"), "Follow-up"
     )
     config = {
         "project": {"name": "app", "version": "1.0"},
@@ -231,9 +234,15 @@ def test_runtime_consumes_with_task_identity(state: LinkState) -> None:
     assert denied.status_code == 404
     invalid = post(GetSpaceMessagesRequest(limit=0))
     assert invalid.status_code == 400
-    response = post(GetSpaceMessagesRequest())
+    response = post(GetSpaceMessagesRequest(unseen_only=True, limit=1))
     assert response.status_code == 200
     assert GetSpaceMessagesResponse.FromString(response.content).messages == [message]
+    response = post(GetSpaceMessagesRequest(limit=1))
+    assert response.status_code == 200
+    assert GetSpaceMessagesResponse.FromString(response.content).messages == [followup]
+    response = post(GetSpaceMessagesRequest(unseen_only=True))
+    assert response.status_code == 200
+    assert not GetSpaceMessagesResponse.FromString(response.content).messages
     # Existing AgentApp trace reads work without a RunSeries; summaries never use zero.
     assert not runtime_handlers.get_run_series_events(
         GetRunSeriesEventsRequest(), state, acquired.task

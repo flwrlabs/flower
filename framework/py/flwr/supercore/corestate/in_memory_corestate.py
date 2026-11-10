@@ -1053,6 +1053,7 @@ class InMemoryCoreState(
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Read messages and advance the participant's seen cursor atomically."""
         if limit <= 0:
@@ -1065,8 +1066,8 @@ class InMemoryCoreState(
                 return None
             key = (space_id, participant.flwr_aid or participant.agent_id)
             cursor = self.space_participant_cursors.get(key, 0)
-            if participant.agent_id and before_id is None and after_id is None:
-                after_id = cursor
+            if unseen_only:
+                after_id = max(cursor, after_id or 0)
             messages = [
                 message
                 for message in self.space_message_store[space_id]

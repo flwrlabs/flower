@@ -168,6 +168,7 @@ def get_space_messages(
             task_token,
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unseen_only=request.unseen_only,
             after_id=request.after_id if request.HasField("after_id") else None,
         )
     except PermissionError as exc:

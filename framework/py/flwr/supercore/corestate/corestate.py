@@ -697,13 +697,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Return a message page in ascending ID order.
 
         Every read marks messages seen through the newest returned ID without
         moving the participant's cursor backward. Bounds are exclusive. With
-        after_id, select the earliest matching page; with before_id, the latest.
-        Without bounds, agents read their next unseen page and users the latest.
+        after_id or unseen_only, select the earliest matching page; otherwise
+        select the latest. unseen_only filters using the participant's cursor and
+        can be combined with explicit ID bounds.
         Return None for missing spaces or nonparticipants. Raise ValueError for
         a nonpositive limit or invalid range.
         """

@@ -350,6 +350,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Read with live task authority, raising PermissionError for stale tokens."""
 

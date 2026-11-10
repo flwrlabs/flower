@@ -217,15 +217,25 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
     user = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[user, *members]).id)
     messages = [state.create_space_message(space_id, user, str(i)) for i in range(3)]
-    assert state.get_space_messages(space_id, members[0], limit=2) == messages[:2]
+    assert (
+        state.get_space_messages(space_id, members[0], unseen_only=True, limit=2)
+        == messages[:2]
+    )
     assert (
         state.get_space_messages(space_id, members[0], after_id=0, limit=1)
         == messages[:1]
     )
-    assert state.get_space_messages(space_id, members[0]) == messages[2:]
-    assert state.get_space_messages(space_id, members[0]) == []
-    assert state.get_space_messages(space_id, members[1]) == messages
-    # Users keep normal history pagination; their reads also persist a seen position.
+    assert (
+        state.get_space_messages(space_id, members[0], unseen_only=True) == messages[2:]
+    )
+    assert state.get_space_messages(space_id, members[0], unseen_only=True) == []
+    assert state.get_space_messages(space_id, members[1], limit=1) == messages[-1:]
+    assert state.get_space_messages(space_id, members[1], unseen_only=True) == []
+    assert (
+        state.get_space_messages(space_id, user, unseen_only=True, limit=1)
+        == messages[:1]
+    )
+    # Both page-selection modes mark returned messages seen for this participant.
     assert state.get_space_messages(space_id, user) == messages
     assert state.get_space_messages(space_id, user, after_id=0, limit=1) == messages[:1]
     assert messages[-1] is not None

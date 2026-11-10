@@ -564,6 +564,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unseen_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Keep live task authorization and cursor advancement in one transaction."""
         with self.session() as session:
@@ -595,6 +596,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 limit=limit,
                 before_id=before_id,
                 after_id=after_id,
+                unseen_only=unseen_only,
             )
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches

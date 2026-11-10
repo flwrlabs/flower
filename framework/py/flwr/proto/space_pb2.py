@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/space.proto\x12\nflwr.proto\"I\n\x10SpaceParticipant\x12\x12\n\x08\x66lwr_aid\x18\x01 \x01(\tH\x00\x12\x12\n\x08\x61gent_id\x18\x02 \x01(\x04H\x00\x42\r\n\x0bparticipant\"j\n\x05Space\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x12\n\ncreated_at\x18\x03 \x01(\t\x12\x32\n\x0cparticipants\x18\x04 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"H\n\x12\x43reateSpaceRequest\x12\x32\n\x0cparticipants\x18\x01 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"7\n\x13\x43reateSpaceResponse\x12 \n\x05space\x18\x01 \x01(\x0b\x32\x11.flwr.proto.Space\"\x13\n\x11ListSpacesRequest\"7\n\x12ListSpacesResponse\x12!\n\x06spaces\x18\x01 \x03(\x0b\x32\x11.flwr.proto.Space\"\x7f\n\x0cSpaceMessage\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\"\x93\x01\n\x17GetSpaceMessagesRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x16\n\tbefore_id\x18\x02 \x01(\x04H\x00\x88\x01\x01\x12\x12\n\x05limit\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x15\n\x08\x61\x66ter_id\x18\x04 \x01(\x04H\x02\x88\x01\x01\x42\x0c\n\n_before_idB\x08\n\x06_limitB\x0b\n\t_after_id\"F\n\x18GetSpaceMessagesResponse\x12*\n\x08messages\x18\x01 \x03(\x0b\x32\x18.flwr.proto.SpaceMessage\"<\n\x17SendSpaceMessageRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"E\n\x18SendSpaceMessageResponse\x12)\n\x07message\x18\x01 \x01(\x0b\x32\x18.flwr.proto.SpaceMessageb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/space.proto\x12\nflwr.proto\"I\n\x10SpaceParticipant\x12\x12\n\x08\x66lwr_aid\x18\x01 \x01(\tH\x00\x12\x12\n\x08\x61gent_id\x18\x02 \x01(\x04H\x00\x42\r\n\x0bparticipant\"j\n\x05Space\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x12\n\ncreated_at\x18\x03 \x01(\t\x12\x32\n\x0cparticipants\x18\x04 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"H\n\x12\x43reateSpaceRequest\x12\x32\n\x0cparticipants\x18\x01 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"7\n\x13\x43reateSpaceResponse\x12 \n\x05space\x18\x01 \x01(\x0b\x32\x11.flwr.proto.Space\"\x13\n\x11ListSpacesRequest\"7\n\x12ListSpacesResponse\x12!\n\x06spaces\x18\x01 \x03(\x0b\x32\x11.flwr.proto.Space\"\x7f\n\x0cSpaceMessage\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\"\xa8\x01\n\x17GetSpaceMessagesRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x16\n\tbefore_id\x18\x02 \x01(\x04H\x00\x88\x01\x01\x12\x12\n\x05limit\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x15\n\x08\x61\x66ter_id\x18\x04 \x01(\x04H\x02\x88\x01\x01\x12\x13\n\x0bunseen_only\x18\x05 \x01(\x08\x42\x0c\n\n_before_idB\x08\n\x06_limitB\x0b\n\t_after_id\"F\n\x18GetSpaceMessagesResponse\x12*\n\x08messages\x18\x01 \x03(\x0b\x32\x18.flwr.proto.SpaceMessage\"<\n\x17SendSpaceMessageRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"E\n\x18SendSpaceMessageResponse\x12)\n\x07message\x18\x01 \x01(\x0b\x32\x18.flwr.proto.SpaceMessageb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -46,11 +46,11 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SPACEMESSAGE']._serialized_start=430
   _globals['_SPACEMESSAGE']._serialized_end=557
   _globals['_GETSPACEMESSAGESREQUEST']._serialized_start=560
-  _globals['_GETSPACEMESSAGESREQUEST']._serialized_end=707
-  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_start=709
-  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_end=779
-  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_start=781
-  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_end=841
-  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_start=843
-  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_end=912
+  _globals['_GETSPACEMESSAGESREQUEST']._serialized_end=728
+  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_start=730
+  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_end=800
+  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_start=802
+  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_end=862
+  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_start=864
+  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_end=933
 # @@protoc_insertion_point(module_scope)
