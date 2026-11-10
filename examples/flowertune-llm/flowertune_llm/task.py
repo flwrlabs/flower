@@ -123,7 +123,9 @@ def _parse_scheduler_job_id(stdout: str) -> str:
     # Flux IDs are opaque strings. Accept one token, but never pass an entire
     # status sentence through to a scheduler dependency argument.
     if not any(character.isspace() for character in candidate):
-        return candidate.split(";", maxsplit=1)[0]
+        job_id = candidate.split(";", maxsplit=1)[0]
+        if job_id:
+            return job_id
     raise ValueError(f"unrecognized scheduler job ID output: {candidate!r}")
 
 
@@ -1505,6 +1507,7 @@ def run_torchtitan_training(
         phase: str,
         *,
         allow_job_failure: bool = False,
+        require_job_id: bool = True,
     ) -> str:
         """Return a scheduler job ID or raise with the submission diagnostics."""
         if result.returncode != 0 and not allow_job_failure:
@@ -1516,6 +1519,17 @@ def run_torchtitan_training(
         try:
             job_id = _parse_scheduler_job_id(result.stdout)
         except ValueError as exc:
+            if not require_job_id:
+                log(
+                    INFO,
+                    "[TorchTitan] waited %s job returned no parsable job ID; "
+                    "using exit status: exit_code=%s stdout=%s stderr=%s",
+                    phase,
+                    result.returncode,
+                    result.stdout,
+                    result.stderr,
+                )
+                return "unreported"
             cleanup_failed_scheduler_run()
             raise RuntimeError(
                 f"Scheduler did not return a valid job ID for TorchTitan {phase} "
@@ -1575,7 +1589,11 @@ def run_torchtitan_training(
         for attempt in range(train_max_retries + 1):
             # Conversion already completed; its scheduler record may have been
             # purged by the time a long training attempt needs to be retried.
-            input_dependency = conversion_job_id if attempt == 0 else None
+            input_dependency = (
+                conversion_job_id
+                if attempt == 0 and scheduler_backend == "flux"
+                else None
+            )
             log(
                 INFO,
                 "[TorchTitan] training attempt %s/%s: input_dependency=%s",
@@ -1620,7 +1638,11 @@ def run_torchtitan_training(
                 if path:
                     _remove_path(path)
 
-        run_phase("from_dcp", train_job_id, conversion=True)
+        run_phase(
+            "from_dcp",
+            train_job_id if scheduler_backend == "flux" else None,
+            conversion=True,
+        )
         return completed_pipeline_result(results, job_ids)
 
     def conversion_setting(name: str, fallback: str) -> str:
@@ -1799,8 +1821,8 @@ def run_torchtitan_training(
             )
 
             submit_parts = [slurm_submit, "--parsable", "--wait"]
-            if dependency:
-                submit_parts.append(f"--dependency=afterok:{dependency}")
+            # Each phase has already completed before the next submission.
+            # Flux-backed sbatch wrappers need not return a parsable job ID.
             # Conversion workers are single-node, single-process Python jobs.
             # Native Slurm supplies defaults, but Flux-backed sbatch wrappers
             # require the allocation to be explicit. Later extra arguments can
@@ -1842,7 +1864,12 @@ def run_torchtitan_training(
                 check=False,
             )
             return (
-                parse_job_id(phase_result, phase, allow_job_failure=phase == "train"),
+                parse_job_id(
+                    phase_result,
+                    phase,
+                    allow_job_failure=phase == "train",
+                    require_job_id=False,
+                ),
                 phase_result,
             )
 

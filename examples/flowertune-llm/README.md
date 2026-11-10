@@ -109,10 +109,14 @@ converted input and input layers. Custom training scripts must retain that input
 and load the round's step-0 checkpoint when restarted.
 
 Conversion back to layers (or a state dictionary in all-at-once mode) is submitted
-only after training succeeds, with a dependency on the successful training job.
-Conversion failures, rejected submissions, and failures after the retry limit
-return a client error. Combined conversion/training jobs are not retried by this
-setting. The strategy timeout must cover queueing and all attempts; keep
+only after training succeeds. Slurm submissions use `sbatch --wait` sequentially,
+so they do not require job IDs or `afterok` dependencies; this also supports
+Slurm-compatible wrappers on Flux. Native Flux submissions retain dependencies
+on the successful preceding job and wait through `flux job attach`.
+Conversion failures and failures after the retry limit return a client error.
+Slurm training submission errors share the bounded training retry limit; native
+Flux submission errors fail immediately. Combined conversion/training jobs are
+not retried by this setting. The strategy timeout must cover queueing and all attempts; keep
 `strategy.timeout=86400` for long runs.
 
 ### 70B Aggregation-Only (Deployment Engine)
@@ -282,8 +286,10 @@ trainer.torchtitan.dcp-separate-jobs=true
 
 For layerwise aggregation, the ClientApp submits `layers -> DCP`, training, and
 `DCP -> layers` jobs. For all-at-once aggregation, it submits `state -> DCP`,
-training, and `DCP -> state` jobs. Both variants use `afterok` dependencies and
-wait for the final conversion job before returning the trained update. If the
+training, and `DCP -> state` jobs. Both variants wait for each phase to complete
+successfully before proceeding and return the trained update only after the
+final conversion. Native Flux also uses `afterok` dependencies; the Slurm backend
+does not need dependencies because each submission uses `--wait`. If the
 first-round DCP cache is already valid, the first conversion job is skipped.
 Conversion jobs inherit the normal
 `scheduler.*` resources unless overridden with

@@ -48,6 +48,8 @@ def test_parse_scheduler_job_id_supports_slurm_wrappers_and_flux() -> None:
     )
     assert task_module._parse_scheduler_job_id("1312795;cluster\n") == "1312795"
     assert task_module._parse_scheduler_job_id("f3AbCDe\n") == "f3AbCDe"
+    with pytest.raises(ValueError):
+        task_module._parse_scheduler_job_id(";cluster\n")
 
 
 def test_run_torchtitan_training_cleans_successful_dcp_handoff(
@@ -365,17 +367,17 @@ def test_layerwise_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> No
     assert "--nodes=1" in submissions[0]
     assert "--ntasks=1" in submissions[0]
     assert "--mem" in submissions[0] and "256G" in submissions[0]
-    assert not any(arg.startswith("--dependency=") for arg in submissions[0])
-    assert "--dependency=afterok:101" in submissions[1]
+    assert not any(
+        arg.startswith("--dependency=") for cmd in submissions for arg in cmd
+    )
     assert "64G" in submissions[1]
-    assert "--dependency=afterok:102" in submissions[2]
     assert "--nodes=1" in submissions[2]
     assert "--ntasks=1" in submissions[2]
     assert "--wait" in submissions[2]
 
 
 def test_all_at_once_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> None:
-    """All-at-once DCP conversion should run in dependent scheduler jobs."""
+    """All-at-once DCP conversion should run in sequential waited jobs."""
     context = Context(
         run_id=10,
         node_id=20,
@@ -441,8 +443,10 @@ def test_all_at_once_dcp_submits_dependent_slurm_jobs(tmp_path, monkeypatch) -> 
     assert result is not None
     assert torch.equal(result["weight"], torch.ones(2))
     assert len(submissions) == 3
-    assert "--dependency=afterok:201" in submissions[1]
-    assert "--dependency=afterok:202" in submissions[2]
+    assert all("--wait" in cmd for cmd in submissions)
+    assert not any(
+        arg.startswith("--dependency=") for cmd in submissions for arg in cmd
+    )
     script_dir = tmp_path / "layers" / "10" / "20" / "torchtitan"
     assert not script_dir.exists()
 
@@ -656,24 +660,33 @@ def test_separate_jobs_retry_training(
     else:
         with pytest.raises(RuntimeError):
             run()
+    if case == "submission_failure" and backend == "slurm":
+        expected_phases = ["to_dcp", "train", "train", "train"]
     assert [phase for phase, _ in submissions] == expected_phases
     assert completed == (
-        expected_phases[:-1] if case == "submission_failure" else expected_phases
+        ["to_dcp"] if case == "submission_failure" else expected_phases
     )
     if case == "exhausted":
         assert attempts == 3
     prefix = "f" if backend == "flux" else ""
     train_commands = [cmd for phase, cmd in submissions if phase == "train"]
-    if train_commands:
+    if train_commands and backend == "flux":
         assert f"--dependency=afterok:{prefix}101" in train_commands[0]
     for command in train_commands[1:]:
         assert not any(arg.startswith("--dependency=") for arg in command)
-    if case == "retry":
+    if case == "retry" and backend == "flux":
         assert f"--dependency=afterok:{prefix}103" in submissions[-1][1]
+    if backend == "slurm":
+        assert not any(
+            arg.startswith("--dependency=") for _, cmd in submissions for arg in cmd
+        )
 
 
-def test_slurm_retry_executes_real_scripts(tmp_path) -> None:
-    """A waited scheduler command reports a failed job ID and retries its script."""
+@pytest.mark.parametrize(
+    "scheduler_output", ["id", "progress_stderr", "progress_stdout", "none"]
+)
+def test_slurm_retry_executes_real_scripts(tmp_path, scheduler_output) -> None:
+    """Waited jobs retry correctly even when wrappers do not return job IDs."""
     layer_dir = tmp_path / "layers" / "10" / "20"
     layer_dir.mkdir(parents=True)
     (tmp_path / "workspace").mkdir()
@@ -683,6 +696,12 @@ def test_slurm_retry_executes_real_scripts(tmp_path) -> None:
     calls = tmp_path / "calls"
     attempts = tmp_path / "attempts"
     scheduler = tmp_path / "sbatch"
+    output = {
+        "id": 'echo "$id"\n',
+        "progress_stderr": 'echo "flux-job: f2zzfYHyZL1M started" >&2\n',
+        "progress_stdout": 'echo "flux-job: f2zzfYHyZL1M started"\n',
+        "none": "",
+    }[scheduler_output]
     scheduler.write_text(
         "#!/bin/bash\nset -u\n"
         f"counter={shlex.quote(str(counter))}\ncalls={shlex.quote(str(calls))}\n"
@@ -690,7 +709,8 @@ def test_slurm_retry_executes_real_scripts(tmp_path) -> None:
         'id=$((id + 1)); echo "$id" > "$counter"\n'
         'printf "%s\\n" "$*" >> "$calls"\n'
         'script="${@: -1}"\nbash "$script" >&2\nstatus=$?\n'
-        'echo "$id"\nexit "$status"\n'
+        + output
+        + 'exit "$status"\n'
     )
     scheduler.chmod(0o755)
     templates = {}
@@ -751,9 +771,14 @@ def test_slurm_retry_executes_real_scripts(tmp_path) -> None:
     commands = calls.read_text().splitlines()
     assert len(commands) == 4
     assert all("--wait" in cmd and "--parsable" in cmd for cmd in commands)
-    assert "--dependency=afterok:101" in commands[1]
-    assert "--dependency=" not in commands[2]
-    assert "--dependency=afterok:103" in commands[3]
+    assert all("--dependency=" not in cmd for cmd in commands)
+    script_names = [Path(shlex.split(cmd)[-1]).name for cmd in commands]
+    assert [
+        name.endswith(suffix)
+        for name, suffix in zip(
+            script_names, ["_to_dcp.sh", "_train.sh", "_train.sh", "_from_dcp.sh"]
+        )
+    ] == [True] * 4
 
 
 def test_layerwise_dcp_client_conversion_runs_outside_job(
