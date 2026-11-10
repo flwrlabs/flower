@@ -344,8 +344,13 @@ erDiagram
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
   task ||--o{ task_usage : task_id
-  user_event_feeds ||--o{ user_events : user_id
+  user_event_feeds ||--o| user_events : user_id
   events ||--o{ user_events : event_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
+
+The `user_events` primary key is `(user_id, seq)`, so each `user_event_feeds` row
+can have many `user_events` rows. Paracelsus renders this relationship as
+zero-or-one because it treats each column in a composite primary key as
+individually unique.
