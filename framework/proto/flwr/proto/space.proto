@@ -55,6 +55,10 @@ message GetSpaceMessagesRequest {
   optional uint32 limit = 3;
   // Runtime only: exclusive lower bound, selecting the earliest matching page.
   optional uint64 after_id = 4;
+  // Runtime only: read the next unseen page and advance the agent's cursor.
+  // Cannot be combined with before_id or after_id. History reads leave it
+  // false.
+  bool consume = 5;
 }
 message GetSpaceMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.

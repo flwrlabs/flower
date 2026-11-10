@@ -62,6 +62,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
@@ -294,6 +298,19 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest,
+    state: NodeState,
+    task: Task,
+    task_token: str,
+) -> GetSpaceMessagesResponse:
+    """Space agent message retrieval is only available on SuperLink."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space agent messages require SuperLink.",
+    )
 
 
 def get_space_events(

@@ -23,13 +23,13 @@ from uuid import UUID
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
-from flwr.proto.control_pb2 import SpaceMessage  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceMessage  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.typing import AgentRunTarget
+from flwr.supercore.typing import AgentRunCandidate, AgentRunTarget
 from flwr.superlink.federation import FederationManager
 
 from .utils import create_run_context
@@ -260,7 +260,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
         fab_id: str | None,
         fab_version: str | None,
@@ -276,6 +276,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -315,6 +316,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         space_id : UUID | None (default: None)
             Space for an AgentApp run with a fresh context. Cannot be combined
             with federation configuration, a series, or federation connectors.
+        agent_id : int | None (default: None)
+            Server-owned executing agent identity for a Space Run.
 
         Returns
         -------
@@ -328,17 +331,28 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def submit_agent_message(
-        self,
-        space_id: UUID,
-        flwr_aid: str,
-        content: str,
-        targets: Sequence[AgentRunTarget],
-    ) -> tuple[SpaceMessage, list[int]]:
-        """Publish a message, queue entries, and pending executions atomically.
+    def get_pending_agent_runs(
+        self, *, limit: int = 100
+    ) -> Sequence[AgentRunCandidate]:
+        """Find participating agents with unseen user input and no open Run."""
 
-        Only explicit targets execute. A failure rolls back the entire submission.
-        """
+    @abc.abstractmethod
+    def create_agent_run(
+        self, candidate: AgentRunCandidate, target: AgentRunTarget
+    ) -> int | None:
+        """Create one Run window after atomically rechecking cursor eligibility."""
+
+    @abc.abstractmethod
+    def get_agent_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        task_token: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        consume: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Read with live task authority, raising PermissionError for stale tokens."""
 
     @abc.abstractmethod
     def get_run_info(  # pylint: disable=too-many-arguments

@@ -21,14 +21,6 @@ erDiagram
     TIMESTAMP updated_at
   }
 
-  agent_queue {
-    BIGINT id PK
-    BIGINT agent_id FK
-    BIGINT message_id FK
-    CHAR(32) space_id FK
-    BIGINT run_id UK
-  }
-
   automation {
     INTEGER automation_id PK
     TIMESTAMP created_at
@@ -189,6 +181,7 @@ erDiagram
   }
 
   run {
+    BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
@@ -255,6 +248,7 @@ erDiagram
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
+    BIGINT seen_through_message_id
   }
 
   task {
@@ -316,15 +310,13 @@ erDiagram
     VARCHAR usage_type
   }
 
-  space ||--o{ agent_queue : space_id
-  agent ||--o{ agent_queue : agent_id
-  space_message ||--o{ agent_queue : message_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
+  agent ||--o{ run : agent_id
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id

@@ -33,14 +33,13 @@ JSONObject: TypeAlias = dict[str, JSONValue]
 
 
 @dataclass(frozen=True)
-class AgentQueueEntry:
-    """Persisted agent trigger and its position in the execution queue."""
+class AgentRunCandidate:
+    """An agent/Space pair with unseen user input and no open Run."""
 
-    id: int
     space_id: UUID
     agent_id: int
-    message_id: int
-    run_id: int
+    flwr_aid: str
+    app_spec: str
 
 
 @dataclass(frozen=True)

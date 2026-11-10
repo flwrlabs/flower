@@ -74,6 +74,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+)
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
@@ -234,6 +238,17 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetRunSeriesEvents",
             request=request,
             response_type=GetRunSeriesEventsResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Read history, or set consume to advance the agent's seen cursor."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-messages",
+            rpc_method="/flwr.proto.Runtime/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
         )
 
     def GetSpaceEvents(self, request: GetSpaceEventsRequest) -> GetSpaceEventsResponse:

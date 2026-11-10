@@ -23,7 +23,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
+from sqlalchemy import MetaData, Select, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -38,13 +38,10 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    SpaceMessage,
-    SpaceParticipant,
-)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceMessage, SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
@@ -54,18 +51,18 @@ from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
-from flwr.supercore.state.schema.corestate_models import AgentQueue as AgentQueueModel
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import (
     SpaceMessage as SpaceMessageModel,
 )
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.typing import AgentRunTarget
+from flwr.supercore.typing import AgentRunCandidate, AgentRunTarget
 from flwr.supercore.utils import simulation_config_from_json, simulation_config_to_json
 from flwr.superlink.federation import FederationManager
 
@@ -74,7 +71,6 @@ from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
     validate_agent_app,
-    validate_agent_submission,
     validate_run_scope,
 )
 
@@ -407,6 +403,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -465,6 +462,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         usage_reported_at="",
                         series_id=resolved_series_id,
                         space_id=space_id,
+                        agent_id=agent_id,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -514,107 +512,92 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
-    def submit_agent_message(
-        self,
-        space_id: UUID,
-        flwr_aid: str,
-        content: str,
-        targets: Sequence[AgentRunTarget],
-    ) -> tuple[SpaceMessage, list[int]]:
-        """Commit the message, queue entries, and pending runs together."""
-        targets = tuple(targets)
-        validate_agent_submission(flwr_aid, content, targets)
+    def get_pending_agent_runs(
+        self, *, limit: int = 100
+    ) -> Sequence[AgentRunCandidate]:
+        """Find participating agents with unread user input and no open Run."""
+        self._cleanup_expired_task_tokens()
         with self.session() as session:
-            if not self._lock_space(session, space_id):
-                raise ValueError("Space does not exist.")
-            message = self.create_space_message(
-                space_id, SpaceParticipant(flwr_aid=flwr_aid), content
-            )
-            if message is None:
-                raise ValueError("The caller must participate in the Space.")
-            run_ids: list[int] = []
-            for target in targets:
-                app_spec = session.scalar(
-                    select(AgentModel.app_spec).where(
-                        AgentModel.agent_id == target.agent_id
-                    )
-                )
-                if app_spec is None:
-                    raise ValueError("Agent does not exist.")
-                validate_agent_app(target, app_spec)
-                if self.get_fab(target.fab_hash) is None:
-                    raise ValueError("The resolved AgentApp FAB must be stored first.")
-                run_id = self.create_run(
-                    fab_id=target.fab_id,
-                    fab_version=target.fab_version,
-                    fab_hash=target.fab_hash,
-                    override_config=target.override_config.copy(),
-                    federation_id=None,
-                    federation_config=None,
-                    flwr_aid=flwr_aid,
-                    primary_task_type=TaskType.AGENT_APP,
-                    space_id=space_id,
-                )
-                if not run_id:
-                    raise ValueError("Failed to create the agent run.")
-                self.create_agent_queue_entry(
-                    space_id, target.agent_id, message.id, run_id
-                )
-                run_ids.append(run_id)
-            return message, run_ids
+            return [
+                AgentRunCandidate(*row)
+                for row in session.execute(_agent_run_candidates_query().limit(limit))
+            ]
 
-    def activate_task(self, task_id: int) -> bool:
-        """Start prompt delivery when a queued primary Task begins execution."""
+    def create_agent_run(
+        self, candidate: AgentRunCandidate, target: AgentRunTarget
+    ) -> int | None:
+        """Recheck eligibility under the Space guard before creating a Run."""
         with self.session() as session:
-            if not super().activate_task(task_id):
-                return False
-            source = session.execute(
-                select(AgentQueueModel.run_id, SpaceMessageModel.content)
-                .join(
-                    SpaceMessageModel,
-                    SpaceMessageModel.id == AgentQueueModel.message_id,
+            if not self._lock_space(session, candidate.space_id):
+                return None
+            current = session.execute(
+                _agent_run_candidates_query().where(
+                    SpaceParticipantTable.c.space_id == candidate.space_id,
+                    AgentModel.agent_id == candidate.agent_id,
                 )
-                .join(RunModel, RunModel.run_id == AgentQueueModel.run_id)
-                .where(RunModel.primary_task_id == task_id)
-            ).first()
-            if source is not None:
-                prompt = create_user_prompt_message(source.run_id, source.content)
-                if not self.store_messages([prompt])[0]:
-                    raise ValueError("Failed to store the agent input.")
-                self._store_generated_message(prompt)
-            return True
-
-    def claim_task(self, task_id: int) -> str | None:
-        """Apply queue eligibility atomically with the generic task claim."""
-        with self.session() as session:
-            scope = session.execute(
-                select(
-                    AgentQueueModel.space_id,
-                    AgentQueueModel.agent_id,
-                    AgentQueueModel.message_id,
-                )
-                .join(RunModel, RunModel.run_id == AgentQueueModel.run_id)
-                .where(RunModel.primary_task_id == task_id)
             ).one_or_none()
-        if scope is None:
-            return super().claim_task(task_id)
-        with self.session() as session:
-            if not self._lock_space(session, scope.space_id):
+            if current is None or AgentRunCandidate(*current) != candidate:
                 return None
-            older = session.scalar(
-                select(AgentQueueModel.run_id)
-                .join(TaskModel, TaskModel.run_id == AgentQueueModel.run_id)
-                .where(
-                    AgentQueueModel.space_id == scope.space_id,
-                    AgentQueueModel.agent_id == scope.agent_id,
-                    AgentQueueModel.message_id < scope.message_id,
-                    TaskModel.finished_at.is_(None),
-                )
-                .limit(1)
+            if target.agent_id != candidate.agent_id:
+                raise ValueError("The resolved AgentApp targets a different agent.")
+            validate_agent_app(target, candidate.app_spec)
+            if self.get_fab(target.fab_hash) is None:
+                raise ValueError("The resolved AgentApp FAB must be stored first.")
+            run_id = self.create_run(
+                fab_id=target.fab_id,
+                fab_version=target.fab_version,
+                fab_hash=target.fab_hash,
+                override_config=target.override_config.copy(),
+                federation_id=None,
+                federation_config=None,
+                flwr_aid=candidate.flwr_aid,
+                primary_task_type=TaskType.AGENT_APP,
+                space_id=candidate.space_id,
+                agent_id=candidate.agent_id,
             )
-            if older is not None:
+            return run_id or None
+
+    def get_agent_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        task_token: str,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        consume: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Keep live task authorization and cursor advancement in one transaction."""
+        with self.session() as session:
+            run = session.scalar(
+                select(RunModel)
+                .join(TaskModel, TaskModel.run_id == RunModel.run_id)
+                .where(TaskModel.token == task_token)
+            )
+            if run is None or run.space_id is None or run.agent_id is None:
+                raise PermissionError("A live Space agent task is required.")
+            if not self._lock_space(session, run.space_id):
                 return None
-            return super().claim_task(task_id)
+            task = session.scalar(
+                select(TaskModel)
+                .where(
+                    TaskModel.token == task_token,
+                    TaskModel.type == TaskType.AGENT_APP,
+                    TaskModel.task_id == run.primary_task_id,
+                    TaskModel.finished_at.is_(None),
+                    TaskModel.active_until >= now(),
+                )
+                .with_for_update()
+            )
+            if task is None:
+                raise PermissionError("A live Space agent task is required.")
+            return self.get_space_messages(
+                run.space_id,
+                SpaceParticipant(agent_id=run.agent_id),
+                limit=limit,
+                before_id=before_id,
+                after_id=after_id,
+                consume=consume,
+            )
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,
@@ -976,4 +959,43 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         primary_task_type=task.type,
         series_id=run.series_id or 0,
         space_id=run.space_id,
+        agent_id=run.agent_id,
+    )
+
+
+def _agent_run_candidates_query() -> Select[tuple[UUID, int, str, str]]:
+    """Select unread agent/Space pairs without an unfinished primary Task."""
+    unread = (
+        select(SpaceMessageModel.id)
+        .where(
+            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
+            SpaceMessageModel.flwr_aid.is_not(None),
+            SpaceMessageModel.id > SpaceParticipantTable.c.seen_through_message_id,
+        )
+        .exists()
+    )
+    open_run = (
+        select(RunModel.run_id)
+        .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+        .where(
+            RunModel.space_id == SpaceParticipantTable.c.space_id,
+            RunModel.agent_id == AgentModel.agent_id,
+            TaskModel.finished_at.is_(None),
+        )
+        .correlate(SpaceParticipantTable, AgentModel)
+        .exists()
+    )
+    return (
+        select(
+            SpaceParticipantTable.c.space_id,
+            AgentModel.agent_id,
+            AgentModel.flwr_aid,
+            AgentModel.app_spec,
+        )
+        .join(AgentModel, AgentModel.agent_id == SpaceParticipantTable.c.agent_id)
+        .where(
+            unread,
+            ~open_run,
+        )
+        .order_by(SpaceParticipantTable.c.space_id, AgentModel.agent_id)
     )

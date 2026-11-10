@@ -64,6 +64,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
@@ -76,7 +80,10 @@ from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_han
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    process_pending_agent_runs,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
@@ -90,6 +97,24 @@ def get_run_series_events(
     """Get events from all runs in the authenticated task's series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
     run = state.get_run_info(run_ids=[task.run_id])[0]
+    if run.space_id is not None:
+        return GetRunSeriesEventsResponse(
+            events=state.get_task_events(
+                space_id=run.space_id,
+                event_types=request.event_types or None,
+                after_task_event_id=(
+                    request.after_event_id
+                    if request.HasField("after_event_id")
+                    else None
+                ),
+                before_task_event_id=(
+                    request.before_event_id
+                    if request.HasField("before_event_id")
+                    else None
+                ),
+                last_n=request.last_n or None,
+            )
+        )
     series = state.get_run_series(series_ids=[run.series_id])[0]
     series_runs = state.get_run_info(run_ids=series.run_ids)
     primary_task_ids = [
@@ -107,6 +132,52 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest,
+    state: LinkState,
+    task: Task,
+    task_token: str,
+) -> GetSpaceMessagesResponse:
+    """Read or consume messages using the authenticated Run's agent identity."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    run = runs[0]
+    if (
+        run.space_id is None
+        or run.agent_id is None
+        or task.type != TaskType.AGENT_APP
+        or task.task_id != run.primary_task_id
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE, "A Space agent task is required."
+        )
+    if request.space_id and request.space_id != str(run.space_id):
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space not found.")
+    limit = request.limit if request.HasField("limit") else 50
+    if not 1 <= limit <= 100:
+        raise FlowerError(
+            ApiErrorCode.INVALID_SPACE_REQUEST, "limit must be between 1 and 100."
+        )
+    try:
+        messages = state.get_agent_space_messages(
+            task_token,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+            after_id=request.after_id if request.HasField("after_id") else None,
+            consume=request.consume,
+        )
+    except PermissionError as exc:
+        raise FlowerError(ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, str(exc)) from exc
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if messages is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space not found.")
+    return GetSpaceMessagesResponse(messages=messages)
 
 
 def get_space_events(
@@ -138,6 +209,11 @@ def get_compacted_contexts(
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
+    if not runs[0].series_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Compacted contexts require a RunSeries.",
+        )
     return core_runtime_handlers.get_compacted_contexts(
         request, state, runs[0].series_id
     )
@@ -152,6 +228,11 @@ def put_compacted_context(
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
+    if not runs[0].series_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Compacted contexts require a RunSeries.",
+        )
     return core_runtime_handlers.put_compacted_context(
         request, state, runs[0].series_id
     )
@@ -160,6 +241,7 @@ def put_compacted_context(
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
     """Process due automations, then acquire an eligible pending task."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    process_pending_agent_runs(state, limit=100)
     return core_runtime_handlers.acquire_task(request, state)
 
 

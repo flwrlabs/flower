@@ -36,21 +36,6 @@ from flwr.supercore.typing import AgentRunTarget
 from flwr.supercore.utils import parse_app_spec
 
 
-def validate_agent_submission(
-    flwr_aid: str, content: str, targets: Sequence[AgentRunTarget]
-) -> None:
-    """Require a user message and unique, resolved agent targets."""
-    if not flwr_aid or not content.strip():
-        raise ValueError("An account and nonempty message content are required.")
-    if len({target.agent_id for target in targets}) != len(targets):
-        raise ValueError("Each agent may be targeted only once.")
-    for target in targets:
-        if not 0 < target.agent_id < 2**63:
-            raise ValueError("Agent IDs must be positive signed 64-bit integers.")
-        if not all((target.fab_id, target.fab_version, target.fab_hash)):
-            raise ValueError("A resolved AgentApp is required.")
-
-
 def validate_agent_app(target: AgentRunTarget, app_spec: str) -> None:
     """Require the accepted FAB to match the selected agent's configuration."""
     app_id, version = parse_app_spec(app_spec)

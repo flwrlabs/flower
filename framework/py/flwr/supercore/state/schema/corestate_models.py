@@ -225,6 +225,7 @@ SpaceParticipantTable = Table(
     Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
+    Column("seen_through_message_id", BigInteger, nullable=False, server_default="0"),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
@@ -262,33 +263,6 @@ class SpaceMessage(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-
-
-class AgentQueue(FlwrBase):
-    """Persist agent orchestration independently of worker Tasks."""
-
-    __tablename__ = "agent_queue"
-    __table_args__ = (
-        UniqueConstraint("agent_id", "message_id", name="uq_agent_queue_message"),
-        Index(
-            "idx_agent_queue_space_agent_message", "space_id", "agent_id", "message_id"
-        ),
-        {"sqlite_autoincrement": True},
-    )
-
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-        autoincrement=True,
-    )
-    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
-    agent_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("agent.agent_id"), nullable=False
-    )
-    message_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("space_message.id"), nullable=False
-    )
-    run_id: Mapped[int] = mapped_column(UInt64(), unique=True, nullable=False)
 
 
 class SeriesContext(FlwrBase):

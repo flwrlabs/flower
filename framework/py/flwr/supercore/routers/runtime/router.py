@@ -78,12 +78,17 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+)
 from flwr.supercore.dependencies.runtime import (
     RuntimeHandlersDependency,
     RuntimeStateDependency,
     SuperExecAuthDependency,
     TaskDependency,
 )
+from flwr.supercore.dependencies.task import TaskTokenDependency
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
@@ -255,6 +260,19 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get events from the authenticated task's run series."""
     return handlers.get_run_series_events(request, state, task)
+
+
+@router.post("/get-space-messages")
+def runtime_get_space_messages(
+    request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+    token: TaskTokenDependency,
+) -> GetSpaceMessagesResponse:
+    """Read or consume messages in the authenticated agent's Space."""
+    assert token is not None  # TaskDependency has authenticated the header.
+    return handlers.get_space_messages(request, state, task, token)
 
 
 @router.post("/get-space-events")
