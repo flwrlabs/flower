@@ -20,7 +20,7 @@ from uuid import UUID
 
 from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common.constant import INT64_MAX_VALUE, SUPERLINK_NODE_ID
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
