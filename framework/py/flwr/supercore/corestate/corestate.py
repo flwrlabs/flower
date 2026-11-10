@@ -22,6 +22,8 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from google.protobuf.message import Message as ProtoMessage
+
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -285,14 +287,21 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return owned Agents, participating Spaces, and their consistent feed head."""
 
     @abstractmethod
-    def store_event(
-        self, event: Event, recipients: Sequence[str]
+    def store_event(  # pylint: disable=too-many-arguments
+        self,
+        event_id: UUID,
+        event_type: str,
+        payload: ProtoMessage,
+        recipients: Sequence[str],
+        *,
+        space_id: UUID | None = None,
     ) -> tuple[Event, Sequence[str]]:
         """Store a shared event and allocate ordered recipient positions atomically.
 
-        Identical retries return the original event and sorted recipients;
-        changed content raises ValueError. SQL callers can use an enclosing session
-        to commit application changes with the event.
+        CoreState assigns the creation timestamp. Identical retries return the
+        original event and sorted recipients; changing type, Space, or payload
+        raises ValueError. SQL callers can use an enclosing session to commit
+        application changes with the event.
         """
 
     @abstractmethod

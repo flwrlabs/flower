@@ -17,37 +17,16 @@
 
 from datetime import UTC, datetime
 from os import urandom
-from uuid import UUID, uuid4
-
-from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import Message as ProtoMessage
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
-from flwr.proto.control_pb2 import Event  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
-
-
-def event_from_message(
-    event_type: str, payload: ProtoMessage, space_id: UUID | None = None
-) -> Event:
-    """Snapshot a protobuf payload, preserving field names and uint64 strings."""
-    event = Event(
-        event_id=str(uuid4()),
-        type=event_type,
-        created_at=now().isoformat(),
-    )
-    event.payload.update(MessageToDict(payload, preserving_proto_field_name=True))
-    event.payload.SetInParent()
-    if space_id is not None:
-        event.space_id = str(space_id)
-    return event
 
 
 def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:

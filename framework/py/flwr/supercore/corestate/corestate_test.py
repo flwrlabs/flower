@@ -24,7 +24,7 @@ from operator import attrgetter
 from threading import Event as ThreadEvent
 from typing import Any, cast
 from unittest.mock import call, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from parameterized import parameterized
 from sqlalchemy import delete
@@ -65,7 +65,6 @@ from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from . import CoreState
 from .in_memory_corestate import InMemoryCoreState
 from .sql_corestate import SqlCoreState
-from .utils import event_from_message
 from .utils_test import create_task_message
 
 
@@ -2628,21 +2627,38 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_user_event_replay_and_retries(self) -> None:
         """Preserve shared payloads and original recipients across retries."""
         state = self.state_factory()
-        event = event_from_message("agent.updated", Agent(id=2**64 - 1))
-        original = state.store_event(event, ["bob", "alice", "bob"])
-        self.assertEqual(original, (event, ("alice", "bob")))
-        self.assertEqual(state.store_event(event, ["charlie"]), original)
+        event_id = uuid4()
+        payload = Agent(id=2**64 - 1)
+        created_at = now()
+        with self._patch_message_time(created_at):
+            original = state.store_event(
+                event_id, "agent.updated", payload, ["bob", "alice", "bob"]
+            )
+        self.assertEqual(original[0].created_at, created_at.isoformat())
+        self.assertEqual(original[1], ("alice", "bob"))
+        with self._patch_message_time(created_at + timedelta(days=1)):
+            self.assertEqual(
+                state.store_event(event_id, "agent.updated", payload, ["charlie"]),
+                original,
+            )
         self.assertEqual(state.get_user_events("charlie"), [])
-        second = event_from_message("agent.updated", Agent(id=1))
-        second.created_at = (now() - timedelta(days=1)).isoformat()
-        state.store_event(second, ["alice"])
+        second_id = uuid4()
+        with self._patch_message_time(created_at - timedelta(days=1)):
+            second, _ = state.store_event(
+                second_id, "agent.updated", Agent(), ["alice"]
+            )
+        self.assertTrue(second.HasField("payload"))
+        self.assertEqual(
+            state.store_event(second_id, "agent.updated", Agent(), ["charlie"]),
+            (second, ("alice",)),
+        )
         page = state.get_user_events("alice", limit=1)
         self.assertEqual(page[0].event.payload["id"], str(2**64 - 1))
         self.assertEqual(state.get_user_events("alice", page[0].seq)[0].event, second)
         self.assertEqual(state.get_user_events("alice", 2), [])
-        event.payload["id"] = "changed"
+        payload.id = 1
         with self.assertRaisesRegex(ValueError, "different content"):
-            state.store_event(event, ["alice"])
+            state.store_event(event_id, "agent.updated", payload, ["alice"])
         original[0].type = "changed"
         self.assertEqual(state.get_user_events("alice", limit=1), page)
 

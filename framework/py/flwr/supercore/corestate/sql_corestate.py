@@ -27,6 +27,7 @@ from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import Message as ProtoMessage
 from sqlalchemy import (
     MetaData,
     and_,
@@ -161,7 +162,6 @@ from .corestate import CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
-    event_from_message,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
     validate_event_cursor,
@@ -759,7 +759,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
-            self.store_event(event_from_message("agent.updated", agent), [flwr_aid])
+            self.store_event(uuid4(), "agent.updated", agent, [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -811,32 +811,39 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 cursor=head,
             )
 
-    def store_event(
-        self, event: Event, recipients: Sequence[str]
+    def store_event(  # pylint: disable=too-many-arguments
+        self,
+        event_id: UUID,
+        event_type: str,
+        payload: ProtoMessage,
+        recipients: Sequence[str],
+        *,
+        space_id: UUID | None = None,
     ) -> tuple[Event, Sequence[str]]:
         """Persist an immutable event and its deliveries in the current transaction."""
-        event_id = UUID(event.event_id)
+        content = MessageToDict(payload, preserving_proto_field_name=True)
         with self.session() as session:
-            inserted = session.scalar(
+            model = session.scalars(
                 self.dialect_insert(EventModel)
                 .values(
                     event_id=event_id,
-                    type=event.type,
-                    space_id=(
-                        UUID(event.space_id) if event.HasField("space_id") else None
-                    ),
-                    payload=MessageToDict(event.payload),
-                    created_at=datetime.fromisoformat(event.created_at),
+                    type=event_type,
+                    space_id=space_id,
+                    payload=content,
+                    created_at=now(),
                 )
                 .on_conflict_do_nothing(index_elements=[EventModel.event_id])
-                .returning(EventModel.event_id)
-            )
-            if inserted is None:
+                .returning(EventModel)
+            ).one_or_none()
+            if model is None:
                 model = session.scalars(
                     select(EventModel).where(EventModel.event_id == event_id)
                 ).one()
-                original = _event_from_model(model)
-                if original != event:
+                if (
+                    model.type != event_type
+                    or model.space_id != space_id
+                    or model.payload != content
+                ):
                     raise ValueError("Event ID already exists with different content")
                 original_users = tuple(
                     session.scalars(
@@ -845,7 +852,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         .order_by(UserEventModel.user_id)
                     )
                 )
-                return original, original_users
+                return _event_from_model(model), original_users
 
             positions = self._lock_event_feeds(session, recipients, increment=1)
             for user_id, seq in positions.items():
@@ -854,7 +861,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
-            return event, tuple(positions)
+            return _event_from_model(model), tuple(positions)
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
@@ -1369,8 +1376,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 space = _space_from_model(model)
                 space.participants.extend(members)
                 self.store_event(
-                    event_from_message("space.updated", space, model.id),
+                    uuid4(),
+                    "space.updated",
+                    space,
                     [member.flwr_aid for member in members if member.flwr_aid],
+                    space_id=model.id,
                 )
                 return space
         except IntegrityError as exc:
@@ -1453,7 +1463,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
             self.store_event(
-                event_from_message("message.created", message, space_id), recipients
+                uuid4(), "message.created", message, recipients, space_id=space_id
             )
             return message
 
@@ -2609,7 +2619,7 @@ def _event_from_model(model: EventModel) -> Event:
     event = Event(
         event_id=str(model.event_id),
         type=model.type,
-        created_at=model.created_at.isoformat(),
+        created_at=model.created_at.astimezone(UTC).isoformat(),
     )
     event.payload.update(model.payload)
     event.payload.SetInParent()

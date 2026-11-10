@@ -27,6 +27,9 @@ from threading import Lock, RLock
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import Message as ProtoMessage
+
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common.constant import (
@@ -79,7 +82,6 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
-    event_from_message,
     generate_rand_int_from_bytes,
     validate_event_cursor,
     validate_message_metadata,
@@ -624,8 +626,8 @@ class InMemoryCoreState(
             )
             self._store_events(
                 [
-                    event_from_message("agent.updated", agent),
-                    event_from_message("space.updated", space, space_id),
+                    (uuid4(), "agent.updated", agent, None),
+                    (uuid4(), "space.updated", space, space_id),
                 ],
                 [flwr_aid],
             )
@@ -654,20 +656,27 @@ class InMemoryCoreState(
                 cursor=len(self.user_event_store.get(flwr_aid, [])),
             )
 
-    def store_event(
-        self, event: Event, recipients: Sequence[str]
+    def store_event(  # pylint: disable=too-many-arguments
+        self,
+        event_id: UUID,
+        event_type: str,
+        payload: ProtoMessage,
+        recipients: Sequence[str],
+        *,
+        space_id: UUID | None = None,
     ) -> tuple[Event, Sequence[str]]:
         """Store one immutable event and its original recipient set."""
         with self.lock_space_store:
-            if (
-                event.HasField("space_id")
-                and UUID(event.space_id) not in self.space_store
-            ):
+            if space_id is not None and space_id not in self.space_store:
                 raise ValueError("Event Space does not exist")
-            self._store_events([event], recipients)
-            return deepcopy(self.event_store[UUID(event.event_id)])
+            self._store_events([(event_id, event_type, payload, space_id)], recipients)
+            return deepcopy(self.event_store[event_id])
 
-    def _store_events(self, events: Sequence[Event], recipients: Sequence[str]) -> None:
+    def _store_events(
+        self,
+        events: Sequence[tuple[UUID, str, ProtoMessage, UUID | None]],
+        recipients: Sequence[str],
+    ) -> None:
         """Validate a mutation's complete event batch before publishing any of it.
 
         The caller holds lock_space_store and publishes application state
@@ -675,15 +684,28 @@ class InMemoryCoreState(
         """
         users = tuple(sorted(set(recipients)))
         pending: dict[UUID, Event] = {}
-        for event in events:
-            event_id = UUID(event.event_id)
+        for event_id, event_type, payload, space_id in events:
+            content = MessageToDict(payload, preserving_proto_field_name=True)
             stored = self.event_store.get(event_id)
             original = stored[0] if stored is not None else pending.get(event_id)
             if original is not None:
-                if original != event:
+                if (
+                    original.type != event_type
+                    or original.space_id != (str(space_id) if space_id else "")
+                    or MessageToDict(original.payload) != content
+                ):
                     raise ValueError("Event ID already exists with different content")
             else:
-                pending[event_id] = deepcopy(event)
+                event = Event(
+                    event_id=str(event_id),
+                    type=event_type,
+                    created_at=now().isoformat(),
+                )
+                if space_id is not None:
+                    event.space_id = str(space_id)
+                event.payload.update(content)
+                event.payload.SetInParent()
+                pending[event_id] = event
         for event_id, event in pending.items():
             self.event_store[event_id] = (event, users)
             for user_id in users:
@@ -1088,7 +1110,7 @@ class InMemoryCoreState(
                 participants=members,
             )
             self._store_events(
-                [event_from_message("space.updated", space, space_id)],
+                [(uuid4(), "space.updated", space, space_id)],
                 [member.flwr_aid for member in members if member.flwr_aid],
             )
             self.space_store[space_id] = space
@@ -1125,7 +1147,7 @@ class InMemoryCoreState(
                 content=content,
             )
             self._store_events(
-                [event_from_message("message.created", message, space_id)],
+                [(uuid4(), "message.created", message, space_id)],
                 [p.flwr_aid for p in space.participants if p.flwr_aid],
             )
             self.space_message_id_counter = message.id
