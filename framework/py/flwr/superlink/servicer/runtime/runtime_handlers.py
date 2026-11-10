@@ -140,7 +140,7 @@ def get_space_messages(
     task: Task,
     task_token: str,
 ) -> GetSpaceMessagesResponse:
-    """Read or consume messages using the authenticated Run's agent identity."""
+    """Read messages and mark them seen for the authenticated Run's agent."""
     runs = state.get_run_info(run_ids=[task.run_id])
     if not runs:
         raise FlowerError(
@@ -169,7 +169,6 @@ def get_space_messages(
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
             after_id=request.after_id if request.HasField("after_id") else None,
-            consume=request.consume,
         )
     except PermissionError as exc:
         raise FlowerError(ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, str(exc)) from exc

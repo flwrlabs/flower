@@ -1322,26 +1322,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-        consume: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Read history or atomically consume an agent's next message page."""
+        """Read messages and advance the participant's seen cursor atomically."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        if consume and (
-            not participant.agent_id or before_id is not None or after_id is not None
-        ):
-            raise ValueError("Consuming reads require an agent and no ID bounds.")
         if not (participant.flwr_aid or participant.agent_id):
             return None
         field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
         identity = participant.flwr_aid or participant.agent_id
-        forward = consume or after_id is not None
+        forward = after_id is not None
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
-        if consume:
+        if participant.agent_id and before_id is None and after_id is None:
+            forward = True
             message_conditions.append(
                 SpaceMessageModel.id > SpaceParticipantTable.c.seen_through_message_id
             )
@@ -1364,7 +1360,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .limit(limit)
         )
         with self.session() as session:
-            if consume and not self._lock_space(session, space_id):
+            if not self._lock_space(session, space_id):
                 return None
             models = list(session.scalars(query))
             if not models:
@@ -1374,14 +1370,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for model in models
                 if model is not None
             ]
-            if consume and messages:
+            if messages:
+                seen_through = max(message.id for message in messages)
                 session.execute(
                     update(SpaceParticipantTable)
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == participant.agent_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.seen_through_message_id < seen_through,
                     )
-                    .values(seen_through_message_id=messages[-1].id)
+                    .values(seen_through_message_id=seen_through)
                 )
             return messages if forward else list(reversed(messages))
 

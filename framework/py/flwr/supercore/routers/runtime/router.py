@@ -270,7 +270,7 @@ def runtime_get_space_messages(
     task: TaskDependency,
     token: TaskTokenDependency,
 ) -> GetSpaceMessagesResponse:
-    """Read or consume messages in the authenticated agent's Space."""
+    """Read messages and advance the authenticated agent's seen cursor."""
     assert token is not None  # TaskDependency has authenticated the header.
     return handlers.get_space_messages(request, state, task, token)
 

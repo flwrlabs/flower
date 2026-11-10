@@ -203,7 +203,7 @@ class InMemoryCoreState(
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
         self.lock_space_store = RLock()
-        self.space_participant_cursors: dict[tuple[UUID, int], int] = {}
+        self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -1053,24 +1053,20 @@ class InMemoryCoreState(
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-        consume: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Read history or atomically consume an agent's next message page."""
+        """Read messages and advance the participant's seen cursor atomically."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        if consume and (
-            not participant.agent_id or before_id is not None or after_id is not None
-        ):
-            raise ValueError("Consuming reads require an agent and no ID bounds.")
         with self.lock_space_store:
             space = self.space_store.get(space_id)
             if space is None or participant not in space.participants:
                 return None
-            key = (space_id, participant.agent_id)
-            if consume:
-                after_id = self.space_participant_cursors.get(key, 0)
+            key = (space_id, participant.flwr_aid or participant.agent_id)
+            cursor = self.space_participant_cursors.get(key, 0)
+            if participant.agent_id and before_id is None and after_id is None:
+                after_id = cursor
             messages = [
                 message
                 for message in self.space_message_store[space_id]
@@ -1078,8 +1074,8 @@ class InMemoryCoreState(
                 and (after_id is None or message.id > after_id)
             ]
             page = messages[:limit] if after_id is not None else messages[-limit:]
-            if consume and page:
-                self.space_participant_cursors[key] = page[-1].id
+            if page:
+                self.space_participant_cursors[key] = max(cursor, page[-1].id)
             return page
 
     def get_run_series(  # pylint: disable=too-many-arguments

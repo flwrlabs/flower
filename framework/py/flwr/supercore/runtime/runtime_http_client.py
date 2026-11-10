@@ -243,7 +243,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
     def GetSpaceMessages(
         self, request: GetSpaceMessagesRequest
     ) -> GetSpaceMessagesResponse:
-        """Read history, or set consume to advance the agent's seen cursor."""
+        """Read messages and advance the authenticated agent's seen cursor."""
         return self._unary_unary(
             path="/v1/runtime/get-space-messages",
             rpc_method="/flwr.proto.Runtime/GetSpaceMessages",

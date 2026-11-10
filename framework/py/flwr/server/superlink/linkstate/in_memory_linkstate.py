@@ -556,7 +556,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-        consume: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Authorize the live task and advance its agent cursor in the same lock."""
         with self.lock_task_store, self.lock, self.lock_space_store:
@@ -577,7 +576,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 limit=limit,
                 before_id=before_id,
                 after_id=after_id,
-                consume=consume,
             )
 
     def get_run_info(

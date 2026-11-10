@@ -86,7 +86,7 @@ def _start(state: LinkState, target: AgentRunTarget) -> tuple[int, str]:
 
 
 def test_run_window_accepts_followups(state: LinkState) -> None:
-    """History is read-only; consuming reads share one window and preserve order."""
+    """Every read marks messages seen while follow-ups share one execution window."""
     space_id, target = _setup(state)
     user = SpaceParticipant(flwr_aid="alice")
     first = state.create_space_message(space_id, user, "First")
@@ -94,11 +94,12 @@ def test_run_window_accepts_followups(state: LinkState) -> None:
     assert not state.get_run_info()  # Submission does not create a Run.
     task_id, token = _start(state, target)
     assert not state.get_pending_agent_runs()
-    assert state.get_agent_space_messages(token, limit=1) == [second]
-    assert state.get_agent_space_messages(token, consume=True, limit=1) == [first]
+    assert state.get_agent_space_messages(token, limit=1) == [first]
+    assert second is not None
+    assert state.get_agent_space_messages(token, before_id=second.id) == [first]
     third = state.create_space_message(space_id, user, "Follow-up")
-    assert state.get_agent_space_messages(token, consume=True) == [second, third]
-    assert state.get_agent_space_messages(token, consume=True) == []
+    assert state.get_agent_space_messages(token) == [second, third]
+    assert state.get_agent_space_messages(token) == []
     assert len(state.get_run_info()) == 1
     assert state.finish_task(task_id, SubStatus.COMPLETED, "")
     assert not state.get_pending_agent_runs()
@@ -111,18 +112,18 @@ def test_run_window_accepts_followups(state: LinkState) -> None:
     assert len(state.get_run_info()) == 2
 
 
-@pytest.mark.parametrize("consume", [False, True])
-def test_failure_reschedules_only_unseen_input(state: LinkState, consume: bool) -> None:
+@pytest.mark.parametrize("read", [False, True])
+def test_failure_reschedules_only_unseen_input(state: LinkState, read: bool) -> None:
     """Seen is retrieval, not successful processing; stale tokens cannot advance."""
     space_id, target = _setup(state)
     state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Input")
     task_id, token = _start(state, target)
-    if consume:
-        assert state.get_agent_space_messages(token, consume=True)
+    if read:
+        assert state.get_agent_space_messages(token)
     assert state.finish_task(task_id, SubStatus.FAILED, "Agent failed")
     with pytest.raises(PermissionError):
-        state.get_agent_space_messages(token, consume=True)
-    assert bool(state.get_pending_agent_runs()) is not consume
+        state.get_agent_space_messages(token)
+    assert bool(state.get_pending_agent_runs()) is not read
 
 
 def test_broadcast_has_independent_agent_cursors(state: LinkState) -> None:
@@ -140,7 +141,7 @@ def test_broadcast_has_independent_agent_cursors(state: LinkState) -> None:
     message = state.create_space_message(UUID(space.id), user, "For both agents")
     for target in (first, second):
         _, token = _start(state, target)
-        assert state.get_agent_space_messages(token, consume=True) == [message]
+        assert state.get_agent_space_messages(token) == [message]
     assert not state.get_pending_agent_runs()
 
 
@@ -177,7 +178,7 @@ def test_concurrent_schedulers_and_reads_serialize(state: LinkState) -> None:
 
     def consume(backend: LinkState) -> object:
         barrier.wait(timeout=5)
-        return backend.get_agent_space_messages(token, consume=True, limit=1)
+        return backend.get_agent_space_messages(token, limit=1)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         pages = list(pool.map(consume, (state, other)))
@@ -226,11 +227,11 @@ def test_runtime_consumes_with_task_identity(state: LinkState) -> None:
     def post(request: GetSpaceMessagesRequest) -> Response:
         return cast(Response, client.post(path, content=request.SerializeToString()))
 
-    denied = post(GetSpaceMessagesRequest(space_id=str(UUID(int=1)), consume=True))
+    denied = post(GetSpaceMessagesRequest(space_id=str(UUID(int=1))))
     assert denied.status_code == 404
-    invalid = post(GetSpaceMessagesRequest(consume=True, after_id=0))
+    invalid = post(GetSpaceMessagesRequest(limit=0))
     assert invalid.status_code == 400
-    response = post(GetSpaceMessagesRequest(consume=True))
+    response = post(GetSpaceMessagesRequest())
     assert response.status_code == 200
     assert GetSpaceMessagesResponse.FromString(response.content).messages == [message]
     # Existing AgentApp trace reads work without a RunSeries; summaries never use zero.
@@ -243,4 +244,4 @@ def test_runtime_consumes_with_task_identity(state: LinkState) -> None:
         )
     assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
     assert state.finish_task(acquired.task.task_id, SubStatus.COMPLETED, "")
-    assert post(GetSpaceMessagesRequest(consume=True)).status_code == 401
+    assert post(GetSpaceMessagesRequest()).status_code == 401

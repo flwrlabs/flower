@@ -152,7 +152,7 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         task: Task,
         task_token: str,
     ) -> GetSpaceMessagesResponse:
-        """Read history or consume the authenticated agent's next page."""
+        """Read messages and advance the authenticated agent's seen cursor."""
 
     def get_space_events(
         self,

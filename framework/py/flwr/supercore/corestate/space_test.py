@@ -17,12 +17,14 @@
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -200,34 +202,44 @@ def test_invalid_message_range(state: CoreState, before_id: int, after_id: int) 
         )
 
 
-def test_consuming_reads_advance_only_the_selected_agent(state: CoreState) -> None:
-    """Consume oldest-first while preserving history and independent agent cursors."""
+def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
+    """Reads advance independent user/agent cursors and never move them backward."""
     agents = [
         state.create_agent(
             "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
         )
         for _ in range(2)
     ]
-    assert all(agent is not None for agent in agents)
     members = [
         SpaceParticipant(agent_id=agent.id) for agent in agents if agent is not None
     ]
+    assert len(members) == 2
     user = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[user, *members]).id)
     messages = [state.create_space_message(space_id, user, str(i)) for i in range(3)]
-    assert state.get_space_messages(space_id, members[0], limit=1) == messages[-1:]
+    assert state.get_space_messages(space_id, members[0], limit=2) == messages[:2]
     assert (
-        state.get_space_messages(space_id, members[0], consume=True, limit=2)
-        == messages[:2]
+        state.get_space_messages(space_id, members[0], after_id=0, limit=1)
+        == messages[:1]
     )
-    assert state.get_space_messages(space_id, members[0], consume=True) == messages[2:]
-    assert state.get_space_messages(space_id, members[0], consume=True) == []
-    assert state.get_space_messages(space_id, members[1], consume=True) == messages
-    assert state.get_space_messages(space_id, members[0]) == messages
-    for member, bounds in [
-        (user, {}),
-        (members[0], {"after_id": 0}),
-        (members[0], {"before_id": 100}),
-    ]:
-        with pytest.raises(ValueError, match="Consuming"):
-            state.get_space_messages(space_id, member, consume=True, **bounds)
+    assert state.get_space_messages(space_id, members[0]) == messages[2:]
+    assert state.get_space_messages(space_id, members[0]) == []
+    assert state.get_space_messages(space_id, members[1]) == messages
+    # Users keep normal history pagination; their reads also persist a seen position.
+    assert state.get_space_messages(space_id, user) == messages
+    assert state.get_space_messages(space_id, user, after_id=0, limit=1) == messages[:1]
+    assert messages[-1] is not None
+    if isinstance(state, InMemoryLinkState):
+        assert state.space_participant_cursors[(space_id, "alice")] == messages[-1].id
+    else:
+        assert isinstance(state, SqlLinkState)
+        with state.session() as session:
+            assert (
+                session.scalar(
+                    select(SpaceParticipantTable.c.seen_through_message_id).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid == "alice",
+                    )
+                )
+                == messages[-1].id
+            )

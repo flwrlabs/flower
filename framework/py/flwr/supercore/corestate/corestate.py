@@ -697,15 +697,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-        consume: bool = False,
     ) -> Sequence[SpaceMessage] | None:
         """Return a message page in ascending ID order.
 
-        Bounds are exclusive. With after_id, select the earliest matching page;
-        otherwise select the latest. Return None for missing spaces or
-        nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
-        Consuming agent reads start at the stored cursor and advance it through
-        the returned page atomically. They cannot specify historical ID bounds.
+        Every read marks messages seen through the newest returned ID without
+        moving the participant's cursor backward. Bounds are exclusive. With
+        after_id, select the earliest matching page; with before_id, the latest.
+        Without bounds, agents read their next unseen page and users the latest.
+        Return None for missing spaces or nonparticipants. Raise ValueError for
+        a nonpositive limit or invalid range.
         """
 
     @abstractmethod

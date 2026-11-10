@@ -161,28 +161,24 @@ global___SpaceMessage = SpaceMessage
 
 @typing.final
 class GetSpaceMessagesRequest(google.protobuf.message.Message):
+    """Reading marks messages seen through the newest returned ID for the caller."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SPACE_ID_FIELD_NUMBER: builtins.int
     BEFORE_ID_FIELD_NUMBER: builtins.int
     LIMIT_FIELD_NUMBER: builtins.int
     AFTER_ID_FIELD_NUMBER: builtins.int
-    CONSUME_FIELD_NUMBER: builtins.int
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
     before_id: builtins.int
-    """Exclusive upper ID bound. Absent selects the newest page unless after_id is
-    set.
+    """Exclusive upper ID bound. Without bounds, Runtime selects the next unseen
+    page and Control selects the newest page.
     """
     limit: builtins.int
     """Absent uses the server's default page size."""
     after_id: builtins.int
     """Runtime only: exclusive lower bound, selecting the earliest matching page."""
-    consume: builtins.bool
-    """Runtime only: read the next unseen page and advance the agent's cursor.
-    Cannot be combined with before_id or after_id. History reads leave it
-    false.
-    """
     def __init__(
         self,
         *,
@@ -190,10 +186,9 @@ class GetSpaceMessagesRequest(google.protobuf.message.Message):
         before_id: builtins.int | None = ...,
         limit: builtins.int | None = ...,
         after_id: builtins.int | None = ...,
-        consume: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "consume", b"consume", "limit", b"limit", "space_id", b"space_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit", "space_id", b"space_id"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_after_id", b"_after_id"]) -> typing.Literal["after_id"] | None: ...
     @typing.overload

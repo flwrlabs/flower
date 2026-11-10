@@ -45,20 +45,17 @@ message SpaceMessage {
   string content = 5;
 }
 
+// Reading marks messages seen through the newest returned ID for the caller.
 message GetSpaceMessagesRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
   string space_id = 1;
-  // Exclusive upper ID bound. Absent selects the newest page unless after_id is
-  // set.
+  // Exclusive upper ID bound. Without bounds, Runtime selects the next unseen
+  // page and Control selects the newest page.
   optional uint64 before_id = 2;
   // Absent uses the server's default page size.
   optional uint32 limit = 3;
   // Runtime only: exclusive lower bound, selecting the earliest matching page.
   optional uint64 after_id = 4;
-  // Runtime only: read the next unseen page and advance the agent's cursor.
-  // Cannot be combined with before_id or after_id. History reads leave it
-  // false.
-  bool consume = 5;
 }
 message GetSpaceMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.
