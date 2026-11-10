@@ -19,6 +19,7 @@ import random
 import string
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
+from uuid import UUID
 
 import pytest
 
@@ -549,6 +550,7 @@ def test_run_serialization_deserialization() -> None:
         primary_task_type=TaskType.SIMULATION,
         series_id=123,
         account_name="test-account",
+        space_id=UUID("12345678-1234-5678-1234-567812345678"),
     )
 
     # Execute
@@ -557,4 +559,7 @@ def test_run_serialization_deserialization() -> None:
 
     # Assert
     assert isinstance(proto, ProtoRun)
+    assert proto.space_id == str(original.space_id)
     assert original == deserialized
+    assert not run_to_proto(Run.create_empty(2)).HasField("space_id")
+    assert run_from_proto(ProtoRun()).space_id is None

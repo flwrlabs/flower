@@ -51,6 +51,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -253,6 +255,17 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get events from the authenticated task's run series."""
     return handlers.get_run_series_events(request, state, task)
+
+
+@router.post("/get-space-events")
+def get_space_events(
+    request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> GetSpaceEventsResponse:
+    """Get events from the authenticated task's Space."""
+    return handlers.get_space_events(request, state, task)
 
 
 @router.post("/get-compacted-contexts")

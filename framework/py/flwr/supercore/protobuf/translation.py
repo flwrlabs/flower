@@ -35,12 +35,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateAgentRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
-    CreateSpaceRequest,
     DisconnectConnectorRequest,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
     GetRunSeriesRequest,
-    GetSpaceMessagesRequest,
     ListAgentsRequest,
     ListAppAssociationsRequest,
     ListAppsRequest,
@@ -52,7 +50,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesEventsRequest,
     ListRunSeriesRequest,
     ListRunsRequest,
-    ListSpacesRequest,
     PullArtifactsRequest,
     RefreshAuthTokensRequest,
     RegisterNodeRequest,
@@ -61,7 +58,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
-    SendSpaceMessageRequest,
     SetFederationIconRequest,
     ShowFederationRequest,
     StartAutomationRequest,
@@ -99,6 +95,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetFileRequest,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
+    GetSpaceEventsRequest,
     ListFilesRequest,
     PullAppMessagesRequest,
     PullTaskInputRequest,
@@ -111,6 +108,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    GetSpaceMessagesRequest,
+    ListSpacesRequest,
+    SendSpaceMessageRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
@@ -217,6 +220,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
     ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
     ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
+    ("POST", "/v1/runtime/get-space-events"): GetSpaceEventsRequest,
     ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
     ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,

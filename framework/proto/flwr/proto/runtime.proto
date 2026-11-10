@@ -77,6 +77,17 @@ message GetRunSeriesEventsRequest {
 }
 message GetRunSeriesEventsResponse { repeated TaskEvent events = 1; }
 
+// GetSpaceEvents messages
+message GetSpaceEventsRequest {
+  // ID bounds are exclusive.
+  optional uint64 after_event_id = 1;
+  optional uint64 before_event_id = 2;
+  // Select newest matching events; zero means no limit.
+  // Response remains in ascending ID order.
+  uint32 last_n = 3;
+}
+message GetSpaceEventsResponse { repeated TaskEvent events = 1; }
+
 // GetCompactedContexts messages
 message GetCompactedContextsRequest {
   optional uint32 limit = 1;

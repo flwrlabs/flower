@@ -28,9 +28,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
-    Space,
-    SpaceMessage,
-    SpaceParticipant,
     StartRunRequest,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -38,6 +35,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
@@ -1351,6 +1353,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1364,6 +1367,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_ids : Optional[Sequence[int]] (default: None)
             If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        space_id : Optional[UUID] (default: None)
+            If set, return only events from runs in this space.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
@@ -1382,6 +1387,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[TaskEvent]
             Task events ordered by ID.
         """
+
+    # pylint: disable=unused-argument
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return run IDs associated with a space, if this state stores runs."""
+        return []
 
     @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
