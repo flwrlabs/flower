@@ -295,6 +295,8 @@ message CreateFederationRequest {
   string federation_name = 1;
   string description = 2;
   bool simulation = 3;
+  // Bare namespace handle. Omission selects the authenticated caller's handle.
+  optional string handle = 4;
 }
 message CreateFederationResponse { Federation federation = 1; }
 
