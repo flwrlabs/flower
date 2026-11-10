@@ -680,9 +680,13 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(apps[0].app_type, TaskType.SERVER_APP)
 
     @parameterized.expand(
-        ["allowed", "denied", "persist_failure"]
+        [
+            (outcome, runtime)
+            for outcome in ["allowed", "denied", "persist_failure"]
+            for runtime in [RunTime.DEPLOYMENT, RunTime.SIMULATION]
+        ]
     )  # type: ignore[untyped-decorator]
-    def test_start_run_admission_guard(self, outcome: str) -> None:
+    def test_start_run_admission_guard(self, outcome: str, runtime: RunTime) -> None:
         """Hold admission through persistence and release it on failure."""
         request = StartRunRequest(federation=NOOP_FEDERATION_ID)
         request.fab.content = b"admission guard FAB"
@@ -713,6 +717,13 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             return persist_app(*args, **kwargs)
 
         with (
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=(
+                    SimulationConfig() if runtime == RunTime.SIMULATION else None
+                ),
+            ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers.get_fab_config",
                 return_value={"tool": {"flwr": {"app": {}}}},
@@ -744,7 +755,12 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                     self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
 
         guard.assert_called_once_with(
-            flwr_aid=self.aid, federation_id=NOOP_FEDERATION_ID
+            flwr_aid=self.aid,
+            context=StartRunContext(federation_id=NOOP_FEDERATION_ID, runtime=runtime),
+        )
+        self.assertIs(
+            guard.call_args.kwargs["context"],
+            cast(Mock, self.state.federation_manager).can_execute.call_args.args[2],
         )
         self.assertEqual(
             events,

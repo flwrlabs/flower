@@ -786,10 +786,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "AgentApp run requested without a user prompt.",
             )
 
+        start_run_context = StartRunContext(
+            federation_id=federation_id, runtime=runtime
+        )
         state.federation_manager.can_execute(
             flwr_aid,
             ActionType.START_RUN,
-            StartRunContext(federation_id=federation_id, runtime=runtime),
+            start_run_context,
         )
 
         # Create run
@@ -810,7 +813,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
         # Allow the manager to guard app association and run persistence together.
         with state.federation_manager.run_admission(
-            flwr_aid=flwr_aid, federation_id=federation_id
+            flwr_aid=flwr_aid, context=start_run_context
         ):
             if not is_stored_app and not is_cached_hub_app:
                 metadata = get_app_presentation_metadata(fab_config)

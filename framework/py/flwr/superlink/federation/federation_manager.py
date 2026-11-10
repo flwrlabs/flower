@@ -23,7 +23,11 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import ActionType, RunTime
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.typing import ActionContext, CreateFederationContext
+from flwr.supercore.typing import (
+    ActionContext,
+    CreateFederationContext,
+    StartRunContext,
+)
 from flwr.superlink.federation.typing import Federation
 
 if TYPE_CHECKING:
@@ -247,21 +251,22 @@ class FederationManager(ABC):
         )
 
     def run_admission(
-        self, *, flwr_aid: str, federation_id: str
+        self, *, flwr_aid: str, context: StartRunContext
     ) -> AbstractContextManager[None]:
         """Guard admission while associating an app and persisting its run.
 
         Managers with mutable access policies can override this method to recheck
-        authorization before app association and hold the required locks through
-        run creation. The default implementation preserves existing admission
-        behavior.
+        authorization using the resolved run context before app association and
+        hold the required locks through run creation. The default implementation
+        preserves existing admission behavior.
 
         Parameters
         ----------
         flwr_aid : str
             The authenticated account requesting the run.
-        federation_id : str
-            The federation in which the run will be created.
+        context : StartRunContext
+            The same federation and runtime context used by the initial
+            ``START_RUN`` entitlement check.
 
         Returns
         -------
@@ -269,7 +274,7 @@ class FederationManager(ABC):
             The context surrounding app association and persistence of the new run.
         """
         # Managers without transactional admission require no additional guard.
-        _ = flwr_aid, federation_id
+        _ = flwr_aid, context
         return nullcontext()
 
     @abstractmethod
