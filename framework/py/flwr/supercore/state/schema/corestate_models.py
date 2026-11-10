@@ -271,6 +271,7 @@ SpaceParticipantTable = Table(
     Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
+    Column("seen_through_message_id", BigInteger, nullable=False, server_default="0"),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
