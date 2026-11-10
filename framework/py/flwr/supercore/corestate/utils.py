@@ -50,19 +50,6 @@ def event_from_message(
     return event
 
 
-def normalize_event(event: Event) -> Event:
-    """Copy an event with canonical UUIDs and a UTC timestamp."""
-    normalized = Event()
-    normalized.CopyFrom(event)
-    normalized.event_id = str(UUID(event.event_id))
-    if event.HasField("space_id"):
-        normalized.space_id = str(UUID(event.space_id))
-    normalized.created_at = (
-        datetime.fromisoformat(event.created_at).astimezone(UTC).isoformat()
-    )
-    return normalized
-
-
 def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
     """Reject cursors outside the committed feed and invalid page sizes."""
     if not 0 <= after_seq <= head:

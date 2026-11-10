@@ -81,7 +81,6 @@ from .corestate import CoreState
 from .utils import (
     event_from_message,
     generate_rand_int_from_bytes,
-    normalize_event,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -677,7 +676,6 @@ class InMemoryCoreState(
         users = tuple(sorted(set(recipients)))
         pending: dict[UUID, Event] = {}
         for event in events:
-            event = normalize_event(event)
             event_id = UUID(event.event_id)
             stored = self.event_store.get(event_id)
             original = stored[0] if stored is not None else pending.get(event_id)
@@ -685,7 +683,7 @@ class InMemoryCoreState(
                 if original != event:
                     raise ValueError("Event ID already exists with different content")
             else:
-                pending[event_id] = event
+                pending[event_id] = deepcopy(event)
         for event_id, event in pending.items():
             self.event_store[event_id] = (event, users)
             for user_id in users:

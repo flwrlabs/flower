@@ -163,7 +163,6 @@ from .utils import (
     context_to_bytes,
     event_from_message,
     generate_rand_int_from_bytes,
-    normalize_event,
     timestamp_to_iso,
     validate_event_cursor,
     validate_message_metadata,
@@ -816,7 +815,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, event: Event, recipients: Sequence[str]
     ) -> tuple[Event, Sequence[str]]:
         """Persist an immutable event and its deliveries in the current transaction."""
-        event = normalize_event(event)
         users = tuple(sorted(set(recipients)))
         event_id = UUID(event.event_id)
         with self.session() as session:
