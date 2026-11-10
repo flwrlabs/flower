@@ -47,8 +47,6 @@ def validate_run_scope(  # pylint: disable=too-many-arguments
 ) -> None:
     """Require either a federation run or a Space AgentApp run."""
     if agent_id is not None:
-        if not 0 < agent_id <= INT64_MAX_VALUE:
-            raise ValueError("agent_id is outside the supported range.")
         if space_id is None:
             raise ValueError("agent_id requires a Space run.")
     if space_id is None:
