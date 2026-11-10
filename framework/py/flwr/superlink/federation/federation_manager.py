@@ -16,18 +16,12 @@
 
 
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING
 
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
-from flwr.supercore.constant import ActionType, RunTime
-from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.typing import (
-    ActionContext,
-    CreateFederationContext,
-    StartRunContext,
-)
+from flwr.supercore.constant import ActionType
+from flwr.supercore.typing import ActionContext
 from flwr.superlink.federation.typing import Federation
 
 if TYPE_CHECKING:
@@ -166,10 +160,14 @@ class FederationManager(ABC):
     ) -> Federation:
         """Create a new federation.
 
+        Implementations must authorize the namespace in ``federation_id`` for the
+        authenticated actor identified by ``flwr_aid`` at creation time. The actor
+        remains the requesting account when selecting another namespace.
+
         Parameters
         ----------
         flwr_aid : str
-            The ID of the account creating the federation.
+            The ID of the authenticated account creating the federation.
         federation_id : str
             The federation ID.
         description : str
@@ -183,99 +181,6 @@ class FederationManager(ABC):
         Federation
             The created federation.
         """
-
-    def create_federation_in_namespace(  # pylint: disable=too-many-arguments
-        self,
-        *,
-        flwr_aid: str,
-        caller_handle: str,
-        handle: str,
-        federation_name: str,
-        description: str,
-        simulation: bool | None = None,
-    ) -> Federation:
-        """Authorize a namespace and create a federation in it.
-
-        The default implementation only permits the authenticated caller's own
-        namespace and delegates to ``create_federation``. Managers supporting
-        additional namespaces must override this method and authorize the target
-        namespace atomically with creation and apply its entitlement checks.
-
-        Parameters
-        ----------
-        flwr_aid : str
-            The authenticated account ID.
-        caller_handle : str
-            The authenticated account's handle, supplied by the server.
-        handle : str
-            The validated bare namespace handle selected for creation.
-        federation_name : str
-            The validated short federation name within the namespace.
-        description : str
-            A human-readable description of the federation.
-        simulation : bool | None
-            Whether this federation is intended for simulation.
-
-        Returns
-        -------
-        Federation
-            The created federation.
-
-        Raises
-        ------
-        FlowerError
-            If the selected namespace is not the caller's own namespace.
-        """
-        # Existing managers must explicitly opt in to creating in other namespaces.
-        if handle != caller_handle:
-            raise FlowerError(
-                ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
-                "Cannot create a federation in the selected namespace.",
-            )
-        # Preserve the entitlement checks used by existing manager implementations.
-        federation_id = f"@{handle}/{federation_name}"
-        self.can_execute(
-            flwr_aid,
-            ActionType.CREATE_FEDERATION,
-            CreateFederationContext(
-                federation_id=federation_id,
-                runtime=RunTime.SIMULATION if simulation else RunTime.DEPLOYMENT,
-                visibility="private",
-            ),
-        )
-        return self.create_federation(
-            flwr_aid=flwr_aid,
-            federation_id=federation_id,
-            description=description,
-            simulation=simulation,
-        )
-
-    def run_admission(
-        self, *, flwr_aid: str, context: StartRunContext
-    ) -> AbstractContextManager[None]:
-        """Guard admission while associating an app and persisting its run.
-
-        Managers with mutable access policies can override this method to recheck
-        authorization using the resolved run context before app association and
-        hold the required locks through run creation. The default implementation
-        preserves existing admission behavior.
-
-        Parameters
-        ----------
-        flwr_aid : str
-            The authenticated account requesting the run.
-        context : StartRunContext
-            The same federation and runtime context used by the initial
-            ``START_RUN`` entitlement check.
-
-        Returns
-        -------
-        AbstractContextManager[None]
-            The context surrounding app association and persistence of the new run.
-        """
-        # Managers without transactional admission require no additional guard.
-        _ = flwr_aid, context
-        return nullcontext()
 
     @abstractmethod
     def archive_federation(self, flwr_aid: str, federation_id: str) -> None:

@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -184,12 +185,12 @@ from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.typing import (
     AcceptInvitationContext,
+    CreateFederationContext,
     CreateInvitationContext,
     RegisterSupernodeContext,
     StartRunContext,
 )
 from flwr.supercore.utils import (
-    check_federation_format,
     get_metadata_str,
     parse_app_spec,
     request_download_link,
@@ -787,13 +788,10 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "AgentApp run requested without a user prompt.",
             )
 
-        start_run_context = StartRunContext(
-            federation_id=federation_id, runtime=runtime
-        )
         state.federation_manager.can_execute(
             flwr_aid,
             ActionType.START_RUN,
-            start_run_context,
+            StartRunContext(federation_id=federation_id, runtime=runtime),
         )
 
         # Create run
@@ -812,43 +810,39 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        # Allow the manager to guard app association and run persistence together.
-        with state.federation_manager.run_admission(
-            flwr_aid=flwr_aid, context=start_run_context
-        ):
-            if not is_stored_app and not is_cached_hub_app:
-                metadata = get_app_presentation_metadata(fab_config)
-                state.store_app(
-                    fab=fab,
-                    federation_id=federation_id,
-                    app_id=app_id,
-                    app_type=app_type,
-                    added_by=flwr_aid,
-                    is_hub_app=is_hub_app,
-                    display_name=metadata.display_name,
-                    description=metadata.description,
-                    color=metadata.color,
-                )
-
-            series_id = request.series_id if request.HasField("series_id") else None
-            series_description: str | None = None
-            if primary_task_type == TaskType.AGENT_APP and series_id is None:
-                series_description = _derive_run_series_description(user_prompt) or None
-
-            run_id = state.create_run(
-                fab_id,
-                fab_version,
-                fab.hash_str,
-                override_config,
-                federation_id,
-                resolved_federation_config,
-                flwr_aid,
-                primary_task_type,
-                user_prompt=user_prompt or None,
-                series_id=series_id,
-                series_description=series_description,
-                connector_ids=connector_ids,
+        if not is_stored_app and not is_cached_hub_app:
+            metadata = get_app_presentation_metadata(fab_config)
+            state.store_app(
+                fab=fab,
+                federation_id=federation_id,
+                app_id=app_id,
+                app_type=app_type,
+                added_by=flwr_aid,
+                is_hub_app=is_hub_app,
+                display_name=metadata.display_name,
+                description=metadata.description,
+                color=metadata.color,
             )
+
+        series_id = request.series_id if request.HasField("series_id") else None
+        series_description: str | None = None
+        if primary_task_type == TaskType.AGENT_APP and series_id is None:
+            series_description = _derive_run_series_description(user_prompt) or None
+
+        run_id = state.create_run(
+            fab_id,
+            fab_version,
+            fab.hash_str,
+            override_config,
+            federation_id,
+            resolved_federation_config,
+            flwr_aid,
+            primary_task_type,
+            user_prompt=user_prompt or None,
+            series_id=series_id,
+            series_description=series_description,
+            connector_ids=connector_ids,
+        )
 
         if run_id == 0:
             raise FlowerError(
@@ -1991,24 +1985,33 @@ def create_federation(
 
     # Keep explicitly selected namespaces compatible with federation ID consumers.
     handle = request.handle if request.HasField("handle") else account.account_name
-    if request.HasField("handle"):
-        try:
-            check_federation_format(f"@{handle}/{request.federation_name}")
-        except ValueError as exc:
-            raise FlowerError(
-                ApiErrorCode.INVALID_FEDERATION_NAME,
-                "Invalid namespace handle in CreateFederation request.",
-                public_details="Namespace must contain only ASCII letters, digits, "
-                "hyphens, or underscores.",
-            ) from exc
+    if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must contain only ASCII letters, digits, "
+            "hyphens, or underscores.",
+        )
 
     # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation = state.federation_manager.create_federation_in_namespace(
-        caller_handle=account.account_name,
-        handle=handle,
-        federation_name=request.federation_name,
+    federation_id = f"@{handle}/{request.federation_name}"
+
+    runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
+    state.federation_manager.can_execute(
+        flwr_aid,
+        ActionType.CREATE_FEDERATION,
+        CreateFederationContext(
+            federation_id=federation_id,
+            runtime=runtime,
+            visibility="private",
+        ),
+    )
+
+    # The manager authorizes the selected namespace for the authenticated actor.
+    federation = state.federation_manager.create_federation(
+        federation_id=federation_id,
         description=request.description,
         flwr_aid=flwr_aid,
         simulation=request.simulation,
