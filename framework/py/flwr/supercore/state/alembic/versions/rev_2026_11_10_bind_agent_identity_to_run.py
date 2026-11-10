@@ -15,7 +15,7 @@
 """Bind agent identity to Run.
 
 Revision ID: 6aa3c50bb2cd
-Revises: d771362f578b
+Revises: 54706abbd828
 Create Date: 2026-11-10 13:35:08.766567
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "6aa3c50bb2cd"
-down_revision: str | Sequence[str] | None = "d771362f578b"
+down_revision: str | Sequence[str] | None = "54706abbd828"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
