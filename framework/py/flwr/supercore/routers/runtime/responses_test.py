@@ -165,6 +165,17 @@ def test_model_response_accounts_usage_and_preserves_output(
             json=_stream_request() | {"stream": stream},
         )
     assert result.status_code == 200
+    recorded = backend.record_phase_spans.call_args.args
+    assert recorded[0] == "model.request_prepare"
+    assert [phase[0] for phase in recorded[1]] == [
+        "model.request_authenticate",
+        "model.request_decode",
+    ]
+    assert recorded[2] == {
+        "flwr.component": "superlink",
+        "flwr.run_id": "789",
+        "flwr.task_id": "123",
+    }
     if stream:
         assert result.content == wire
         span = backend.trace_span.return_value.__enter__.return_value
