@@ -18,12 +18,15 @@
 import hashlib
 import json
 import secrets
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
+from threading import RLock
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
 from sqlalchemy import (
     MetaData,
     and_,
@@ -41,6 +44,7 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -61,7 +65,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -103,6 +110,7 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import Event as EventModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -140,6 +148,10 @@ from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventM
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
+from flwr.supercore.state.schema.corestate_models import UserEvent as UserEventModel
+from flwr.supercore.state.schema.corestate_models import (
+    UserEventFeed as UserEventFeedModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -149,8 +161,11 @@ from .corestate import CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
+    event_from_message,
     generate_rand_int_from_bytes,
+    normalize_event,
     timestamp_to_iso,
+    validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
@@ -172,6 +187,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+        self._sqlite_memory_lock = RLock()
+
+    @contextmanager
+    def session(self) -> Iterator[Session]:
+        """Serialize transactions sharing SQLite's single in-memory connection."""
+        barrier = (
+            self._sqlite_memory_lock if self._is_in_memory_sqlite else nullcontext()
+        )
+        with barrier, super().session() as session:
+            yield session
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -735,6 +760,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
+            self.store_event(event_from_message("agent.updated", agent), [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -754,6 +780,137 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             return [_agent_from_model(model) for model in session.scalars(stmt)]
+
+    def _lock_event_feeds(
+        self, session: Session, recipients: Sequence[str]
+    ) -> dict[str, int]:
+        """Create and lock counters in sorted order until the transaction ends.
+
+        Updating to the current value also provides SQLite's write barrier;
+        SELECT FOR UPDATE alone would not lock anything on that backend.
+        """
+        heads = {}
+        for user_id in sorted(set(recipients)):
+            session.execute(
+                self.dialect_insert(UserEventFeedModel)
+                .values(user_id=user_id, last_seq=0)
+                .on_conflict_do_nothing(index_elements=[UserEventFeedModel.user_id])
+            )
+            heads[user_id] = session.execute(
+                update(UserEventFeedModel)
+                .where(UserEventFeedModel.user_id == user_id)
+                .values(last_seq=UserEventFeedModel.last_seq)
+                .returning(UserEventFeedModel.last_seq)
+            ).scalar_one()
+        return heads
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read visible state while preventing this user's feed from committing."""
+        if not flwr_aid:
+            raise ValueError("Account ID must be nonempty")
+        with self.session() as session:
+            head = self._lock_event_feeds(session, [flwr_aid])[flwr_aid]
+            return BootstrapResponse(
+                agents=self.list_agents(flwr_aid),
+                spaces=self.get_spaces(flwr_aid),
+                cursor=head,
+            )
+
+    def store_event(
+        self, event: Event, recipients: Sequence[str]
+    ) -> tuple[Event, Sequence[str]]:
+        """Persist an immutable event and its deliveries in the current transaction."""
+        event = normalize_event(event)
+        if any(not user_id for user_id in recipients):
+            raise ValueError("Recipient IDs must be nonempty")
+        users = tuple(sorted(set(recipients)))
+        event_id = UUID(event.event_id)
+        with self.session() as session:
+            if (
+                event.HasField("space_id")
+                and session.get(SpaceModel, UUID(event.space_id)) is None
+            ):
+                raise ValueError("Event Space does not exist")
+            inserted = session.scalar(
+                self.dialect_insert(EventModel)
+                .values(
+                    event_id=event_id,
+                    type=event.type,
+                    space_id=(
+                        UUID(event.space_id) if event.HasField("space_id") else None
+                    ),
+                    payload=MessageToDict(event.payload),
+                    created_at=datetime.fromisoformat(event.created_at),
+                )
+                .on_conflict_do_nothing(index_elements=[EventModel.event_id])
+                .returning(EventModel.event_id)
+            )
+            if inserted is None:
+                original = _event_from_model(
+                    session.scalars(
+                        select(EventModel).where(EventModel.event_id == event_id)
+                    ).one()
+                )
+                if original != event:
+                    raise ValueError("Event ID already exists with different content")
+                original_users = tuple(
+                    session.scalars(
+                        select(UserEventModel.user_id)
+                        .where(UserEventModel.event_id == event_id)
+                        .order_by(UserEventModel.user_id)
+                    )
+                )
+                return original, original_users
+
+            heads = self._lock_event_feeds(session, users)
+            for user_id, head in heads.items():
+                session.execute(
+                    update(UserEventFeedModel)
+                    .where(UserEventFeedModel.user_id == user_id)
+                    .values(last_seq=head + 1)
+                )
+                session.execute(
+                    insert(UserEventModel).values(
+                        user_id=user_id, seq=head + 1, event_id=event_id
+                    )
+                )
+            return event, users
+
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read a non-consuming page with access filtering before pagination."""
+        if not flwr_aid:
+            raise ValueError("Account ID must be nonempty")
+        accessible = exists().where(
+            SpaceParticipantTable.c.space_id == EventModel.space_id,
+            SpaceParticipantTable.c.flwr_aid == flwr_aid,
+        )
+        with self.session() as session:
+            head = (
+                session.scalar(
+                    select(UserEventFeedModel.last_seq).where(
+                        UserEventFeedModel.user_id == flwr_aid
+                    )
+                )
+                or 0
+            )
+            validate_event_cursor(after_seq, head, limit)
+            query = (
+                select(UserEventModel.seq, EventModel)
+                .join(EventModel, EventModel.event_id == UserEventModel.event_id)
+                .where(
+                    UserEventModel.user_id == flwr_aid,
+                    UserEventModel.seq > after_seq,
+                    or_(EventModel.space_id.is_(None), accessible),
+                )
+                .order_by(UserEventModel.seq)
+                .limit(limit)
+            )
+            return [
+                StreamEventsResponse(seq=seq, event=_event_from_model(model))
+                for seq, model in session.execute(query)
+            ]
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -1240,6 +1397,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 space = _space_from_model(model)
                 space.participants.extend(members)
+                self.store_event(
+                    event_from_message("space.updated", space, model.id),
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                )
                 return space
         except IntegrityError as exc:
             raise ValueError("Invalid space participants") from exc
@@ -1309,7 +1470,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _space_message_from_model(model)
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            recipients = list(
+                session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                )
+            )
+            self.store_event(
+                event_from_message("message.created", message, space_id), recipients
+            )
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
@@ -2456,6 +2631,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(NonceStoreModel.nonce)
             )
             return session.scalar(stmt) is not None
+
+
+def _event_from_model(model: EventModel) -> Event:
+    """Convert a journal row without losing protobuf JSON's integer strings."""
+    event = Event(
+        event_id=str(model.event_id),
+        type=model.type,
+        created_at=model.created_at.isoformat(),
+    )
+    event.payload.update(model.payload)
+    event.payload.SetInParent()
+    if model.space_id is not None:
+        event.space_id = str(model.space_id)
+    return event
 
 
 def _agent_from_model(model: AgentModel) -> Agent:

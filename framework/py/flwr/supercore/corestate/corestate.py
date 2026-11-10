@@ -28,7 +28,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -275,6 +278,69 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[Agent]
             Agents belonging to the account, or an empty sequence if none exist.
+        """
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read owned Agents, participating Spaces, and a consistent feed head.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Nonempty authenticated account ID.
+
+        Returns
+        -------
+        BootstrapResponse
+            Visible state and its cursor, captured under the feed's write barrier.
+        """
+
+    @abstractmethod
+    def store_event(
+        self, event: Event, recipients: Sequence[str]
+    ) -> tuple[Event, Sequence[str]]:
+        """Append a shared event and allocate each recipient's next feed position.
+
+        SQL callers can use an enclosing session to commit application changes
+        and events together. Agent, Space, and message creation already do this.
+
+        Parameters
+        ----------
+        event : Event
+            Event with a UUID, nonempty type, JSON payload, and aware timestamp.
+            A set Space ID must reference an existing Space.
+        recipients : Sequence[str]
+            Nonempty account IDs. Duplicates are ignored.
+
+        Returns
+        -------
+        tuple[Event, Sequence[str]]
+            Stored event and original recipients in sorted order. Reusing an ID
+            with identical content returns these without allocating positions;
+            changed content raises ValueError. New recipients on a retry are ignored.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Replay accessible events in ascending, exclusive user-feed order.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Nonempty authenticated account ID.
+        after_seq : int, (default: 0)
+            Exclusive cursor, between zero and the committed feed head.
+            Invalid cursors raise ValueError.
+        limit : int, (default: 100)
+            Positive maximum number of accessible events to return.
+
+        Returns
+        -------
+        Sequence[StreamEventsResponse]
+            Committed entries, excluding events for currently inaccessible Spaces.
+            Reading never consumes entries or advances a shared cursor.
         """
 
     @abstractmethod

@@ -17,16 +17,99 @@
 
 from datetime import UTC, datetime
 from os import urandom
+from uuid import UUID, uuid4
+
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.message import Message as ProtoMessage
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
+from flwr.proto.control_pb2 import Event  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
+
+
+def event_from_message(
+    event_type: str, payload: ProtoMessage, space_id: UUID | None = None
+) -> Event:
+    """Snapshot a protobuf payload, preserving field names and uint64 strings.
+
+    Parameters
+    ----------
+    event_type : str
+        Application event type.
+    payload : ProtoMessage
+        Message to capture as protobuf JSON.
+    space_id : UUID | None, (default: None)
+        Space whose current membership governs delivery, if applicable.
+
+    Returns
+    -------
+    Event
+        Event with a new UUID and UTC timestamp.
+    """
+    event = Event(
+        event_id=str(uuid4()),
+        type=event_type,
+        created_at=now().isoformat(),
+    )
+    event.payload.update(MessageToDict(payload, preserving_proto_field_name=True))
+    event.payload.SetInParent()
+    if space_id is not None:
+        event.space_id = str(space_id)
+    return event
+
+
+def normalize_event(event: Event) -> Event:
+    """Validate event metadata and copy it into a canonical representation.
+
+    Parameters
+    ----------
+    event : Event
+        Event with a UUID, type, payload, and timezone-aware timestamp.
+
+    Returns
+    -------
+    Event
+        Independent copy with canonical UUIDs and UTC timestamp.
+    """
+    normalized = Event()
+    normalized.CopyFrom(event)
+    normalized.event_id = str(UUID(event.event_id))
+    if event.HasField("space_id"):
+        normalized.space_id = str(UUID(event.space_id))
+    if not event.type or not event.HasField("payload"):
+        raise ValueError("Event type and payload must be set")
+    # Struct permits non-finite numbers, which cannot be represented as JSON.
+    MessageToDict(event.payload)
+    created_at = datetime.fromisoformat(event.created_at)
+    if created_at.tzinfo is None:
+        raise ValueError("Event timestamp must include a timezone")
+    normalized.created_at = created_at.astimezone(UTC).isoformat()
+    return normalized
+
+
+def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
+    """Reject cursors outside the committed feed and invalid page sizes.
+
+    Parameters
+    ----------
+    after_seq : int
+        Exclusive uint64 replay cursor.
+    head : int
+        Committed user-feed head.
+    limit : int
+        Positive maximum number of events to return.
+    """
+    if not isinstance(after_seq, int) or not 0 <= after_seq <= min(head, 2**64 - 1):
+        raise ValueError("after_seq must be between zero and the feed head")
+    if limit <= 0:
+        raise ValueError("limit must be positive")
 
 
 def generate_rand_int_from_bytes(
