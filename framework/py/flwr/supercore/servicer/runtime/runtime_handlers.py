@@ -17,6 +17,7 @@
 # pylint: disable=unused-argument
 
 from logging import DEBUG, ERROR
+from uuid import UUID
 
 from flwr.common.constant import Status
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -35,6 +36,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetCompactedContextsResponse,
     GetFileRequest,
     GetFileResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullTaskMessageRequest,
@@ -64,6 +67,24 @@ from flwr.supercore.constant import (
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
+
+
+def get_space_events(
+    request: GetSpaceEventsRequest, state: CoreState, space_id: UUID
+) -> GetSpaceEventsResponse:
+    """Get locally stored events for a Space."""
+    log(DEBUG, "Runtime.GetSpaceEvents")
+    events = state.get_task_events(
+        space_id=space_id,
+        after_task_event_id=(
+            request.after_event_id if request.HasField("after_event_id") else None
+        ),
+        before_task_event_id=(
+            request.before_event_id if request.HasField("before_event_id") else None
+        ),
+        last_n=request.last_n or None,
+    )
+    return GetSpaceEventsResponse(events=events)
 
 
 def get_compacted_contexts(

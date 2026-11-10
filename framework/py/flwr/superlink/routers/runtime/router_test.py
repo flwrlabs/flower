@@ -34,6 +34,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
@@ -207,6 +209,25 @@ def test_get_run_series_events_delegates_with_authenticated_task(
 
     assert response.status_code == 200
     assert GetRunSeriesEventsResponse.FromString(response.content) == expected
+    handler.assert_called_once_with(request, state, task)
+
+
+def test_get_space_events_delegates_with_authenticated_task(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Space event requests pass the authenticated task to the handler."""
+    state = Mock(spec=LinkState)
+    task = Task(task_id=123)
+    expected = GetSpaceEventsResponse()
+    handler = Mock(return_value=expected)
+    monkeypatch.setattr(runtime_handlers, "get_space_events", handler)
+    client = TestClient(_create_app(state, task=task))
+    request = GetSpaceEventsRequest()
+
+    response = _post(client, "/v1/runtime/get-space-events", request)
+
+    assert response.status_code == 200
+    assert GetSpaceEventsResponse.FromString(response.content) == expected
     handler.assert_called_once_with(request, state, task)
 
 
