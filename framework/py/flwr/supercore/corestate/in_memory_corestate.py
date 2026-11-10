@@ -613,7 +613,7 @@ class InMemoryCoreState(
                 created_at=created_at,
                 updated_at=created_at,
             )
-            self.store_event("agent.updated", agent, [flwr_aid])
+            self.store_event("agent.created", agent, [flwr_aid])
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
             try:
                 self.create_space(
@@ -1077,7 +1077,7 @@ class InMemoryCoreState(
             self.space_message_store[space_id] = []
             try:
                 self.store_event(
-                    "space.updated",
+                    "space.created",
                     space,
                     [member.flwr_aid for member in members if member.flwr_aid],
                     space_id=space_id,

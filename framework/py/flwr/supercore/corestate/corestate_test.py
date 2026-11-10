@@ -2616,7 +2616,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         entries = state.get_user_events("alice", snapshot.cursor)
         self.assertEqual(
             [(entry.seq, entry.event.type) for entry in entries],
-            [(3, "space.updated"), (4, "message.created")],
+            [(3, "space.created"), (4, "message.created")],
         )
         self.assertEqual(
             [entry.event for entry in entries],
@@ -2631,7 +2631,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         payload = Agent(id=2**64 - 1)
         created_at = now()
         with self._patch_message_time(created_at):
-            state.store_event("agent.updated", payload, ["bob", "alice", "bob"])
+            state.store_event("agent.created", payload, ["bob", "alice", "bob"])
         first = state.get_user_events("alice")[0].event
         self.assertEqual(first.created_at, created_at.isoformat())
         self.assertEqual(
@@ -2639,7 +2639,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(state.get_user_events("charlie"), [])
         with self._patch_message_time(created_at - timedelta(days=1)):
-            state.store_event("agent.updated", Agent(), ["alice"])
+            state.store_event("agent.created", Agent(), ["alice"])
         second = state.get_user_events("alice", 1)[0].event
         self.assertNotEqual(first.event_id, second.event_id)
         self.assertTrue(second.HasField("payload"))
@@ -2745,7 +2745,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
         entries = state.get_user_events("alice", snapshot.cursor)
         assert agent is not None
-        self.assertEqual(entries[0].event.type, "agent.updated")
+        self.assertEqual(entries[0].event.type, "agent.created")
         self.assertEqual(entries[0].event.payload["id"], str(agent.id))
 
     def test_user_event_sql_transactions(self) -> None:

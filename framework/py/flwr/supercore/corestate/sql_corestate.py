@@ -759,7 +759,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
-            self.store_event("agent.updated", agent, [flwr_aid])
+            self.store_event("agent.created", agent, [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -1355,7 +1355,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 space = _space_from_model(model)
                 space.participants.extend(members)
                 self.store_event(
-                    "space.updated",
+                    "space.created",
                     space,
                     [member.flwr_aid for member in members if member.flwr_aid],
                     space_id=model.id,
