@@ -31,7 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AppInfo,
     Automation,
     BootstrapResponse,
-    Event,
     StartRunRequest,
     StreamEventsResponse,
 )
@@ -287,21 +286,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return owned Agents, participating Spaces, and their consistent feed head."""
 
     @abstractmethod
-    def store_event(  # pylint: disable=too-many-arguments
+    def store_event(
         self,
-        event_id: UUID,
         event_type: str,
         payload: ProtoMessage,
         recipients: Sequence[str],
-        *,
         space_id: UUID | None = None,
-    ) -> tuple[Event, Sequence[str]]:
+    ) -> None:
         """Store a shared event and allocate ordered recipient positions atomically.
 
-        CoreState assigns the creation timestamp. Identical retries return the
-        original event and sorted recipients; changing type, Space, or payload
-        raises ValueError. SQL callers can use an enclosing session to commit
-        application changes with the event.
+        Each call creates a new event with a generated UUID and creation timestamp.
+        SQL callers can use an enclosing session to commit application changes
+        with the event.
         """
 
     @abstractmethod
@@ -311,6 +307,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Replay accessible events after an exclusive cursor in user-feed order.
 
         Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        If all remaining entries are inaccessible, return a cursor-only response
+        with no event. Clients apply present events before saving seq; cursor-only
+        responses only advance the client's cursor.
         Reading does not consume entries or advance a shared cursor.
         """
 

@@ -610,7 +610,11 @@ class StreamEventsResponse(google.protobuf.message.Message):
     seq: builtins.int
     """Position in the authenticated user's feed, also used as the SSE id."""
     @property
-    def event(self) -> global___Event: ...
+    def event(self) -> global___Event:
+        """Absent for a cursor-only response advancing past inaccessible events.
+        Apply a present event before saving seq; otherwise only advance the cursor.
+        """
+
     def __init__(
         self,
         *,

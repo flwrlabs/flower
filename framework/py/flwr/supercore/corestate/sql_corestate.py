@@ -759,7 +759,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
-            self.store_event(uuid4(), "agent.updated", agent, [flwr_aid])
+            self.store_event("agent.updated", agent, [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -811,49 +811,25 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 cursor=head,
             )
 
-    def store_event(  # pylint: disable=too-many-arguments
+    def store_event(
         self,
-        event_id: UUID,
         event_type: str,
         payload: ProtoMessage,
         recipients: Sequence[str],
-        *,
         space_id: UUID | None = None,
-    ) -> tuple[Event, Sequence[str]]:
-        """Persist an immutable event and its deliveries in the current transaction."""
-        content = MessageToDict(payload, preserving_proto_field_name=True)
+    ) -> None:
+        """Create an event and its deliveries in the current transaction."""
+        event_id = uuid4()
         with self.session() as session:
-            model = session.scalars(
-                self.dialect_insert(EventModel)
-                .values(
+            session.execute(
+                insert(EventModel).values(
                     event_id=event_id,
                     type=event_type,
                     space_id=space_id,
-                    payload=content,
+                    payload=MessageToDict(payload, preserving_proto_field_name=True),
                     created_at=now(),
                 )
-                .on_conflict_do_nothing(index_elements=[EventModel.event_id])
-                .returning(EventModel)
-            ).one_or_none()
-            if model is None:
-                model = session.scalars(
-                    select(EventModel).where(EventModel.event_id == event_id)
-                ).one()
-                if (
-                    model.type != event_type
-                    or model.space_id != space_id
-                    or model.payload != content
-                ):
-                    raise ValueError("Event ID already exists with different content")
-                original_users = tuple(
-                    session.scalars(
-                        select(UserEventModel.user_id)
-                        .where(UserEventModel.event_id == event_id)
-                        .order_by(UserEventModel.user_id)
-                    )
-                )
-                return _event_from_model(model), original_users
-
+            )
             positions = self._lock_event_feeds(session, recipients, increment=1)
             for user_id, seq in positions.items():
                 session.execute(
@@ -861,7 +837,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
-            return _event_from_model(model), tuple(positions)
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
@@ -873,7 +848,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             feed = session.get(UserEventFeedModel, flwr_aid, populate_existing=True)
-            validate_event_cursor(after_seq, feed.last_seq if feed else 0, limit)
+            head = feed.last_seq if feed else 0
+            validate_event_cursor(after_seq, head, limit)
             query = (
                 select(UserEventModel.seq, EventModel)
                 .join(EventModel, EventModel.event_id == UserEventModel.event_id)
@@ -885,10 +861,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .order_by(UserEventModel.seq)
                 .limit(limit)
             )
-            return [
+            results = [
                 StreamEventsResponse(seq=seq, event=_event_from_model(model))
                 for seq, model in session.execute(query)
             ]
+            if not results and head > after_seq:
+                results.append(StreamEventsResponse(seq=head))
+            return results
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -1376,7 +1355,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 space = _space_from_model(model)
                 space.participants.extend(members)
                 self.store_event(
-                    uuid4(),
                     "space.updated",
                     space,
                     [member.flwr_aid for member in members if member.flwr_aid],
@@ -1462,9 +1440,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 )
             )
-            self.store_event(
-                uuid4(), "message.created", message, recipients, space_id=space_id
-            )
+            self.store_event("message.created", message, recipients, space_id=space_id)
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments

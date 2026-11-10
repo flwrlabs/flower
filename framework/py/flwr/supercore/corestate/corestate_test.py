@@ -24,7 +24,7 @@ from operator import attrgetter
 from threading import Event as ThreadEvent
 from typing import Any, cast
 from unittest.mock import call, patch
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from parameterized import parameterized
 from sqlalchemy import delete
@@ -42,6 +42,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     Automation,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -2624,46 +2625,45 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
         self.assertEqual(entries[1].event.payload["id"], str(message.id))
 
-    def test_user_event_replay_and_retries(self) -> None:
-        """Preserve shared payloads and original recipients across retries."""
+    def test_user_event_replay(self) -> None:
+        """Assign event metadata and replay immutable payloads in feed order."""
         state = self.state_factory()
-        event_id = uuid4()
         payload = Agent(id=2**64 - 1)
         created_at = now()
         with self._patch_message_time(created_at):
-            original = state.store_event(
-                event_id, "agent.updated", payload, ["bob", "alice", "bob"]
-            )
-        self.assertEqual(original[0].created_at, created_at.isoformat())
-        self.assertEqual(original[1], ("alice", "bob"))
-        with self._patch_message_time(created_at + timedelta(days=1)):
-            self.assertEqual(
-                state.store_event(event_id, "agent.updated", payload, ["charlie"]),
-                original,
-            )
-        self.assertEqual(state.get_user_events("charlie"), [])
-        second_id = uuid4()
-        with self._patch_message_time(created_at - timedelta(days=1)):
-            second, _ = state.store_event(
-                second_id, "agent.updated", Agent(), ["alice"]
-            )
-        self.assertTrue(second.HasField("payload"))
+            state.store_event("agent.updated", payload, ["bob", "alice", "bob"])
+        first = state.get_user_events("alice")[0].event
+        self.assertEqual(first.created_at, created_at.isoformat())
         self.assertEqual(
-            state.store_event(second_id, "agent.updated", Agent(), ["charlie"]),
-            (second, ("alice",)),
+            [entry.event for entry in state.get_user_events("bob")], [first]
         )
+        self.assertEqual(state.get_user_events("charlie"), [])
+        with self._patch_message_time(created_at - timedelta(days=1)):
+            state.store_event("agent.updated", Agent(), ["alice"])
+        second = state.get_user_events("alice", 1)[0].event
+        self.assertNotEqual(first.event_id, second.event_id)
+        self.assertTrue(second.HasField("payload"))
         page = state.get_user_events("alice", limit=1)
         self.assertEqual(page[0].event.payload["id"], str(2**64 - 1))
         self.assertEqual(state.get_user_events("alice", page[0].seq)[0].event, second)
         self.assertEqual(state.get_user_events("alice", 2), [])
         payload.id = 1
-        with self.assertRaisesRegex(ValueError, "different content"):
-            state.store_event(event_id, "agent.updated", payload, ["alice"])
-        original[0].type = "changed"
+        first.type = "changed"
         self.assertEqual(state.get_user_events("alice", limit=1), page)
 
+    def test_user_event_agent_creation_failure(self) -> None:
+        """Roll back the Agent and its event if initial Space creation fails."""
+        state = self.state_factory()
+        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+            with self.assertRaises(ValueError):
+                state.create_agent(
+                    "alice", AgentConfig(name="Agent", app_spec="@test/app")
+                )
+        snapshot = state.get_bootstrap("alice")
+        self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
+
     def test_user_event_access(self) -> None:
-        """Filter revoked Space access before limiting the replay page."""
+        """Filter revoked access and advance through the hidden tail after paging."""
         state = self.state_factory()
         alice = SpaceParticipant(flwr_aid="alice")
         space = state.create_space(
@@ -2671,6 +2671,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         state.create_space_message(UUID(space.id), alice, "Private")
         visible = state.create_space(participants=[alice])
+        state.create_space_message(UUID(visible.id), alice, "Visible")
+        state.create_space_message(UUID(space.id), alice, "Hidden tail")
         if isinstance(state, SqlCoreState):
             with state.session() as session:
                 session.execute(
@@ -2687,7 +2689,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(entry.seq, entry.event.space_id) for entry in page], [(3, visible.id)]
         )
-        self.assertEqual(state.get_bootstrap("alice").cursor, 3)
+        page = state.get_user_events("alice", 3, limit=1)
+        self.assertEqual(
+            [(entry.seq, entry.event.type) for entry in page], [(4, "message.created")]
+        )
+        self.assertEqual(
+            state.get_user_events("alice", 4), [StreamEventsResponse(seq=5)]
+        )
+        self.assertEqual(state.get_user_events("alice", 5), [])
+        self.assertEqual(state.get_bootstrap("alice").cursor, 5)
 
     def test_user_event_invalid_cursors(self) -> None:
         """Reject cursors outside the feed and nonpositive page sizes."""

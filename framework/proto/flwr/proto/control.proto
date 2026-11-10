@@ -141,6 +141,8 @@ message StreamEventsRequest {
 message StreamEventsResponse {
   // Position in the authenticated user's feed, also used as the SSE id.
   uint64 seq = 1;
+  // Absent for a cursor-only response advancing past inaccessible events.
+  // Apply a present event before saving seq; otherwise only advance the cursor.
   Event event = 2;
 }
 
