@@ -40,8 +40,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    CreateSpaceRequest,
-    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -50,8 +48,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -74,8 +70,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
-    ListSpacesRequest,
-    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -92,8 +86,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
@@ -114,6 +106,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
