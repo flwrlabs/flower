@@ -787,10 +787,13 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "AgentApp run requested without a user prompt.",
             )
 
+        start_run_context = StartRunContext(
+            federation_id=federation_id, runtime=runtime
+        )
         state.federation_manager.can_execute(
             flwr_aid,
             ActionType.START_RUN,
-            StartRunContext(federation_id=federation_id, runtime=runtime),
+            start_run_context,
         )
 
         # Create run
@@ -809,39 +812,43 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 "Stored app ID does not match the request",
             )
 
-        if not is_stored_app and not is_cached_hub_app:
-            metadata = get_app_presentation_metadata(fab_config)
-            state.store_app(
-                fab=fab,
-                federation_id=federation_id,
-                app_id=app_id,
-                app_type=app_type,
-                added_by=flwr_aid,
-                is_hub_app=is_hub_app,
-                display_name=metadata.display_name,
-                description=metadata.description,
-                color=metadata.color,
+        # Allow the manager to guard app association and run persistence together.
+        with state.federation_manager.run_admission(
+            flwr_aid=flwr_aid, context=start_run_context
+        ):
+            if not is_stored_app and not is_cached_hub_app:
+                metadata = get_app_presentation_metadata(fab_config)
+                state.store_app(
+                    fab=fab,
+                    federation_id=federation_id,
+                    app_id=app_id,
+                    app_type=app_type,
+                    added_by=flwr_aid,
+                    is_hub_app=is_hub_app,
+                    display_name=metadata.display_name,
+                    description=metadata.description,
+                    color=metadata.color,
+                )
+
+            series_id = request.series_id if request.HasField("series_id") else None
+            series_description: str | None = None
+            if primary_task_type == TaskType.AGENT_APP and series_id is None:
+                series_description = _derive_run_series_description(user_prompt) or None
+
+            run_id = state.create_run(
+                fab_id,
+                fab_version,
+                fab.hash_str,
+                override_config,
+                federation_id,
+                resolved_federation_config,
+                flwr_aid,
+                primary_task_type,
+                user_prompt=user_prompt or None,
+                series_id=series_id,
+                series_description=series_description,
+                connector_ids=connector_ids,
             )
-
-        series_id = request.series_id if request.HasField("series_id") else None
-        series_description: str | None = None
-        if primary_task_type == TaskType.AGENT_APP and series_id is None:
-            series_description = _derive_run_series_description(user_prompt) or None
-
-        run_id = state.create_run(
-            fab_id,
-            fab_version,
-            fab.hash_str,
-            override_config,
-            federation_id,
-            resolved_federation_config,
-            flwr_aid,
-            primary_task_type,
-            user_prompt=user_prompt or None,
-            series_id=series_id,
-            series_description=series_description,
-            connector_ids=connector_ids,
-        )
 
         if run_id == 0:
             raise FlowerError(

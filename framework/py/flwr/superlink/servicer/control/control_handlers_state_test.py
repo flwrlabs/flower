@@ -20,6 +20,8 @@ import hashlib
 import json
 import os
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -676,6 +678,98 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.SIMULATION)
         self.assertEqual(apps[0].app_type, TaskType.SERVER_APP)
+
+    @parameterized.expand(
+        [
+            (outcome, runtime)
+            for outcome in ["allowed", "denied", "persist_failure"]
+            for runtime in [RunTime.DEPLOYMENT, RunTime.SIMULATION]
+        ]
+    )  # type: ignore[untyped-decorator]
+    def test_start_run_admission_guard(self, outcome: str, runtime: RunTime) -> None:
+        """Hold admission through persistence and release it on failure."""
+        request = StartRunRequest(federation=NOOP_FEDERATION_ID)
+        request.fab.content = b"admission guard FAB"
+        events: list[str] = []
+        persist_run = self.state.create_run
+        persist_app = self.state.store_app
+
+        @contextmanager
+        def admission() -> Iterator[None]:
+            events.append("enter")
+            if outcome == "denied":
+                raise FlowerError(ApiErrorCode.NO_PERMISSIONS, "Admission denied")
+            try:
+                yield
+            finally:
+                events.append("exit")
+
+        def create_run(*args: Any, **kwargs: Any) -> int:
+            events.append("persist")
+            if outcome == "persist_failure":
+                raise FlowerError(
+                    ApiErrorCode.FAILED_TO_CREATE_RUN, "Persistence failed"
+                )
+            return persist_run(*args, **kwargs)
+
+        def store_app(*args: Any, **kwargs: Any) -> str:
+            events.append("store_app")
+            return persist_app(*args, **kwargs)
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=(
+                    SimulationConfig() if runtime == RunTime.SIMULATION else None
+                ),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+                return_value={"tool": {"flwr": {"app": {}}}},
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_handlers.get_metadata_from_config",
+                return_value=("flwr/demo", "v1.0.0"),
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "run_admission",
+                return_value=admission(),
+            ) as guard,
+            patch.object(self.state, "create_run", side_effect=create_run),
+            patch.object(self.state, "store_app", side_effect=store_app),
+        ):
+            if outcome == "allowed":
+                response = control_handlers.start_run(
+                    request, get_current_account_info(), self.state
+                )
+                self.assertTrue(self.state.get_run_info(run_ids=[response.run_id]))
+            else:
+                with self.assertRaises(FlowerError):
+                    control_handlers.start_run(
+                        request, get_current_account_info(), self.state
+                    )
+                self.assertEqual(list(self.state.get_run_info()), [])
+                if outcome == "denied":
+                    self.assertEqual(self.state.list_apps(NOOP_FEDERATION_ID), [])
+
+        guard.assert_called_once_with(
+            flwr_aid=self.aid,
+            context=StartRunContext(federation_id=NOOP_FEDERATION_ID, runtime=runtime),
+        )
+        self.assertIs(
+            guard.call_args.kwargs["context"],
+            cast(Mock, self.state.federation_manager).can_execute.call_args.args[2],
+        )
+        self.assertEqual(
+            events,
+            (
+                ["enter"]
+                if outcome == "denied"
+                else ["enter", "store_app", "persist", "exit"]
+            ),
+        )
 
     def test_start_run_raises_if_create_run_fails(self) -> None:
         """Test StartRun raises if the initial task cannot be created."""

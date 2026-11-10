@@ -16,12 +16,13 @@
 
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING
 
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import ActionType
-from flwr.supercore.typing import ActionContext
+from flwr.supercore.typing import ActionContext, StartRunContext
 from flwr.superlink.federation.typing import Federation
 
 if TYPE_CHECKING:
@@ -177,6 +178,34 @@ class FederationManager(ABC):
         Federation
             The created federation.
         """
+
+    def run_admission(
+        self, *, flwr_aid: str, context: StartRunContext
+    ) -> AbstractContextManager[None]:
+        """Guard admission while associating an app and persisting its run.
+
+        Managers with mutable access policies can override this method to recheck
+        authorization using the resolved run context before app association and
+        hold the required locks through run creation. The default implementation
+        preserves existing admission behavior. Implementations requiring atomic
+        state writes must provide their own transaction and rollback behavior.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The authenticated account requesting the run.
+        context : StartRunContext
+            The same federation and runtime context used by the initial
+            ``START_RUN`` entitlement check.
+
+        Returns
+        -------
+        AbstractContextManager[None]
+            The context surrounding app association and persistence of the new run.
+        """
+        # Managers without transactional admission require no additional guard.
+        _ = flwr_aid, context
+        return nullcontext()
 
     @abstractmethod
     def archive_federation(self, flwr_aid: str, federation_id: str) -> None:
