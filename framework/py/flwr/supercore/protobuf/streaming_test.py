@@ -89,9 +89,13 @@ def test_response_cancels_context_after_normal_completion() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "media_type", ["application/flower-protobuf-stream", "text/event-stream"]
+)
 @pytest.mark.parametrize("spec_version", ["2.0", "2.4"])
 def test_disconnect_unblocks_synchronous_stream_iteration(
     spec_version: str,
+    media_type: str,
 ) -> None:
     """Signal a blocked synchronous iterator as soon as the client disconnects."""
     context = ProtobufStreamContext()
@@ -103,9 +107,7 @@ def test_disconnect_unblocks_synchronous_stream_iteration(
             time.sleep(0.001)
         yield from ()
 
-    response = CancellableProtobufStreamingResponse(
-        content(), context, "application/flower-protobuf-stream"
-    )
+    response = CancellableProtobufStreamingResponse(content(), context, media_type)
 
     async def run_response() -> None:
         async def receive() -> Message:

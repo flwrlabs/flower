@@ -316,7 +316,36 @@ def stream_logs(
     )
 
 
-@router.post("/stream-run-events")
+# Browser formats apply only to this endpoint; protobuf remains the default.
+@router.post(
+    "/stream-run-events",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "runId": {"type": "string", "format": "uint64"},
+                            "afterTaskEventId": {"type": "string", "format": "uint64"},
+                        },
+                        "additionalProperties": False,
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {
+            "description": (
+                "Length-delimited protobuf by default. Send Accept: text/event-stream "
+                "for SSE with TaskEvent.id as id and TaskEvent.data as data lines. "
+                "Whitespace-only event data is skipped."
+            ),
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        }
+    },
+)
 def stream_run_events(
     request: Annotated[StreamRunEventsRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,

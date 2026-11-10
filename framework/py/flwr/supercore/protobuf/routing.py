@@ -41,12 +41,14 @@ def _configure_openapi(
 ) -> None:
     """Add the common protobuf wire contract to OpenAPI metadata."""
     openapi_extra = dict(kwargs.get("openapi_extra") or {})
-    openapi_extra["requestBody"] = {
-        "required": True,
-        "content": {
-            PROTOBUF_MEDIA_TYPE: {"schema": _BINARY_SCHEMA},
-        },
+    # Keep endpoint-declared formats alongside the common protobuf request body.
+    request_body = dict(openapi_extra.get("requestBody") or {})
+    request_body["required"] = True
+    request_body["content"] = {
+        **request_body.get("content", {}),
+        PROTOBUF_MEDIA_TYPE: {"schema": _BINARY_SCHEMA},
     }
+    openapi_extra["requestBody"] = request_body
     kwargs["openapi_extra"] = openapi_extra
     kwargs["response_class"] = Response
 
@@ -57,10 +59,14 @@ def _configure_openapi(
         else PROTOBUF_MEDIA_TYPE
     )
     responses = dict(kwargs.get("responses") or {})
-    responses[200] = {
-        "description": "Successful Response",
-        "content": {response_media_type: {"schema": _BINARY_SCHEMA}},
+    # Preserve endpoint response metadata while documenting the binary default.
+    success_response = dict(responses.get(200) or {})
+    success_response.setdefault("description", "Successful Response")
+    success_response["content"] = {
+        **success_response.get("content", {}),
+        response_media_type: {"schema": _BINARY_SCHEMA},
     }
+    responses[200] = success_response
     kwargs["responses"] = responses
 
 

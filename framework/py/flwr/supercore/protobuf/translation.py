@@ -21,6 +21,7 @@ from typing import cast
 
 from fastapi import Depends, Request
 from fastapi.responses import Response
+from google.protobuf.json_format import Parse, ParseError
 from google.protobuf.message import DecodeError, Message
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -66,6 +67,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
+    StreamRunEventsResponse,
     UnregisterNodeRequest,
     UpdateRunSeriesDescriptionRequest,
 )
@@ -240,12 +242,28 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Parse the protobuf request and serialize the protobuf handler result."""
-        request_type = PROTOBUF_REQUEST_TYPES.get((request.method, request.url.path))
+        route_key = (request.method, request.url.path)
+        request_type = PROTOBUF_REQUEST_TYPES.get(route_key)
+        run_events = route_key == ("POST", "/v1/control/stream-run-events")
+        media_type = (
+            request.headers.get("content-type", "").partition(";")[0].strip().lower()
+        )
         if request_type is not None:
-            self._check_request_media_type(request)
-            request.state.protobuf_request = self._parse_request(
-                await request.body(), request_type
-            )
+            if run_events and media_type == "application/json":
+                try:
+                    request.state.protobuf_request = Parse(
+                        (await request.body()).decode("utf-8"), StreamRunEventsRequest()
+                    )
+                except (ParseError, UnicodeDecodeError) as exc:
+                    raise FlowerError(
+                        ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
+                        f"Invalid protobuf JSON payload: {exc!r}",
+                    ) from exc
+            else:
+                self._check_request_media_type(request)
+                request.state.protobuf_request = self._parse_request(
+                    await request.body(), request_type
+                )
         else:
             # Continue for unrecognized requests
             return await call_next(request)
@@ -270,8 +288,12 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
 
         result = request.state.protobuf_response
+        event_stream = (
+            run_events
+            and request.headers.get("accept", "").strip().lower() == "text/event-stream"
+        )
         protobuf_response = self._response_for(
-            result, get_protobuf_stream_context(request)
+            result, get_protobuf_stream_context(request), event_stream
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
@@ -307,7 +329,9 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _response_for(
-        result: object, stream_context: ProtobufStreamContext
+        result: object,
+        stream_context: ProtobufStreamContext,
+        event_stream: bool = False,
     ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
@@ -320,6 +344,15 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterator):
+            if event_stream:
+                response = CancellableProtobufStreamingResponse(
+                    _encode_run_events(cast(Iterator[StreamRunEventsResponse], result)),
+                    stream_context,
+                    "text/event-stream",
+                )
+                response.headers["cache-control"] = "no-cache, no-transform"
+                response.headers["x-accel-buffering"] = "no"
+                return response
             content = (
                 frame_message(message) for message in cast(Iterator[Message], result)
             )
@@ -350,3 +383,14 @@ def get_protobuf_request(request: Request) -> Message:
 
 
 PROTOBUF_REQUEST_DEPENDENCY = Depends(get_protobuf_request)
+
+
+def _encode_run_events(messages: Iterator[StreamRunEventsResponse]) -> Iterator[bytes]:
+    """Encode run event data using SSE line framing."""
+    for message in messages:
+        event = message.task_event
+        if not event.data.strip():
+            continue
+        data = event.data.replace("\r\n", "\n").replace("\r", "\n")
+        lines = "".join(f"data: {line}\n" for line in data.split("\n"))
+        yield f"id: {event.id}\n{lines}\n".encode()

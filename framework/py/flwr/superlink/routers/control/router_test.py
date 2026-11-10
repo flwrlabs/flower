@@ -356,10 +356,22 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
             inspect.unwrap(route.endpoint)
         )
         assert request_body["required"] is True
-        assert request_body["content"] == {
-            PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
+        expected_request_types = {PROTOBUF_MEDIA_TYPE}
+        expected_response_types = {expected_media_type}
+        if route.path == "/v1/control/stream-run-events":
+            expected_request_types.add("application/json")
+            expected_response_types.add("text/event-stream")
+            assert request_body["content"]["application/json"]["schema"][
+                "properties"
+            ] == {
+                "runId": {"type": "string", "format": "uint64"},
+                "afterTaskEventId": {"type": "string", "format": "uint64"},
+            }
+        assert set(request_body["content"]) == expected_request_types
+        assert request_body["content"][PROTOBUF_MEDIA_TYPE] == {
+            "schema": {"type": "string", "format": "binary"}
         }
-        assert set(success_content) == {expected_media_type}
+        assert set(success_content) == expected_response_types
         assert success_content[expected_media_type]["schema"] == {
             "type": "string",
             "format": "binary",
@@ -1221,6 +1233,98 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
     assert account is _ACCOUNT
     assert state is linkstate
     assert callable(is_active)
+
+
+@pytest.mark.parametrize("json_request", [False, True])
+def test_stream_run_events_returns_sse(json_request: bool) -> None:
+    """Preserve uint64 cursors and frame multiline data without SSE injection."""
+    app = _create_app()
+    linkstate = Mock(spec=LinkState)
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+    cursor = 2**64 - 2
+    request = StreamRunEventsRequest(run_id=2**64 - 1, after_task_event_id=cursor)
+    expected = [
+        StreamRunEventsResponse(task_event=TaskEvent(id=cursor, data=" \r\n")),
+        StreamRunEventsResponse(
+            task_event=TaskEvent(id=cursor + 1, data="first\r\nid: injected\rthird\n")
+        ),
+    ]
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.stream_run_events",
+        return_value=iter(expected),
+    ) as stream:
+        response = TestClient(app).post(
+            "/v1/control/stream-run-events",
+            content=(
+                f'{{"runId":"{request.run_id}","afterTaskEventId":"{cursor}"}}'.encode()
+                if json_request
+                else request.SerializeToString()
+            ),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": (
+                    "application/json" if json_request else PROTOBUF_MEDIA_TYPE
+                ),
+                "accept": "text/event-stream",
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+    assert response.headers["cache-control"] == "no-cache, no-transform"
+    assert response.headers["x-accel-buffering"] == "no"
+    assert response.text == (
+        f"id: {cursor + 1}\ndata: first\ndata: id: injected\ndata: third\ndata: \n\n"
+    )
+    assert stream.call_args.args[:3] == (request, _ACCOUNT, linkstate)
+    assert not stream.call_args.args[3]()
+
+
+@pytest.mark.parametrize("body", [b"{", b'{"runId":"invalid"}', b"\xff"])
+def test_stream_run_events_rejects_invalid_json(body: bytes) -> None:
+    """Reject malformed protobuf JSON before invoking the streaming handler."""
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.stream_run_events"
+    ) as stream:
+        response = TestClient(_create_app()).post(
+            "/v1/control/stream-run-events",
+            content=body,
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": "application/json",
+                "accept": "text/event-stream",
+            },
+        )
+    assert response.status_code == 400
+    assert response.json()["code"] == ApiErrorCode.INVALID_PROTOBUF_PAYLOAD
+    stream.assert_not_called()
+
+
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_stream_run_events_sse_requires_authentication_and_membership(
+    authenticated: bool,
+) -> None:
+    """Authorize browser event streams before opening an SSE response."""
+    authn_plugin = Mock()
+    app = _create_app(authn_plugin)
+    authn_plugin.validate_tokens_in_metadata.return_value = (
+        authenticated,
+        _ACCOUNT if authenticated else None,
+    )
+    linkstate = Mock(spec=LinkState)
+    run = Run.create_empty(7)
+    run.federation_id = "@other/federation"
+    linkstate.get_run_info.return_value = [run]
+    linkstate.federation_manager = Mock()
+    linkstate.federation_manager.has_member.return_value = False
+    app.dependency_overrides[get_linkstate] = lambda: linkstate
+    response = TestClient(app).post(
+        "/v1/control/stream-run-events",
+        json={"runId": "7"},
+        headers={"authorization": "Bearer access-token", "accept": "text/event-stream"},
+    )
+    assert response.status_code == (412 if authenticated else 401)
+    assert response.headers["content-type"] == "application/json"
+    linkstate.get_task_events.assert_not_called()
 
 
 def test_stream_logs_returns_missing_run_error_before_streaming() -> None:
