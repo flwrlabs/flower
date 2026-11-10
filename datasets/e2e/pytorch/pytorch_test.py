@@ -39,8 +39,8 @@ class SimpleCNN(nn.Module):
 #    and then normalizes it.
 @parameterized_class(
     [
-        {"dataset_name": "cifar10", "test_split": "test", "transforms": ToTensor()},
-        {"dataset_name": "cifar10", "test_split": "test", "transforms": Compose(
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test", "transforms": ToTensor()},
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test", "transforms": Compose(
             [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )},
     ]
