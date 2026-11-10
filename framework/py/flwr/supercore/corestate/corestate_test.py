@@ -2822,7 +2822,7 @@ def test_replay_filters_current_access_before_limit(state: CoreState) -> None:
             )
     else:
         assert isinstance(state, InMemoryCoreState)
-        with state.lock_event_store, state.lock_space_store:
+        with state.lock_space_store:
             state.space_store[UUID(space.id)].participants.remove(alice)
     entries = state.get_user_events("alice", limit=1)
     assert len(entries) == 1 and entries[0].seq == 3 and entries[0].event == visible
@@ -2957,7 +2957,7 @@ def test_bootstrap_waits_for_pending_write(state: CoreState) -> None:
         barrier = (
             state.session()
             if isinstance(state, SqlCoreState)
-            else state.lock_event_store
+            else state.lock_space_store
         )
         with barrier:
             agent = state.create_agent(

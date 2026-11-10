@@ -191,8 +191,6 @@ class InMemoryCoreState(
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, tuple[Event, tuple[str, ...]]] = {}
         self.user_event_store: dict[str, list[UUID]] = {}
-        # One barrier covers journal writes and all visible state mutations.
-        self.lock_event_store = RLock()
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
@@ -606,7 +604,7 @@ class InMemoryCoreState(
             config.HasField("description") and not config.description
         ):
             return None
-        with self.lock_event_store, self.lock_space_store, self.lock_agent_store:
+        with self.lock_space_store, self.lock_agent_store:
             created_at = now().isoformat()
             agent = Agent(
                 id=self.agent_id_counter + 1,
@@ -627,33 +625,32 @@ class InMemoryCoreState(
             )
             self._store_events(
                 [
-                    (event_from_message("agent.updated", agent), [flwr_aid]),
-                    (event_from_message("space.updated", space, space_id), [flwr_aid]),
-                ]
+                    event_from_message("agent.updated", agent),
+                    event_from_message("space.updated", space, space_id),
+                ],
+                [flwr_aid],
             )
             self.agent_id_counter = agent.id
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
-            return deepcopy(agent)
+            return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:
             return []
         with self.lock_agent_store:
-            return deepcopy(
-                sorted(
-                    self.agent_store.get(flwr_aid, {}).values(),
-                    key=lambda agent: agent.id,
-                )
+            return sorted(
+                self.agent_store.get(flwr_aid, {}).values(),
+                key=lambda agent: agent.id,
             )
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Snapshot visible state and its feed head under the mutation barrier."""
         if not flwr_aid:
             raise ValueError("Account ID must be nonempty")
-        with self.lock_event_store:
+        with self.lock_space_store:
             return BootstrapResponse(
                 agents=self.list_agents(flwr_aid),
                 spaces=self.get_spaces(flwr_aid),
@@ -664,44 +661,39 @@ class InMemoryCoreState(
         self, event: Event, recipients: Sequence[str]
     ) -> tuple[Event, Sequence[str]]:
         """Store one immutable event and its original recipient set."""
-        event = normalize_event(event)
-        with self.lock_event_store, self.lock_space_store:
+        with self.lock_space_store:
             if (
                 event.HasField("space_id")
                 and UUID(event.space_id) not in self.space_store
             ):
                 raise ValueError("Event Space does not exist")
-            return self._store_events([(event, recipients)])[0]
+            self._store_events([event], recipients)
+            return deepcopy(self.event_store[UUID(event.event_id)])
 
-    def _store_events(
-        self, entries: Sequence[tuple[Event, Sequence[str]]]
-    ) -> list[tuple[Event, Sequence[str]]]:
+    def _store_events(self, events: Sequence[Event], recipients: Sequence[str]) -> None:
         """Validate a mutation's complete event batch before publishing any of it.
 
-        The caller holds the mutation barrier and publishes application state
+        The caller holds lock_space_store and publishes application state
         before releasing it. New Spaces need not be in space_store yet.
         """
-        pending: dict[UUID, tuple[Event, tuple[str, ...]]] = {}
-        results: list[tuple[Event, Sequence[str]]] = []
-        for event, recipients in entries:
+        if any(not user_id for user_id in recipients):
+            raise ValueError("Recipient IDs must be nonempty")
+        users = tuple(sorted(set(recipients)))
+        pending: dict[UUID, Event] = {}
+        for event in events:
             event = normalize_event(event)
-            if any(not user_id for user_id in recipients):
-                raise ValueError("Recipient IDs must be nonempty")
             event_id = UUID(event.event_id)
-            original = self.event_store.get(event_id) or pending.get(event_id)
+            stored = self.event_store.get(event_id)
+            original = stored[0] if stored is not None else pending.get(event_id)
             if original is not None:
-                if original[0] != event:
+                if original != event:
                     raise ValueError("Event ID already exists with different content")
-                results.append((deepcopy(original[0]), original[1]))
-                continue
-            users = tuple(sorted(set(recipients)))
-            pending[event_id] = (event, users)
-            results.append((deepcopy(event), users))
-        for event_id, (event, users) in pending.items():
+            else:
+                pending[event_id] = event
+        for event_id, event in pending.items():
             self.event_store[event_id] = (event, users)
             for user_id in users:
                 self.user_event_store.setdefault(user_id, []).append(event_id)
-        return results
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
@@ -709,7 +701,7 @@ class InMemoryCoreState(
         """Return a non-consuming page, filtering current Space access."""
         if not flwr_aid:
             raise ValueError("Account ID must be nonempty")
-        with self.lock_event_store, self.lock_space_store:
+        with self.lock_space_store:
             feed = self.user_event_store.get(flwr_aid, [])
             validate_event_cursor(after_seq, len(feed), limit)
             viewer = SpaceParticipant(flwr_aid=flwr_aid)
@@ -1086,7 +1078,7 @@ class InMemoryCoreState(
                 raise ValueError("Space participants must have a nonempty identity")
             if participant not in members:
                 members.append(participant)
-        with self.lock_event_store, self.lock_space_store, self.lock_agent_store:
+        with self.lock_space_store, self.lock_agent_store:
             known_agent_ids = {
                 agent_id for agents in self.agent_store.values() for agent_id in agents
             }
@@ -1104,16 +1096,12 @@ class InMemoryCoreState(
                 participants=members,
             )
             self._store_events(
-                [
-                    (
-                        event_from_message("space.updated", space, space_id),
-                        [member.flwr_aid for member in members if member.flwr_aid],
-                    )
-                ]
+                [event_from_message("space.updated", space, space_id)],
+                [member.flwr_aid for member in members if member.flwr_aid],
             )
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
-            return deepcopy(space)
+            return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
         """Return participating spaces, newest first."""
@@ -1125,7 +1113,7 @@ class InMemoryCoreState(
                 if viewer in space.participants
             ]
             spaces.sort(key=lambda item: item.created_at, reverse=True)
-            return deepcopy(spaces)
+            return spaces
 
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
@@ -1133,7 +1121,7 @@ class InMemoryCoreState(
         """Store a participant's message atomically with its membership check."""
         if not content.strip():
             raise ValueError("Message content must be nonempty")
-        with self.lock_event_store, self.lock_space_store:
+        with self.lock_space_store:
             space = self.space_store.get(space_id)
             if space is None or author not in space.participants:
                 return None
@@ -1145,16 +1133,12 @@ class InMemoryCoreState(
                 content=content,
             )
             self._store_events(
-                [
-                    (
-                        event_from_message("message.created", message, space_id),
-                        [p.flwr_aid for p in space.participants if p.flwr_aid],
-                    )
-                ]
+                [event_from_message("message.created", message, space_id)],
+                [p.flwr_aid for p in space.participants if p.flwr_aid],
             )
             self.space_message_id_counter = message.id
             self.space_message_store[space_id].append(message)
-            return deepcopy(message)
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,

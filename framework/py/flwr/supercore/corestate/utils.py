@@ -106,7 +106,7 @@ def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
     limit : int
         Positive maximum number of events to return.
     """
-    if not isinstance(after_seq, int) or not 0 <= after_seq <= min(head, 2**64 - 1):
+    if not 0 <= after_seq <= head:
         raise ValueError("after_seq must be between zero and the feed head")
     if limit <= 0:
         raise ValueError("limit must be positive")

@@ -782,24 +782,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def _lock_event_feeds(
-        self, session: Session, recipients: Sequence[str]
+        self, session: Session, recipients: Sequence[str], *, increment: int = 0
     ) -> dict[str, int]:
-        """Create and lock counters in sorted order until the transaction ends.
+        """Lock and optionally advance counters in sorted order until commit.
 
-        Updating to the current value also provides SQLite's write barrier;
+        Upserting even an unchanged counter provides SQLite's write barrier;
         SELECT FOR UPDATE alone would not lock anything on that backend.
         """
         heads = {}
         for user_id in sorted(set(recipients)):
-            session.execute(
-                self.dialect_insert(UserEventFeedModel)
-                .values(user_id=user_id, last_seq=0)
-                .on_conflict_do_nothing(index_elements=[UserEventFeedModel.user_id])
-            )
             heads[user_id] = session.execute(
-                update(UserEventFeedModel)
-                .where(UserEventFeedModel.user_id == user_id)
-                .values(last_seq=UserEventFeedModel.last_seq)
+                self.dialect_insert(UserEventFeedModel)
+                .values(user_id=user_id, last_seq=increment)
+                .on_conflict_do_update(
+                    index_elements=[UserEventFeedModel.user_id],
+                    set_={"last_seq": UserEventFeedModel.last_seq + increment},
+                )
                 .returning(UserEventFeedModel.last_seq)
             ).scalar_one()
         return heads
@@ -862,16 +860,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 return original, original_users
 
-            heads = self._lock_event_feeds(session, users)
-            for user_id, head in heads.items():
-                session.execute(
-                    update(UserEventFeedModel)
-                    .where(UserEventFeedModel.user_id == user_id)
-                    .values(last_seq=head + 1)
-                )
+            positions = self._lock_event_feeds(session, users, increment=1)
+            for user_id, seq in positions.items():
                 session.execute(
                     insert(UserEventModel).values(
-                        user_id=user_id, seq=head + 1, event_id=event_id
+                        user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
             return event, users
