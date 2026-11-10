@@ -38,6 +38,7 @@ from flwr.common.constant import (
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.supercore import log
@@ -356,6 +357,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -366,6 +368,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             series_description=series_description,
             connector_ids=connector_ids,
             primary_task_type=primary_task_type,
+            agent_id=agent_id,
         )
         if initial_task_event is not None:
             try:
@@ -375,7 +378,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock_task_store, self.lock, self.lock_task_event_store:
             if space_id is not None:
                 with self.lock_space_store:
-                    if space_id not in self.space_store:
+                    space = self.space_store.get(space_id)
+                    if space is None or (
+                        agent_id is not None
+                        and SpaceParticipant(agent_id=agent_id)
+                        not in space.participants
+                    ):
                         return 0
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
@@ -424,6 +432,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     clientapp_runtime=0.0,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
+                    agent_id=agent_id,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,
