@@ -254,7 +254,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
                     request.state.protobuf_request = Parse(
                         (await request.body()).decode("utf-8"), StreamRunEventsRequest()
                     )
-                except (ParseError, UnicodeDecodeError) as exc:
+                except (ParseError, UnicodeDecodeError, TypeError) as exc:
                     raise FlowerError(
                         ApiErrorCode.INVALID_PROTOBUF_PAYLOAD,
                         f"Invalid protobuf JSON payload: {exc!r}",
@@ -288,9 +288,8 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             )
 
         result = request.state.protobuf_response
-        event_stream = (
-            run_events
-            and request.headers.get("accept", "").strip().lower() == "text/event-stream"
+        event_stream = run_events and self._accepts_event_stream(
+            request.headers.get("accept", "")
         )
         protobuf_response = self._response_for(
             result, get_protobuf_stream_context(request), event_stream
@@ -304,6 +303,25 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
             if header[0] not in (b"content-length", b"content-type")
         )
         return protobuf_response
+
+    @staticmethod
+    def _accepts_event_stream(accept: str) -> bool:
+        # Require explicit SSE, preserving protobuf for wildcard/default clients.
+        for media_range in accept.lower().split(","):
+            media_type, *parameters = media_range.split(";")
+            if media_type.strip() != "text/event-stream":
+                continue
+            quality = "1"
+            for parameter in parameters:
+                name, _, value = parameter.partition("=")
+                if name.strip() == "q":
+                    quality = value.strip()
+            try:
+                if 0 < float(quality) <= 1:
+                    return True
+            except ValueError:
+                continue
+        return False
 
     @staticmethod
     def _check_request_media_type(request: Request) -> None:

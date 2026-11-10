@@ -1236,7 +1236,21 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
 
 
 @pytest.mark.parametrize("json_request", [False, True])
-def test_stream_run_events_returns_sse(json_request: bool) -> None:
+@pytest.mark.parametrize(
+    "accept, sse",
+    [
+        ("text/event-stream", True),
+        ("text/event-stream, */*", True),
+        ("text/event-stream; q=1", True),
+        ("application/json;q=0.5, text/event-stream;q=0.8", True),
+        ("text/event-stream;q=0, */*", False),
+        ("text/event-stream;q=invalid", False),
+        ("*/*", False),
+    ],
+)
+def test_stream_run_events_returns_sse(
+    json_request: bool, accept: str, sse: bool
+) -> None:
     """Preserve uint64 cursors and frame multiline data without SSE injection."""
     app = _create_app()
     linkstate = Mock(spec=LinkState)
@@ -1265,10 +1279,16 @@ def test_stream_run_events_returns_sse(json_request: bool) -> None:
                 "content-type": (
                     "application/json" if json_request else PROTOBUF_MEDIA_TYPE
                 ),
-                "accept": "text/event-stream",
+                "accept": accept,
             },
         )
     assert response.status_code == 200
+    if not sse:
+        assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
+        assert response.content == b"".join(
+            frame_message(message) for message in expected
+        )
+        return
     assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
     assert response.headers["cache-control"] == "no-cache, no-transform"
     assert response.headers["x-accel-buffering"] == "no"
@@ -1279,7 +1299,9 @@ def test_stream_run_events_returns_sse(json_request: bool) -> None:
     assert not stream.call_args.args[3]()
 
 
-@pytest.mark.parametrize("body", [b"{", b'{"runId":"invalid"}', b"\xff"])
+@pytest.mark.parametrize(
+    "body", [b"{", b'{"runId":"invalid"}', b"\xff", b"null", b"true", b"1"]
+)
 def test_stream_run_events_rejects_invalid_json(body: bytes) -> None:
     """Reject malformed protobuf JSON before invoking the streaming handler."""
     with patch(
