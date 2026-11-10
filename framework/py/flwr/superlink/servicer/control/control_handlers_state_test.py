@@ -1246,11 +1246,17 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.assertFalse(response.federations[0].can_invite_members)
         self.assertFalse(response.federations[0].can_add_supernodes)
 
-    def test_create_federation_success(self) -> None:
+    @parameterized.expand(
+        [
+            (handle, name)
+            for handle in [None, NOOP_ACCOUNT_NAME]
+            for name in ["test-federation", "café"]
+        ]
+    )  # type: ignore[untyped-decorator]
+    def test_create_federation_success(self, handle: str | None, name: str) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
         works."""
         # Prepare
-        name = "test-federation"
         description = "A test federation"
         expected_fed_id = f"@{NOOP_ACCOUNT_NAME}/{name}"
         request = CreateFederationRequest(
@@ -1258,6 +1264,10 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             description=description,
             simulation=True,
         )
+        if handle is not None:
+            request.handle = handle
+        request = CreateFederationRequest.FromString(request.SerializeToString())
+        self.assertEqual(request.HasField("handle"), handle is not None)
         mock_members = [
             Member(account=Account(id=self.aid), role="owner"),
         ]
@@ -1373,6 +1383,83 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             cm.exception.public_details, "Create federation not permitted."
         )
         self.assertEqual(cm.exception.entitlement_code, 103)
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        ["team", "Team_01-test", "t" * 100]
+    )
+    def test_create_federation_dispatches_namespace_policy(self, handle: str) -> None:
+        """Custom managers receive the actor and selected namespace together."""
+        manager = cast(Mock, self.state.federation_manager)
+        federation = SimpleNamespace(
+            id=f"@{handle}/demo",
+            description="Team federation",
+            members=[],
+            member_count=0,
+            simulation=True,
+            can_invite_members=True,
+            can_add_supernodes=True,
+        )
+        request = CreateFederationRequest(
+            federation_name="demo",
+            description="Team federation",
+            simulation=True,
+            handle=handle,
+        )
+        request = CreateFederationRequest.FromString(request.SerializeToString())
+        self.assertTrue(request.HasField("handle"))
+        with patch.object(
+            manager, "create_federation", return_value=federation
+        ) as create:
+            response = control_handlers.create_federation(
+                request,
+                get_current_account_info(),
+                self.state,
+            )
+
+        create.assert_called_once_with(
+            flwr_aid=self.aid,
+            federation_id=f"@{handle}/demo",
+            description="Team federation",
+            simulation=True,
+        )
+        manager.can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.CREATE_FEDERATION,
+            CreateFederationContext(
+                federation_id=f"@{handle}/demo",
+                runtime=RunTime.SIMULATION,
+                visibility="private",
+            ),
+        )
+        self.assertEqual(response.federation.name, f"@{handle}/demo")
+
+    @parameterized.expand(
+        [
+            "",
+            "@owner",
+            "owner/name",
+            "two words",
+            "x\n",
+            "x\x00",
+            "x\u200b",
+            "team.name",
+            "team:name",
+            "téam",
+        ]
+    )  # type: ignore[untyped-decorator]
+    def test_create_federation_rejects_malformed_handle(self, handle: str) -> None:
+        """Reject malformed selectors before initializing or creating federations."""
+        with self.assertRaises(FlowerError) as error:
+            control_handlers.create_federation(
+                CreateFederationRequest(federation_name="demo", handle=handle),
+                get_current_account_info(),
+                self.state,
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_FEDERATION_NAME)
+        manager = cast(Mock, self.state.federation_manager)
+        manager.ensure_default_federations_exist.assert_not_called()
+        manager.create_federation.assert_not_called()
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation raises when federation name is invalid."""
