@@ -344,7 +344,7 @@ erDiagram
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
   task ||--o{ task_usage : task_id
-  user_event_feeds ||--o| user_events : user_id
+  user_event_feeds ||--o{ user_events : user_id
   events ||--o{ user_events : event_id
 
 ```
