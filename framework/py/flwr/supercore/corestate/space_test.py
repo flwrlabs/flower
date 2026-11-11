@@ -14,20 +14,15 @@
 # ==============================================================================
 """Space persistence tests."""
 
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -251,53 +246,4 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
     # Both page-selection modes mark returned messages read for this participant.
     assert state.get_space_messages(space_id, user) == messages
     assert state.get_space_messages(space_id, user, after_id=0, limit=1) == messages[:1]
-    assert messages[-1] is not None
-    if isinstance(state, InMemoryLinkState):
-        assert state.space_participant_cursors[(space_id, "alice")] == messages[-1].id
-    else:
-        assert isinstance(state, SqlLinkState)
-        with state.session() as session:
-            assert (
-                session.scalar(
-                    select(SpaceParticipantTable.c.read_through_message_id).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.flwr_aid == "alice",
-                    )
-                )
-                == messages[-1].id
-            )
-
-
-def test_sql_unread_reads_are_transactional(tmp_path: Path) -> None:
-    """Concurrent readers get distinct pages and rolled-back reads remain unread."""
-    database = str(tmp_path / "state.db")
-    backends = [
-        SqlLinkState(database, NoOpFederationManager(), ObjectStoreFactory().store())
-        for _ in range(2)
-    ]
-    for backend in backends:
-        backend.initialize()
-    state = backends[0]
-    reader = SpaceParticipant(flwr_aid="alice")
-    space_id = UUID(state.create_space(participants=[reader]).id)
-    messages = [state.create_space_message(space_id, reader, str(i)) for i in range(3)]
-    with pytest.raises(RuntimeError, match="rollback"), state.session():
-        assert (
-            state.get_space_messages(space_id, reader, unread_only=True, limit=1)
-            == messages[:1]
-        )
-        raise RuntimeError("rollback")
-    barrier = Barrier(2)
-
-    def read(backend: SqlLinkState) -> int:
-        barrier.wait(timeout=5)
-        page = backend.get_space_messages(space_id, reader, unread_only=True, limit=1)
-        assert page is not None and len(page) == 1
-        return page[0].id
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        ids = list(pool.map(read, backends))
-    assert sorted(ids) == [
-        message.id for message in messages[:2] if message is not None
-    ]
-    assert state.get_space_messages(space_id, reader, unread_only=True) == messages[2:]
+    assert state.get_space_messages(space_id, user, unread_only=True) == []

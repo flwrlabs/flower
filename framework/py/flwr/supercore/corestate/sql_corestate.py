@@ -41,7 +41,6 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -1296,8 +1295,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             SpaceParticipantTable.c[field] == identity,
         )
         with self.session() as session:
-            if not self._lock_space(session, space_id):
-                return None
             model = session.scalars(
                 insert(SpaceMessageModel)
                 .from_select(
@@ -1324,7 +1321,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         after_id: int | None = None,
         unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Read messages and advance the participant's read cursor atomically."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
@@ -1361,8 +1358,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .limit(limit)
         )
         with self.session() as session:
-            if not self._lock_space(session, space_id):
-                return None
             models = list(session.scalars(query))
             if not models:
                 return None
@@ -1387,18 +1382,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 if unread_only or after_id is not None
                 else list(reversed(messages))
             )
-
-    def _lock_space(self, session: Session, space_id: UUID) -> bool:
-        """Serialize message writes and reads that advance participant cursors."""
-        return (
-            session.scalar(
-                update(SpaceModel)
-                .where(SpaceModel.id == space_id)
-                .values(id=SpaceModel.id)
-                .returning(SpaceModel.id)
-            )
-            is not None
-        )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,

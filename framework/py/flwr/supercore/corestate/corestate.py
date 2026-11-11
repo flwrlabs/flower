@@ -699,15 +699,39 @@ class CoreState(ABC):  # pylint: disable=R0904
         after_id: int | None = None,
         unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a message page in ascending ID order.
+        """Read a page and advance the participant's read cursor.
 
-        Every read marks messages read through the newest returned ID without
-        moving the participant's cursor backward. Bounds are exclusive. With
-        after_id or unread_only, select the earliest matching page; otherwise
-        select the latest. unread_only filters using the participant's cursor and
-        can be combined with explicit ID bounds.
-        Return None for missing spaces or nonparticipants. Raise ValueError for
-        a nonpositive limit or invalid range.
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the messages.
+        participant : SpaceParticipant
+            User or agent reading the messages.
+        limit : int (default: 50)
+            Maximum number of messages to return.
+        before_id : int | None (default: None)
+            Exclusive upper message ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower message ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceMessage] | None
+            Messages in ascending ID order, selecting the newest page by default.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or the supplied ID range is invalid.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
         """
 
     @abstractmethod

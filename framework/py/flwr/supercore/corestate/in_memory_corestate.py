@@ -1055,7 +1055,7 @@ class InMemoryCoreState(
         after_id: int | None = None,
         unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Read messages and advance the participant's read cursor atomically."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
