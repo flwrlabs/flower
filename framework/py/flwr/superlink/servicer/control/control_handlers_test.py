@@ -21,6 +21,8 @@ from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
 
+import pytest
+
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     NOOP_ACCOUNT_NAME,
@@ -43,6 +45,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
+    StreamEventsRequest,
+    StreamEventsResponse,
     UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -77,8 +81,11 @@ from .control_handlers import (
     start_automation,
     start_run,
     stop_automation,
+    stream_events,
     update_run_series_description,
 )
+
+_ACCOUNT = AccountInfo(flwr_aid="alice", account_name="Alice")
 
 
 class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
@@ -996,3 +1003,45 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [item.automation_id for item in stopped],
             [automation.automation_id],
         )
+
+
+@pytest.mark.parametrize(
+    ("after_seq", "last_event_id", "expected"),
+    [(None, None, 0), (None, "7", 7), (3, "invalid", 3), (0, "7", 0)],
+)
+def test_stream_cursor_precedence(
+    after_seq: int | None, last_event_id: str | None, expected: int
+) -> None:
+    """Prefer the protobuf cursor, then Last-Event-ID, then zero."""
+    state = Mock(spec=LinkState)
+    stream = stream_events(
+        StreamEventsRequest(after_seq=after_seq),
+        _ACCOUNT,
+        state,
+        lambda: True,
+        last_event_id,
+    )
+    state.get_user_events.assert_called_once_with("alice", after_seq=expected)
+    stream.close()
+
+
+def test_stream_replays_pages_polls_and_stops_on_disconnect() -> None:
+    """Forward events and cursor markers, then poll from the last delivered seq."""
+    state = Mock(spec=LinkState)
+    entries = [StreamEventsResponse(seq=seq) for seq in range(1, 5)]
+    entries[0].event.type = "agent.created"
+    entries[-1].event.type = "message.created"
+    state.get_user_events.side_effect = [entries[:2], entries[2:3], [], entries[3:]]
+    active = Mock(return_value=True)
+    stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, active)
+    with patch("flwr.superlink.servicer.control.control_handlers.time.sleep") as sleep:
+        assert [next(stream) for _ in entries] == entries
+        active.return_value = False
+        assert not list(stream)
+    sleep.assert_called_once_with(0.5)
+    assert state.get_user_events.call_args_list == [
+        call("alice", after_seq=0),
+        call("alice", after_seq=2),
+        call("alice", after_seq=3),
+        call("alice", after_seq=3),
+    ]
