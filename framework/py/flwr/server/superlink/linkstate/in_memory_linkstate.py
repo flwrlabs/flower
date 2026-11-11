@@ -376,16 +376,29 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 validate_task_event_data(initial_task_event.data)
             except ValueError:
                 return 0
-        with self.lock_task_store, self.lock, self.lock_task_event_store:
-            if space_id is not None:
-                with self.lock_space_store:
-                    space = self.space_store.get(space_id)
-                    if space is None or (
-                        agent_id is not None
-                        and SpaceParticipant(agent_id=agent_id)
-                        not in space.participants
-                    ):
-                        return 0
+        with (
+            self.lock_task_store,
+            self.lock,
+            self.lock_task_event_store,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            if space_id is not None and space_id not in self.space_store:
+                return 0
+            if space_id is not None and agent_id is not None:
+                self._cleanup_expired_task_tokens_locked()
+                if not self._agent_can_start_run(space_id, agent_id):
+                    return 0
+                flwr_aid, agent = next(
+                    (owner, agents[agent_id])
+                    for owner, agents in self.agent_store.items()
+                    if agent_id in agents
+                )
+                app_id, version = parse_app_spec(agent.config.app_spec)
+                if app_id != f"@{fab_id}" or (version and version != fab_version):
+                    return 0
+                if not fab_hash or self.get_fab(fab_hash) is None:
+                    raise ValueError("The resolved AgentApp FAB must be stored first.")
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -525,51 +538,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         if limit is not None and len(candidates) == limit:
                             return candidates
             return candidates
-
-    def create_agent_run(
-        self,
-        space_id: UUID,
-        agent_id: int,
-        *,
-        fab_id: str,
-        fab_version: str,
-        fab_hash: str,
-    ) -> int | None:
-        """Open one execution window under the existing state locks."""
-        with (
-            self.lock_task_store,
-            self.lock,
-            self.lock_space_store,
-            self.lock_agent_store,
-        ):
-            self._cleanup_expired_task_tokens_locked()
-            if not self._agent_can_start_run(space_id, agent_id):
-                return None
-            owner, agent = next(
-                (owner, agents[agent_id])
-                for owner, agents in self.agent_store.items()
-                if agent_id in agents
-            )
-            app_id, version = parse_app_spec(agent.config.app_spec)
-            if app_id != f"@{fab_id}" or (version and version != fab_version):
-                return None
-            if self.get_fab(fab_hash) is None:
-                raise ValueError("The resolved AgentApp FAB must be stored first.")
-            return (
-                self.create_run(
-                    fab_id=fab_id,
-                    fab_version=fab_version,
-                    fab_hash=fab_hash,
-                    override_config={},
-                    federation_id=None,
-                    federation_config=None,
-                    flwr_aid=owner,
-                    primary_task_type=TaskType.AGENT_APP,
-                    space_id=space_id,
-                    agent_id=agent_id,
-                )
-                or None
-            )
 
     def get_run_info(
         self,

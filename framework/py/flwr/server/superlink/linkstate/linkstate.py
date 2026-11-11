@@ -294,7 +294,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
-            Flower Account ID of the creator.
+            Flower Account ID of the creator. Agent-bound Space runs use the
+            executing agent's owner.
         primary_task_type : str
             The type of the primary task to create for the run.
         series_id : int | None (default: None)
@@ -316,18 +317,21 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Space for an AgentApp run with a fresh context. Cannot be combined
             with federation configuration, a series, or federation connectors.
         agent_id : int | None (default: None)
-            Executing agent assigned by the server for a Space run. The agent
-            must participate in the Space; otherwise creation returns 0.
+            Executing agent assigned by the server for a Space run. Creation
+            returns 0 unless the agent participates, has unread user input,
+            has no open Run, and its app matches the resolved FAB. The FAB must
+            already be stored.
 
         Returns
         -------
         int
-            The run ID of the newly created run.
+            The new run ID, or 0 if creation fails or the agent is ineligible.
 
         Notes
         -----
         This method will not verify if the account has permission to create
-        a run in the federation or space. Invalid scope combinations raise ValueError.
+        a run in the federation or space. Invalid scope combinations or missing
+        FABs for agent-bound runs raise ValueError.
         """
 
     @abc.abstractmethod
@@ -345,43 +349,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         Sequence[tuple[UUID, Agent]]
             Eligible Space IDs and agents. This does not advance read cursors.
-        """
-
-    @abc.abstractmethod
-    def create_agent_run(  # pylint: disable=too-many-arguments
-        self,
-        space_id: UUID,
-        agent_id: int,
-        *,
-        fab_id: str,
-        fab_version: str,
-        fab_hash: str,
-    ) -> int | None:
-        """Recheck eligibility and create a Run and primary Task together.
-
-        Parameters
-        ----------
-        space_id : UUID
-            Space containing unread user input.
-        agent_id : int
-            Participating agent to execute.
-        fab_id : str
-            Resolved AgentApp ID without the leading @.
-        fab_version : str
-            Resolved AgentApp version.
-        fab_hash : str
-            Hash of an AgentApp FAB already stored in state.
-
-        Returns
-        -------
-        int | None
-            New Run ID, or None if another Run is open, input is read,
-            participation changed, or the resolved app no longer matches.
-
-        Raises
-        ------
-        ValueError
-            If the resolved FAB has not been stored.
         """
 
     @abc.abstractmethod

@@ -1228,14 +1228,19 @@ def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
             fab_hash = state.store_fab(fab)
 
             # Recheck eligibility atomically; another poll may have opened a Run.
-            run_id = state.create_agent_run(
-                space_id,
-                agent.id,
+            run_id = state.create_run(
                 fab_id=fab_id,
                 fab_version=version,
                 fab_hash=fab_hash,
+                override_config={},
+                federation_id=None,
+                federation_config=None,
+                flwr_aid=None,
+                primary_task_type=TaskType.AGENT_APP,
+                space_id=space_id,
+                agent_id=agent.id,
             )
-            if run_id is not None:
+            if run_id:
                 created += 1
         except Exception as exc:  # pylint: disable=broad-exception-caught
             # A failed candidate must not prevent other eligible agents from starting.

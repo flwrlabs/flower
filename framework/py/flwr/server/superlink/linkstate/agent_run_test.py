@@ -24,6 +24,7 @@ import pytest
 from flwr.proto.control_pb2 import Agent, AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
+from flwr.supercore.constant import TaskType
 from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
@@ -73,9 +74,25 @@ def test_unread_input_opens_one_run(states: tuple[LinkState, LinkState]) -> None
     assert not state.get_agent_run_candidates()
     state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Input")
     assert state.get_agent_run_candidates() == [(space_id, agent)]
-    assert state.create_agent_run(space_id, agent.id, **app) is not None
+    run_ids = [
+        state.create_run(
+            fab_id=app["fab_id"],
+            fab_version=app["fab_version"],
+            fab_hash=app["fab_hash"],
+            override_config={},
+            federation_id=None,
+            federation_config=None,
+            flwr_aid=None,
+            primary_task_type=TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
+        for _ in range(2)
+    ]
+    assert run_ids[0]
+    assert run_ids[1] == 0
     assert not state.get_agent_run_candidates()
-    assert state.create_agent_run(space_id, agent.id, **app) is None
+    assert state.get_run_info(run_ids=[run_ids[0]])[0].flwr_aid == "alice"
 
 
 def test_concurrent_admission_creates_one_run(
@@ -87,11 +104,22 @@ def test_concurrent_admission_creates_one_run(
     state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Input")
     barrier = Barrier(2)
 
-    def start(backend: LinkState) -> int | None:
+    def start(backend: LinkState) -> int:
         barrier.wait(timeout=5)
-        return backend.create_agent_run(space_id, agent.id, **app)
+        return backend.create_run(
+            fab_id=app["fab_id"],
+            fab_version=app["fab_version"],
+            fab_hash=app["fab_hash"],
+            override_config={},
+            federation_id=None,
+            federation_config=None,
+            flwr_aid=None,
+            primary_task_type=TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         ids = list(pool.map(start, (state, second)))
-    assert sum(run_id is not None for run_id in ids) == 1
+    assert sum(bool(run_id) for run_id in ids) == 1
     assert len(state.get_run_info()) == 1

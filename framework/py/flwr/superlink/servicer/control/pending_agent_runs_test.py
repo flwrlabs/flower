@@ -28,6 +28,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.constant import TaskType
 from flwr.supercore.fab import Fab
 
 from . import control_handlers
@@ -70,12 +71,17 @@ def test_process_pending_agent_runs_resolves_app(
     state.store_fab.assert_called_once_with(
         Fab(hashlib.sha256(content).hexdigest(), content, verifications)
     )
-    state.create_agent_run.assert_called_once_with(
-        space_id,
-        agent.id,
+    state.create_run.assert_called_once_with(
         fab_id="publisher/app",
         fab_version="1.0",
         fab_hash="stored-hash",
+        override_config={},
+        federation_id=None,
+        federation_config=None,
+        flwr_aid=None,
+        primary_task_type=TaskType.AGENT_APP,
+        space_id=space_id,
+        agent_id=agent.id,
     )
 
 
@@ -89,7 +95,7 @@ def test_process_pending_agent_runs_limits_successes(
         (space_id, Agent(id=i, config=AgentConfig(app_spec="@publisher/app")))
         for i in range(1, 15)
     ]
-    state.create_agent_run.side_effect = [None, 123]
+    state.create_run.side_effect = [0, 123]
     with (
         patch.object(
             control_handlers,
@@ -101,7 +107,7 @@ def test_process_pending_agent_runs_limits_successes(
     ):
         process_pending_agent_runs(state, limit=1)
     assert resolve.call_count == 13
-    assert state.create_agent_run.call_count == 2
+    assert state.create_run.call_count == 2
 
 
 @pytest.mark.parametrize("invalid_bundle", ["oversized", "serverapp"])
@@ -128,7 +134,7 @@ def test_process_pending_agent_runs_rejects_invalid_bundle(
     ):
         process_pending_agent_runs(state)
     state.store_fab.assert_not_called()
-    state.create_agent_run.assert_not_called()
+    state.create_run.assert_not_called()
 
 
 def test_start_run_preserves_oversized_fab_response() -> None:

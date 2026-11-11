@@ -434,14 +434,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                participant = session.scalar(
-                    select(SpaceParticipantTable.c.agent_id).where(
+                # Serialize admission for this agent and Space before rechecking.
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         SpaceParticipantTable.c.agent_id == agent_id,
                     )
+                    .values(
+                        read_through_message_id=SpaceParticipantTable.c.read_through_message_id
+                    )
                 )
-                if participant is None:
+                candidate = session.execute(
+                    _agent_run_candidates_query().where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        AgentModel.agent_id == agent_id,
+                    )
+                ).one_or_none()
+                if candidate is None:
                     return 0
+                _, agent = candidate
+                app_id, version = parse_app_spec(agent.app_spec)
+                if app_id != f"@{fab_id}" or (version and version != fab_version):
+                    return 0
+                if not fab_hash or self.get_fab(fab_hash) is None:
+                    raise ValueError("The resolved AgentApp FAB must be stored first.")
+                flwr_aid = agent.flwr_aid
             existing_run_id = session.scalar(
                 select(RunModel.run_id).where(RunModel.run_id == run_id)
             )
@@ -538,60 +556,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     _agent_run_candidates_query().limit(limit)
                 )
             ]
-
-    def create_agent_run(  # pylint: disable=too-many-arguments
-        self,
-        space_id: UUID,
-        agent_id: int,
-        *,
-        fab_id: str,
-        fab_version: str,
-        fab_hash: str,
-    ) -> int | None:
-        """Serialize admission on the agent participant and recheck eligibility."""
-        with self.session() as session:
-            participant = session.scalar(
-                update(SpaceParticipantTable)
-                .where(
-                    SpaceParticipantTable.c.space_id == space_id,
-                    SpaceParticipantTable.c.agent_id == agent_id,
-                )
-                .values(
-                    read_through_message_id=SpaceParticipantTable.c.read_through_message_id
-                )
-                .returning(SpaceParticipantTable.c.agent_id)
-            )
-            if participant is None:
-                return None
-            candidate = session.execute(
-                _agent_run_candidates_query().where(
-                    SpaceParticipantTable.c.space_id == space_id,
-                    AgentModel.agent_id == agent_id,
-                )
-            ).one_or_none()
-            if candidate is None:
-                return None
-            _, agent = candidate
-            app_id, version = parse_app_spec(agent.app_spec)
-            if app_id != f"@{fab_id}" or (version and version != fab_version):
-                return None
-            if self.get_fab(fab_hash) is None:
-                raise ValueError("The resolved AgentApp FAB must be stored first.")
-            return (
-                self.create_run(
-                    fab_id=fab_id,
-                    fab_version=fab_version,
-                    fab_hash=fab_hash,
-                    override_config={},
-                    federation_id=None,
-                    federation_config=None,
-                    flwr_aid=agent.flwr_aid,
-                    primary_task_type=TaskType.AGENT_APP,
-                    space_id=space_id,
-                    agent_id=agent_id,
-                )
-                or None
-            )
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,
