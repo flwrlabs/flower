@@ -239,26 +239,6 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
 }
 
 
-def _accepts_sse(accept: str) -> bool:
-    """Return whether an explicit SSE media range has a positive quality."""
-    for media_range in accept.split(","):
-        media_type, *parameters = media_range.split(";")
-        if media_type.strip().lower() != SSE_MEDIA_TYPE:
-            continue
-        quality = 1.0
-        for parameter in parameters:
-            name, _, value = parameter.partition("=")
-            if name.strip().lower() == "q":
-                try:
-                    quality = float(value)
-                except ValueError:
-                    quality = 0.0
-                break
-        if 0 < quality <= 1:
-            return True
-    return False
-
-
 class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
     """Translate protobuf requests and handler results at the HTTP boundary."""
 
@@ -299,7 +279,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         protobuf_response = self._response_for(
             result,
             get_protobuf_stream_context(request),
-            use_sse=_accepts_sse(request.headers.get("accept", "")),
+            use_sse=request.headers.get("accept") == SSE_MEDIA_TYPE,
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
