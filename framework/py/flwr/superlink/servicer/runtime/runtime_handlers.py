@@ -168,7 +168,12 @@ def get_space_messages(
     request: GetSpaceMessagesRequest, state: LinkState, task: Task
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
-    space_id, _ = _task_space(request.space_id, state, task)
+    space_id, run = _task_space(request.space_id, state, task)
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Space message reads require an agent binding.",
+        )
     limit = request.limit if request.HasField("limit") else 50
     if limit > 100:
         raise FlowerError(
@@ -177,7 +182,7 @@ def get_space_messages(
     try:
         messages = state.get_space_messages(
             space_id,
-            flwr_aid=None,
+            SpaceParticipant(agent_id=run.agent_id),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
             after_id=request.after_id if request.HasField("after_id") else None,

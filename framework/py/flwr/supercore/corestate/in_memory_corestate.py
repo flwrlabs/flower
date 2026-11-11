@@ -1047,7 +1047,7 @@ class InMemoryCoreState(
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str | None,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
@@ -1058,12 +1058,9 @@ class InMemoryCoreState(
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        viewer = SpaceParticipant(flwr_aid=flwr_aid) if flwr_aid is not None else None
         with self.lock_space_store:
             space = self.space_store.get(space_id)
-            if space is None or (
-                viewer is not None and viewer not in space.participants
-            ):
+            if space is None or participant not in space.participants:
                 return None
             messages = [
                 message

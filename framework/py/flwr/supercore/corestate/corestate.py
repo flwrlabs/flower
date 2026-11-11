@@ -692,7 +692,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str | None,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
@@ -703,8 +703,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Bounds are exclusive. With after_id, select the earliest matching page;
         otherwise select the latest. Return None for missing spaces or
         nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
-        Pass flwr_aid=None only after authorizing access to the Space, such as
-        through an authenticated Runtime task's Run.
+        The participant identifies the account or agent reading the page.
         """
 
     @abstractmethod
