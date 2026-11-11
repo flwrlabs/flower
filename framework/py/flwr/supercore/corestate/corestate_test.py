@@ -2713,10 +2713,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             with self.subTest(limit=limit), self.assertRaises(ValueError):
                 state.get_user_events("alice", limit=limit)
 
-    def test_user_event_bootstrap_barrier(self) -> None:
-        """A mutation started during bootstrap is replayed after the snapshot cursor."""
+    def test_user_event_bootstrap_replay(self) -> None:
+        """Allow writes during bootstrap and replay them after its captured cursor."""
         state = self.state_factory()
-        reading, writing, release = ThreadEvent(), ThreadEvent(), ThreadEvent()
+        reading, release = ThreadEvent(), ThreadEvent()
         list_agents = state.list_agents
 
         def paused_list_agents(flwr_aid: str) -> list[Agent]:
@@ -2725,12 +2725,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             assert release.wait(5)
             return agents
 
-        def write() -> Agent | None:
-            writing.set()
-            return state.create_agent(
-                "alice", AgentConfig(name="Agent", app_spec="@test/app")
-            )
-
         with (
             patch.object(state, "list_agents", paused_list_agents),
             ThreadPoolExecutor(max_workers=2) as executor,
@@ -2738,19 +2732,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             bootstrap = executor.submit(state.get_bootstrap, "alice")
             try:
                 self.assertTrue(reading.wait(5))
-                writer = executor.submit(write)
-                self.assertTrue(writing.wait(5))
-                with self.assertRaises(TimeoutError):
-                    writer.result(timeout=0.1)
+                agent = executor.submit(
+                    state.create_agent,
+                    "alice",
+                    AgentConfig(name="Agent", app_spec="@test/app"),
+                ).result(timeout=5)
             finally:
                 release.set()
             snapshot = bootstrap.result(timeout=5)
-            agent = writer.result(timeout=5)
-        self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
+        self.assertFalse(snapshot.agents or snapshot.cursor)
+        self.assertEqual(len(snapshot.spaces), 1)
         entries = state.get_user_events("alice", snapshot.cursor)
         assert agent is not None
         self.assertEqual(entries[0].event.type, "agent.created")
         self.assertEqual(entries[0].event.payload["id"], str(agent.id))
+        self.assertEqual(entries[1].event.payload["id"], snapshot.spaces[0].id)
 
     def test_user_event_sql_transactions(self) -> None:
         """Keep SQL events atomic, persistent, and committed in feed order."""

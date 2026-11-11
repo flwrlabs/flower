@@ -28,7 +28,6 @@ from typing import Literal, cast
 from uuid import UUID, uuid4
 
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import Message as ProtoMessage
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
@@ -642,18 +641,19 @@ class InMemoryCoreState(
             )
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
-        """Snapshot visible state and its feed head under the mutation barrier."""
+        """Read the feed cursor before fetching visible state."""
         with self.lock_space_store:
-            return BootstrapResponse(
-                agents=self.list_agents(flwr_aid),
-                spaces=self.get_spaces(flwr_aid),
-                cursor=len(self.user_event_store.get(flwr_aid, [])),
-            )
+            head = len(self.user_event_store.get(flwr_aid, []))
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head,
+        )
 
     def store_event(
         self,
         event_type: str,
-        payload: ProtoMessage,
+        payload: Agent | Space | SpaceMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
     ) -> UUID:

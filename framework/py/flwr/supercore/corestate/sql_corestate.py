@@ -18,16 +18,13 @@
 import hashlib
 import json
 import secrets
-from collections.abc import Callable, Collection, Iterator, Sequence
-from contextlib import contextmanager, nullcontext
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
-from threading import RLock
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import Message as ProtoMessage
 from sqlalchemy import (
     MetaData,
     and_,
@@ -187,16 +184,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
-        self._sqlite_memory_lock = RLock()
-
-    @contextmanager
-    def session(self) -> Iterator[Session]:
-        """Serialize transactions sharing SQLite's single in-memory connection."""
-        barrier = (
-            self._sqlite_memory_lock if self._is_in_memory_sqlite else nullcontext()
-        )
-        with barrier, super().session() as session:
-            yield session
 
     def dialect_insert(self, table: Any) -> SQLiteInsert | PostgresInsert:
         """Return a dialect-specific insert statement for CoreState upserts."""
@@ -782,40 +769,40 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return [_agent_from_model(model) for model in session.scalars(stmt)]
 
     def _lock_event_feeds(
-        self, session: Session, recipients: Sequence[str], *, increment: int = 0
+        self, session: Session, recipients: Sequence[str]
     ) -> dict[str, int]:
-        """Lock and optionally advance counters in sorted order until commit.
-
-        Upserting even an unchanged counter provides SQLite's write barrier;
-        SELECT FOR UPDATE alone would not lock anything on that backend.
-        """
+        """Lock and advance counters in sorted user-ID order until commit."""
         heads = {}
         for user_id in sorted(set(recipients)):
             heads[user_id] = session.execute(
                 self.dialect_insert(UserEventFeedModel)
-                .values(user_id=user_id, last_seq=increment)
+                .values(user_id=user_id, last_seq=1)
                 .on_conflict_do_update(
                     index_elements=[UserEventFeedModel.user_id],
-                    set_={"last_seq": UserEventFeedModel.last_seq + increment},
+                    set_={"last_seq": UserEventFeedModel.last_seq + 1},
                 )
                 .returning(UserEventFeedModel.last_seq)
             ).scalar_one()
         return heads
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
-        """Read visible state while preventing this user's feed from committing."""
+        """Read the feed cursor before fetching visible state."""
         with self.session() as session:
-            head = self._lock_event_feeds(session, [flwr_aid])[flwr_aid]
-            return BootstrapResponse(
-                agents=self.list_agents(flwr_aid),
-                spaces=self.get_spaces(flwr_aid),
-                cursor=head,
+            head = session.scalar(
+                select(UserEventFeedModel.last_seq).where(
+                    UserEventFeedModel.user_id == flwr_aid
+                )
             )
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head or 0,
+        )
 
     def store_event(
         self,
         event_type: str,
-        payload: ProtoMessage,
+        payload: Agent | Space | SpaceMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
     ) -> UUID:
@@ -831,7 +818,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     created_at=now(),
                 )
             )
-            positions = self._lock_event_feeds(session, recipients, increment=1)
+            positions = self._lock_event_feeds(session, recipients)
             for user_id, seq in positions.items():
                 session.execute(
                     insert(UserEventModel).values(

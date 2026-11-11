@@ -22,8 +22,6 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from google.protobuf.message import Message as ProtoMessage
-
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -283,13 +281,16 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
-        """Return owned Agents, participating Spaces, and their consistent feed head."""
+        """Read the feed cursor before fetching owned Agents and participating Spaces.
+
+        Concurrent changes may appear in both this response and subsequent replay.
+        """
 
     @abstractmethod
     def store_event(
         self,
         event_type: str,
-        payload: ProtoMessage,
+        payload: Agent | Space | SpaceMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
     ) -> UUID:
