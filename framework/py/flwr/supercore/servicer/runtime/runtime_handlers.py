@@ -95,21 +95,26 @@ def get_space_events(
     return GetSpaceEventsResponse(events=events)
 
 
-def _authenticate_space_agent(run: Run) -> tuple[UUID, SpaceParticipant]:
-    """Require a Run bound to a Space and resolve its agent identity."""
+def _authenticate_space_agent(task: Task, run: Run) -> tuple[UUID, SpaceParticipant]:
+    """Require the primary AgentApp task of a Run bound to a Space and agent."""
     if run.space_id is None or run.agent_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             "Space messages require a Run bound to a Space and an agent.",
         )
+    if task.type != TaskType.AGENT_APP or task.task_id != run.primary_task_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Only the primary AgentApp task can access Space messages.",
+        )
     return run.space_id, SpaceParticipant(agent_id=run.agent_id)
 
 
 def get_space_messages(
-    request: GetSpaceMessagesRequest, state: CoreState, run: Run
+    request: GetSpaceMessagesRequest, state: CoreState, task: Task, run: Run
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
-    space_id, participant = _authenticate_space_agent(run)
+    space_id, participant = _authenticate_space_agent(task, run)
     limit = request.limit if request.HasField("limit") else 100
     if limit > 100:
         raise FlowerError(
@@ -135,12 +140,7 @@ def send_space_message(
     request: SendSpaceMessageRequest, state: CoreState, task: Task, run: Run
 ) -> SendSpaceMessageResponse:
     """Publish with the primary AgentApp's server-bound agent identity."""
-    space_id, participant = _authenticate_space_agent(run)
-    if task.type != TaskType.AGENT_APP or task.task_id != run.primary_task_id:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "Only the primary AgentApp task can publish Space messages.",
-        )
+    space_id, participant = _authenticate_space_agent(task, run)
     try:
         message = state.create_space_message(space_id, participant, request.content)
     except ValueError as exc:

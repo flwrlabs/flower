@@ -44,7 +44,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
-from flwr.proto.space_pb2 import SendSpaceMessageRequest  # pylint: disable=E0611
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    SendSpaceMessageRequest,
+)
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate import CoreState
@@ -57,6 +60,7 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 from . import runtime_handlers
 
 
+@pytest.mark.parametrize("read", [False, True])
 @pytest.mark.parametrize(
     "task,agent_id",
     [
@@ -65,20 +69,26 @@ from . import runtime_handlers
         (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
     ],
 )
-def test_send_space_message_requires_bound_primary_agent(
-    task: Task, agent_id: int | None
+def test_space_messages_require_bound_primary_agent(
+    task: Task, agent_id: int | None, read: bool
 ) -> None:
-    """Publishing requires a bound agent and the Run's primary AgentApp task."""
+    """Reading and publishing require the Run's bound primary AgentApp task."""
     state = Mock(spec=CoreState)
     run = Run.create_empty(123)
     run.space_id = UUID("12345678-1234-5678-1234-567812345678")
     run.agent_id = agent_id
     run.primary_task_id = 1
     with pytest.raises(FlowerError) as error:
-        runtime_handlers.send_space_message(
-            SendSpaceMessageRequest(content="No"), state, task, run
-        )
+        if read:
+            runtime_handlers.get_space_messages(
+                GetSpaceMessagesRequest(), state, task, run
+            )
+        else:
+            runtime_handlers.send_space_message(
+                SendSpaceMessageRequest(content="No"), state, task, run
+            )
     assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_space_messages.assert_not_called()
     state.create_space_message.assert_not_called()
 
 

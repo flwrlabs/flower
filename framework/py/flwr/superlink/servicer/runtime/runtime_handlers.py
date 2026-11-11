@@ -151,7 +151,7 @@ def get_space_messages(
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
     return core_runtime_handlers.get_space_messages(
-        request, state, _get_task_run(state, task)
+        request, state, task, _get_task_run(state, task)
     )
 
 
