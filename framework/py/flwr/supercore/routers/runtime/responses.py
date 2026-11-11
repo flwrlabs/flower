@@ -262,7 +262,11 @@ def _authenticate(request: Request, state: CoreState) -> Task:
         )
 
     task = state.get_task_by_token(parts[1])
-    if task is None or task.type != TaskType.AGENT_APP:
+    if (
+        task is None
+        or task.type != TaskType.AGENT_APP
+        or not state.is_task_scope_valid(task)
+    ):
         raise _ResponsesError(
             401, "Invalid authentication credentials.", "invalid_api_key"
         )

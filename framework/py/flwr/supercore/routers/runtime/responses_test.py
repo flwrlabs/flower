@@ -50,6 +50,7 @@ def _state() -> Mock:
     state.get_task_by_token.return_value = Task(
         task_id=123, run_id=789, type=TaskType.AGENT_APP
     )
+    state.is_task_scope_valid.return_value = True
     return state
 
 
@@ -58,14 +59,21 @@ def _stream_request() -> JSONObject:
     return {"model": "model", "input": "hello", "stream": True}
 
 
-@pytest.mark.parametrize("authorization", [None, "Basic task-token"])
+@pytest.mark.parametrize(
+    "authorization", [None, "Basic task-token", "Bearer task-token"]
+)
 def test_responses_requires_bearer_authentication(
     authorization: str | None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Reject missing and non-Bearer task credentials."""
+    """Reject missing, non-Bearer, and revoked-scope credentials before inference."""
     headers = {"Authorization": authorization} if authorization else {}
+    state = _state()
+    state.is_task_scope_valid.return_value = False
+    provider = Mock()
+    monkeypatch.setattr(responses, "model_provider_response", provider)
 
-    response = _client(_state()).post(
+    response = _client(state).post(
         "/v1/runtime/responses",
         json={"model": "model", "input": "hello"},
         headers=headers,
@@ -73,6 +81,7 @@ def test_responses_requires_bearer_authentication(
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "invalid_api_key"
+    provider.assert_not_called()
 
 
 @pytest.mark.parametrize(
