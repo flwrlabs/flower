@@ -193,6 +193,58 @@ class TestAlembicRun(unittest.TestCase):
 
         self.assertEqual(normalize(actual), normalize(expected))
 
+    def test_participant_cursor_rename_preserves_values(self) -> None:
+        """Preserve cursor positions and defaults across upgrade and downgrade."""
+        engine = self.create_engine("participant_cursor.db")
+        try:
+            self.upgrade_to_revision(engine, "6aa3c50bb2cd")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO space (id, created_at, title) "
+                        "VALUES ('00000000000000000000000000000001', "
+                        "'2026-11-11T00:00:00+00:00', '')"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO space_participant "
+                        "(space_id, flwr_aid, seen_through_message_id) "
+                        "VALUES ('00000000000000000000000000000001', 'alice', 42)"
+                    )
+                )
+            self.upgrade_to_revision(engine, "6cbf924cf5ec")
+            with engine.begin() as connection:
+                self.assertEqual(
+                    connection.scalar(
+                        text("SELECT read_through_message_id FROM space_participant")
+                    ),
+                    42,
+                )
+                connection.execute(
+                    text("UPDATE space_participant SET read_through_message_id = 99")
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO space_participant (space_id, flwr_aid) "
+                        "VALUES ('00000000000000000000000000000001', 'bob')"
+                    )
+                )
+            self.downgrade_to_revision(engine, "6aa3c50bb2cd")
+            with engine.connect() as connection:
+                positions = connection.execute(
+                    text(
+                        "SELECT flwr_aid, seen_through_message_id "
+                        "FROM space_participant"
+                    )
+                ).all()
+                self.assertEqual(
+                    {row[0]: row[1] for row in positions},
+                    {"alice": 99, "bob": 0},
+                )
+        finally:
+            engine.dispose()
+
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""
         # Prepare
