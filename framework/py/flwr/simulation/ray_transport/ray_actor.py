@@ -120,24 +120,24 @@ def _log_kfd_diagnostics() -> None:
             WARNING,
             "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
             "process cannot open it (no read/write access). This is a "
-            "permissions issue, not a missing or misplaced "
-            "`librocm_smi64.so`: the current user is likely missing from "
+            "permissions issue, not a missing or unimportable "
+            "`amdsmi`: the current user is likely missing from "
             "the `render` (and `video`) group that owns `/dev/kfd` -- the "
             "`/dev/dri/renderD*` node ROCm also needs is commonly owned by "
             "the same group and likely affected too -- or "
             "the container was started without `--device=/dev/kfd "
             "--device=/dev/dri --group-add render --group-add video`. "
             "Both Ray and the ML framework will report zero GPUs until "
-            "device access is fixed; pointing ROCM_PATH at the SMI "
-            "library will not help.",
+            "device access is fixed; fixing `amdsmi`/ROCM_PATH "
+            "configuration will not help.",
         )
         return
 
     # /dev/kfd alone is not sufficient: ROCm also reaches the GPU through a
     # /dev/dri/renderD* node, which a container or host can pass through (or
-    # permission) independently of /dev/kfd. If no such node is usable, pointing
-    # ROCM_PATH at the SMI library -- the fix for the common case below -- would
-    # not help at all.
+    # permission) independently of /dev/kfd. If no such node is usable, fixing
+    # `amdsmi`/ROCM_PATH -- the fix for the common case below -- would not help
+    # at all.
     render_nodes = glob.glob("/dev/dri/renderD*")
     accessible_render_nodes = [
         node for node in render_nodes if os.access(node, os.R_OK | os.W_OK)
@@ -155,12 +155,18 @@ def _log_kfd_diagnostics() -> None:
             "The ROCm kernel driver is loaded (/dev/kfd exists), so "
             "an AMD GPU is likely present on this host. If Ray's GPU "
             "resources were not limited deliberately, check that Ray "
-            "can enumerate it: Ray finds AMD GPUs by opening "
-            "`$ROCM_PATH/lib/librocm_smi64.so` (ROCM_PATH defaults to "
-            "/opt/rocm) under that *unversioned* name. Ensure "
-            "ROCM_PATH points at a ROCm root containing the "
-            "`librocm_smi64.so` symlink rather than only a versioned "
-            "`librocm_smi64.so.<N>`.",
+            "can enumerate it: Ray 2.56+ discovers AMD GPUs through "
+            "the `amdsmi` Python package rather than opening "
+            "`librocm_smi64.so` directly, and a missing or "
+            "unimportable `amdsmi` fails silently -- Ray simply "
+            "reports zero GPUs with no visible error. Confirm it is "
+            "importable in the exact Python environment Ray runs in: "
+            "`python -c 'import amdsmi'`. If that fails, install "
+            "`amd-smi-lib` (system package) or the `amdsmi` pip "
+            "wheel; the pip wheel also needs ROCM_HOME or ROCM_PATH "
+            "pointing at a root containing the unversioned "
+            "`libamd_smi.so` symlink, rather than only a versioned "
+            "`libamd_smi.so.<N>`.",
         )
     elif accessible_render_nodes:
         log(
@@ -171,7 +177,7 @@ def _log_kfd_diagnostics() -> None:
             "ID is not `%s`) -- ROCm cannot use it. This usually "
             "means the AMD GPU's own render node is missing or "
             "permission-denied on this host or container, not that "
-            "ROCM_PATH needs adjusting: check that `--device=/dev/dri "
+            "`amdsmi`/ROCM_PATH needs adjusting: check that `--device=/dev/dri "
             "--group-add render` passes through and grants access to "
             "the AMD device specifically, not just any render node.",
             ", ".join(accessible_render_nodes),
@@ -183,8 +189,8 @@ def _log_kfd_diagnostics() -> None:
             "The ROCm kernel driver is loaded and accessible "
             "(/dev/kfd), but no accessible `/dev/dri/renderD*` node "
             "was found (%s). ROCm reaches the GPU through both "
-            "`/dev/kfd` and a render node, so pointing ROCM_PATH at "
-            "the SMI library will not help here -- Ray and the ML "
+            "`/dev/kfd` and a render node, so fixing `amdsmi`/ROCM_PATH "
+            "will not help here -- Ray and the ML "
             "framework will both keep reporting zero GPUs until the "
             "render node itself is present and accessible. This is "
             "usually the same permissions issue as missing `/dev/kfd` "

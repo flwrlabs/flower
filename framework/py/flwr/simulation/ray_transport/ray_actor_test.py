@@ -156,11 +156,11 @@ class TestPoolSizeFromResources(TestCase):
         output = "\n".join(logs.output)
         self.assertIn("cannot open it", output)
         self.assertIn("render", output)
-        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("python -c 'import amdsmi'", output)
 
-    def test_kfd_present_and_accessible_points_at_smi_library(self) -> None:
-        """Test that an openable /dev/kfd with a usable render node points at the SMI
-        library path."""
+    def test_kfd_present_and_accessible_points_at_amdsmi(self) -> None:
+        """Test that an openable /dev/kfd with a usable render node points at the
+        `amdsmi` package rather than the pre-2.56 `librocm_smi64.so` path."""
         client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
         with (
             patch(
@@ -189,7 +189,8 @@ class TestPoolSizeFromResources(TestCase):
                     pool_size_from_resources(client_resources)
 
         output = "\n".join(logs.output)
-        self.assertIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertIn("python -c 'import amdsmi'", output)
+        self.assertIn("libamd_smi.so", output)
         self.assertNotIn("cannot open it", output)
         self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
 
@@ -232,7 +233,7 @@ class TestPoolSizeFromResources(TestCase):
 
         output = "\n".join(logs.output)
         self.assertIn("not AMD-backed", output)
-        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("python -c 'import amdsmi'", output)
         self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
 
     def test_kfd_accessible_but_no_usable_render_node_reports_render_node(self) -> None:
@@ -262,7 +263,7 @@ class TestPoolSizeFromResources(TestCase):
                     pool_size_from_resources(client_resources)
 
         output = "\n".join(logs.output)
-        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("python -c 'import amdsmi'", output)
         self.assertNotIn("cannot open it", output)
         self.assertIn("no accessible `/dev/dri/renderD*` node", output)
         self.assertIn("render", output)
@@ -285,8 +286,8 @@ class TestPoolSizeFromResources(TestCase):
                     {"Resources": {"CPU": 8}},
                 ],
             ),
-            # These would normally trigger the "points at the SMI library" branch on
-            # a single-node cluster -- proving the gate suppresses it, not just that
+            # These would normally trigger the "points at amdsmi" branch on a
+            # single-node cluster -- proving the gate suppresses it, not just that
             # it adds extra text.
             patch(
                 "flwr.simulation.ray_transport.ray_actor.os.path.exists",
@@ -312,7 +313,7 @@ class TestPoolSizeFromResources(TestCase):
         output = "\n".join(logs.output)
         self.assertIn("multi-node Ray cluster", output)
         self.assertIn("each node individually", output)
-        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("python -c 'import amdsmi'", output)
         self.assertNotIn("cannot open it", output)
         self.assertNotIn("not AMD-backed", output)
         self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
