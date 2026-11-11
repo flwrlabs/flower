@@ -1023,15 +1023,6 @@ class InMemoryCoreState(
             spaces.sort(key=lambda item: item.created_at, reverse=True)
             return spaces
 
-    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
-        """Return whether the agent is a current participant in the Space."""
-        with self.lock_space_store:
-            space = self.space_store.get(space_id)
-            return (
-                space is not None
-                and SpaceParticipant(agent_id=agent_id) in space.participants
-            )
-
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:

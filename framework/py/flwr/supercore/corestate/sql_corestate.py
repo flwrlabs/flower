@@ -1274,19 +1274,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     space.participants.add(agent_id=member_agent_id)
             return list(spaces.values())
 
-    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
-        """Return whether the agent is a current participant in the Space."""
-        with self.session() as session:
-            return (
-                session.scalar(
-                    select(SpaceParticipantTable.c.agent_id).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == agent_id,
-                    )
-                )
-                is not None
-            )
-
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:

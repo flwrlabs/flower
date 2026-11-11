@@ -152,11 +152,6 @@ def _task_space(requested_id: str, state: LinkState, task: Task) -> tuple[UUID, 
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             "This endpoint is only available to Space tasks.",
         )
-    if run.agent_id is None or not state.is_agent_in_space(space_id, run.agent_id):
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
-            "Runtime task-token authentication failed.",
-        )
     if requested_id:
         try:
             matches = UUID(requested_id) == space_id

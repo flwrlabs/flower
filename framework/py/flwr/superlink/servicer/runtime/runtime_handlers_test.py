@@ -103,21 +103,23 @@ from flwr.superlink.servicer.runtime import runtime_handlers
 
 
 @pytest.mark.parametrize(
-    "task",
+    "task,agent_id",
     [
-        Task(task_id=1, run_id=123, type=TaskType.CONNECTOR),
-        Task(task_id=2, run_id=123, type=TaskType.AGENT_APP),
+        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
+        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
+        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
     ],
 )
-def test_send_space_message_rejects_non_primary_agent_task(task: Task) -> None:
-    """Only the Run's primary AgentApp may publish as the bound agent."""
+def test_send_space_message_requires_bound_primary_agent(
+    task: Task, agent_id: int | None
+) -> None:
+    """Publishing requires a bound agent and the Run's primary AgentApp task."""
     state = Mock(spec=LinkState)
     run = Run.create_empty(123)
     run.space_id = UUID("12345678-1234-5678-1234-567812345678")
-    run.agent_id = 42
+    run.agent_id = agent_id
     run.primary_task_id = 1
     state.get_run_info.return_value = [run]
-    state.is_agent_in_space.return_value = True
     with pytest.raises(FlowerError) as error:
         runtime_handlers.send_space_message(
             SendSpaceMessageRequest(content="No"), state, task

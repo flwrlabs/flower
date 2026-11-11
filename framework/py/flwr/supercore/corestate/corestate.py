@@ -683,10 +683,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List spaces the user participates in."""
 
     @abstractmethod
-    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
-        """Return whether the agent is a current participant in the Space."""
-
-    @abstractmethod
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
