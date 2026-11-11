@@ -45,7 +45,7 @@ message SpaceMessage {
   string content = 5;
 }
 
-// Selects the newest page by default. All reads advance the caller's seen
+// Selects the newest page by default. All reads advance the caller's read
 // cursor.
 message GetSpaceMessagesRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
@@ -56,8 +56,8 @@ message GetSpaceMessagesRequest {
   optional uint32 limit = 3;
   // Runtime only: exclusive lower bound, selecting the earliest matching page.
   optional uint64 after_id = 4;
-  // Return only messages after the caller's seen cursor, oldest first.
-  bool unseen_only = 5;
+  // Return only messages after the caller's read cursor, oldest first.
+  bool unread_only = 5;
 }
 message GetSpaceMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.

@@ -1322,9 +1322,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
-        unseen_only: bool = False,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Read messages and advance the participant's seen cursor atomically."""
+        """Read messages and advance the participant's read cursor atomically."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
@@ -1336,9 +1336,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
-        if unseen_only:
+        if unread_only:
             message_conditions.append(
-                SpaceMessageModel.id > SpaceParticipantTable.c.seen_through_message_id
+                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
             )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
@@ -1355,7 +1355,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             .order_by(
                 SpaceMessageModel.id.asc()
-                if unseen_only or after_id is not None
+                if unread_only or after_id is not None
                 else SpaceMessageModel.id.desc()
             )
             .limit(limit)
@@ -1372,19 +1372,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 if model is not None
             ]
             if messages:
-                seen_through = max(message.id for message in messages)
+                read_through = max(message.id for message in messages)
                 session.execute(
                     update(SpaceParticipantTable)
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         SpaceParticipantTable.c[field] == identity,
-                        SpaceParticipantTable.c.seen_through_message_id < seen_through,
+                        SpaceParticipantTable.c.read_through_message_id < read_through,
                     )
-                    .values(seen_through_message_id=seen_through)
+                    .values(read_through_message_id=read_through)
                 )
             return (
                 messages
-                if unseen_only or after_id is not None
+                if unread_only or after_id is not None
                 else list(reversed(messages))
             )
 

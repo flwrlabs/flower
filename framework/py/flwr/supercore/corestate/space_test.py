@@ -219,16 +219,16 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
     assert len(members) == 2
     user = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[user, *members]).id)
-    assert state.get_space_messages(space_id, user, unseen_only=True) == []
+    assert state.get_space_messages(space_id, user, unread_only=True) == []
     assert (
         state.get_space_messages(
-            space_id, SpaceParticipant(flwr_aid="outsider"), unseen_only=True
+            space_id, SpaceParticipant(flwr_aid="outsider"), unread_only=True
         )
         is None
     )
     messages = [state.create_space_message(space_id, user, str(i)) for i in range(3)]
     assert (
-        state.get_space_messages(space_id, members[0], unseen_only=True, limit=2)
+        state.get_space_messages(space_id, members[0], unread_only=True, limit=2)
         == messages[:2]
     )
     assert (
@@ -237,18 +237,18 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
     )
     other_id = UUID(state.create_space(participants=[user, members[0]]).id)
     other = state.create_space_message(other_id, user, "Another Space")
-    assert state.get_space_messages(other_id, members[0], unseen_only=True) == [other]
+    assert state.get_space_messages(other_id, members[0], unread_only=True) == [other]
     assert (
-        state.get_space_messages(space_id, members[0], unseen_only=True) == messages[2:]
+        state.get_space_messages(space_id, members[0], unread_only=True) == messages[2:]
     )
-    assert state.get_space_messages(space_id, members[0], unseen_only=True) == []
+    assert state.get_space_messages(space_id, members[0], unread_only=True) == []
     assert state.get_space_messages(space_id, members[1], limit=1) == messages[-1:]
-    assert state.get_space_messages(space_id, members[1], unseen_only=True) == []
+    assert state.get_space_messages(space_id, members[1], unread_only=True) == []
     assert (
-        state.get_space_messages(space_id, user, unseen_only=True, limit=1)
+        state.get_space_messages(space_id, user, unread_only=True, limit=1)
         == messages[:1]
     )
-    # Both page-selection modes mark returned messages seen for this participant.
+    # Both page-selection modes mark returned messages read for this participant.
     assert state.get_space_messages(space_id, user) == messages
     assert state.get_space_messages(space_id, user, after_id=0, limit=1) == messages[:1]
     assert messages[-1] is not None
@@ -259,7 +259,7 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
         with state.session() as session:
             assert (
                 session.scalar(
-                    select(SpaceParticipantTable.c.seen_through_message_id).where(
+                    select(SpaceParticipantTable.c.read_through_message_id).where(
                         SpaceParticipantTable.c.space_id == space_id,
                         SpaceParticipantTable.c.flwr_aid == "alice",
                     )
@@ -268,8 +268,8 @@ def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
             )
 
 
-def test_sql_unseen_reads_are_transactional(tmp_path: Path) -> None:
-    """Concurrent readers get distinct pages and rolled-back reads remain unseen."""
+def test_sql_unread_reads_are_transactional(tmp_path: Path) -> None:
+    """Concurrent readers get distinct pages and rolled-back reads remain unread."""
     database = str(tmp_path / "state.db")
     backends = [
         SqlLinkState(database, NoOpFederationManager(), ObjectStoreFactory().store())
@@ -283,7 +283,7 @@ def test_sql_unseen_reads_are_transactional(tmp_path: Path) -> None:
     messages = [state.create_space_message(space_id, reader, str(i)) for i in range(3)]
     with pytest.raises(RuntimeError, match="rollback"), state.session():
         assert (
-            state.get_space_messages(space_id, reader, unseen_only=True, limit=1)
+            state.get_space_messages(space_id, reader, unread_only=True, limit=1)
             == messages[:1]
         )
         raise RuntimeError("rollback")
@@ -291,7 +291,7 @@ def test_sql_unseen_reads_are_transactional(tmp_path: Path) -> None:
 
     def read(backend: SqlLinkState) -> int:
         barrier.wait(timeout=5)
-        page = backend.get_space_messages(space_id, reader, unseen_only=True, limit=1)
+        page = backend.get_space_messages(space_id, reader, unread_only=True, limit=1)
         assert page is not None and len(page) == 1
         return page[0].id
 
@@ -300,4 +300,4 @@ def test_sql_unseen_reads_are_transactional(tmp_path: Path) -> None:
     assert sorted(ids) == [
         message.id for message in messages[:2] if message is not None
     ]
-    assert state.get_space_messages(space_id, reader, unseen_only=True) == messages[2:]
+    assert state.get_space_messages(space_id, reader, unread_only=True) == messages[2:]

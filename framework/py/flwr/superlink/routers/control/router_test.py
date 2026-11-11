@@ -184,7 +184,7 @@ def test_space_routes(
     assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
         message
     ]
-    assert state.get_space_messages(UUID(space.id), caller, unseen_only=True) == []
+    assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
 
 
@@ -225,11 +225,11 @@ def test_create_space_rejects_other_users_agent(
     assert not state.get_spaces(_ACCOUNT.flwr_aid)
 
 
-@pytest.mark.parametrize("unseen_only,expected_index", [(False, 1), (True, 0)])
+@pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
 def test_space_history_pagination(
-    space_client: tuple[TestClient, LinkState], unseen_only: bool, expected_index: int
+    space_client: tuple[TestClient, LinkState], unread_only: bool, expected_index: int
 ) -> None:
-    """Apply the HTTP request's cursor, page size, and unseen filter."""
+    """Apply the HTTP request's cursor, page size, and unread filter."""
     client, state = space_client
     space = state.create_space(
         participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
@@ -242,7 +242,7 @@ def test_space_history_pagination(
     response = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(
-            space_id=space.id, before_id=last.id, limit=1, unseen_only=unseen_only
+            space_id=space.id, before_id=last.id, limit=1, unread_only=unread_only
         ).SerializeToString(),
     )
     assert response.status_code == 200
