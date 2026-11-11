@@ -168,12 +168,12 @@ ArtifactProviderDependency = Annotated[
 
 @router.post("/bootstrap")
 def bootstrap(
-    request: Annotated[BootstrapRequest, Depends(get_protobuf_request)],
+    _request: Annotated[BootstrapRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> BootstrapResponse:
     """Read the caller's feed cursor followed by its Agents and Spaces."""
-    return control_handlers.bootstrap(request, account, linkstate)
+    return control_handlers.bootstrap(account, linkstate)
 
 
 @router.post("/stream-events")

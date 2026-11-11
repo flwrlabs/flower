@@ -48,6 +48,7 @@ from flwr.common.constant import (
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
+    USER_EVENTS_STREAM_INTERVAL,
     Status,
 )
 from flwr.common.serde import (
@@ -68,7 +69,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
-    BootstrapRequest,
     BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
@@ -212,11 +212,8 @@ from flwr.superlink.run_source import RunSource
 from .conversation_title import start_title_generation
 
 
-def bootstrap(
-    request: BootstrapRequest, account: AccountInfo, state: LinkState
-) -> BootstrapResponse:
+def bootstrap(account: AccountInfo, state: LinkState) -> BootstrapResponse:
     """Read the account's feed cursor followed by its visible Agents and Spaces."""
-    del request
     return state.get_bootstrap(account.flwr_aid)
 
 
@@ -228,6 +225,19 @@ def stream_events(
     last_event_id: str | None = None,
 ) -> Generator[StreamEventsResponse, None, None]:
     """Validate replay before starting the authenticated account's stream."""
+    raw_interval = os.getenv(
+        "FLWR_USER_EVENTS_STREAM_INTERVAL", str(USER_EVENTS_STREAM_INTERVAL)
+    )
+    try:
+        poll_interval = float(raw_interval)
+        if not 0.01 <= poll_interval <= 60:
+            raise ValueError
+    except ValueError as err:
+        raise ValueError(
+            "FLWR_USER_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
+            f"between 0.01 and 60, got {raw_interval!r}."
+        ) from err
+
     after_seq = request.after_seq
     try:
         if not request.HasField("after_seq") and last_event_id is not None:
@@ -248,7 +258,7 @@ def stream_events(
                 cursor = entry.seq
                 yield entry
             if not batch:
-                time.sleep(0.5)
+                time.sleep(poll_interval)
             if is_active():
                 batch = state.get_user_events(account.flwr_aid, after_seq=cursor)
 
