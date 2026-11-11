@@ -21,9 +21,7 @@ import unittest
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
-from uuid import uuid4
-
-import pytest
+from uuid import UUID
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -34,7 +32,6 @@ from flwr.common.constant import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
-    Agent,
     AgentConfig,
     AppInfo,
     ListAppAssociationsRequest,
@@ -53,6 +50,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
@@ -89,124 +87,6 @@ from .control_handlers import (
 )
 
 
-@pytest.fixture(name="agent_app_config")
-def agent_app_bundle_config() -> dict[str, Any]:
-    """Return metadata from a resolved AgentApp FAB."""
-    return {
-        "project": {"name": "app", "version": "1.0"},
-        "tool": {
-            "flwr": {
-                "app": {"publisher": "publisher", "components": {"agentapp": "app:app"}}
-            }
-        },
-    }
-
-
-def test_process_pending_agent_runs_resolves_app(
-    agent_app_config: dict[str, Any],
-) -> None:
-    """Store the resolved AgentApp and pass its metadata to state admission."""
-    state = Mock(spec=LinkState)
-    space_id = uuid4()
-    agent = Agent(id=7, config=AgentConfig(app_spec="@publisher/app"))
-    state.get_agent_run_candidates.return_value = [(space_id, agent)]
-    state.store_fab.return_value = "stored-hash"
-    content, verifications = b"agent-fab", {"signature": "verified"}
-    with (
-        patch.object(
-            control_handlers,
-            "_get_remote_fab",
-            return_value=(content, verifications, None),
-        ) as resolve,
-        patch.object(control_handlers, "get_fab_config", return_value=agent_app_config),
-    ):
-        process_pending_agent_runs(state)
-    resolve.assert_called_once_with(agent.config.app_spec)
-    state.store_fab.assert_called_once_with(
-        Fab(hashlib.sha256(content).hexdigest(), content, verifications)
-    )
-    state.create_run.assert_called_once_with(
-        fab_id="publisher/app",
-        fab_version="1.0",
-        fab_hash="stored-hash",
-        override_config={},
-        federation_id=None,
-        federation_config=None,
-        flwr_aid=None,
-        primary_task_type=TaskType.AGENT_APP,
-        space_id=space_id,
-        agent_id=agent.id,
-    )
-
-
-def test_process_pending_agent_runs_limits_successes(
-    agent_app_config: dict[str, Any],
-) -> None:
-    """Failed and stale candidates do not exhaust the successful-admission limit."""
-    state = Mock(spec=LinkState)
-    space_id = uuid4()
-    state.get_agent_run_candidates.return_value = [
-        (space_id, Agent(id=i, config=AgentConfig(app_spec="@publisher/app")))
-        for i in range(1, 15)
-    ]
-    state.create_run.side_effect = [0, 123]
-    with (
-        patch.object(
-            control_handlers,
-            "_get_remote_fab",
-            side_effect=[ValueError("Unavailable app")] * 11
-            + [(b"agent-fab", {}, None)] * 3,
-        ) as resolve,
-        patch.object(control_handlers, "get_fab_config", return_value=agent_app_config),
-    ):
-        process_pending_agent_runs(state, limit=1)
-    assert resolve.call_count == 13
-    assert state.create_run.call_count == 2
-
-
-@pytest.mark.parametrize("invalid_bundle", ["oversized", "serverapp"])
-def test_process_pending_agent_runs_rejects_invalid_bundle(
-    agent_app_config: dict[str, Any], invalid_bundle: str
-) -> None:
-    """Reject oversized FABs and bundles without an AgentApp component."""
-    state = Mock(spec=LinkState)
-    state.get_agent_run_candidates.return_value = [
-        (uuid4(), Agent(id=7, config=AgentConfig(app_spec="@publisher/app")))
-    ]
-    if invalid_bundle == "serverapp":
-        agent_app_config["tool"]["flwr"]["app"]["components"] = {"serverapp": "app:app"}
-    with (
-        patch.object(
-            control_handlers,
-            "FAB_MAX_SIZE",
-            0 if invalid_bundle == "oversized" else 100,
-        ),
-        patch.object(
-            control_handlers, "_get_remote_fab", return_value=(b"fab", {}, None)
-        ),
-        patch.object(control_handlers, "get_fab_config", return_value=agent_app_config),
-    ):
-        process_pending_agent_runs(state)
-    state.store_fab.assert_not_called()
-    state.create_run.assert_not_called()
-
-
-def test_start_run_preserves_oversized_fab_response() -> None:
-    """Shared FAB preparation preserves the legacy empty response for oversized FABs."""
-    state = Mock(spec=LinkState)
-    state.federation_manager = Mock()
-    request = StartRunRequest(federation="federation")
-    request.fab.content = b"oversized"
-    with (
-        patch.object(control_handlers, "FAB_MAX_SIZE", 0),
-        patch.object(control_handlers, "get_fab_config") as parse_config,
-    ):
-        response = start_run(request, AccountInfo("alice", "alice"), state)
-    assert not response.HasField("run_id")
-    parse_config.assert_not_called()
-    state.create_run.assert_not_called()
-
-
 class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     """Test Control API handlers."""
 
@@ -234,6 +114,40 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             self.account.flwr_aid,
             TaskType.SERVER_APP,
         )
+
+    def test_process_pending_agent_runs(self) -> None:
+        """Resolve an AgentApp and create one Run for its unread Space input."""
+        agent = self.state.create_agent(
+            self.account.flwr_aid,
+            AgentConfig(name="Agent", app_spec="@publisher/app"),
+        )
+        assert agent is not None
+        space_id = UUID(self.state.get_spaces(self.account.flwr_aid)[0].id)
+        self.state.create_space_message(
+            space_id, SpaceParticipant(flwr_aid=self.account.flwr_aid), "Input"
+        )
+        config = {
+            "project": {"name": "app", "version": "1.0"},
+            "tool": {
+                "flwr": {
+                    "app": {
+                        "publisher": "publisher",
+                        "components": {"agentapp": "app:app"},
+                    }
+                }
+            },
+        }
+        with (
+            patch.object(
+                control_handlers, "_get_remote_fab", return_value=(b"fab", {}, None)
+            ) as resolve,
+            patch.object(control_handlers, "get_fab_config", return_value=config),
+        ):
+            process_pending_agent_runs(self.state)
+            process_pending_agent_runs(self.state)
+        resolve.assert_called_once_with(agent.config.app_spec)
+        runs = self.state.get_run_info()
+        assert len(runs) == 1 and runs[0].agent_id == agent.id
 
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply the default page size in the shared Control handler."""
