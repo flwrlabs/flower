@@ -1044,7 +1044,7 @@ def test_list_runs_returns_runs_from_linkstate(
     assert linkstate.get_run_info.call_args_list == [
         call(
             flwr_aids=[_ACCOUNT.flwr_aid],
-            federation_ids=[NOOP_FEDERATION_ID],
+            federation_ids=[None, NOOP_FEDERATION_ID],
             order_by="pending_at",
             ascending=False,
             limit=expected_limit,

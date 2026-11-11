@@ -1274,14 +1274,17 @@ def list_runs(
     account_name = account.account_name
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
-        # Return the account's runs only in federations it can still access.
+        # Preserve owned Space runs and restrict federation runs to current access.
         limit = request.limit if request.HasField("limit") else 20
         skip = request.skip if request.HasField("skip") else 0
         runs = state.get_run_info(
             flwr_aids=[flwr_aid],
             federation_ids=[
-                federation.id
-                for federation in state.federation_manager.get_federations(flwr_aid)
+                None,
+                *(
+                    federation.id
+                    for federation in state.federation_manager.get_federations(flwr_aid)
+                ),
             ],
             order_by="pending_at",
             ascending=False,
@@ -1678,10 +1681,11 @@ def pull_artifacts(
             f"status={run.status.status}, owner_aid={run.flwr_aid}.",
         )
 
-    # Require both submission ownership and current federation membership.
+    # Require ownership and current membership for federation-scoped runs.
     flwr_aid = account.flwr_aid
     _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run)
-    _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
+    if run.space_id is None:
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
     # Call artifact provider
     download_url = artifact_provider.get_url(run_id)

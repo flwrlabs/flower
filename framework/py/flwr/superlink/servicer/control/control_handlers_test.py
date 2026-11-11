@@ -119,7 +119,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.flwr_aid],
-            federation_ids=[NOOP_FEDERATION_ID],
+            federation_ids=[None, NOOP_FEDERATION_ID],
             order_by="pending_at",
             ascending=False,
             limit=20,

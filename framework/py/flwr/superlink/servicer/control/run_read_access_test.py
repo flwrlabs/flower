@@ -16,6 +16,7 @@
 
 from dataclasses import replace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import pytest
 
@@ -128,3 +129,66 @@ def test_pull_artifacts_still_requires_run_ownership(state: LinkState) -> None:
             )
     assert error.value.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
     provider.get_url.assert_not_called()
+
+
+def test_owned_space_runs_keep_listing_and_artifact_access(state: LinkState) -> None:
+    """Keep owned Space runs visible without requiring federation membership."""
+    federation_run_id = _create_run(state)
+    removed_run_id = _create_run(state, "@owner/removed")
+    space_id = UUID(state.create_space(participants=[]).id)
+    space_run_ids = [
+        state.create_run(
+            "flwr/demo",
+            "v0.0.1",
+            "hash123",
+            {},
+            None,
+            None,
+            flwr_aid,
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            user_prompt="Hello",
+        )
+        for flwr_aid in [_ACCOUNT.flwr_aid, "other-account"]
+    ]
+    owned_space_run_id, other_space_run_id = space_run_ids
+
+    # Scope selection and caller ownership apply before ordering and pagination.
+    response = list_runs(ListRunsRequest(limit=1), _ACCOUNT, state)
+    assert set(response.run_dict) == {owned_space_run_id}
+    response = list_runs(ListRunsRequest(limit=1, skip=1), _ACCOUNT, state)
+    assert set(response.run_dict) == {federation_run_id}
+    with patch.object(state.federation_manager, "get_federations", return_value=[]):
+        response = list_runs(ListRunsRequest(), _ACCOUNT, state)
+    assert set(response.run_dict) == {owned_space_run_id}
+    assert removed_run_id not in response.run_dict
+    assert other_space_run_id not in response.run_dict
+
+    # A Space run submitter can still obtain artifacts without a federation.
+    state.stop_run(owned_space_run_id)
+    provider = Mock(get_url=Mock(return_value="https://artifacts.example/space.zip"))
+    with patch.object(state.federation_manager, "has_member") as has_member:
+        response_artifacts = pull_artifacts(
+            PullArtifactsRequest(run_id=owned_space_run_id), _ACCOUNT, state, provider
+        )
+    assert response_artifacts.url == "https://artifacts.example/space.zip"
+    has_member.assert_not_called()
+    provider.get_url.assert_called_once_with(owned_space_run_id)
+
+    state.stop_run(other_space_run_id)
+    with pytest.raises(FlowerError) as error:
+        pull_artifacts(
+            PullArtifactsRequest(run_id=other_space_run_id), _ACCOUNT, state, provider
+        )
+    assert error.value.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
+
+    # Empty filters still select no runs; an explicit None entry selects Space runs.
+    assert not state.get_run_info(federation_ids=[])
+    assert {run.run_id for run in state.get_run_info(federation_ids=[None])} == set(
+        space_run_ids
+    )
+    assert {run.run_id for run in state.get_run_info(federation_ids=None)} == {
+        federation_run_id,
+        removed_run_id,
+        *space_run_ids,
+    }
