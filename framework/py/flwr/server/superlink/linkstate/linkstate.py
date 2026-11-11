@@ -23,6 +23,7 @@ from uuid import UUID
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -327,6 +328,60 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -----
         This method will not verify if the account has permission to create
         a run in the federation or space. Invalid scope combinations raise ValueError.
+        """
+
+    @abc.abstractmethod
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread user messages and no open Run.
+
+        Parameters
+        ----------
+        limit : int | None (default: None)
+            Maximum number of Space/agent pairs to return; None returns all.
+
+        Returns
+        -------
+        Sequence[tuple[UUID, Agent]]
+            Eligible Space IDs and agents. This does not advance read cursors.
+        """
+
+    @abc.abstractmethod
+    def create_agent_run(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        agent_id: int,
+        *,
+        fab_id: str,
+        fab_version: str,
+        fab_hash: str,
+    ) -> int | None:
+        """Recheck eligibility and create a Run and primary Task together.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing unread user input.
+        agent_id : int
+            Participating agent to execute.
+        fab_id : str
+            Resolved AgentApp ID without the leading @.
+        fab_version : str
+            Resolved AgentApp version.
+        fab_hash : str
+            Hash of an AgentApp FAB already stored in state.
+
+        Returns
+        -------
+        int | None
+            New Run ID, or None if another Run is open, input is read,
+            participation changed, or the resolved app no longer matches.
+
+        Raises
+        ------
+        ValueError
+            If the resolved FAB has not been stored.
         """
 
     @abc.abstractmethod

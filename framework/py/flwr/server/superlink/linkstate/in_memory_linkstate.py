@@ -35,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -48,7 +49,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.utils import uint64_to_int64
+from flwr.supercore.utils import parse_app_spec, uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -473,6 +474,102 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             )
 
             return run_id
+
+    def _agent_can_start_run(self, space_id: UUID, agent_id: int) -> bool:
+        """Check eligibility while the task, Run, and Space locks are held."""
+        space = self.space_store.get(space_id)
+        if (
+            space is None
+            or SpaceParticipant(agent_id=agent_id) not in space.participants
+        ):
+            return False
+        if any(
+            record.space_id == space_id
+            and record.run.agent_id == agent_id
+            and self.task_store[cast(int, record.run.primary_task_id)].status.status
+            != Status.FINISHED
+            for record in self.run_ids.values()
+        ):
+            return False
+        cursor = self.space_participant_cursors.get((space_id, agent_id), 0)
+        return any(
+            message.id > cursor and message.author.HasField("flwr_aid")
+            for message in self.space_message_store[space_id]
+        )
+
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread user input and no open Run."""
+        if limit is not None and limit <= 0:
+            return []
+        with (
+            self.lock_task_store,
+            self.lock,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            self._cleanup_expired_task_tokens_locked()
+            agents = {
+                agent.id: agent
+                for owned in self.agent_store.values()
+                for agent in owned.values()
+            }
+            candidates = []
+            for space_id, space in self.space_store.items():
+                for member in space.participants:
+                    if member.agent_id in agents and self._agent_can_start_run(
+                        space_id, member.agent_id
+                    ):
+                        candidates.append((space_id, agents[member.agent_id]))
+                        if limit is not None and len(candidates) == limit:
+                            return candidates
+            return candidates
+
+    def create_agent_run(
+        self,
+        space_id: UUID,
+        agent_id: int,
+        *,
+        fab_id: str,
+        fab_version: str,
+        fab_hash: str,
+    ) -> int | None:
+        """Open one execution window under the existing state locks."""
+        with (
+            self.lock_task_store,
+            self.lock,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            self._cleanup_expired_task_tokens_locked()
+            if not self._agent_can_start_run(space_id, agent_id):
+                return None
+            owner, agent = next(
+                (owner, agents[agent_id])
+                for owner, agents in self.agent_store.items()
+                if agent_id in agents
+            )
+            app_id, version = parse_app_spec(agent.config.app_spec)
+            if app_id != f"@{fab_id}" or (version and version != fab_version):
+                return None
+            if self.get_fab(fab_hash) is None:
+                raise ValueError("The resolved AgentApp FAB must be stored first.")
+            return (
+                self.create_run(
+                    fab_id=fab_id,
+                    fab_version=fab_version,
+                    fab_hash=fab_hash,
+                    override_config={},
+                    federation_id=None,
+                    federation_config=None,
+                    flwr_aid=owner,
+                    primary_task_type=TaskType.AGENT_APP,
+                    space_id=space_id,
+                    agent_id=agent_id,
+                )
+                or None
+            )
 
     def get_run_info(
         self,
