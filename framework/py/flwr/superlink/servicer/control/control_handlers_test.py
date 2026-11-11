@@ -112,12 +112,14 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply the default page size in the shared Control handler."""
         state = Mock(spec=LinkState)
+        state.federation_manager = NoOpFederationManager()
         state.get_run_info.return_value = []
 
         list_runs(ListRunsRequest(), self.account, state)
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.flwr_aid],
+            federation_ids=[NOOP_FEDERATION_ID],
             order_by="pending_at",
             ascending=False,
             limit=20,
