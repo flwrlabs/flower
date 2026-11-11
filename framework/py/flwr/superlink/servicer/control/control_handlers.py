@@ -1376,9 +1376,10 @@ def get_space_messages(
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
-            account.flwr_aid,
+            SpaceParticipant(flwr_aid=account.flwr_aid),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc
