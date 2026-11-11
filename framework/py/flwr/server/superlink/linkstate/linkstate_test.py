@@ -831,6 +831,40 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
+    def test_get_run_info_filter_space_and_federation_runs(self) -> None:
+        """Distinguish unrestricted, empty, Space-only, and mixed filters."""
+        state = self.state_factory()
+        federation_run_id = create_dummy_run(state)
+        space_run_id = state.create_run(
+            "flwr/test",
+            "1.0",
+            "hash",
+            {},
+            None,
+            None,
+            "account",
+            TaskType.AGENT_APP,
+            space_id=UUID(state.create_space(participants=[]).id),
+            user_prompt="Hello",
+        )
+
+        cases: list[tuple[list[str | None] | None, set[int]]] = [
+            (None, {federation_run_id, space_run_id}),
+            ([], set()),
+            ([None], {space_run_id}),
+            ([NOOP_FEDERATION_ID], {federation_run_id}),
+            ([NOOP_FEDERATION_ID, None], {federation_run_id, space_run_id}),
+        ]
+        for federation_ids, expected in cases:
+            with self.subTest(federation_ids=federation_ids):
+                self.assertSetEqual(
+                    {
+                        run.run_id
+                        for run in state.get_run_info(federation_ids=federation_ids)
+                    },
+                    expected,
+                )
+
     def test_get_run_info_filter_logic(self) -> None:
         """Test get_run_info ORs within each filter and ANDs across filters."""
         # Prepare

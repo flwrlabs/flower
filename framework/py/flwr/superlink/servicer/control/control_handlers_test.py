@@ -21,6 +21,7 @@ import unittest
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
+from uuid import UUID
 
 import pytest
 
@@ -104,14 +105,14 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             account_name=NOOP_ACCOUNT_NAME,
         )
 
-    def _create_dummy_run(self) -> int:
+    def _create_dummy_run(self, federation_id: str = NOOP_FEDERATION_ID) -> int:
         """Create a run owned by the test account."""
         return self.state.create_run(
             "flwr/demo",
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION_ID,
+            federation_id,
             None,
             self.account.flwr_aid,
             TaskType.SERVER_APP,
@@ -120,17 +121,54 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply the default page size in the shared Control handler."""
         state = Mock(spec=LinkState)
+        state.federation_manager = NoOpFederationManager()
         state.get_run_info.return_value = []
 
         list_runs(ListRunsRequest(), self.account, state)
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.flwr_aid],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=20,
             skip=0,
         )
+
+    def test_list_runs_filters_membership_and_retains_owned_space_runs(self) -> None:
+        """Filter federation access before paging while retaining owned Space runs."""
+        federation_run_id = self._create_dummy_run()
+        space_id = UUID(self.state.create_space(participants=[]).id)
+        space_run_ids = [
+            self.state.create_run(
+                "flwr/demo",
+                "v0.0.1",
+                "hash123",
+                {},
+                None,
+                None,
+                flwr_aid,
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            for flwr_aid in [self.account.flwr_aid, "other-account"]
+        ]
+        owned_space_run_id = space_run_ids[0]
+        self._create_dummy_run("@owner/inaccessible")
+
+        # Scope selection and caller ownership apply before ordering and pagination.
+        response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id, owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1, skip=1), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id}
+        with patch.object(
+            self.state.federation_manager, "get_federations", return_value=[]
+        ):
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
 
     def _create_dummy_run_series(
         self, series_id: int, run_ids: list[int] | None = None

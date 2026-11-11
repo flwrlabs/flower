@@ -94,7 +94,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
@@ -1031,6 +1031,7 @@ def test_list_runs_returns_runs_from_linkstate(
 ) -> None:
     """ListRuns applies the default and requested pagination."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.flwr_aid
     linkstate.get_run_info.return_value = [run]
@@ -1056,6 +1057,7 @@ def test_list_runs_returns_runs_from_linkstate(
     assert linkstate.get_run_info.call_args_list == [
         call(
             flwr_aids=[_ACCOUNT.flwr_aid],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=expected_limit,
@@ -1067,6 +1069,7 @@ def test_list_runs_returns_runs_from_linkstate(
 def test_list_runs_cleans_finished_runs_on_page() -> None:
     """ListRuns cleans up finished runs returned on the page."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     page_run = Run.create_empty(7)
     page_run.flwr_aid = _ACCOUNT.flwr_aid
     page_run.status.status = Status.FINISHED
@@ -1263,7 +1266,9 @@ def test_stream_logs_returns_missing_run_error_before_streaming() -> None:
 def test_pull_artifacts_returns_provider_url() -> None:
     """Return the configured provider's URL for a finished owned run."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
+    run.federation_id = NOOP_FEDERATION_ID
     run.flwr_aid = _ACCOUNT.flwr_aid
     run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
     linkstate.get_run_info.return_value = [run]
