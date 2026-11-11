@@ -216,6 +216,7 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
+AGENT_RUN_BATCH_LIMIT = 10
 AUTOMATION_BATCH_LIMIT = 1
 
 FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
