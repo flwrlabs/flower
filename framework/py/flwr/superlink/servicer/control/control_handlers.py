@@ -165,6 +165,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AGENT_RUN_BATCH_LIMIT,
     DEFAULT_FEDERATION_SIMULATION,
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
@@ -1206,7 +1207,9 @@ def dispatch_automation(
     )
 
 
-def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
+def process_pending_agent_runs(
+    state: LinkState, *, limit: int = AGENT_RUN_BATCH_LIMIT
+) -> None:
     """Resolve eligible AgentApps and attempt to open execution windows."""
     created = 0
     # Scan eligible agents; limit successful admissions rather than candidates.
