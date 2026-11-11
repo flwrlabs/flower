@@ -14,12 +14,15 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+# pylint: disable=too-many-lines
 
 import hashlib
 import unittest
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
+from uuid import UUID
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -37,6 +40,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsRequest,
     ListRunSeriesEventsRequest,
     ListRunsRequest,
+    PullArtifactsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -72,6 +76,7 @@ from .control_handlers import (
     list_automations,
     list_run_series_events,
     list_runs,
+    pull_artifacts,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -96,14 +101,14 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             account_name=NOOP_ACCOUNT_NAME,
         )
 
-    def _create_dummy_run(self) -> int:
+    def _create_dummy_run(self, federation_id: str = NOOP_FEDERATION_ID) -> int:
         """Create a run owned by the test account."""
         return self.state.create_run(
             "flwr/demo",
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION_ID,
+            federation_id,
             None,
             self.account.flwr_aid,
             TaskType.SERVER_APP,
@@ -119,12 +124,142 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.flwr_aid],
-            federation_ids=[None, NOOP_FEDERATION_ID],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=20,
             skip=0,
         )
+
+    def test_list_runs_filters_current_membership_before_pagination(self) -> None:
+        """Hide submitted runs after membership ends and page accessible runs."""
+        first_run_id = self._create_dummy_run()
+        second_run_id = self._create_dummy_run()
+        shared_federation = "@owner/shared"
+        shared_run_id = self._create_dummy_run(shared_federation)
+        federations = self.state.federation_manager.get_federations(
+            self.account.flwr_aid
+        )
+
+        with patch.object(
+            self.state.federation_manager,
+            "get_federations",
+            return_value=[*federations, replace(federations[0], id=shared_federation)],
+        ) as get_federations:
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+            assert set(response.run_dict) == {
+                first_run_id,
+                second_run_id,
+                shared_run_id,
+            }
+
+            get_federations.return_value = federations
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+            assert set(response.run_dict) == {first_run_id, second_run_id}
+            response = list_runs(
+                ListRunsRequest(limit=1, skip=1), self.account, self.state
+            )
+            assert set(response.run_dict) == {first_run_id}
+
+            get_federations.return_value = []
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+            assert not response.run_dict
+
+    def test_pull_artifacts_requires_current_membership(self) -> None:
+        """Allow owned artifacts until membership ends, then never issue a URL."""
+        run_id = self._create_dummy_run()
+        self.state.stop_run(run_id)
+        provider = Mock(get_url=Mock(return_value="https://artifacts.example/run.zip"))
+        request = PullArtifactsRequest(run_id=run_id)
+
+        response = pull_artifacts(request, self.account, self.state, provider)
+        assert response.url == "https://artifacts.example/run.zip"
+        provider.get_url.assert_called_once_with(run_id)
+        provider.get_url.reset_mock()
+
+        with patch.object(
+            self.state.federation_manager, "has_member", return_value=False
+        ):
+            with self.assertRaises(FlowerError) as error:
+                pull_artifacts(request, self.account, self.state, provider)
+        assert error.exception.code == ApiErrorCode.FEDERATION_NOT_FOUND
+        provider.get_url.assert_not_called()
+
+    def test_pull_artifacts_still_requires_run_ownership(self) -> None:
+        """Federation membership alone does not authorize artifact downloads."""
+        run_id = self._create_dummy_run()
+        self.state.stop_run(run_id)
+        provider = Mock()
+        with patch.object(
+            self.state.federation_manager, "has_member", return_value=True
+        ):
+            with self.assertRaises(FlowerError) as error:
+                pull_artifacts(
+                    PullArtifactsRequest(run_id=run_id),
+                    replace(self.account, flwr_aid="other-account"),
+                    self.state,
+                    provider,
+                )
+        assert error.exception.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
+        provider.get_url.assert_not_called()
+
+    def test_owned_space_runs_keep_listing_and_artifact_access(self) -> None:
+        """Keep owned Space runs visible without requiring federation membership."""
+        federation_run_id = self._create_dummy_run()
+        space_id = UUID(self.state.create_space(participants=[]).id)
+        space_run_ids = [
+            self.state.create_run(
+                "flwr/demo",
+                "v0.0.1",
+                "hash123",
+                {},
+                None,
+                None,
+                flwr_aid,
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            for flwr_aid in [self.account.flwr_aid, "other-account"]
+        ]
+        owned_space_run_id, other_space_run_id = space_run_ids
+
+        # Scope selection and caller ownership apply before ordering and pagination.
+        response = list_runs(ListRunsRequest(limit=1), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1, skip=1), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id}
+        with patch.object(
+            self.state.federation_manager, "get_federations", return_value=[]
+        ):
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
+
+        # A Space run submitter can still obtain artifacts without a federation.
+        self.state.stop_run(owned_space_run_id)
+        provider = Mock(
+            get_url=Mock(return_value="https://artifacts.example/space.zip")
+        )
+        with patch.object(self.state.federation_manager, "has_member") as has_member:
+            response_artifacts = pull_artifacts(
+                PullArtifactsRequest(run_id=owned_space_run_id),
+                self.account,
+                self.state,
+                provider,
+            )
+        assert response_artifacts.url == "https://artifacts.example/space.zip"
+        has_member.assert_not_called()
+        provider.get_url.assert_called_once_with(owned_space_run_id)
+
+        self.state.stop_run(other_space_run_id)
+        with self.assertRaises(FlowerError) as error:
+            pull_artifacts(
+                PullArtifactsRequest(run_id=other_space_run_id),
+                self.account,
+                self.state,
+                provider,
+            )
+        assert error.exception.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
 
     def _create_dummy_run_series(
         self, series_id: int, run_ids: list[int] | None = None

@@ -1274,18 +1274,16 @@ def list_runs(
     account_name = account.account_name
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
-        # Preserve owned Space runs and restrict federation runs to current access.
+        federation_ids: list[str | None] = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
+        ]
+        federation_ids.append(None)  # Space runs have no federation.
         limit = request.limit if request.HasField("limit") else 20
         skip = request.skip if request.HasField("skip") else 0
         runs = state.get_run_info(
             flwr_aids=[flwr_aid],
-            federation_ids=[
-                None,
-                *(
-                    federation.id
-                    for federation in state.federation_manager.get_federations(flwr_aid)
-                ),
-            ],
+            federation_ids=federation_ids,
             order_by="pending_at",
             ascending=False,
             limit=limit,
