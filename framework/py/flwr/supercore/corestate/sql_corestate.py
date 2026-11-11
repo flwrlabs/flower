@@ -1427,21 +1427,29 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        forward = after_id is not None
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
+        if unread_only:
+            message_conditions.append(
+                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
+            )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             message_conditions.append(SpaceMessageModel.id < before_id)
@@ -1453,10 +1461,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .outerjoin(SpaceMessageModel, and_(*message_conditions))
             .where(
                 SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c.flwr_aid == flwr_aid,
+                SpaceParticipantTable.c[field] == identity,
             )
             .order_by(
-                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
+                SpaceMessageModel.id.asc()
+                if unread_only or after_id is not None
+                else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
@@ -1469,7 +1479,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for model in models
                 if model is not None
             ]
-            return messages if forward else list(reversed(messages))
+            if messages:
+                read_through = max(message.id for message in messages)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_message_id < read_through,
+                    )
+                    .values(read_through_message_id=read_through)
+                )
+            return (
+                messages
+                if unread_only or after_id is not None
+                else list(reversed(messages))
+            )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
