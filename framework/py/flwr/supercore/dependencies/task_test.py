@@ -44,11 +44,25 @@ def test_authenticate_task_returns_task_for_valid_token() -> None:
     state = Mock(spec=CoreState)
     expected_task = Task(task_id=123)
     state.get_task_by_token.return_value = expected_task
+    state.is_task_scope_valid.return_value = True
 
     task = authenticate_task(_make_request(["valid-token"]), "valid-token", state)
 
     assert task is expected_task
     state.get_task_by_token.assert_called_once_with("valid-token")
+    state.is_task_scope_valid.assert_called_once_with(expected_task)
+
+
+def test_authenticate_task_rejects_invalid_scope() -> None:
+    """A valid token cannot bypass the task's current scope grants."""
+    state = Mock(spec=CoreState)
+    state.get_task_by_token.return_value = Task(task_id=123, run_id=456)
+    state.is_task_scope_valid.return_value = False
+
+    with pytest.raises(FlowerError) as exc_info:
+        authenticate_task(_make_request(["valid-token"]), "valid-token", state)
+
+    assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
 
 @pytest.mark.parametrize("token", [None, "invalid-token"])
@@ -64,6 +78,7 @@ def test_authenticate_task_rejects_missing_or_invalid_token(
 
     assert exc_info.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
     assert exc_info.value.message == "Runtime task-token authentication failed."
+    state.is_task_scope_valid.assert_not_called()
     if token is None:
         state.get_task_by_token.assert_not_called()
     else:

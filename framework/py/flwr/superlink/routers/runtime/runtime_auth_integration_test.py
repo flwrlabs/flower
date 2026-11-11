@@ -22,7 +22,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from google.protobuf.message import Message
 from httpx import Response
+from sqlalchemy import delete
 
+from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -31,8 +33,14 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
 )
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.server.superlink.linkstate import (
+    InMemoryLinkState,
+    LinkState,
+    LinkStateFactory,
+    SqlLinkState,
+)
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -45,15 +53,16 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 
-@pytest.fixture(name="state")
-def fixture_state() -> LinkState:
-    """Create an in-memory LinkState."""
+@pytest.fixture(name="state", params=[FLWR_IN_MEMORY_DB_NAME, ":memory:"])
+def fixture_state(request: pytest.FixtureRequest) -> LinkState:
+    """Create in-memory and SQLite LinkState backends."""
     return LinkStateFactory(
-        FLWR_IN_MEMORY_DB_NAME,
+        request.param,
         NoOpFederationManager(),
         ObjectStoreFactory(),
     ).state()
@@ -181,7 +190,11 @@ def test_get_space_events_reads_only_authenticated_space(
     client: TestClient, state: LinkState
 ) -> None:
     """A task token only grants access to events in its run's Space."""
-    space_id = UUID(state.create_space(participants=[]).id)
+    agent = state.create_agent(
+        "account", AgentConfig(name="Agent", app_spec="@flwr/app")
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("account")[0].id)
     other_space_id = UUID(state.create_space(participants=[]).id)
     run_ids = [
         state.create_run(
@@ -194,6 +207,7 @@ def test_get_space_events_reads_only_authenticated_space(
             "account",
             TaskType.AGENT_APP,
             space_id=current_space_id,
+            agent_id=agent.id if current_space_id == space_id else None,
             initial_task_event=TaskEvent(event="message", data='{"type":"message"}'),
         )
         for current_space_id in (space_id, other_space_id)
@@ -211,3 +225,53 @@ def test_get_space_events_reads_only_authenticated_space(
     events = GetSpaceEventsResponse.FromString(response.content).events
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
+
+
+@pytest.mark.parametrize("bound", [True, False])
+def test_task_authentication_requires_current_agent_membership(
+    client: TestClient, state: LinkState, bound: bool
+) -> None:
+    """Reject unbound Space tasks and tokens whose agent loses membership."""
+    agent = state.create_agent(
+        "account", AgentConfig(name="Agent", app_spec="@flwr/app")
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("account")[0].id)
+    run_id = state.create_run(
+        "",
+        "",
+        "",
+        {},
+        None,
+        None,
+        "account",
+        TaskType.AGENT_APP,
+        space_id=space_id,
+        agent_id=agent.id if bound else None,
+    )
+    task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None and state.activate_task(task_id)
+    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
+    assert response.status_code == (200 if bound else 401)
+    if bound:
+        if isinstance(state, InMemoryLinkState):
+            state.space_store[space_id].participants.remove(
+                SpaceParticipant(agent_id=agent.id)
+            )
+        else:
+            assert isinstance(state, SqlLinkState)
+            with state.session() as session:
+                session.execute(
+                    delete(SpaceParticipantTable).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.agent_id == agent.id,
+                    )
+                )
+        response = _post(
+            client, "get-space-events", GetSpaceEventsRequest(), token=token
+        )
+    assert response.status_code == 401
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert state.get_task_by_token(token) is not None

@@ -1253,6 +1253,15 @@ class CoreState(ABC):  # pylint: disable=R0904
             The task if the token is valid, otherwise None.
         """
 
+    # pylint: disable-next=unused-argument
+    def is_task_scope_valid(self, task: Task) -> bool:
+        """Check component-specific grants after task-token authentication.
+
+        CoreState has no additional scope grants. States that own Run and Space
+        metadata override this check.
+        """
+        return True
+
     @abstractmethod
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message.

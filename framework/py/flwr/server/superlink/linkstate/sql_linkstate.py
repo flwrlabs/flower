@@ -23,7 +23,17 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
+from sqlalchemy import (
+    MetaData,
+    and_,
+    bindparam,
+    case,
+    exists,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -80,6 +90,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def is_task_scope_valid(self, task: Task) -> bool:
+        """Require the Run's executing agent to remain a Space participant."""
+        stmt = select(RunModel.run_id).where(
+            RunModel.run_id == task.run_id,
+            or_(
+                and_(RunModel.space_id.is_(None), RunModel.agent_id.is_(None)),
+                exists().where(
+                    SpaceParticipantTable.c.space_id == RunModel.space_id,
+                    SpaceParticipantTable.c.agent_id == RunModel.agent_id,
+                ),
+            ),
+        )
+        with self.session() as session:
+            return session.scalar(stmt) is not None
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""

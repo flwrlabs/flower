@@ -45,7 +45,7 @@ def authenticate_task(
             "Runtime task-token authentication failed.",
         )
     task = state.get_task_by_token(token) if token else None
-    if task is None:
+    if task is None or not state.is_task_scope_valid(task):
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
             "Runtime task-token authentication failed.",

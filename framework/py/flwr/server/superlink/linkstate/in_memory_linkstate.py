@@ -127,6 +127,23 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
+    def is_task_scope_valid(self, task: Task) -> bool:
+        """Require the Run's executing agent to remain a Space participant."""
+        with self.lock, self.lock_space_store:
+            record = self.run_ids.get(task.run_id)
+            if record is None:
+                return False
+            agent_id = record.run.agent_id
+            if record.space_id is None:
+                return agent_id is None
+            if agent_id is None:
+                return False
+            space = self.space_store.get(record.space_id)
+            return (
+                space is not None
+                and SpaceParticipant(agent_id=agent_id) in space.participants
+            )
+
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
         with self.lock:

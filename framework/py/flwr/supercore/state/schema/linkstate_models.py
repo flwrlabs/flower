@@ -75,6 +75,7 @@ class Run(LinkStateBase):
     __table_args__ = (
         Index("idx_run_series_id", "series_id"),
         Index("idx_run_space_id", "space_id"),
+        Index("idx_run_space_agent", "space_id", "agent_id"),
     )
 
     run_id: Mapped[int | None] = mapped_column(UInt64(), unique=True, nullable=True)
