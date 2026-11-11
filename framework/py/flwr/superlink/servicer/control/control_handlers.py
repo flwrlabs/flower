@@ -1201,20 +1201,26 @@ def dispatch_automation(
 def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
     """Resolve eligible AgentApps and attempt to open execution windows."""
     created = 0
+    # Scan eligible agents; limit successful admissions rather than candidates.
     for space_id, agent in state.get_agent_run_candidates():
         if created >= limit:
             break
         try:
+            # Resolve the configured FAB and validate its size and app type.
             content, verifications, _ = _get_remote_fab(agent.config.app_spec)
             if len(content) > FAB_MAX_SIZE:
                 raise ValueError("AgentApp FAB exceeds the size limit.")
             config = get_fab_config(content)
             if _get_app_type(config) != TaskType.AGENT_APP:
                 raise ValueError("The agent must use an AgentApp bundle.")
+
+            # Store the resolved FAB before creating a Run that references it.
             fab_id, version = get_metadata_from_config(config)
             fab_hash = state.store_fab(
                 Fab(hashlib.sha256(content).hexdigest(), content, verifications)
             )
+
+            # Recheck eligibility atomically; another poll may have opened a Run.
             run_id = state.create_agent_run(
                 space_id,
                 agent.id,
@@ -1225,6 +1231,7 @@ def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
             if run_id is not None:
                 created += 1
         except Exception as exc:  # pylint: disable=broad-exception-caught
+            # A failed candidate must not prevent other eligible agents from starting.
             log(
                 ERROR,
                 "Unable to start agent %d in Space %s: %s",
