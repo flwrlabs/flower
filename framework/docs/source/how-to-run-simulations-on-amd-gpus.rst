@@ -226,8 +226,7 @@ both variables -- for example ``ROCR_VISIBLE_DEVICES=3`` alongside
 ``HIP_VISIBLE_DEVICES=3``. Left alone, that pair passes every check below while still
 being broken: ROCr's filter exposes that single device as ordinal ``0``, so
 ``HIP_VISIBLE_DEVICES=3`` asks for an ordinal that no longer exists, and the
-verification steps later in this guide still report zero GPUs with no indication of
-why.
+verification steps later in this guide still report zero GPUs with no indication of why.
 
 A value can also be in range and syntactically well-formed while still being wrong: a
 repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only looks at
@@ -248,8 +247,8 @@ from the resulting field count, including the empty one -- so it can advertise a
 that no ordinal maps to. The snippet checks the raw string for a trailing comma before
 trusting what ``read -ra`` parsed from it, and rejects the mask if one is present.
 
-This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and
-``[[ ... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
+This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and ``[[
+... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
 ``bash``, not with ``sh`` or a POSIX-only shell like ``dash`` -- on Debian and Ubuntu in
 particular, ``/bin/sh`` is ``dash``, so pasting this directly into a ``#!/bin/sh``
 script or a ``sh -c "..."`` invocation fails before ``HIP_VISIBLE_DEVICES`` is ever
@@ -281,7 +280,25 @@ exported, silently leaving Ray's original import failure in place:
             _norm_ids=()
             IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
             for _id in "${_hip_ids[@]}"; do
-                if ! [[ "$_id" =~ ^[0-9]+$ ]] || [ "$_id" -ge "$_n" ]; then
+                if ! [[ "$_id" =~ ^[0-9]+$ ]]; then
+                    _bad=1
+                    continue
+                fi
+                # Compare digit-string lengths rather than `[ "$_id" -ge "$_n"
+                # ]` directly: an all-digit ordinal outside Bash's integer
+                # range (e.g. a mistyped 30-digit value) makes that
+                # comparison fail with "integer expression expected" and a
+                # nonzero exit status -- which the original `||` chain
+                # treated as false, silently accepting an out-of-range
+                # ordinal. `_n` is always small, so a trimmed ordinal with
+                # more digits than `_n` is unambiguously too large without
+                # needing arithmetic on it, and one with the same digit
+                # count is bounded by `_n`'s own magnitude, so comparing it
+                # numerically is safe.
+                _trimmed_id="${_id#"${_id%%[!0]*}"}"
+                [ -z "$_trimmed_id" ] && _trimmed_id=0
+                if [ "${#_trimmed_id}" -gt "${#_n}" ] ||
+                    { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; then
                     _bad=1
                 else
                     _norm_ids+=("$((10#$_id))")
@@ -308,7 +325,7 @@ exported, silently leaving Ray's original import failure in place:
                      "concurrent ClientApps collide on it. Left unchanged, so" \
                      "remove the duplicate and re-run this snippet." >&2
             fi
-            unset _hip_ids _id _bad _dup _norm_ids
+            unset _hip_ids _id _bad _dup _norm_ids _trimmed_id
         fi
         unset _n
     fi
@@ -379,7 +396,13 @@ exported, silently leaving Ray's original import failure in place:
     property of the SuperLink, not of an individual run -- it only changes when the
     SuperLink itself is stopped and restarted, same as above. Run simulations that need
     different masks sequentially, stopping the SuperLink between them, rather than
-    concurrently.
+    concurrently. If you need them to run concurrently, start a separate managed local
+    SuperLink for each -- a different ``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT`` (and a
+    different ``FLWR_HOME`` so they do not share state) per shell, exported before that
+    shell's first ``flwr run`` -- so each SuperLink copies its own shell's
+    ``HIP_VISIBLE_DEVICES`` at startup instead of all runs competing for one singleton.
+    See :doc:`how-to-run-flower-locally` for how those variables control the managed
+    SuperLink's address and storage location.
 
 .. important::
 
@@ -391,8 +414,8 @@ exported, silently leaving Ray's original import failure in place:
     ``ROCM_PATH``, ``HIP_VISIBLE_DEVICES``, and ``ROCR_VISIBLE_DEVICES`` were present in
     *that node's* shell at the moment ``ray start`` ran there. Exporting corrected
     values afterwards -- in the driver shell that later runs ``flwr run``, or by
-    restarting only the Flower-managed SuperLink -- changes nothing for nodes Ray
-    itself started, since Flower does not manage those processes.
+    restarting only the Flower-managed SuperLink -- changes nothing for nodes Ray itself
+    started, since Flower does not manage those processes.
 
     For a manually started Ray cluster, ``ROCM_PATH`` and the
     ``HIP_VISIBLE_DEVICES``/``ROCR_VISIBLE_DEVICES`` handling above must therefore be
@@ -400,8 +423,7 @@ exported, silently leaving Ray's original import failure in place:
     node's ``ray start`` command runs. If a cluster is already running with the wrong
     environment, stop it (``ray stop`` on every node, or tear the cluster down and
     restart it) so each node redoes GPU discovery with the corrected environment; those
-    nodes will keep reporting ``GPU=0`` until they are individually fixed and
-    restarted.
+    nodes will keep reporting ``GPU=0`` until they are individually fixed and restarted.
 
 *************************************
  Verify that Ray detects the AMD GPU
@@ -455,7 +477,7 @@ exit: the run can appear to hang after the error is printed. If that happens, in
 it and scroll back for the warning that precedes it.
 
 No GPU reported while a GPU was requested
-------------------------------------------
+-----------------------------------------
 
 If the preceding warning reads ``Ray reports no GPU resources (GPUs=0) but each client
 requests num_gpus=...``, Ray detected no GPU at all while your ``ClientApp`` requested a
@@ -470,17 +492,17 @@ fraction of one:
     `num_gpus=0` if no GPU is expected, otherwise review that limit before
     suspecting discovery.
 
-Three different situations produce this warning, and only one of them calls for the
-ROCm fixes elsewhere in this guide:
+Three different situations produce this warning, and only one of them calls for the ROCm
+fixes elsewhere in this guide:
 
 - The cluster genuinely has no GPU. Set ``client-resources-num-gpus`` to ``0`` and move
   on.
-- Ray's GPU resources were limited deliberately, for example via
-  ``flwr federation simulation-config --init-args-num-gpus 0``. Lowering
-  ``client-resources-num-gpus`` will not help here either -- no non-zero value can be
-  satisfied by a cluster reporting ``GPUs=0`` -- but neither will ``ROCM_PATH`` or
-  ``HIP_VISIBLE_DEVICES``, since the limit is applied at ``ray.init()`` and never
-  reaches ROCm. Review, or raise, the configured ``init-args-num-gpus`` value instead.
+- Ray's GPU resources were limited deliberately, for example via ``flwr federation
+  simulation-config --init-args-num-gpus 0``. Lowering ``client-resources-num-gpus``
+  will not help here either -- no non-zero value can be satisfied by a cluster reporting
+  ``GPUs=0`` -- but neither will ``ROCM_PATH`` or ``HIP_VISIBLE_DEVICES``, since the
+  limit is applied at ``ray.init()`` and never reaches ROCm. Review, or raise, the
+  configured ``init-args-num-gpus`` value instead.
 - ROCm reaches the GPU but Ray did not discover it. Work through `Point Ray at the ROCm
   SMI library`_ and `Set HIP_VISIBLE_DEVICES for Ray`_, then re-run the verification
   above.
@@ -520,7 +542,7 @@ Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly thi
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
 
 CPU or GPU capacity is too small for even one client
-------------------------------------------------------
+----------------------------------------------------
 
 If the preceding warning instead reads ``The ActorPool is empty. The system (CPUs=...,
 GPUs=...) does not meet the criteria to host at least one client...``, Ray *did* detect
@@ -528,9 +550,8 @@ resources, but no single node has enough of them for a client on its own -- for 
 a node reporting ``CPU=1`` with ``client-resources-num-cpus`` set to ``2``, or a 1-GPU
 node with ``client-resources-num-gpus`` set to ``2``. This is a resource-sizing problem,
 not a GPU discovery problem: lower ``client-resources-num-cpus`` and/or
-``client-resources-num-gpus``, or add CPU/GPU capacity to the cluster. The
-``ROCM_PATH`` and ``HIP_VISIBLE_DEVICES`` fixes elsewhere in this guide do not apply
-here.
+``client-resources-num-gpus``, or add CPU/GPU capacity to the cluster. The ``ROCM_PATH``
+and ``HIP_VISIBLE_DEVICES`` fixes elsewhere in this guide do not apply here.
 
 Both the ML framework and Ray report zero GPUs
 ==============================================
