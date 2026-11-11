@@ -283,6 +283,9 @@ def test_space_messages_use_authenticated_run(
 
     request: Message
     for request, expected in (
+        (GetSpaceMessagesRequest(unread_only=True, limit=1), [first]),
+        (GetSpaceMessagesRequest(unread_only=True, limit=1), [reply]),
+        (GetSpaceMessagesRequest(unread_only=True), []),
         (GetSpaceMessagesRequest(), [first, reply]),
         (GetSpaceMessagesRequest(after_id=0, limit=1), [first]),
         (GetSpaceMessagesRequest(before_id=reply.id), [first]),

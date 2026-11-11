@@ -186,6 +186,7 @@ def get_space_messages(
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
             after_id=request.after_id if request.HasField("after_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc

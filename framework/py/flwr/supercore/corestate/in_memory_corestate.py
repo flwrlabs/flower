@@ -203,6 +203,7 @@ class InMemoryCoreState(
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
         self.lock_space_store = RLock()
+        self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -1052,8 +1053,9 @@ class InMemoryCoreState(
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return an authorized Space history page in ascending ID order."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
@@ -1062,13 +1064,20 @@ class InMemoryCoreState(
             space = self.space_store.get(space_id)
             if space is None or participant not in space.participants:
                 return None
+            key = (space_id, participant.flwr_aid or participant.agent_id)
+            cursor = self.space_participant_cursors.get(key, 0)
+            if unread_only:
+                after_id = max(cursor, after_id or 0)
             messages = [
                 message
                 for message in self.space_message_store[space_id]
                 if (before_id is None or message.id < before_id)
                 and (after_id is None or message.id > after_id)
             ]
-            return messages[:limit] if after_id is not None else messages[-limit:]
+            page = messages[:limit] if after_id is not None else messages[-limit:]
+            if page:
+                self.space_participant_cursors[key] = max(cursor, page[-1].id)
+            return page
 
     def get_run_series(  # pylint: disable=too-many-arguments
         self,
