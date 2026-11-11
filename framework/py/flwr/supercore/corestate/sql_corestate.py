@@ -42,7 +42,6 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -768,23 +767,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             return [_agent_from_model(model) for model in session.scalars(stmt)]
 
-    def _lock_event_feeds(
-        self, session: Session, recipients: Sequence[str]
-    ) -> dict[str, int]:
-        """Lock and advance counters in sorted user-ID order until commit."""
-        heads = {}
-        for user_id in sorted(set(recipients)):
-            heads[user_id] = session.execute(
-                self.dialect_insert(UserEventFeedModel)
-                .values(user_id=user_id, last_seq=1)
-                .on_conflict_do_update(
-                    index_elements=[UserEventFeedModel.user_id],
-                    set_={"last_seq": UserEventFeedModel.last_seq + 1},
-                )
-                .returning(UserEventFeedModel.last_seq)
-            ).scalar_one()
-        return heads
-
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Read the feed cursor before fetching visible state."""
         with self.session() as session:
@@ -818,8 +800,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     created_at=now(),
                 )
             )
-            positions = self._lock_event_feeds(session, recipients)
-            for user_id, seq in positions.items():
+            for user_id in sorted(set(recipients)):
+                seq = session.execute(
+                    self.dialect_insert(UserEventFeedModel)
+                    .values(user_id=user_id, last_seq=1)
+                    .on_conflict_do_update(
+                        index_elements=[UserEventFeedModel.user_id],
+                        set_={"last_seq": UserEventFeedModel.last_seq + 1},
+                    )
+                    .returning(UserEventFeedModel.last_seq)
+                ).scalar_one()
                 session.execute(
                     insert(UserEventModel).values(
                         user_id=user_id, seq=seq, event_id=event_id
