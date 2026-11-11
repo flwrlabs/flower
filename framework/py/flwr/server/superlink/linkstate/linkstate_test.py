@@ -29,11 +29,13 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from threading import Barrier
 from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
+import pytest
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
 from sqlalchemy import event, select, update
@@ -50,7 +52,11 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    StartRunRequest,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -58,6 +64,7 @@ from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
@@ -89,6 +96,103 @@ from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
+
+
+@pytest.fixture(name="agent_run_states", params=["memory", "sqlite"])
+def agent_run_backends(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> tuple[LinkState, LinkState]:
+    """Use one logical backend, with independent connections for file-based SQL."""
+    if request.param == "memory":
+        memory_state = InMemoryLinkState(
+            NoOpFederationManager(), ObjectStoreFactory().store()
+        )
+        return memory_state, memory_state
+    sql_states = [
+        SqlLinkState(
+            str(tmp_path / "state.db"),
+            NoOpFederationManager(),
+            ObjectStoreFactory().store(),
+        )
+        for _ in range(2)
+    ]
+    for state in sql_states:
+        state.initialize()
+    return sql_states[0], sql_states[1]
+
+
+def _setup_agent_run(state: LinkState) -> tuple[UUID, Agent, dict[str, str]]:
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+    fab_hash = state.store_fab(Fab("", b"agent-fab", {}))
+    return (
+        space_id,
+        agent,
+        {"fab_id": "publisher/app", "fab_version": "1.0", "fab_hash": fab_hash},
+    )
+
+
+def test_unread_input_opens_one_run(
+    agent_run_states: tuple[LinkState, LinkState],
+) -> None:
+    """Unread user input is eligible until a Run is open for the agent and Space."""
+    state = agent_run_states[0]
+    space_id, agent, app = _setup_agent_run(state)
+    assert not state.get_agent_run_candidates()
+    state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Input")
+    assert state.get_agent_run_candidates() == [(space_id, agent)]
+    run_ids = [
+        state.create_run(
+            fab_id=app["fab_id"],
+            fab_version=app["fab_version"],
+            fab_hash=app["fab_hash"],
+            override_config={},
+            federation_id=None,
+            federation_config=None,
+            flwr_aid=None,
+            primary_task_type=TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
+        for _ in range(2)
+    ]
+    assert run_ids[0]
+    assert run_ids[1] == 0
+    assert not state.get_agent_run_candidates()
+    assert state.get_run_info(run_ids=[run_ids[0]])[0].flwr_aid == "alice"
+
+
+def test_concurrent_admission_creates_one_run(
+    agent_run_states: tuple[LinkState, LinkState],
+) -> None:
+    """Concurrent schedulers cannot open duplicate windows for an agent/Space."""
+    state, second = agent_run_states
+    space_id, agent, app = _setup_agent_run(state)
+    state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Input")
+    barrier = Barrier(2)
+
+    def start(backend: LinkState) -> int:
+        barrier.wait(timeout=5)
+        return backend.create_run(
+            fab_id=app["fab_id"],
+            fab_version=app["fab_version"],
+            fab_hash=app["fab_hash"],
+            override_config={},
+            federation_id=None,
+            federation_config=None,
+            flwr_aid=None,
+            primary_task_type=TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ids = list(pool.map(start, (state, second)))
+    assert sum(bool(run_id) for run_id in ids) == 1
+    assert len(state.get_run_info()) == 1
 
 
 class StateTest(CoreStateTest):
