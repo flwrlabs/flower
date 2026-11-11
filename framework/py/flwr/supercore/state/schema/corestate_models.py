@@ -43,7 +43,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from flwr.supercore.state.schema.types import UInt64, UTCDateTime
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONValue
 
 
 class FlwrBase(DeclarativeBase):
@@ -60,7 +60,7 @@ class Event(FlwrBase):
     event_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     type: Mapped[str] = mapped_column(Text, nullable=False)
     space_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("space.id"))
-    payload: Mapped[JSONObject] = mapped_column(
+    payload: Mapped[dict[str, JSONValue]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
