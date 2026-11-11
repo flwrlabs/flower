@@ -546,7 +546,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -591,10 +591,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if not federation_ids:
                     return []
                 federation_id_set = set(federation_ids)
+                # Returned Run objects use an empty string for absent federation IDs.
+                # Inspect the stored scope to identify Space runs.
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
                     if self.run_ids[run_id].run.federation_id in federation_id_set
+                    or (
+                        None in federation_id_set
+                        and self.run_ids[run_id].space_id is not None
+                    )
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]

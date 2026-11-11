@@ -357,7 +357,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -377,8 +377,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
             Sequence of Flower Account IDs to filter by.
-        federation_ids : Optional[Sequence[str]] (default: None)
-            Sequence of federation IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)
