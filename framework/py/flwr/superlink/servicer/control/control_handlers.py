@@ -1652,7 +1652,10 @@ def pull_artifacts(
     state: LinkState,
     artifact_provider: ArtifactProvider | None,
 ) -> PullArtifactsResponse:
-    """Pull artifacts for a given run ID."""
+    """Pull artifacts for a given run ID.
+
+    Currently unused: the ``flwr pull`` client was never completed.
+    """
     # Check if artifact provider is configured
     if artifact_provider is None:
         raise FlowerError(

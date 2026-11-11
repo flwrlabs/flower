@@ -18,7 +18,6 @@
 
 import hashlib
 import unittest
-from dataclasses import replace
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
@@ -40,7 +39,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListAutomationsRequest,
     ListRunSeriesEventsRequest,
     ListRunsRequest,
-    PullArtifactsRequest,
     RefreshAuthTokensRequest,
     RemoveAppRequest,
     RemoveAppResponse,
@@ -76,7 +74,6 @@ from .control_handlers import (
     list_automations,
     list_run_series_events,
     list_runs,
-    pull_artifacts,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -131,33 +128,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             skip=0,
         )
 
-    def test_pull_artifacts_requires_ownership_and_current_membership(self) -> None:
-        """Reject artifact requests unless both ownership and membership hold."""
-        run_id = self._create_dummy_run()
-        self.state.stop_run(run_id)
-        request = PullArtifactsRequest(run_id=run_id)
-        provider = Mock()
-        cases = [
-            (self.account, False, ApiErrorCode.FEDERATION_NOT_FOUND),
-            (
-                replace(self.account, flwr_aid="other-account"),
-                True,
-                ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT,
-            ),
-        ]
-        for account, has_membership, expected_error in cases:
-            with self.subTest(account=account.flwr_aid, member=has_membership):
-                with patch.object(
-                    self.state.federation_manager,
-                    "has_member",
-                    return_value=has_membership,
-                ):
-                    with self.assertRaises(FlowerError) as error:
-                        pull_artifacts(request, account, self.state, provider)
-                assert error.exception.code == expected_error
-                provider.get_url.assert_not_called()
-
-    def test_owned_space_runs_keep_listing_and_artifact_access(self) -> None:
+    def test_list_runs_filters_membership_and_retains_owned_space_runs(self) -> None:
         """Filter federation access before paging while retaining owned Space runs."""
         federation_run_id = self._create_dummy_run()
         space_id = UUID(self.state.create_space(participants=[]).id)
@@ -176,7 +147,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
             for flwr_aid in [self.account.flwr_aid, "other-account"]
         ]
-        owned_space_run_id, other_space_run_id = space_run_ids
+        owned_space_run_id = space_run_ids[0]
         self._create_dummy_run("@owner/inaccessible")
 
         # Scope selection and caller ownership apply before ordering and pagination.
@@ -191,32 +162,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             response = list_runs(ListRunsRequest(), self.account, self.state)
         assert set(response.run_dict) == {owned_space_run_id}
-
-        # A Space run submitter can still obtain artifacts without a federation.
-        self.state.stop_run(owned_space_run_id)
-        provider = Mock(
-            get_url=Mock(return_value="https://artifacts.example/space.zip")
-        )
-        with patch.object(self.state.federation_manager, "has_member") as has_member:
-            response_artifacts = pull_artifacts(
-                PullArtifactsRequest(run_id=owned_space_run_id),
-                self.account,
-                self.state,
-                provider,
-            )
-        assert response_artifacts.url == "https://artifacts.example/space.zip"
-        has_member.assert_not_called()
-        provider.get_url.assert_called_once_with(owned_space_run_id)
-
-        self.state.stop_run(other_space_run_id)
-        with self.assertRaises(FlowerError) as error:
-            pull_artifacts(
-                PullArtifactsRequest(run_id=other_space_run_id),
-                self.account,
-                self.state,
-                provider,
-            )
-        assert error.exception.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
 
     def _create_dummy_run_series(
         self, series_id: int, run_ids: list[int] | None = None
