@@ -73,6 +73,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -613,7 +614,7 @@ class InMemoryCoreState(
                 created_at=created_at,
                 updated_at=created_at,
             )
-            self.store_event("agent.created", agent, [flwr_aid])
+            event_id = self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
             self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
             try:
                 self.create_space(
@@ -624,7 +625,7 @@ class InMemoryCoreState(
                 )
             except Exception:
                 del self.agent_store[flwr_aid][agent.id]
-                event_id = self.user_event_store[flwr_aid].pop()
+                self.user_event_store[flwr_aid].remove(event_id)
                 del self.event_store[event_id]
                 raise
             self.agent_id_counter = agent.id
@@ -655,8 +656,8 @@ class InMemoryCoreState(
         payload: ProtoMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
-    ) -> None:
-        """Create an event and append it to each recipient's feed."""
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         event = Event(
             event_id=str(event_id), type=event_type, created_at=now().isoformat()
@@ -671,6 +672,7 @@ class InMemoryCoreState(
             self.event_store[event_id] = event
             for user_id in sorted(set(recipients)):
                 self.user_event_store.setdefault(user_id, []).append(event_id)
+        return event_id
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
@@ -1077,7 +1079,7 @@ class InMemoryCoreState(
             self.space_message_store[space_id] = []
             try:
                 self.store_event(
-                    "space.created",
+                    EventType.SPACE_CREATED,
                     space,
                     [member.flwr_aid for member in members if member.flwr_aid],
                     space_id=space_id,
@@ -1118,7 +1120,7 @@ class InMemoryCoreState(
                 content=content,
             )
             self.store_event(
-                "message.created",
+                EventType.MESSAGE_CREATED,
                 message,
                 [p.flwr_aid for p in space.participants if p.flwr_aid],
                 space_id=space_id,

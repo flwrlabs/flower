@@ -292,8 +292,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         payload: ProtoMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
-    ) -> None:
-        """Store a shared event and allocate ordered recipient positions atomically.
+    ) -> UUID:
+        """Store a shared event and its ordered deliveries, returning its UUID.
 
         Each call creates a new event with a generated UUID and creation timestamp.
         SQL callers can use an enclosing session to commit application changes

@@ -56,6 +56,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -2631,15 +2632,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         payload = Agent(id=2**64 - 1)
         created_at = now()
         with self._patch_message_time(created_at):
-            state.store_event("agent.created", payload, ["bob", "alice", "bob"])
+            event_id = state.store_event(
+                EventType.AGENT_CREATED, payload, ["bob", "alice", "bob"]
+            )
         first = state.get_user_events("alice")[0].event
+        self.assertEqual(first.event_id, str(event_id))
         self.assertEqual(first.created_at, created_at.isoformat())
         self.assertEqual(
             [entry.event for entry in state.get_user_events("bob")], [first]
         )
         self.assertEqual(state.get_user_events("charlie"), [])
         with self._patch_message_time(created_at - timedelta(days=1)):
-            state.store_event("agent.created", Agent(), ["alice"])
+            state.store_event(EventType.AGENT_CREATED, Agent(), ["alice"])
         second = state.get_user_events("alice", 1)[0].event
         self.assertNotEqual(first.event_id, second.event_id)
         self.assertTrue(second.HasField("payload"))

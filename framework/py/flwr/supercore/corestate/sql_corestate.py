@@ -97,6 +97,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -759,7 +760,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
-            self.store_event("agent.created", agent, [flwr_aid])
+            self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -817,8 +818,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         payload: ProtoMessage,
         recipients: Sequence[str],
         space_id: UUID | None = None,
-    ) -> None:
-        """Create an event and its deliveries in the current transaction."""
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         with self.session() as session:
             session.execute(
@@ -837,6 +838,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         user_id=user_id, seq=seq, event_id=event_id
                     )
                 )
+        return event_id
 
     def get_user_events(
         self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
@@ -1355,7 +1357,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 space = _space_from_model(model)
                 space.participants.extend(members)
                 self.store_event(
-                    "space.created",
+                    EventType.SPACE_CREATED,
                     space,
                     [member.flwr_aid for member in members if member.flwr_aid],
                     space_id=model.id,
@@ -1440,7 +1442,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 )
             )
-            self.store_event("message.created", message, recipients, space_id=space_id)
+            self.store_event(
+                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
+            )
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
