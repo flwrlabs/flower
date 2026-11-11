@@ -47,19 +47,19 @@ FEDERATION_CONFIG_HELP_MESSAGE = CONFIG_HELP_MESSAGE.format(
 # Constants for `flwr chat`
 CHAT_DEFAULT_FEDERATION_NAME = "personal"
 CHAT_SUPERGRID_CONNECTION_NAME = "supergrid"
-CHAT_AGENT_INPUT_KEY = "agent.input"
-CHAT_AGENTS_API_PATH = "/user/agents"
 CHAT_HELP_COMMAND = "/help"
 CHAT_EXIT_COMMAND = "/quit"
 CHAT_NEW_COMMAND = "/new"
 CHAT_LOAD_COMMAND = "/load"
 CHAT_FEDERATION_COMMAND = "/federation"
+CHAT_CONNECTOR_COMMAND = "/connector"
 CHAT_HISTORY_COMMAND = "/history"
 CHAT_COMMANDS = {
     CHAT_HELP_COMMAND: "Show available commands.",
     CHAT_NEW_COMMAND: "Start a new conversation.",
     CHAT_LOAD_COMMAND: "Build and select a local AgentApp.",
     CHAT_FEDERATION_COMMAND: "Select a federation.",
+    CHAT_CONNECTOR_COMMAND: "Select or clear connectors.",
     CHAT_HISTORY_COMMAND: "Show or continue conversation history.",
     CHAT_EXIT_COMMAND: "Exit Flower Chat.",
 }
@@ -158,8 +158,6 @@ LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY = ":local-in-memory:"
 LOCAL_SUPERLINK_HTTP_API_PORT = os.environ.get(
     "FLWR_LOCAL_SUPERLINK_HTTP_API_PORT", "39091"
 )
-LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
-LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
 LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0
 CONTROL_API_PROBE_TIMEOUT = 0.4
 CONTROL_API_PROBE_INTERVAL = 0.2

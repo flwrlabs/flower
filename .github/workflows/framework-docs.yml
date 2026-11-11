@@ -133,14 +133,14 @@ jobs:
             aws s3 sync --exclude ".*" --cache-control "no-cache" ./framework/docs/build/html/${DOC_VERSION}/en/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/
           fi
       - name: Generate and deploy shared docs UI metadata from main
-        if: ${{ github.repository == 'flwrlabs/flower' && (github.ref == 'refs/heads/main' || github.event_name == 'release') }}
+        if: ${{ github.repository == 'flwrlabs/flower' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/framework-')) }}
         env:
           AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
         run: |
-          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
-            echo "GitHub release event detected; generating docs UI metadata from `main`"
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Generating docs UI metadata from `main`"
             git fetch origin main
             git checkout origin/main
           fi

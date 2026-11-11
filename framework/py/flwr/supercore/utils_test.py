@@ -28,8 +28,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from .utils import (
     MetadataLookupError,
     build_sql_in_params,
-    find_metadata_keys,
-    get_metadata_bytes,
     get_metadata_str,
     get_metadata_str_checked,
     humanize_bytes,
@@ -43,6 +41,7 @@ from .utils import (
     simulation_config_to_json,
     strict_json_dumps,
     strict_json_loads,
+    strict_json_loads_object,
     uint64_to_int64,
 )
 
@@ -76,18 +75,6 @@ def test_build_sql_in_params_from_set() -> None:
     assert set(params.values()) == {10, 20, 30}
 
 
-def test_find_metadata_keys() -> None:
-    """Return the subset of requested keys present in metadata."""
-    assert find_metadata_keys(
-        [
-            ("x-token", "value"),
-            ("x-trace-id", "abc"),
-            ("x-token", "other"),
-        ],
-        ("x-token", "missing"),
-    ) == {"x-token"}
-
-
 def test_mask_string() -> None:
     """Test the `mask_string` function."""
     assert mask_string("abcdefghi") == "abcd...fghi"
@@ -111,6 +98,14 @@ def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None
 def test_strict_json_loads() -> None:
     """Parse valid JSON values."""
     assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_object() -> None:
+    """Accept strict JSON objects and reject other top-level values."""
+    assert strict_json_loads_object('{"key":[1,true,null]}') == {"key": [1, True, None]}
+    for raw in ("[]", "null", '{"key":NaN}'):
+        with pytest.raises(ValueError):
+            strict_json_loads_object(raw)
 
 
 def test_strict_json_loads_rejects_non_finite_numbers() -> None:
@@ -179,22 +174,6 @@ def test_get_metadata_str_checked(
 
     assert value == expected_value
     assert error_type == expected_error
-
-
-@pytest.mark.parametrize(
-    ("metadata", "key", "expected"),
-    [
-        ([("x-bin", b"value")], "x-bin", b"value"),
-        ([("x-bin", b"")], "x-bin", None),
-        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
-        ([("x-bin", "value")], "x-bin", None),
-    ],
-)
-def test_get_metadata_bytes(
-    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
-) -> None:
-    """Return exactly one non-empty bytes value of the expected type."""
-    assert get_metadata_bytes(metadata, key) == expected
 
 
 @parameterized.expand(  # type: ignore

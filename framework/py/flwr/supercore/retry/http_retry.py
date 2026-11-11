@@ -25,12 +25,14 @@ import httpx
 from flwr.common.constant import MAX_RETRY_DELAY
 from flwr.supercore import log
 from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.run import RunNotRunningException
 
 from .retry_invoker import RetryInvoker, RetryState, exponential
 
 _RETRYABLE_STATUS_CODES = frozenset(
     {
+        httpx.codes.BAD_GATEWAY,
         httpx.codes.SERVICE_UNAVAILABLE,
         httpx.codes.GATEWAY_TIMEOUT,
     }
@@ -86,6 +88,14 @@ def make_simple_http_retry_invoker() -> RetryInvoker:
         if isinstance(exc, httpx.HTTPStatusError):
             status_code = exc.response.status_code
             if status_code == httpx.codes.FORBIDDEN:
+                error = FlowerError.from_json(exc.response.text)
+                if (
+                    error is not None
+                    and error.code == ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE
+                ):
+                    # Connector authorization does not mean the run has stopped.
+                    # Preserve the HTTP error for the caller to handle.
+                    return True
                 raise RunNotRunningException
             if status_code == httpx.codes.UNAUTHORIZED:
                 with shutdown_lock:

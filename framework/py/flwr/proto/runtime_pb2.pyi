@@ -21,9 +21,12 @@ import builtins
 import collections.abc
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
+import flwr.proto.file_pb2
 import flwr.proto.message_pb2
 import flwr.proto.node_pb2
+import flwr.proto.recorddict_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runseries_pb2
 import flwr.proto.task_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -31,68 +34,6 @@ import google.protobuf.message
 import typing
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
-
-@typing.final
-class PullPendingTasksRequest(google.protobuf.message.Message):
-    """PullPendingTasks messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___PullPendingTasksRequest = PullPendingTasksRequest
-
-@typing.final
-class PullPendingTasksResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TASKS_FIELD_NUMBER: builtins.int
-    @property
-    def tasks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.Task]: ...
-    def __init__(
-        self,
-        *,
-        tasks: collections.abc.Iterable[flwr.proto.task_pb2.Task] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["tasks", b"tasks"]) -> None: ...
-
-global___PullPendingTasksResponse = PullPendingTasksResponse
-
-@typing.final
-class ClaimTaskRequest(google.protobuf.message.Message):
-    """ClaimTask messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TASK_ID_FIELD_NUMBER: builtins.int
-    task_id: builtins.int
-    def __init__(
-        self,
-        *,
-        task_id: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["task_id", b"task_id"]) -> None: ...
-
-global___ClaimTaskRequest = ClaimTaskRequest
-
-@typing.final
-class ClaimTaskResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TOKEN_FIELD_NUMBER: builtins.int
-    token: builtins.str
-    def __init__(
-        self,
-        *,
-        token: builtins.str | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_token", b"_token"]) -> typing.Literal["token"] | None: ...
-
-global___ClaimTaskResponse = ClaimTaskResponse
 
 @typing.final
 class SendTaskHeartbeatRequest(google.protobuf.message.Message):
@@ -172,15 +113,19 @@ class PullAppMessagesRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    MESSAGE_IDS_FIELD_NUMBER: builtins.int
+    REPLY_TO_MESSAGE_IDS_FIELD_NUMBER: builtins.int
     @property
-    def message_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]: ...
+    def reply_to_message_ids(self) -> flwr.proto.recorddict_pb2.StringList:
+        """Absent means no correlation filter; present with no IDs matches nothing."""
+
     def __init__(
         self,
         *,
-        message_ids: collections.abc.Iterable[builtins.str] | None = ...,
+        reply_to_message_ids: flwr.proto.recorddict_pb2.StringList | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["message_ids", b"message_ids"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_reply_to_message_ids", b"_reply_to_message_ids", "reply_to_message_ids", b"reply_to_message_ids"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_reply_to_message_ids", b"_reply_to_message_ids", "reply_to_message_ids", b"reply_to_message_ids"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_reply_to_message_ids", b"_reply_to_message_ids"]) -> typing.Literal["reply_to_message_ids"] | None: ...
 
 global___PullAppMessagesRequest = PullAppMessagesRequest
 
@@ -222,11 +167,11 @@ class GetNodesResponse(google.protobuf.message.Message):
 
     NODES_FIELD_NUMBER: builtins.int
     @property
-    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.Node]: ...
+    def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.NodeInfo]: ...
     def __init__(
         self,
         *,
-        nodes: collections.abc.Iterable[flwr.proto.node_pb2.Node] | None = ...,
+        nodes: collections.abc.Iterable[flwr.proto.node_pb2.NodeInfo] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["nodes", b"nodes"]) -> None: ...
 
@@ -300,9 +245,35 @@ class GetRunSeriesEventsRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    EVENT_TYPES_FIELD_NUMBER: builtins.int
+    AFTER_EVENT_ID_FIELD_NUMBER: builtins.int
+    BEFORE_EVENT_ID_FIELD_NUMBER: builtins.int
+    LAST_N_FIELD_NUMBER: builtins.int
+    after_event_id: builtins.int
+    """ID bounds are exclusive."""
+    before_event_id: builtins.int
+    last_n: builtins.int
+    """Select newest matching events; zero means no limit.
+    Response remains in ascending ID order.
+    """
+    @property
+    def event_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Empty means all event types."""
+
     def __init__(
         self,
+        *,
+        event_types: collections.abc.Iterable[builtins.str] | None = ...,
+        after_event_id: builtins.int | None = ...,
+        before_event_id: builtins.int | None = ...,
+        last_n: builtins.int = ...,
     ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id", "event_types", b"event_types", "last_n", b"last_n"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_event_id", b"_after_event_id"]) -> typing.Literal["after_event_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_before_event_id", b"_before_event_id"]) -> typing.Literal["before_event_id"] | None: ...
 
 global___GetRunSeriesEventsRequest = GetRunSeriesEventsRequest
 
@@ -321,6 +292,124 @@ class GetRunSeriesEventsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
 
 global___GetRunSeriesEventsResponse = GetRunSeriesEventsResponse
+
+@typing.final
+class GetSpaceEventsRequest(google.protobuf.message.Message):
+    """GetSpaceEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_EVENT_ID_FIELD_NUMBER: builtins.int
+    BEFORE_EVENT_ID_FIELD_NUMBER: builtins.int
+    LAST_N_FIELD_NUMBER: builtins.int
+    after_event_id: builtins.int
+    """ID bounds are exclusive."""
+    before_event_id: builtins.int
+    last_n: builtins.int
+    """Select newest matching events; zero means no limit.
+    Response remains in ascending ID order.
+    """
+    def __init__(
+        self,
+        *,
+        after_event_id: builtins.int | None = ...,
+        before_event_id: builtins.int | None = ...,
+        last_n: builtins.int = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id", "last_n", b"last_n"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_event_id", b"_after_event_id"]) -> typing.Literal["after_event_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_before_event_id", b"_before_event_id"]) -> typing.Literal["before_event_id"] | None: ...
+
+global___GetSpaceEventsRequest = GetSpaceEventsRequest
+
+@typing.final
+class GetSpaceEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___GetSpaceEventsResponse = GetSpaceEventsResponse
+
+@typing.final
+class GetCompactedContextsRequest(google.protobuf.message.Message):
+    """GetCompactedContexts messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LIMIT_FIELD_NUMBER: builtins.int
+    BEFORE_CONTEXT_ID_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    before_context_id: builtins.int
+    def __init__(
+        self,
+        *,
+        limit: builtins.int | None = ...,
+        before_context_id: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_before_context_id", b"_before_context_id", "_limit", b"_limit", "before_context_id", b"before_context_id", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_before_context_id", b"_before_context_id", "_limit", b"_limit", "before_context_id", b"before_context_id", "limit", b"limit"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_before_context_id", b"_before_context_id"]) -> typing.Literal["before_context_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___GetCompactedContextsRequest = GetCompactedContextsRequest
+
+@typing.final
+class GetCompactedContextsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONTEXTS_FIELD_NUMBER: builtins.int
+    @property
+    def contexts(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.runseries_pb2.CompactedContext]: ...
+    def __init__(
+        self,
+        *,
+        contexts: collections.abc.Iterable[flwr.proto.runseries_pb2.CompactedContext] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["contexts", b"contexts"]) -> None: ...
+
+global___GetCompactedContextsResponse = GetCompactedContextsResponse
+
+@typing.final
+class PutCompactedContextRequest(google.protobuf.message.Message):
+    """PutCompactedContext messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONTEXT_FIELD_NUMBER: builtins.int
+    @property
+    def context(self) -> flwr.proto.runseries_pb2.CompactedContext: ...
+    def __init__(
+        self,
+        *,
+        context: flwr.proto.runseries_pb2.CompactedContext | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context"]) -> None: ...
+
+global___PutCompactedContextRequest = PutCompactedContextRequest
+
+@typing.final
+class PutCompactedContextResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PutCompactedContextResponse = PutCompactedContextResponse
 
 @typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
@@ -412,17 +501,20 @@ class GetConnectorResponse(google.protobuf.message.Message):
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     CREDENTIALS_JSON_FIELD_NUMBER: builtins.int
     CONFIG_JSON_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     credentials_json: builtins.str
     config_json: builtins.str
+    connector_id: builtins.int
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
         credentials_json: builtins.str = ...,
         config_json: builtins.str = ...,
+        connector_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["config_json", b"config_json", "connector_ref", b"connector_ref", "credentials_json", b"credentials_json"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config_json", b"config_json", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "credentials_json", b"credentials_json"]) -> None: ...
 
 global___GetConnectorResponse = GetConnectorResponse
 
@@ -520,10 +612,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    CONNECTOR_ID_FIELD_NUMBER: builtins.int
     type: builtins.str
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
+    connector_id: builtins.int
     def __init__(
         self,
         *,
@@ -531,9 +625,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
+        connector_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_id", b"_connector_id", "_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_connector_id", b"_connector_id"]) -> typing.Literal["connector_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload
@@ -559,3 +656,201 @@ class CreateTaskResponse(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
 
 global___CreateTaskResponse = CreateTaskResponse
+
+@typing.final
+class AcquireTaskRequest(google.protobuf.message.Message):
+    """AcquireTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUPPORTED_TASK_TYPES_FIELD_NUMBER: builtins.int
+    AGENTAPP_FAB_HASHES_FIELD_NUMBER: builtins.int
+    @property
+    def supported_task_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Task types that can be launched regardless of FAB."""
+
+    @property
+    def agentapp_fab_hashes(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """AgentApp FABs that can be launched by a ready prestarted executor."""
+
+    def __init__(
+        self,
+        *,
+        supported_task_types: collections.abc.Iterable[builtins.str] | None = ...,
+        agentapp_fab_hashes: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agentapp_fab_hashes", b"agentapp_fab_hashes", "supported_task_types", b"supported_task_types"]) -> None: ...
+
+global___AcquireTaskRequest = AcquireTaskRequest
+
+@typing.final
+class AcquireTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    TOKEN_FIELD_NUMBER: builtins.int
+    token: builtins.str
+    @property
+    def task(self) -> flwr.proto.task_pb2.Task: ...
+    def __init__(
+        self,
+        *,
+        task: flwr.proto.task_pb2.Task | None = ...,
+        token: builtins.str = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task", b"task", "token", b"token"]) -> None: ...
+
+global___AcquireTaskResponse = AcquireTaskResponse
+
+@typing.final
+class PutFileRequest(google.protobuf.message.Message):
+    """PutFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    EXPECTED_REVISION_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    data: builtins.bytes
+    expected_revision: builtins.int
+    """Absent means create-only"""
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+        data: builtins.bytes = ...,
+        expected_revision: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_expected_revision", b"_expected_revision", "expected_revision", b"expected_revision"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_expected_revision", b"_expected_revision", "data", b"data", "expected_revision", b"expected_revision", "key", b"key"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_expected_revision", b"_expected_revision"]) -> typing.Literal["expected_revision"] | None: ...
+
+global___PutFileRequest = PutFileRequest
+
+@typing.final
+class PutFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REVISION_FIELD_NUMBER: builtins.int
+    revision: builtins.int
+    def __init__(
+        self,
+        *,
+        revision: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["revision", b"revision"]) -> None: ...
+
+global___PutFileResponse = PutFileResponse
+
+@typing.final
+class GetFileRequest(google.protobuf.message.Message):
+    """GetFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["key", b"key"]) -> None: ...
+
+global___GetFileRequest = GetFileRequest
+
+@typing.final
+class GetFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILE_FIELD_NUMBER: builtins.int
+    @property
+    def file(self) -> flwr.proto.file_pb2.File: ...
+    def __init__(
+        self,
+        *,
+        file: flwr.proto.file_pb2.File | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["file", b"file"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["file", b"file"]) -> None: ...
+
+global___GetFileResponse = GetFileResponse
+
+@typing.final
+class ListFilesRequest(google.protobuf.message.Message):
+    """ListFiles messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PREFIX_FIELD_NUMBER: builtins.int
+    START_AFTER_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    prefix: builtins.str
+    start_after: builtins.str
+    """Empty means start from beginning."""
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        prefix: builtins.str = ...,
+        start_after: builtins.str = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit", "prefix", b"prefix", "start_after", b"start_after"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListFilesRequest = ListFilesRequest
+
+@typing.final
+class ListFilesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FILES_FIELD_NUMBER: builtins.int
+    NEXT_START_AFTER_FIELD_NUMBER: builtins.int
+    next_start_after: builtins.str
+    """Last returned key if more results exist; empty otherwise."""
+    @property
+    def files(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.file_pb2.FileMetadata]: ...
+    def __init__(
+        self,
+        *,
+        files: collections.abc.Iterable[flwr.proto.file_pb2.FileMetadata] | None = ...,
+        next_start_after: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["files", b"files", "next_start_after", b"next_start_after"]) -> None: ...
+
+global___ListFilesResponse = ListFilesResponse
+
+@typing.final
+class DeleteFileRequest(google.protobuf.message.Message):
+    """DeleteFile messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    KEY_FIELD_NUMBER: builtins.int
+    EXPECTED_REVISION_FIELD_NUMBER: builtins.int
+    key: builtins.str
+    expected_revision: builtins.int
+    """Must match the current revision."""
+    def __init__(
+        self,
+        *,
+        key: builtins.str = ...,
+        expected_revision: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["expected_revision", b"expected_revision", "key", b"key"]) -> None: ...
+
+global___DeleteFileRequest = DeleteFileRequest
+
+@typing.final
+class DeleteFileResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteFileResponse = DeleteFileResponse

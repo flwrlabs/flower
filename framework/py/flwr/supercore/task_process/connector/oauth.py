@@ -17,6 +17,8 @@
 from __future__ import annotations
 
 import os
+from math import isfinite
+from time import time
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlencode
 
@@ -106,6 +108,50 @@ class OAuthFlow:
             if not pkce_verifier:
                 raise self._error("exchange failed")
             data["code_verifier"] = pkce_verifier
+        payload = self._request_token(data, failure="exchange failed")
+        credentials, config = self._parse_token_response(
+            payload, token_response_path=self._oauth.token_response_path
+        )
+        access_token = cast(str, credentials["access_token"])
+        name = self._connection_name(payload, access_token)
+        if name:
+            config["display_name"] = f"{self.display_name} · {name}"
+        return credentials, config
+
+    @staticmethod
+    def credentials_need_refresh(credentials: JSONObject) -> bool:
+        """Refresh only when the known expiry is within 60 seconds."""
+        if credentials.get("refresh_token") is None:
+            return False
+        expires_at = credentials.get("expires_at")
+        return (
+            isinstance(expires_at, (int, float))
+            and not isinstance(expires_at, bool)
+            and expires_at <= time() + 60
+        )
+
+    def refresh_credentials(self, credentials: JSONObject) -> JSONObject:
+        """Return fresh credentials, preserving or replacing the refresh token."""
+        if not self.credentials_need_refresh(credentials):
+            return credentials
+        refresh_token = credentials.get("refresh_token")
+        if not isinstance(refresh_token, str) or not refresh_token:
+            raise self._error("refresh failed")
+        payload = self._request_token(
+            {"grant_type": "refresh_token", "refresh_token": refresh_token},
+            failure="refresh failed",
+        )
+        tokens, _ = self._parse_token_response(payload)
+        refreshed = dict(credentials)
+        # An omitted lifetime must not reuse the previous access token's expiry.
+        refreshed.pop("expires_at", None)
+        refreshed.pop("expires_in", None)
+        refreshed.update(tokens)
+        return refreshed
+
+    def _request_token(self, data: dict[str, str], *, failure: str) -> JSONObject:
+        """Send a token request using the service's OAuth client configuration."""
+        data = {**self._oauth.token_params, **data}
         auth = None
         if self._oauth.token_auth_method == "client_secret_basic":
             auth = (self._client_id, self._client_secret)
@@ -132,19 +178,54 @@ class OAuthFlow:
                     timeout=30.0,
                 )
         except requests.RequestException:
-            raise self._error("exchange failed") from None
+            raise self._error(failure) from None
         if response.status_code >= 400:
-            raise self._error("exchange failed")
+            raise self._error(failure)
         try:
             response_payload = response.json()
         except ValueError:
             raise self._error("returned an invalid response") from None
         if not isinstance(response_payload, dict):
             raise self._error("returned an invalid response")
-        return self._parse_token_response(cast(JSONObject, response_payload))
+        return cast(JSONObject, response_payload)
+
+    def _connection_name(self, token_payload: JSONObject, access_token: str) -> str:
+        """Read the connection name from the token or provider identity."""
+        # Names can come from the token response or a separate lookup.
+        payload = token_payload
+        url = self._oauth.display_name_url
+        if url:
+            try:
+                response = requests.request(
+                    self._oauth.display_name_method,
+                    url,
+                    headers={
+                        **self._oauth.display_name_headers,
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                identity_payload = response.json()
+            except (requests.RequestException, ValueError):
+                # A name lookup failure should not invalidate the OAuth connection.
+                return ""
+            if not isinstance(identity_payload, dict):
+                return ""
+            payload = cast(JSONObject, identity_payload)
+
+        if self._oauth.display_name_resolver is not None:
+            return self._oauth.display_name_resolver(payload)
+
+        names: list[str] = []
+        for field in self._oauth.display_name_fields:
+            value = payload.get(field)
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
+        return " / ".join(names)
 
     def _parse_token_response(
-        self, payload: JSONObject
+        self, payload: JSONObject, *, token_response_path: tuple[str, ...] = ()
     ) -> tuple[JSONObject, JSONObject]:
         """Validate and extract credentials from a token response."""
         if (
@@ -154,7 +235,7 @@ class OAuthFlow:
         ):
             raise self._error("exchange failed")
         token_payload = payload
-        for key in self._oauth.token_response_path:
+        for key in token_response_path:
             value = token_payload.get(key)
             if not isinstance(value, dict):
                 raise self._error("returned an invalid response")
@@ -171,6 +252,15 @@ class OAuthFlow:
             value = token_payload.get(key)
             if isinstance(value, (str, int)) and not isinstance(value, bool):
                 credentials[key] = value
+        expires_in = credentials.get("expires_in")
+        if isinstance(expires_in, (str, int)):
+            try:
+                lifetime = float(expires_in)
+            except ValueError:
+                raise self._error("returned an invalid response") from None
+            if not isfinite(lifetime) or lifetime < 0:
+                raise self._error("returned an invalid response")
+            credentials["expires_at"] = time() + lifetime
         config: JSONObject = {}
         for key in self._oauth.config_fields:
             value = token_payload.get(key)

@@ -5,35 +5,35 @@ AgentApp. Flower provides an OpenAI-compatible Responses endpoint and its
 credentials while the AgentApp is running, so your code can use the SDK without
 a model-provider API key.
 
-This guide targets Flower 1.35.0.
+This guide targets Flower {{ stable_flwr_version }}.
 
-## Start from the AgentApp template
+## Prepare an AgentApp project
 
-Create a project from the AgentApp published on Flower Hub:
+Start with an AgentApp project from [Write your first
+AgentApp](../tutorials/write-your-first-agentapp.md). Its template already
+includes compatible Flower and OpenAI SDK dependencies:
 
-```console
-$ uvx --from flwr==1.35.0 flwr new @flwrlabs/agent
-$ cd agent
-$ uv sync
-```
+```{code-block} toml
+:substitutions:
 
-The template already includes compatible Flower and OpenAI SDK dependencies:
-
-```toml
-dependencies = ["flwr>=1.35.0,<2.0", "openai>=2.16.0,<3.0.0"]
+dependencies = ["flwr>=|stable_flwr_version|,<2.0", "openai>=2.16.0,<3.0.0"]
 ```
 
 For an existing AgentApp, set its Flower target in `pyproject.toml`:
 
-```toml
+```{code-block} toml
+:substitutions:
+
 [tool.flwr.app]
-flwr-version-target = "1.35.0"
+flwr-version-target = "|stable_flwr_version|"
 ```
 
 Then update its dependencies:
 
-```console
-$ uv add 'flwr>=1.35.0,<2.0' 'openai>=2.16.0,<3.0.0'
+```{code-block} console
+:substitutions:
+
+$ uv add 'flwr>=|stable_flwr_version|,<2.0' 'openai>=2.16.0,<3.0.0'
 ```
 
 Do not add a model-provider API key to the project or its configuration.
@@ -88,11 +88,7 @@ app = AgentApp()
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Send the configured input to the model."""
-    prompt = context.run_config.get("agent.input")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise ValueError("agent.input must be a non-empty string")
-
+    """Send the chat prompt to the model."""
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -100,7 +96,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
-        input=prompt.strip(),
+        input=agent.prompt,
         stream=True,
     )
 
@@ -148,9 +144,8 @@ events so clients receive the complete response event sequence.
 `agent.events.emit(...)` publishes structured events; only event types that
 run-event clients recognize as response output are rendered as assistant text.
 
-Publishing these events does not add an assistant message to the conversation
-state. When later runs need to replay it, see
-{ref}`persist-final-assistant-message` for the complete `Context` update.
+Publishing these events makes them available to later runs through
+`agent.events.get_trace()`; it does not add them to `Context`.
 
 ## Use the SDK with connectors
 
@@ -160,31 +155,37 @@ execution remain on the `AgentSession`:
 - `agent.connectors.tools(...)` returns tool schemas to pass to the SDK
 - `agent.connectors.call(...)` executes a model-requested function call
 - `agent.events.emit(...)` publishes events to the run-event stream
+- `agent.events.get_trace()` reads events from every run in the current series
 
 The SDK returns typed output items. Convert a function-call item with
 `item.to_dict()` before passing it to `agent.connectors.call`. See [Build a
-collaborative research
-agent](../tutorials/build-a-collaborative-agent.md) for a complete bounded tool
+research agent](../tutorials/build-a-research-agent.md) for a complete bounded tool
 loop.
 
-## Persist only the state you need
+## Read conversation history
 
-The runtime records a non-empty `agent.input` as a user message before calling
-the AgentApp. Responses created through the SDK are not automatically appended
-to the Flower `Context`. Store the final assistant message yourself when later
-runs in the same series need to replay it.
+Before calling the AgentApp, Flower records `agent.prompt` as a user-message
+event. Events published with `agent.events.emit(...)` and connector
+activity are stored in the same run-series trace. Read that trace at the start of
+a later run:
 
-Publishing an event with `agent.events.emit` makes it visible to run-event
-clients but does not persist it in the conversation state. See
-{ref}`persist-final-assistant-message` for an implementation that stores the
-final assistant message safely.
+```python
+trace = agent.events.get_trace()
+for entry in trace:
+    event_type = entry["event"]
+    event_data = entry["data"]
+```
 
-## Build and run the AgentApp
+Each entry also includes `id`, `timestamp`, `run_id`, and `task_id`. Filter out
+connector, reasoning, failed, and incomplete events before constructing the
+next model input. See [Build a research agent](../tutorials/build-a-research-agent.md) for a complete loader that
+rebuilds user and assistant messages from the trace.
 
-```console
-$ uv run flwr build
-$ uv run flwr login supergrid
-$ uv run flwr run . supergrid --stream
+Use `Context` only when the AgentApp needs additional app-defined state beyond
+the recorded event trace.
+
+```{tip}
+To test your AgentApp, see {ref}`load-an-agentapp-in-flower-chat`.
 ```
 
 The runtime injects both environment variables when it starts the AgentApp. Do

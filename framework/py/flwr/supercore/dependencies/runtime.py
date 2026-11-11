@@ -31,22 +31,28 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
+    GetCompactedContextsRequest,
+    GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
@@ -69,10 +75,10 @@ StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
 
-    def pull_pending_tasks(
-        self, request: PullPendingTasksRequest, state: StateT_contra
-    ) -> PullPendingTasksResponse:
-        """Pull pending tasks."""
+    def acquire_task(
+        self, request: AcquireTaskRequest, state: StateT_contra
+    ) -> AcquireTaskResponse:
+        """Claim the oldest supported pending task."""
 
     def pull_task_input(
         self, request: PullTaskInputRequest, state: StateT_contra, task: Task
@@ -134,6 +140,24 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         task: Task,
     ) -> GetRunSeriesEventsResponse:
         """Get events from the authenticated task's run series."""
+
+    def get_space_events(
+        self,
+        request: GetSpaceEventsRequest,
+        state: StateT_contra,
+        task: Task,
+    ) -> GetSpaceEventsResponse:
+        """Get events from the authenticated task's Space."""
+
+    def get_compacted_contexts(
+        self, request: GetCompactedContextsRequest, state: StateT_contra, task: Task
+    ) -> GetCompactedContextsResponse:
+        """Get summaries from the authenticated task's run series."""
+
+    def put_compacted_context(
+        self, request: PutCompactedContextRequest, state: StateT_contra, task: Task
+    ) -> PutCompactedContextResponse:
+        """Store a summary in the authenticated task's run series."""
 
 
 def get_runtime_state(request: Request) -> CoreState:

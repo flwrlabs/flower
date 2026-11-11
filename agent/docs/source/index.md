@@ -18,8 +18,7 @@ When you're ready to build:
 
 - [Write your first AgentApp](tutorials/write-your-first-agentapp.md) builds the
   smallest useful custom app.
-- [Build a collaborative research
-  agent](tutorials/build-a-collaborative-agent.md) adds conversation context,
+- [Build a research agent](tutorials/build-a-research-agent.md) adds conversation context,
   multiple connector calls, and a bounded tool loop.
 
 ```{note}
@@ -39,8 +38,9 @@ releases.
 - A **connector** gives an AgentApp a runtime-provided tool. Some connectors are
   built in; account connectors use access granted by the signed-in user.
 
-Read [Use agents and federations](how-to-guides/use-agents-and-federations.md)
-to see how these pieces fit together and how to select agents and federations.
+Read [Understand the AgentApp runtime](explanations/agentapp-runtime.md) for the
+full model, or [Use agents and federations](how-to-guides/use-agents-and-federations.md)
+to choose where an app runs.
 
 ```{toctree}
 :caption: Tutorials
@@ -49,19 +49,19 @@ to see how these pieces fit together and how to select agents and federations.
 tutorials/quickstart
 tutorials/get-started-with-flower-agent
 tutorials/write-your-first-agentapp
-tutorials/build-a-collaborative-agent
+tutorials/build-a-research-agent
 ```
 
 ```{toctree}
 :caption: How-to guides
 :maxdepth: 1
 
+how-to-guides/run-on-supergrid
 how-to-guides/use-agents-and-federations
 how-to-guides/connect-accounts
 how-to-guides/create-automations
 how-to-guides/use-flower-hub
 how-to-guides/use-openai-sdk
-how-to-guides/run-on-supergrid
 how-to-guides/troubleshoot-agent-runs
 how-to-guides/run-with-local-superlink
 how-to-guides/run-with-ollama

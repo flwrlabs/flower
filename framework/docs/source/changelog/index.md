@@ -4,6 +4,27 @@ orphan: true
 
 # Changelog
 
+```{include} v1.43.0.md
+```
+
+```{include} v1.42.0.md
+```
+
+```{include} v1.41.0.md
+```
+
+```{include} v1.40.0.md
+```
+
+```{include} v1.39.0.md
+```
+
+```{include} v1.38.0.md
+```
+
+```{include} v1.37.0.md
+```
+
 ```{include} v1.36.0.md
 ```
 

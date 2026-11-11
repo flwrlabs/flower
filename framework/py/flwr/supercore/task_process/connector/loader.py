@@ -12,29 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Load connector packages from the generated registry."""
+"""Load OAuth connector packages from the generated registry."""
 
 from importlib import import_module
+from typing import cast
 
 from .definition import ConnectorDefinition
 from .registry_generated import CONNECTOR_PACKAGES
 
 
-def load_connectors() -> tuple[ConnectorDefinition, ...]:
-    """Load registered connectors and validate global identifiers."""
-    connectors = tuple(_load_connector(package) for package in CONNECTOR_PACKAGES)
-    refs = [connector.ref for connector in connectors]
-    if len(refs) != len(set(refs)):
-        raise ValueError("Connector references must be globally unique.")
-    tool_names = [name for connector in connectors for name in connector.handlers]
-    if len(tool_names) != len(set(tool_names)):
-        raise ValueError("Connector tool names must be globally unique.")
-    return connectors
+def load_oauth_connectors() -> tuple[ConnectorDefinition, ...]:
+    """Load OAuth connectors listed in the generated package registry."""
+    return tuple(
+        connector
+        for package in CONNECTOR_PACKAGES
+        for connector in _load_connectors(package)
+    )
 
 
-def _load_connector(package: str) -> ConnectorDefinition:
-    """Load one connector definition and validate its package name."""
+def _load_connectors(package: str) -> tuple[ConnectorDefinition, ...]:
+    """Load a single connector or a group exported by a package."""
     module = import_module(f"{package}.definition")
+    connectors = getattr(module, "CONNECTORS", None)
+    if connectors is not None:
+        if (
+            not isinstance(connectors, tuple)
+            or not connectors
+            or any(not isinstance(item, ConnectorDefinition) for item in connectors)
+        ):
+            raise TypeError(
+                f"Connector package '{package}' exports invalid CONNECTORS."
+            )
+        return cast(tuple[ConnectorDefinition, ...], connectors)
+
     connector = getattr(module, "CONNECTOR", None)
     if not isinstance(connector, ConnectorDefinition):
         raise TypeError(f"Connector package '{package}' does not export CONNECTOR.")
@@ -43,4 +53,4 @@ def _load_connector(package: str) -> ConnectorDefinition:
         raise ValueError(
             f"Connector package '{package}' must match reference '{connector.ref}'."
         )
-    return connector
+    return (connector,)

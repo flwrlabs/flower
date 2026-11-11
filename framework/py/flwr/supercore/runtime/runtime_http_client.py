@@ -31,20 +31,28 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
+    GetCompactedContextsRequest,
+    GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PullTaskInputRequest,
     PullTaskInputResponse,
     PullTaskMessageRequest,
@@ -57,6 +65,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskMessageResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -67,27 +79,16 @@ from flwr.supercore.protobuf.client import ProtobufClient
 
 # Match the method names defined by the Runtime protobuf service.
 # pylint: disable=invalid-name
-class RuntimeHttpClient(ProtobufClient):
+class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Runtime API."""
 
-    def PullPendingTasks(
-        self, request: PullPendingTasksRequest
-    ) -> PullPendingTasksResponse:
-        """Pull tasks waiting to be executed."""
+    def AcquireTask(self, request: AcquireTaskRequest) -> AcquireTaskResponse:
+        """Acquire the oldest eligible pending task."""
         return self._unary_unary(
-            path="/v1/runtime/pull-pending-tasks",
-            rpc_method="/flwr.proto.Runtime/PullPendingTasks",
+            path="/v1/runtime/acquire-task",
+            rpc_method="/flwr.proto.Runtime/AcquireTask",
             request=request,
-            response_type=PullPendingTasksResponse,
-        )
-
-    def ClaimTask(self, request: ClaimTaskRequest) -> ClaimTaskResponse:
-        """Claim a task for execution."""
-        return self._unary_unary(
-            path="/v1/runtime/claim-task",
-            rpc_method="/flwr.proto.Runtime/ClaimTask",
-            request=request,
-            response_type=ClaimTaskResponse,
+            response_type=AcquireTaskResponse,
         )
 
     def SendTaskHeartbeat(
@@ -235,6 +236,37 @@ class RuntimeHttpClient(ProtobufClient):
             response_type=GetRunSeriesEventsResponse,
         )
 
+    def GetSpaceEvents(self, request: GetSpaceEventsRequest) -> GetSpaceEventsResponse:
+        """Get events from the authenticated AgentApp task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-events",
+            rpc_method="/flwr.proto.Runtime/GetSpaceEvents",
+            request=request,
+            response_type=GetSpaceEventsResponse,
+        )
+
+    def GetCompactedContexts(
+        self, request: GetCompactedContextsRequest
+    ) -> GetCompactedContextsResponse:
+        """Get summaries from the authenticated task's run series."""
+        return self._unary_unary(
+            path="/v1/runtime/get-compacted-contexts",
+            rpc_method="/flwr.proto.Runtime/GetCompactedContexts",
+            request=request,
+            response_type=GetCompactedContextsResponse,
+        )
+
+    def PutCompactedContext(
+        self, request: PutCompactedContextRequest
+    ) -> PutCompactedContextResponse:
+        """Store a summary in the authenticated task's run series."""
+        return self._unary_unary(
+            path="/v1/runtime/put-compacted-context",
+            rpc_method="/flwr.proto.Runtime/PutCompactedContext",
+            request=request,
+            response_type=PutCompactedContextResponse,
+        )
+
     def PullTaskMessage(
         self, request: PullTaskMessageRequest
     ) -> PullTaskMessageResponse:
@@ -264,4 +296,40 @@ class RuntimeHttpClient(ProtobufClient):
             rpc_method="/flwr.proto.Runtime/GetConnector",
             request=request,
             response_type=GetConnectorResponse,
+        )
+
+    def PutFile(self, request: PutFileRequest) -> PutFileResponse:
+        """Store a file."""
+        return self._unary_unary(
+            path="/v1/runtime/put-file",
+            rpc_method="/flwr.proto.Runtime/PutFile",
+            request=request,
+            response_type=PutFileResponse,
+        )
+
+    def GetFile(self, request: GetFileRequest) -> GetFileResponse:
+        """Get a file."""
+        return self._unary_unary(
+            path="/v1/runtime/get-file",
+            rpc_method="/flwr.proto.Runtime/GetFile",
+            request=request,
+            response_type=GetFileResponse,
+        )
+
+    def ListFiles(self, request: ListFilesRequest) -> ListFilesResponse:
+        """List file metadata."""
+        return self._unary_unary(
+            path="/v1/runtime/list-files",
+            rpc_method="/flwr.proto.Runtime/ListFiles",
+            request=request,
+            response_type=ListFilesResponse,
+        )
+
+    def DeleteFile(self, request: DeleteFileRequest) -> DeleteFileResponse:
+        """Delete a file."""
+        return self._unary_unary(
+            path="/v1/runtime/delete-file",
+            rpc_method="/flwr.proto.Runtime/DeleteFile",
+            request=request,
+            response_type=DeleteFileResponse,
         )

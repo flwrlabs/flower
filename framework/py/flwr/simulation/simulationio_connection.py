@@ -26,6 +26,7 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 
 
 class SimulationIoConnection:
@@ -85,6 +86,7 @@ class SimulationIoConnection:
             insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[
+                RuntimeTracingInterceptor(),
                 RuntimeVersionHttpInterceptor(component_name="flwr-simulation"),
                 RuntimeTokenHttpInterceptor(token=self._token),
             ],

@@ -25,8 +25,7 @@ from httpx import Response
 from pytest import MonkeyPatch
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
+    AcquireTaskRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
 )
@@ -37,7 +36,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state, get_task
-from flwr.supercore.dependencies.runtime_version import RuntimeVersionDependency
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import (
@@ -45,13 +44,11 @@ from flwr.supercore.protobuf.translation import (
     ProtobufTranslationMiddleware,
 )
 from flwr.supercore.routers.runtime import router
-from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supernode.nodestate import NodeState
 from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
-    "/v1/runtime/pull-pending-tasks",
-    "/v1/runtime/claim-task",
+    "/v1/runtime/acquire-task",
 }
 
 
@@ -69,7 +66,7 @@ def _create_app(
         router,
         dependencies=[
             Depends(
-                RuntimeVersionDependency(
+                VersionDependency(
                     component_name="SuperNode",
                     connection_name="Caller <-> SuperNode Runtime API",
                 )
@@ -101,8 +98,8 @@ def test_runtime_route_rejects_incompatible_version() -> None:
     client = TestClient(_create_app(Mock(spec=NodeState)))
 
     response = client.post(
-        "/v1/runtime/claim-task",
-        content=ClaimTaskRequest(task_id=123).SerializeToString(),
+        "/v1/runtime/acquire-task",
+        content=AcquireTaskRequest().SerializeToString(),
         headers={
             "content-type": PROTOBUF_MEDIA_TYPE,
             FLWR_PACKAGE_NAME_METADATA_KEY: "flwr",
@@ -129,7 +126,6 @@ def test_all_runtime_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/runtime/")
     }
 
-    assert len(route_keys) == 20
     assert route_keys == runtime_request_types
 
 
@@ -143,22 +139,6 @@ def test_runtime_routes_declare_expected_security() -> None:
             assert security == []
         else:
             assert security == [{"RuntimeTaskToken": []}]
-
-
-def test_claim_task_delegates_to_shared_handler(monkeypatch: MonkeyPatch) -> None:
-    """ClaimTask translates protobuf payloads and calls the shared handler."""
-    state = Mock(spec=NodeState)
-    expected = ClaimTaskResponse(token="task-token")
-    handler = Mock(return_value=expected)
-    monkeypatch.setattr(core_runtime_handlers, "claim_task", handler)
-    client = TestClient(_create_app(state))
-    request = ClaimTaskRequest(task_id=123)
-
-    response = _post(client, "/v1/runtime/claim-task", request)
-
-    assert response.status_code == 200
-    assert ClaimTaskResponse.FromString(response.content) == expected
-    handler.assert_called_once_with(request, state)
 
 
 def test_pull_task_input_delegates_with_authenticated_task(
@@ -185,7 +165,11 @@ def test_superexec_route_rejects_unsigned_request_when_auth_is_enabled() -> None
     state = Mock(spec=NodeState)
     client = TestClient(_create_app(state, superexec_auth_secret=b"superexec-secret"))
 
-    response = _post(client, "/v1/runtime/claim-task", ClaimTaskRequest(task_id=123))
+    response = _post(
+        client,
+        "/v1/runtime/acquire-task",
+        AcquireTaskRequest(supported_task_types=["flwr-serverapp"]),
+    )
 
     assert response.status_code == 401
     assert response.json() == {

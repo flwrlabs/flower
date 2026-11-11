@@ -20,7 +20,36 @@ from typing import Any
 
 from uvicorn.logging import AccessFormatter, DefaultFormatter
 
-ROUTINE_ACCESS_PATHS = frozenset({"/health", "/v1/runtime/pull-pending-tasks"})
+ROUTINE_ACCESS_PATHS = frozenset(
+    {
+        "/health",
+        "/v1/fleet/confirm-message-received",
+        "/v1/fleet/pull-messages",
+        "/v1/fleet/pull-object",
+        "/v1/fleet/push-messages",
+        "/v1/fleet/push-object",
+        "/v1/fleet/send-node-heartbeat",
+        "/v1/runtime/confirm-message-received",
+        "/v1/runtime/delete-file",
+        "/v1/runtime/get-file",
+        "/v1/runtime/get-nodes",
+        "/v1/runtime/get-run-series-events",
+        "/v1/runtime/get-space-events",
+        "/v1/runtime/list-files",
+        "/v1/runtime/acquire-task",
+        "/v1/runtime/pull-task-message",
+        "/v1/runtime/push-logs",
+        "/v1/runtime/push-messages",
+        "/v1/runtime/push-object",
+        "/v1/runtime/push-task-events",
+        "/v1/runtime/push-task-message",
+        "/v1/runtime/put-file",
+        "/v1/runtime/record-task-usage",
+        "/v1/runtime/send-task-heartbeat",
+        "/v1/runtime/pull-messages",
+        "/v1/runtime/pull-object",
+    }
+)
 LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 UVICORN_DEFAULT_LOG_FORMAT = "%(levelprefix)s %(message)s"

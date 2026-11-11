@@ -66,7 +66,7 @@ The model-facing arguments are:
 
 | Argument         | Required | Meaning                                                          |
 | ---------------- | -------- | ---------------------------------------------------------------- |
-| `input`          | Yes      | `agent.input` for every scheduled run                            |
+| `input`          | Yes      | Prompt for every scheduled run                                   |
 | `start_at`       | Yes      | First run time as an ISO 8601/RFC 3339 timestamp with a timezone |
 | `fixed_interval` | No       | Seconds between recurring runs, omitted for one execution        |
 | `max_runs`       | No       | Maximum executions, valid only with `fixed_interval`             |
@@ -99,9 +99,9 @@ requested one and understands how to stop it.
 
 ## Understand automation scope
 
-The 1.35.0 runtime builds scheduled runs from the current run request. It keeps
-the automation's runs in the current run series and federation and replaces
-`agent.input` with the scheduled `input`.
+The {{ stable_flwr_version }} runtime builds scheduled runs from the current run request. It keeps
+the automation's runs in the current run series and federation and uses the
+scheduled `input` as each run's `agent.prompt`.
 
 Before relying on an automation, confirm that it appears under the expected
 federation and run series. If it uses an account connector, verify that the
@@ -151,7 +151,7 @@ already started. Stop that run separately from its run details or with
 `flwr stop <run-id> supergrid`.
 
 There is no public CLI command for listing or stopping automations in Flower
-1.35.0. Use the automation list in SuperGrid.
+{{ stable_flwr_version }}. Use the automation list in SuperGrid.
 
 ## Recover from a failed schedule
 

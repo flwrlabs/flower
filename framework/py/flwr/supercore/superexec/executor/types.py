@@ -36,6 +36,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     parent_pid: int | None
     suppress_output: bool
     task_id: int
+    fab_hash: str | None = None
 
     def __post_init__(self) -> None:
         """Validate fields required by all executors."""
@@ -92,10 +93,20 @@ class Executor(Protocol):
     the responsibility of the Runtime API.
     """
 
+    def get_eligible_capacity(
+        self,
+        supported_task_types: set[TaskType],
+        *,
+        insecure: bool = False,
+        root_certificates_path: str | None = None,
+    ) -> tuple[set[TaskType], set[str]]:
+        """Return task types and FABs with capacity for acquisition."""
+
     def wait_for_capacity(
         self,
         task_type: TaskType | None = None,
         *,
+        fab_hash: str | None = None,
         insecure: bool = False,
         root_certificates_path: str | None = None,
     ) -> None:
@@ -105,7 +116,7 @@ class Executor(Protocol):
         """Start the TaskExecutor process described by the execution spec."""
 
     def reconcile(self) -> None:
-        """Maintain executor-owned resources between task polls."""
+        """Start executor-owned maintenance before task polling."""
 
     def close(self) -> None:
         """Release executor-owned resources during SuperExec shutdown."""

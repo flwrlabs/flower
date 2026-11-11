@@ -34,18 +34,13 @@ from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
 from flwr.app.user_config import UserConfig
 from flwr.common.args import (
+    add_args_removed_health_server,
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
     try_obtain_server_certificates,
 )
 from flwr.common.config import parse_config_args
-from flwr.common.constant import (
-    FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-    ISOLATION_MODE_PROCESS,
-    ISOLATION_MODE_SUBPROCESS,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
-    TRANSPORT_TYPE_GRPC_RERE,
-)
+from flwr.common.constant import ISOLATION_MODE_PROCESS, ISOLATION_MODE_SUBPROCESS
 from flwr.supercore import log
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
@@ -53,11 +48,11 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import (
     HTTP_SERVER_SHUTDOWN_TIMEOUT,
+    SUPERLINK_DEFAULT_CLIENT_ADDRESS,
     SUPERNODE_UVICORN_DEFAULT_PORT,
     UVICORN_DEFAULT_HOST,
 )
 from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
-from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.logger import console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
@@ -72,7 +67,6 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to start the SuperNode lifespan."""
 
     server_address: str
-    transport: str
     root_certificates: bytes | str | None
     insecure: bool
     authentication_keys: (
@@ -84,7 +78,6 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
     isolation: str
     runtime_certificates: tuple[bytes, bytes, bytes] | None
     runtime_root_certificates_path: str | None
-    health_server_address: str | None
     trusted_entities: dict[str, str] | None
     superexec_auth_secret: bytes | None
     runtime_dependency_install: bool
@@ -135,16 +128,8 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
                 f"Failed to load SuperExec auth secret: {err}",
             )
 
-    # Warn if authentication keys are provided but transport is not grpc-rere
-    if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
-        log(
-            WARN,
-            "SuperNode Authentication is only supported with the grpc-rere transport.",
-        )
-
     return SuperNodeLifespanConfig(
         server_address=args.superlink,
-        transport=args.transport,
         root_certificates=root_certificates,
         insecure=args.insecure,
         authentication_keys=authentication_keys,
@@ -160,7 +145,6 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
             if runtime_certificates is not None
             else None
         ),
-        health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
         runtime_dependency_install=args.runtime_dependency_install,
@@ -213,7 +197,6 @@ def flower_supernode() -> None:
     start_client_internal(
         state_factory=state_factory,
         server_address=config.server_address,
-        transport=config.transport,
         root_certificates=config.root_certificates,
         insecure=config.insecure,
         authentication_keys=config.authentication_keys,
@@ -224,7 +207,6 @@ def flower_supernode() -> None:
         runtime_api_address=f"{runtime_host}:{config.port}",
         runtime_certificates=config.runtime_certificates,
         runtime_root_certificates_path=config.runtime_root_certificates_path,
-        health_server_address=config.health_server_address,
         trusted_entities=config.trusted_entities,
         superexec_auth_secret=config.superexec_auth_secret,
         runtime_dependency_install=config.runtime_dependency_install,
@@ -364,7 +346,7 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_runtime_dependency_install(parser)
-    add_args_health(parser)
+    add_args_removed_health_server(parser)
 
     return parser
 
@@ -411,22 +393,6 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         help="Run the client without HTTPS. By default, the client runs with "
         "HTTPS enabled. Use this flag only if you understand the risks.",
     )
-    ex_group = parser.add_mutually_exclusive_group()
-    ex_group.add_argument(
-        "--grpc-rere",
-        action="store_const",
-        dest="transport",
-        const=TRANSPORT_TYPE_GRPC_RERE,
-        default=TRANSPORT_TYPE_GRPC_RERE,
-        help="Use grpc-rere as a transport layer for the client.",
-    )
-    ex_group.add_argument(
-        "--grpc-adapter",
-        action="store_const",
-        dest="transport",
-        const=TRANSPORT_TYPE_GRPC_ADAPTER,
-        help="Use grpc-adapter as a transport layer for the client.",
-    )
     parser.add_argument(
         "--root-certificates",
         metavar="ROOT_CERT",
@@ -436,8 +402,9 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--superlink",
-        default=FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
-        help="SuperLink Fleet API address (IPv4, IPv6, or a domain name).",
+        default=SUPERLINK_DEFAULT_CLIENT_ADDRESS,
+        help="SuperLink Fleet API address as host:port (IPv4, IPv6, or a domain "
+        "name), without a URL prefix. HTTPS is enabled by default.",
     )
     parser.add_argument(
         "--max-retries",

@@ -22,14 +22,18 @@ from flwr.supercore import log
 from flwr.supercore.constant import ExecutorType, TaskType
 
 from .config import ExecutorConfig
-from .kubernetes_executor import (
-    KubernetesExecutor,
+from .kubernetes_executor import KubernetesExecutor
+from .kubernetes_resources import (
     KubernetesExecutorConfig,
     create_incluster_kubernetes_clients,
 )
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
-from .warm_executor_pool import WarmExecutorPoolConfig, WarmExecutorPoolKey
+from .warm_executor_pool import (
+    WARM_EXECUTOR_TASK_TYPES,
+    WarmExecutorPoolConfig,
+    WarmExecutorPoolKey,
+)
 
 _KUBERNETES_CONFIG_FIELD_MAP = {
     "image-pull-policy": "image_pull_policy",
@@ -51,6 +55,7 @@ _KUBERNETES_CONFIG_FIELD_MAP = {
     "container-security-context": "container_security_context",
     "service-account-name": "service_account_name",
     "warm-executor-owner": "warm_executor_owner",
+    "log-warm-executor-output": "log_warm_executor_output",
 }
 
 
@@ -83,13 +88,14 @@ def get_executor(
             # Retain the owner so reconciliation can clean up surviving idle Pods.
             config.warm_executor_pools = ()
         try:
-            client, exec_client = create_incluster_kubernetes_clients()
+            client, exec_client, probe_client = create_incluster_kubernetes_clients()
         except RuntimeError as err:
             raise ValueError(str(err)) from err
         return KubernetesExecutor(
             client=client,
             config=config,
             exec_client=exec_client,
+            probe_client=probe_client,
         )
 
     raise ValueError(f"Unsupported executor selection: {executor_type}")
@@ -154,7 +160,7 @@ def _read_runtime_root_certificates(path_value: str) -> str:
 def _warm_executor_pools_from_config(
     value: object, runtime_image: str
 ) -> tuple[WarmExecutorPoolConfig, ...]:
-    """Parse AgentApp-only warm-executor pools from trusted executor YAML."""
+    """Parse typed warm-executor pools from trusted executor YAML."""
     if not isinstance(value, list):
         raise ValueError(
             "Kubernetes executor config field 'warm-executor-pools' must be a list."
@@ -164,16 +170,29 @@ def _warm_executor_pools_from_config(
     for entry in value:
         if not isinstance(entry, dict):
             raise ValueError("Warm executor pool entries must be mappings.")
+        if entry.get("task-type") == "flwr-model":
+            log(WARNING, "Ignoring obsolete flwr-model warm executor pool.")
+            continue
         allowed_fields = {
+            "fab-hash",
+            "fab-path",
             "task-type",
             "size",
         }
         if set(entry) - allowed_fields:
             raise ValueError("Warm executor pool entries contain an unknown field.")
 
-        if entry.get("task-type") != TaskType.AGENT_APP.value:
+        task_type_value = entry.get("task-type")
+        try:
+            task_type = (
+                TaskType(task_type_value) if isinstance(task_type_value, str) else None
+            )
+        except ValueError:
+            task_type = None
+        if task_type not in WARM_EXECUTOR_TASK_TYPES:
             raise ValueError(
-                "Warm executor pools support only task-type 'flwr-agentapp'."
+                "Warm executor pools support only task types 'flwr-agentapp' "
+                "and 'flwr-connector'."
             )
         size = entry.get("size")
         if isinstance(size, bool) or not isinstance(size, int):
@@ -182,8 +201,10 @@ def _warm_executor_pools_from_config(
         pools.append(
             WarmExecutorPoolConfig(
                 key=WarmExecutorPoolKey(
-                    task_type=TaskType.AGENT_APP,
+                    task_type=task_type,
                     runtime_image=runtime_image,
+                    fab_hash=entry.get("fab-hash"),
+                    fab_path=entry.get("fab-path"),
                 ),
                 size=size,
             )
@@ -191,5 +212,5 @@ def _warm_executor_pools_from_config(
 
     keys = [pool.key for pool in pools]
     if len(keys) != len(set(keys)):
-        raise ValueError("Warm executor pools must not repeat a compatibility key.")
+        raise ValueError("Warm executor pools must not repeat a routed identity.")
     return tuple(pools)

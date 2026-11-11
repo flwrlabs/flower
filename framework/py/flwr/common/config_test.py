@@ -27,8 +27,10 @@ import pytest
 from flwr.app.user_config import UserConfig
 
 from .config import (
+    AppMetadata,
     flatten_dict,
     fuse_dicts,
+    get_app_presentation_metadata,
     get_project_config,
     get_project_dir,
     parse_config_args,
@@ -39,6 +41,41 @@ from .config import (
 
 # Mock constants
 FAB_CONFIG_FILE = "pyproject.toml"
+
+
+def test_get_app_presentation_metadata() -> None:
+    """Extract non-empty app presentation metadata from project config."""
+    config = {
+        "project": {"description": "Demo agent"},
+        "tool": {
+            "flwr": {
+                "app": {
+                    "display-name": "Demo Agent",
+                    "color": "sky",
+                }
+            }
+        },
+    }
+
+    assert get_app_presentation_metadata(config) == AppMetadata(
+        display_name="Demo Agent",
+        description="Demo agent",
+        color="sky",
+    )
+
+
+def test_get_app_presentation_metadata_ignores_invalid_values() -> None:
+    """Return None for absent, empty, or non-string presentation metadata."""
+    config = {
+        "project": {"description": ""},
+        "tool": {"flwr": {"app": {"display-name": 1}}},
+    }
+
+    assert get_app_presentation_metadata(config) == AppMetadata(
+        display_name=None,
+        description=None,
+        color=None,
+    )
 
 
 def test_get_project_dir_invalid_fab_id() -> None:

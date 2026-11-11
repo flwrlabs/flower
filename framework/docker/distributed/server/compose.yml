@@ -1,6 +1,6 @@
 services:
   superlink:
-    image: flwr/superlink:${FLWR_VERSION:-1.37.0}
+    image: flwr/superlink:${FLWR_VERSION:-1.44.0}
     command:
       - --isolation
       - process
@@ -22,14 +22,13 @@ services:
       - source: superlink-keyfile
         target: /app/certificates/server.key
     ports:
-      - 9092:9092
       - 8000:8000
 
   superexec-serverapp:
     build:
       context: ${PROJECT_DIR:-.}
       dockerfile_inline: |
-        FROM flwr/superexec:${FLWR_VERSION:-1.37.0}
+        FROM flwr/superexec:${FLWR_VERSION:-1.44.0}
 
         WORKDIR /app
         COPY --chown=app:app pyproject.toml LICENSE* ./
@@ -40,8 +39,6 @@ services:
     command:
       - --root-certificates
       - certificates/superlink-ca.crt
-      - --plugin-type
-      - serverapp
       - --runtime-api-address
       - superlink:8000
     secrets:

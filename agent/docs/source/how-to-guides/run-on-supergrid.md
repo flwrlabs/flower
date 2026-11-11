@@ -1,11 +1,11 @@
 # Run an AgentApp on SuperGrid
 
-Submit an AgentApp, choose its federation, follow progress, inspect logs, and
-stop the run when necessary.
+Run a local or downloaded AgentApp in Flower Chat, then inspect or stop its
+SuperGrid runs.
 
 Start with [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md) if you do not have a valid
-AgentApp project. This guide targets Flower 1.35.0.
+AgentApp project. This guide targets Flower {{ stable_flwr_version }}.
 
 To run the same app without SuperGrid, see [Run an AgentApp with a local
 SuperLink](run-with-local-superlink.md).
@@ -14,16 +14,31 @@ SuperLink](run-with-local-superlink.md).
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and log in:
 
-```console
-$ uvx --from flwr==1.35.0 flwr login supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
 ```
 
-Use `uvx --from flwr==1.35.0` for standalone commands. Use `uv run flwr` for
-commands that must load the local project environment.
+Use {substitution-code}`uvx --from flwr==|stable_flwr_version|` for standalone
+commands. Use `uv run flwr` for commands that must load the local project
+environment.
 
-## Validate before submission
+(get-an-agentapp-project)=
 
-From the project directory:
+## Get an AgentApp project
+
+Use a local AgentApp project, or browse [Flower Hub](https://flower.ai/apps)
+and select **Agent** under **Types** to find one to download:
+
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr new '@<publisher>/<agent>'
+```
+
+The command creates a local project directory. Use its path when loading the
+app in Flower Chat. To check a project before chatting, run from its directory:
 
 ```console
 $ uv sync
@@ -33,83 +48,56 @@ $ uv run flwr build
 Fix configuration, dependency, and component-reference errors locally before
 starting a remote run.
 
-## Run a local AgentApp project
+(load-an-agentapp-in-flower-chat)=
+
+## Load and chat with the AgentApp
+
+From an existing project directory, start Flower Chat with the project's Flower
+installation:
 
 ```console
-$ uv run flwr run . supergrid --stream
+$ uv run flwr chat
 ```
 
-Flower builds the project, submits the FAB, prints a run ID, and streams process
-logs. Override a declared configuration value for one run:
+For a downloaded project, you can start Flower Chat outside its directory with
+the documented Flower version:
 
-```console
-$ uv run flwr run . supergrid \
-    --run-config 'agent.input="Compare federated and centralized AI."' \
-    --stream
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr chat
 ```
 
-An override key must already exist under `[tool.flwr.app.config]`.
+At the chat prompt, load the project and send a message:
 
-For longer overrides, create `run-config.toml`:
-
-```toml
-[agent]
-input = "Compare federated and centralized AI."
+```text
+/load <path-to-app>
+Explain Flower Agent in one sentence.
 ```
 
-Then run:
+Use `/load .` when you started chat in the project directory. The path is
+resolved relative to the directory where you started Flower Chat; quote paths
+with spaces.
 
-```console
-$ uv run flwr run . supergrid --run-config run-config.toml --stream
-```
+Flower builds the app when you load it and sends each message as a run. Continue
+chatting at the prompt. Changes to the local app are rebuilt before the next
+message. If a build fails, the previous build stays selected.
 
-Do not combine a TOML run-config file and inline run-config values.
-
-## Run a published agent
-
-After you [find or publish an AgentApp on Flower Hub](use-flower-hub.md), use
-its app spec instead of a local directory:
-
-```console
-$ uvx --from flwr==1.35.0 flwr run @publisher/agent supergrid \
-    --run-config 'agent.input="Explain your task."'
-```
-
-SuperGrid resolves the app spec to an available version of the app. Availability
-can depend on the target federation.
-
-## Choose a federation
-
-List the federations visible to your account:
-
-```console
-$ uvx --from flwr==1.35.0 flwr federation list supergrid
-```
-
-Without `--federation`, SuperGrid uses the account default. To choose another
-federation, use its full ID:
-
-```console
-$ uv run flwr run . supergrid \
-    --federation @account/federation-name \
-    --run-config 'agent.input="Hello from this federation."'
-```
-
-The account must be a member and entitled to execute AgentApps there.
-
-```{important}
-Slack, Notion, GitHub, and Attio connector references are currently accepted
-only for personal-workspace runs. Built-in tools selected by the AgentApp do not
-use the account-connector selection flow.
+```{tip}
+To switch federations or select an assigned agent, see [Use agents and
+federations](use-agents-and-federations.md).
 ```
 
 ## Observe the run
 
-Use the printed run ID:
+The response and supported activity stream into Flower Chat. If you have a run
+ID, inspect the run from the CLI:
 
-```console
-$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
 
 `flwr log` streams by default. Use `--show` to print the available logs once.
@@ -122,8 +110,13 @@ is active.
 
 ## Stop a run
 
-```console
-$ uvx --from flwr==1.35.0 flwr stop <run-id> supergrid
+Press {kbd}`Ctrl+C` during a Flower Chat run to request that it stop. If you
+have its run ID, you can also use:
+
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr stop <run-id> supergrid
 ```
 
 Wait for the run to reach a stopped terminal state before submitting a
@@ -139,10 +132,12 @@ agent catalog, connector, heartbeat, interruption, and stuck-run recovery.
 
 For a custom app, start with:
 
-```console
+```{code-block} console
+:substitutions:
+
 $ uv run flwr build
-$ uvx --from flwr==1.35.0 flwr list --run-id <run-id> supergrid
-$ uvx --from flwr==1.35.0 flwr log <run-id> supergrid --show
+$ uvx --from flwr==|stable_flwr_version| flwr list --run-id <run-id> supergrid
+$ uvx --from flwr==|stable_flwr_version| flwr log <run-id> supergrid --show
 ```
 
 Keep the run ID, series ID when visible, federation ID, app spec, Flower

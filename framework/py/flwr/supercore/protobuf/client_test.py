@@ -24,11 +24,13 @@ import httpx
 import pytest
 
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
+    AcquireTaskRequest,
+    AcquireTaskResponse,
 )
 from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.interceptors import (
+    FlowerErrorHttpInterceptor,
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
@@ -42,10 +44,10 @@ from flwr.supercore.retry import make_simple_http_retry_invoker
 
 from .client import ProtobufCall, ProtobufClient, ProtobufRequestContext
 
-_PATH = "/v1/runtime/claim-task"
-_METHOD = "/flwr.proto.Runtime/ClaimTask"
-_REQUEST = ClaimTaskRequest(task_id=123)
-_RESPONSE = ClaimTaskResponse(token="task-token")
+_PATH = "/v1/runtime/acquire-task"
+_METHOD = "/flwr.proto.Runtime/AcquireTask"
+_REQUEST = AcquireTaskRequest(supported_task_types=["flwr-agentapp"])
+_RESPONSE = AcquireTaskResponse(token="task-token")
 
 
 def _response(status_code: int, content: bytes = b"") -> httpx.Response:
@@ -57,23 +59,23 @@ def _response(status_code: int, content: bytes = b"") -> httpx.Response:
     )
 
 
-def _call(client: ProtobufClient) -> ClaimTaskResponse:
+def _call(client: ProtobufClient) -> AcquireTaskResponse:
     """Call one representative unary protobuf operation."""
     return client._unary_unary(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
-        response_type=ClaimTaskResponse,
+        response_type=AcquireTaskResponse,
     )
 
 
-def _stream_call(client: ProtobufClient) -> Generator[ClaimTaskResponse, None, None]:
+def _stream_call(client: ProtobufClient) -> Generator[AcquireTaskResponse, None, None]:
     """Call one representative streaming protobuf operation."""
     return client._unary_stream(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
-        response_type=ClaimTaskResponse,
+        response_type=AcquireTaskResponse,
     )
 
 
@@ -100,6 +102,25 @@ def test_unary_unary_sends_and_receives_protobuf() -> None:
     assert http_request.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert http_request.headers["accept"] == PROTOBUF_MEDIA_TYPE
     assert send.call_args.kwargs == {}
+
+
+def test_unary_unary_overrides_timeout() -> None:
+    """Allow heartbeat calls to use a shorter timeout than other RPCs."""
+    with patch(
+        "flwr.supercore.protobuf.client.httpx.Client.send",
+        return_value=_response(200, _RESPONSE.SerializeToString()),
+    ) as send:
+        # pylint: disable=protected-access
+        ProtobufClient("https://api.example", timeout=30.0)._unary_unary(
+            path=_PATH,
+            rpc_method=_METHOD,
+            request=_REQUEST,
+            response_type=AcquireTaskResponse,
+            timeout=5.0,
+        )
+        # pylint: enable=protected-access
+
+    assert send.call_args.args[0].extensions["timeout"]["read"] == 5.0
 
 
 def test_configures_http_client() -> None:
@@ -131,7 +152,7 @@ def test_unary_unary_normalizes_path() -> None:
             path=_PATH.removeprefix("/"),
             rpc_method=_METHOD,
             request=_REQUEST,
-            response_type=ClaimTaskResponse,
+            response_type=AcquireTaskResponse,
         )
 
     assert str(send.call_args.args[0].url) == f"http://api.example{_PATH}"
@@ -150,7 +171,8 @@ def test_unary_unary_raises_for_http_error() -> None:
         _call(ProtobufClient("http://api.example"))
 
 
-def test_unary_unary_uses_retry_invoker() -> None:
+@pytest.mark.parametrize("translate_errors", [False, True])
+def test_unary_unary_uses_retry_invoker(translate_errors: bool) -> None:
     """Retry a transient HTTP response before parsing the protobuf response."""
     retry_invoker = make_simple_http_retry_invoker()
     retry_invoker.max_tries = 2
@@ -164,6 +186,7 @@ def test_unary_unary_uses_retry_invoker() -> None:
         result = _call(
             ProtobufClient(
                 "http://api.example",
+                interceptors=[FlowerErrorHttpInterceptor()] if translate_errors else [],
                 retry_invoker=retry_invoker,
             )
         )
@@ -227,10 +250,37 @@ def _stream_response(status_code: int, chunks: list[bytes]) -> httpx.Response:
     )
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_flower_error_interceptor(stream: bool) -> None:
+    """Restore structured errors through unary and streaming client calls."""
+    response = _stream_response(
+        409,
+        [b'{"code": 3017, "detail": "File revision conflict."}'],
+    )
+    with (
+        ProtobufClient(
+            "http://api.example", interceptors=[FlowerErrorHttpInterceptor()]
+        ) as client,
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send", return_value=response
+        ),
+        pytest.raises(FlowerError) as caught,
+    ):
+        if stream:
+            list(_stream_call(client))
+        else:
+            response.read()
+            _call(client)
+
+    assert caught.value.code == ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+    assert caught.value.message == "File revision conflict."
+    assert response.is_closed
+
+
 def test_unary_stream_sends_and_receives_framed_protobuf() -> None:
     """Decode messages split across arbitrary HTTP response chunks."""
-    first = ClaimTaskResponse(token="first")
-    second = ClaimTaskResponse(token="second")
+    first = AcquireTaskResponse(token="first")
+    second = AcquireTaskResponse(token="second")
     content = frame_message(first) + frame_message(second)
     response = _stream_response(
         200,
@@ -323,8 +373,8 @@ def test_unary_stream_closes_response_when_iteration_stops() -> None:
     response = _stream_response(
         200,
         [
-            frame_message(ClaimTaskResponse(token="first")),
-            frame_message(ClaimTaskResponse(token="second")),
+            frame_message(AcquireTaskResponse(token="first")),
+            frame_message(AcquireTaskResponse(token="second")),
         ],
     )
     with patch(
@@ -427,7 +477,7 @@ def test_unary_stream_retries_only_before_returning_response() -> None:
     invalid_stream = _stream_response(
         200,
         [
-            frame_message(ClaimTaskResponse(token="first")),
+            frame_message(AcquireTaskResponse(token="first")),
             len(b"invalid").to_bytes(4, "big") + b"invalid",
         ],
     )

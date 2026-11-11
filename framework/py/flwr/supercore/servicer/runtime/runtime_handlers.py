@@ -17,6 +17,7 @@
 # pylint: disable=unused-argument
 
 from logging import DEBUG, ERROR
+from uuid import UUID
 
 from flwr.common.constant import Status
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -25,18 +26,30 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
+    GetCompactedContextsRequest,
+    GetCompactedContextsResponse,
+    GetFileRequest,
+    GetFileResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
     PushTaskEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
+    PutCompactedContextRequest,
+    PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
@@ -45,10 +58,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import (
+    TASK_TYPE_TO_COMMAND,
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
-    TASK_TYPES_REQUIRING_MODEL_REF,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -56,24 +69,91 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
-def pull_pending_tasks(
-    request: PullPendingTasksRequest, state: CoreState
-) -> PullPendingTasksResponse:
-    """Pull pending tasks."""
-    log(DEBUG, "Runtime.PullPendingTasks")
+def get_space_events(
+    request: GetSpaceEventsRequest, state: CoreState, space_id: UUID
+) -> GetSpaceEventsResponse:
+    """Get locally stored events for a Space."""
+    log(DEBUG, "Runtime.GetSpaceEvents")
+    events = state.get_task_events(
+        space_id=space_id,
+        after_task_event_id=(
+            request.after_event_id if request.HasField("after_event_id") else None
+        ),
+        before_task_event_id=(
+            request.before_event_id if request.HasField("before_event_id") else None
+        ),
+        last_n=request.last_n or None,
+    )
+    return GetSpaceEventsResponse(events=events)
+
+
+def get_compacted_contexts(
+    request: GetCompactedContextsRequest, state: CoreState, series_id: int
+) -> GetCompactedContextsResponse:
+    """Get compacted contexts for the authenticated task's series."""
+    limit = request.limit if request.HasField("limit") else 1
+    if limit == 0:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+            "Limit must be positive.",
+        )
+    contexts = state.get_compacted_contexts(
+        series_id,
+        limit=limit,
+        before_context_id=(
+            request.before_context_id if request.HasField("before_context_id") else None
+        ),
+    )
+    return GetCompactedContextsResponse(contexts=contexts)
+
+
+def put_compacted_context(
+    request: PutCompactedContextRequest, state: CoreState, series_id: int
+) -> PutCompactedContextResponse:
+    """Store a compacted context in the authenticated task's series."""
+    if not request.HasField("context") or not request.context.text:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+            "Compacted context text is required.",
+        )
+    context = request.context
+    if context.series_id and context.series_id != series_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
+            "Compacted context series does not match the authenticated task.",
+        )
+    try:
+        state.store_compacted_context(
+            series_id,
+            context.through_event_id,
+            context.text,
+            context.token_count,
+        )
+    except ValueError as exc:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
+            f"Compacted context already exists for series {series_id} "
+            f"and event {context.through_event_id}.",
+        ) from exc
+    return PutCompactedContextResponse()
+
+
+def acquire_task(request: AcquireTaskRequest, state: CoreState) -> AcquireTaskResponse:
+    """Claim the oldest pending task matching the executor's available capacity."""
+    log(DEBUG, "Runtime.AcquireTask")
+    supported_types = set(request.supported_task_types)
+    agentapp_fab_hashes = set(request.agentapp_fab_hashes)
+    if not supported_types and not agentapp_fab_hashes:
+        return AcquireTaskResponse()
 
     tasks = state.get_tasks(
         statuses=[Status.PENDING], order_by="pending_at", ascending=True
     )
-    return PullPendingTasksResponse(tasks=tasks)
-
-
-def claim_task(request: ClaimTaskRequest, state: CoreState) -> ClaimTaskResponse:
-    """Claim a pending task."""
-    log(DEBUG, "Runtime.ClaimTask")
-
-    token = state.claim_task(request.task_id)
-    return ClaimTaskResponse(token=token)
+    for task in tasks:
+        eligible = task.type in supported_types or task.fab_hash in agentapp_fab_hashes
+        if eligible and (token := state.claim_task(task.task_id)):
+            return AcquireTaskResponse(task=task, token=token)
+    return AcquireTaskResponse()
 
 
 def send_task_heartbeat(
@@ -100,13 +180,17 @@ def create_task(
 
     connector_ref = request.connector_ref or None
 
-    _validate_create_task_request(request, task, connector_ref, state)
+    _validate_create_task_request(request, task, connector_ref)
+    connector_id = None
+    if request.type == TaskType.CONNECTOR and connector_ref:
+        connector_id = _resolve_connector_id(task, connector_ref, state)
     created_task_id = state.create_task(
         task_type=request.type,
         run_id=run_id,
         fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
         model_ref=request.model_ref if request.HasField("model_ref") else None,
         connector_ref=connector_ref,
+        connector_id=connector_id,
         requesting_task_id=task.task_id,
     )
     if created_task_id is None:
@@ -215,11 +299,34 @@ def push_logs(
     return PushLogsResponse()
 
 
+def put_file(request: PutFileRequest, state: CoreState, task: Task) -> PutFileResponse:
+    """Store a file."""
+    raise NotImplementedError
+
+
+def get_file(request: GetFileRequest, state: CoreState, task: Task) -> GetFileResponse:
+    """Get a file."""
+    raise NotImplementedError
+
+
+def list_files(
+    request: ListFilesRequest, state: CoreState, task: Task
+) -> ListFilesResponse:
+    """List file metadata."""
+    raise NotImplementedError
+
+
+def delete_file(
+    request: DeleteFileRequest, state: CoreState, task: Task
+) -> DeleteFileResponse:
+    """Delete a file."""
+    raise NotImplementedError
+
+
 def _validate_create_task_request(
     request: CreateTaskRequest,
     requesting_task: Task,
     connector_ref: str | None,
-    state: CoreState,
 ) -> None:
     """Validate the task creation request."""
     if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
@@ -228,7 +335,7 @@ def _validate_create_task_request(
             f"Task type '{requesting_task.type}' is not allowed to create tasks.",
         )
 
-    if request.type not in set(TaskType):
+    if request.type not in TASK_TYPE_TO_COMMAND:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Invalid task type: {request.type}",
@@ -240,32 +347,41 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
-            f"Task type '{request.type}' requires model_ref.",
-        )
-
     if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires connector_ref.",
         )
 
-    # Check if the connector ref is valid
+    # Check if the connector ref is valid.
     if request.type == TaskType.CONNECTOR and connector_ref:
-
         if connector_registry.has_builtin_connector(connector_ref):
             return
 
         try:
-            connector_registry.get_oauth_flow(connector_ref)
+            connector_registry.get_connector_tools(connector_ref)
         except ValueError as err:
             raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, str(err)) from err
 
-        available_refs = state.get_run_connector_refs(run_id=requesting_task.run_id)
-        if connector_ref not in available_refs:
-            raise FlowerError(
-                ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-                "Connector is not available to this run.",
-            )
+
+def _resolve_connector_id(
+    requesting_task: Task,
+    connector_ref: str,
+    state: CoreState,
+) -> int | None:
+    """Resolve the connector ID for a connector task."""
+    if connector_registry.has_builtin_connector(connector_ref):
+        return None
+
+    matching_ids = [
+        connector_id
+        for connector_id in state.get_run_connector_ids(requesting_task.run_id)
+        if (connector := state.get_connector_by_id(connector_id)) is not None
+        and connector.connector_ref == connector_ref
+    ]
+    if len(matching_ids) != 1:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
+            "Connector is not available to this run.",
+        )
+    return matching_ids[0]

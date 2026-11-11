@@ -18,6 +18,7 @@
 import threading
 import time
 import unittest
+from collections.abc import Iterable
 from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import Mock, patch
@@ -28,10 +29,12 @@ from parameterized import parameterized
 from flwr.app import RecordDict
 from flwr.app.error import Error
 from flwr.app.message import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
+    GetNodesResponse,
     PullAppMessagesRequest,
     PushAppMessagesRequest,
 )
@@ -45,6 +48,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
 )
 from flwr.supercore.run import Run
+from flwr.supercore.task_identity import TaskIdentity
 
 from .http_grid import HttpGrid
 
@@ -64,6 +68,14 @@ class TestHttpGrid(unittest.TestCase):
         self.grid = HttpGrid(token="test-token")
         self.grid._client = self.mock_client  # pylint: disable=protected-access
         self.grid.set_run(self.mock_run)
+        identity_patcher = patch.multiple(
+            TaskIdentity,
+            _task_id=123,
+            _run_id=self.mock_run.run_id,
+            _node_id=SUPERLINK_NODE_ID,
+        )
+        identity_patcher.start()
+        self.addCleanup(identity_patcher.stop)
 
     def test_init_http_grid(self) -> None:
         """Test Runtime HTTP client initialization."""
@@ -77,29 +89,31 @@ class TestHttpGrid(unittest.TestCase):
     def test_get_nodes(self) -> None:
         """Test retrieval of nodes."""
         # Prepare
-        mock_response = Mock()
-        mock_response.nodes = [Mock(node_id=404), Mock(node_id=200)]
+        mock_response = GetNodesResponse(
+            nodes=[
+                NodeInfo(node_id=404, name="London", location="51.5072,-0.1276"),
+                NodeInfo(node_id=200),
+            ]
+        )
         self.mock_client.GetNodes.return_value = mock_response
 
         # Execute
-        node_ids = self.grid.get_node_ids()
+        nodes = list(self.grid.get_nodes())
         args, kwargs = self.mock_client.GetNodes.call_args
 
         # Assert
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
-        self.assertEqual(node_ids, [404, 200])
+        self.assertEqual([node.node_id for node in nodes], [404, 200])
+        self.assertEqual(nodes[0].name, "London")
+        self.assertEqual(nodes[0].location, "51.5072,-0.1276")
 
     def _prep_message(self, message: Message) -> Message:
         # We need to be able to specify the actual object IDs
         # in the mocked responses, due to this we need to set
         # elements in the metadata that would be normally be
         # set when pushing a message.
-        # pylint: disable-next=W0212
-        message.metadata._run_id = 61016  # type: ignore
-        # pylint: disable-next=W0212
-        message.metadata._src_node_id = SUPERLINK_NODE_ID  # type: ignore
         message.metadata.__dict__["_message_id"] = message.object_id
         return message
 
@@ -175,12 +189,54 @@ class TestHttpGrid(unittest.TestCase):
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], PullAppMessagesRequest)
-        self.assertEqual(args[0].message_ids, [ins1.object_id, ins2.object_id])
+        self.assertTrue(args[0].HasField("reply_to_message_ids"))
+        self.assertEqual(
+            args[0].reply_to_message_ids.vals, [ins1.object_id, ins2.object_id]
+        )
         self.assertEqual(msgs[0].metadata, ok_msg.metadata)
         self.assertEqual(msgs[0].content, ok_msg.content)
         self.assertEqual(msgs[1].metadata, err_msg.metadata)
         self.assertEqual(msgs[1].error, err_msg.error)
         self.assertEqual(self.mock_client.PullObject.call_count, len(obj_store))
+
+    @parameterized.expand(  # type: ignore
+        [
+            (None, None),
+            ([], []),
+            (["message-1"], ["message-1"]),
+            (iter(["message-1"]), ["message-1"]),
+        ]
+    )
+    def test_pull_messages_correlation_filter(
+        self,
+        reply_to_message_ids: Iterable[str] | None,
+        expected_ids: list[str] | None,
+    ) -> None:
+        """Preserve correlation filter presence across the wire."""
+        self.mock_client.PullMessages.return_value = Mock(
+            messages_list=[], message_object_trees=[]
+        )
+
+        self.assertEqual(list(self.grid.pull_messages(reply_to_message_ids)), [])
+
+        request = self.mock_client.PullMessages.call_args.args[0]
+        request = PullAppMessagesRequest.FromString(request.SerializeToString())
+        self.assertEqual(
+            request.HasField("reply_to_message_ids"), expected_ids is not None
+        )
+        if expected_ids is not None:
+            self.assertEqual(list(request.reply_to_message_ids.vals), expected_ids)
+
+    def test_pull_messages_without_arguments(self) -> None:
+        """Omit the correlation filter by default."""
+        self.mock_client.PullMessages.return_value = Mock(
+            messages_list=[], message_object_trees=[]
+        )
+
+        self.assertEqual(list(self.grid.pull_messages()), [])
+
+        request = self.mock_client.PullMessages.call_args.args[0]
+        self.assertFalse(request.HasField("reply_to_message_ids"))
 
     def test_send_and_receive_messages_complete(self) -> None:
         """Test send and receive all messages successfully."""
@@ -275,11 +331,11 @@ class TestHttpGrid(unittest.TestCase):
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
-        self.assertEqual(len(interceptors), 2)
-        self.assertIsInstance(interceptors[0], RuntimeVersionHttpInterceptor)
-        self.assertIsInstance(interceptors[1], RuntimeTokenHttpInterceptor)
+        self.assertEqual(len(interceptors), 3)
+        self.assertIsInstance(interceptors[1], RuntimeVersionHttpInterceptor)
+        self.assertIsInstance(interceptors[2], RuntimeTokenHttpInterceptor)
         # pylint: disable-next=protected-access
-        self.assertEqual(interceptors[0]._metadata.component_name, "flwr-serverapp")
+        self.assertEqual(interceptors[1]._metadata.component_name, "flwr-serverapp")
 
     def test_init_rejects_empty_token(
         self,
@@ -313,8 +369,8 @@ class TestHttpGrid(unittest.TestCase):
         # Assert
         self.assertIn(404, node_ids)
 
-    def test_missing_object_creates_message_with_error(self) -> None:
-        """Test that a missing object creates a message with an error."""
+    def test_missing_object_does_not_create_message(self) -> None:
+        """Missing objects do not create business replies or ACK receipt."""
         ins = self._prep_message(Message(RecordDict(), 123, "query"))
         reply = Message(RecordDict(), reply_to=ins)
         reply.metadata.__dict__["_message_id"] = reply.object_id
@@ -328,9 +384,7 @@ class TestHttpGrid(unittest.TestCase):
 
         messages = list(self.grid.pull_messages([ins.object_id]))
 
-        self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
-        self.assertEqual(messages[0].metadata.reply_to_message_id, ins.object_id)
+        self.assertEqual(messages, [])
         self.mock_client.ConfirmMessageReceived.assert_not_called()
 
     @parameterized.expand(  # type: ignore
@@ -349,11 +403,10 @@ class TestHttpGrid(unittest.TestCase):
             ),
         ]
     )
-    def test_timeout_pulling_object_creates_message_with_error(
+    def test_timeout_pulling_object_does_not_create_message(
         self, patcher: AbstractContextManager[Any]
     ) -> None:
-        """Test that pulling an object with a timeout creates a message with an
-        error."""
+        """A transport timeout does not create a business reply."""
         # Prepare: Create instruction message
         ins1 = self._prep_message(Message(RecordDict(), 123, "query"))
 
@@ -381,10 +434,8 @@ class TestHttpGrid(unittest.TestCase):
             # the limit of pulling attempts for a given object
             msgs = list(self.grid.pull_messages([ins1.object_id]))
 
-        # Assert: `msgs` should contain a single error message
-        self.assertEqual(len(msgs), 1)
-        self.assertEqual(msgs[0].has_content(), False)
-        self.assertEqual(msgs[0].error.code, ErrorCode.MESSAGE_UNAVAILABLE)
+        self.assertEqual(msgs, [])
+        self.mock_client.ConfirmMessageReceived.assert_not_called()
         # Assert that PullObject was called PULL_MAX_TRIES_PER_OBJECT times for each
         # object at most. Note that because the message contains multiple objects,
         # we account for this in the assertion.

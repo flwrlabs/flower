@@ -82,6 +82,7 @@ class Federation(google.protobuf.message.Message):
     CAN_INVITE_MEMBERS_FIELD_NUMBER: builtins.int
     CAN_ADD_SUPERNODES_FIELD_NUMBER: builtins.int
     MEMBER_COUNT_FIELD_NUMBER: builtins.int
+    ICON_KEY_FIELD_NUMBER: builtins.int
     name: builtins.str
     description: builtins.str
     """Added in v1.26.0"""
@@ -95,6 +96,8 @@ class Federation(google.protobuf.message.Message):
     """Added in v1.34.0"""
     member_count: builtins.int
     """Added in v1.37.0"""
+    icon_key: builtins.str
+    """Added in v1.40.0"""
     @property
     def nodes(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.node_pb2.NodeInfo]: ...
     @property
@@ -121,9 +124,13 @@ class Federation(google.protobuf.message.Message):
         can_invite_members: builtins.bool = ...,
         can_add_supernodes: builtins.bool = ...,
         member_count: builtins.int | None = ...,
+        icon_key: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_member_count", b"_member_count", "config", b"config", "member_count", b"member_count"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_member_count", b"_member_count", "archived", b"archived", "can_add_supernodes", b"can_add_supernodes", "can_invite_members", b"can_invite_members", "config", b"config", "description", b"description", "member_count", b"member_count", "members", b"members", "name", b"name", "nodes", b"nodes", "runs", b"runs", "simulation", b"simulation"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "_member_count", b"_member_count", "config", b"config", "icon_key", b"icon_key", "member_count", b"member_count"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_icon_key", b"_icon_key", "_member_count", b"_member_count", "archived", b"archived", "can_add_supernodes", b"can_add_supernodes", "can_invite_members", b"can_invite_members", "config", b"config", "description", b"description", "icon_key", b"icon_key", "member_count", b"member_count", "members", b"members", "name", b"name", "nodes", b"nodes", "runs", b"runs", "simulation", b"simulation"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_icon_key", b"_icon_key"]) -> typing.Literal["icon_key"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_member_count", b"_member_count"]) -> typing.Literal["member_count"] | None: ...
 
 global___Federation = Federation

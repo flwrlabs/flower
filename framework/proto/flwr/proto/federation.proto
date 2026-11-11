@@ -42,6 +42,7 @@ message Federation {
   bool can_invite_members = 9;       // Added in v1.34.0
   bool can_add_supernodes = 10;      // Added in v1.34.0
   optional uint32 member_count = 11; // Added in v1.37.0
+  optional string icon_key = 12;     // Added in v1.40.0
 }
 
 message Invitation {

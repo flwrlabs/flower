@@ -22,6 +22,8 @@ from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.protobuf.client import ProtobufClient
 
 _UNARY_UNARY_ENDPOINTS = (
+    "create-agent",
+    "list-agents",
     "start-run",
     "stop-run",
     "start-automation",
@@ -29,6 +31,10 @@ _UNARY_UNARY_ENDPOINTS = (
     "stop-automation",
     "list-runs",
     "list-run-series",
+    "create-space",
+    "list-spaces",
+    "get-space-messages",
+    "send-space-message",
     "get-run-series",
     "update-run-series-description",
     "list-run-series-events",
@@ -45,9 +51,11 @@ _UNARY_UNARY_ENDPOINTS = (
     "list-nodes",
     "list-federations",
     "list-apps",
+    "list-app-associations",
     "add-app",
     "remove-app",
     "show-federation",
+    "set-federation-icon",
     "create-federation",
     "archive-federation",
     "add-node-to-federation",

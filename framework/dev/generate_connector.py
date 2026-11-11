@@ -107,10 +107,13 @@ def _connector_ids() -> list[str]:
         if not path.is_dir() or path.name.startswith("_"):
             continue
         filenames = {entry.name for entry in path.iterdir() if entry.is_file()}
-        if not filenames.intersection(_REQUIRED_MODULES):
+        if not filenames.intersection(_REQUIRED_MODULES | {"mcp.py"}):
             continue
         _validate_identifier(path.name)
-        missing = _REQUIRED_MODULES.difference(filenames)
+        required = (
+            {"definition.py", "mcp.py"} if "mcp.py" in filenames else _REQUIRED_MODULES
+        )
+        missing = required.difference(filenames)
         if missing:
             raise RuntimeError(
                 f"Connector '{path.name}' is missing: {', '.join(sorted(missing))}."
@@ -191,7 +194,7 @@ PROVIDER = ProviderDefinition(
     actions=ACTIONS,
 )
 
-CONNECTOR = ConnectorDefinition(provider=PROVIDER, executors=EXECUTORS)
+CONNECTOR = ConnectorDefinition.from_provider(provider=PROVIDER, executors=EXECUTORS)
 '''
     )
     return {

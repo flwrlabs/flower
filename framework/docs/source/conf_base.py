@@ -334,8 +334,8 @@ html_theme_options = {
     "light_logo": "flower-logo-light.png",
     "dark_logo": "flower-logo-dark.png",
     "light_css_variables": {
-        "color-announcement-background": "#17222d",
-        "color-announcement-text": "#ffffff",
+        "color-announcement-background": "#f2b705",
+        "color-announcement-text": "#000000",
         # Left sidebar
         "color-sidebar-link-text": "#5e5e5e",
         "color-sidebar-link-text--top-level": "#404040",
@@ -347,8 +347,8 @@ html_theme_options = {
         "color-toc-item-text--active": "#404040",
     },
     "dark_css_variables": {
-        "color-announcement-text": "#ffffff",
-        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#000000",
+        "color-announcement-background": "#f2b705",
         # Left sidebar
         "color-sidebar-link-text": "#7c7c7c",
         "color-sidebar-link-text--top-level": "#ababab",

@@ -21,7 +21,8 @@ SuperGrid <how-to-connect-supernodes-to-supergrid>` for instructions.
 You will need:
 
 - Access to a Slurm cluster and a compute partition
-- :doc:`Flower installed <how-to-install-flower>` on the compute nodes
+- The latest :doc:`Flower release installed <how-to-install-flower>` on the compute
+  nodes
 - A registered SuperNode private key that is readable from the compute node
 - All ClientApp dependencies installed in the execution environment
 
@@ -62,7 +63,7 @@ Create ``supernode-subprocess.sbatch``:
     export FLWR_HOME="${SLURM_TMPDIR:-/tmp}/flower-${SLURM_JOB_ID}"
 
     exec flower-supernode \
-        --superlink fleet-supergrid.flower.ai:443 \
+        --superlink api.flower.ai:443 \
         --auth-supernode-private-key <path-to-private-key>
 
 Submit the batch script to deploy the SuperNode:
@@ -114,7 +115,7 @@ Create ``supernode-process.sbatch``:
     export FLWR_HOME="${SLURM_TMPDIR:-/tmp}/flower-${SLURM_JOB_ID}"
 
     exec flower-supernode \
-        --superlink fleet-supergrid.flower.ai:443 \
+        --superlink api.flower.ai:443 \
         --auth-supernode-private-key <path-to-private-key> \
         --isolation process \
         --host 127.0.0.1 \
@@ -144,7 +145,6 @@ Create ``superexec-clientapp.sbatch``:
         if bash -c '</dev/tcp/127.0.0.1/9094' 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address 127.0.0.1:9094
         fi
         sleep 2
@@ -213,7 +213,6 @@ Create ``superexec-clientapp-gpu.sbatch``:
         if bash -c '</dev/tcp/127.0.0.1/9094' 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address 127.0.0.1:9094
         fi
         sleep 2
@@ -263,7 +262,7 @@ Create ``supernode-process-dynamic.sbatch``:
     export FLWR_HOME="${SLURM_TMPDIR:-/tmp}/flower-${SLURM_JOB_ID}"
 
     exec flower-supernode \
-        --superlink fleet-supergrid.flower.ai:443 \
+        --superlink api.flower.ai:443 \
         --auth-supernode-private-key <path-to-private-key> \
         --isolation process \
         --host 0.0.0.0 \
@@ -322,7 +321,6 @@ directive:
         if bash -c "</dev/tcp/${runtime_host}/${runtime_port}" 2>/dev/null; then
             exec flower-superexec \
                 --insecure \
-                --plugin-type clientapp \
                 --runtime-api-address "${runtime_api_address}"
         fi
         sleep 2

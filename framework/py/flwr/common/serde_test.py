@@ -19,6 +19,7 @@ import random
 import string
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
+from uuid import UUID
 
 import pytest
 
@@ -29,6 +30,13 @@ from flwr.common.constant import SUPERLINK_NODE_ID
 
 # pylint: disable=E0611
 from flwr.proto import transport_pb2 as pb2
+from flwr.proto.control_pb2 import Agent as ProtoAgent
+from flwr.proto.control_pb2 import AgentConfig as ProtoAgentConfig
+from flwr.proto.control_pb2 import (
+    CreateAgentRequest,
+    CreateAgentResponse,
+    ListAgentsResponse,
+)
 from flwr.proto.fab_pb2 import Fab as ProtoFab
 from flwr.proto.message_pb2 import Context as ProtoContext
 from flwr.proto.message_pb2 import Message as ProtoMessage
@@ -87,6 +95,54 @@ def test_serialisation_deserialisation() -> None:
 
         # Assert
         assert actual == scalar
+
+
+@pytest.mark.parametrize("title", [None, "", "Researcher"])
+@pytest.mark.parametrize("description", [None, "", "Investigate and cite sources."])
+def test_agent_config_proto_roundtrip(
+    title: str | None, description: str | None
+) -> None:
+    """Preserve absent and empty nullable Agent configuration fields on the wire."""
+    config = ProtoAgentConfig(name="Research Agent", app_spec="@flower/research==1.2.3")
+    if title is not None:
+        config.title = title
+    if description is not None:
+        config.description = description
+
+    actual = ProtoAgentConfig.FromString(config.SerializeToString())
+
+    assert actual == config
+    assert actual.HasField("title") is (title is not None)
+    assert actual.HasField("description") is (description is not None)
+
+
+def test_agent_messages_proto_roundtrip() -> None:
+    """Preserve Agent configuration, identity, and timestamps in Control messages."""
+    config = ProtoAgentConfig(
+        name="Research Agent",
+        title="Researcher",
+        description="Investigate and cite sources.",
+        app_spec="@flower/research",
+    )
+    request = CreateAgentRequest(config=config)
+    agent = ProtoAgent(
+        id=42,
+        config=config,
+        created_at="2026-10-29T08:00:00Z",
+        updated_at="2026-10-29T09:00:00Z",
+    )
+    create_response = CreateAgentResponse(agent=agent)
+    list_response = ListAgentsResponse(agents=[agent])
+
+    assert CreateAgentRequest.FromString(request.SerializeToString()) == request
+    assert (
+        CreateAgentResponse.FromString(create_response.SerializeToString())
+        == create_response
+    )
+    assert (
+        ListAgentsResponse.FromString(list_response.SerializeToString())
+        == list_response
+    )
 
 
 def test_status_to_proto() -> None:
@@ -494,6 +550,8 @@ def test_run_serialization_deserialization() -> None:
         primary_task_type=TaskType.SIMULATION,
         series_id=123,
         account_name="test-account",
+        space_id=UUID("12345678-1234-5678-1234-567812345678"),
+        agent_id=42,
     )
 
     # Execute
@@ -502,4 +560,10 @@ def test_run_serialization_deserialization() -> None:
 
     # Assert
     assert isinstance(proto, ProtoRun)
+    assert proto.space_id == str(original.space_id)
+    assert proto.agent_id == original.agent_id
     assert original == deserialized
+    assert not run_to_proto(Run.create_empty(2)).HasField("space_id")
+    assert run_from_proto(ProtoRun()).space_id is None
+    assert not run_to_proto(Run.create_empty(2)).HasField("agent_id")
+    assert run_from_proto(ProtoRun()).agent_id is None

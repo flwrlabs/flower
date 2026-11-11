@@ -16,17 +16,28 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+import threading
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from uuid import uuid4
 
 from flwr.supercore.constant import TaskType
 
+WARM_EXECUTOR_ACK_TIMEOUT_SECONDS = 5.0
+WARM_EXECUTOR_CONSUMED_ANNOTATION = "flower.ai/warm-executor-consumed"
+WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH = "/run/flwr/runtime-ca"
+WARM_EXECUTOR_ROOT_CERTIFICATES_FILE_PATH = (
+    f"{WARM_EXECUTOR_ROOT_CERTIFICATES_MOUNT_PATH}/ca.crt"
+)
 WARM_EXECUTOR_LABEL = "flower.ai/warm-executor"
 WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION = "flower.ai/warm-executor-runtime-image"
 WARM_EXECUTOR_CONFIGURATION_ANNOTATION = "flower.ai/warm-executor-config-sha256"
+WARM_EXECUTOR_FAB_HASH_ANNOTATION = "flower.ai/warm-executor-fab-hash"
+WARM_EXECUTOR_FAB_PATH_ANNOTATION = "flower.ai/warm-executor-fab-path"
 _TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _TASK_TYPE_LABEL = "flower.ai/task-type"
+WARM_EXECUTOR_TASK_TYPES = frozenset({TaskType.AGENT_APP, TaskType.CONNECTOR})
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,9 @@ class WarmExecutorPoolKey:
 
     task_type: TaskType
     runtime_image: str
+    fab_hash: str | None = None
+    # The deployment path changes Pod compatibility, but not routed identity.
+    fab_path: str | None = field(default=None, compare=False, hash=False)
 
     def __post_init__(self) -> None:
         """Validate values persisted on a warm TaskExecutor Pod."""
@@ -44,6 +58,29 @@ class WarmExecutorPoolKey:
             raise ValueError(
                 "Warm executor pool key requires a non-empty runtime_image."
             )
+        fab_fields = (self.fab_hash, self.fab_path)
+        if any(value is not None for value in fab_fields):
+            if self.task_type != TaskType.AGENT_APP:
+                raise ValueError("Only AgentApp warm executor pools can preload a FAB.")
+            if not all(
+                isinstance(value, str) and value.strip() for value in fab_fields
+            ):
+                raise ValueError(
+                    "Prestarted AgentApp pools require non-empty fab_hash and "
+                    "fab_path values."
+                )
+            assert isinstance(self.fab_hash, str)
+            if len(self.fab_hash) != 64 or any(
+                char not in "0123456789abcdef" for char in self.fab_hash
+            ):
+                raise ValueError(
+                    "Prestarted AgentApp pools require a full SHA-256 fab_hash."
+                )
+            assert isinstance(self.fab_path, str)
+            if not PurePosixPath(self.fab_path).is_absolute():
+                raise ValueError(
+                    "Prestarted AgentApp pools require an absolute fab_path."
+                )
 
 
 @dataclass(frozen=True)
@@ -109,6 +146,14 @@ def is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> b
             _object_field(annotations, WARM_EXECUTOR_RUNTIME_IMAGE_ANNOTATION),
             pool_key.runtime_image,
         ),
+        (
+            _object_field(annotations, WARM_EXECUTOR_FAB_HASH_ANNOTATION),
+            pool_key.fab_hash,
+        ),
+        (
+            _object_field(annotations, WARM_EXECUTOR_FAB_PATH_ANNOTATION),
+            pool_key.fab_path,
+        ),
     )
     if any(actual != expected for actual, expected in expected_fields):
         return False
@@ -126,6 +171,39 @@ def is_compatible_warm_executor(pod: object, pool_key: WarmExecutorPoolKey) -> b
 
 def _object_field(value: object, field_name: str) -> object | None:
     """Return a field from a Kubernetes dict or model object."""
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return value.get(field_name)
     return getattr(value, field_name, None)
+
+
+class WarmExecutorUnavailable(RuntimeError):
+    """Raised before a task token is sent to a warm executor."""
+
+
+@dataclass
+class PendingWarmExecutor:
+    """Keep one creation identity until it is observed, claimed or rejected."""
+
+    key: WarmExecutorPoolKey
+    executor_id: str
+    retry_at: float = 0.0
+    may_exist: bool = False
+
+
+@dataclass
+class WarmExecutorPoolState:
+    """Coordinate dispatch reservations with maintenance and shutdown."""
+
+    busy_pods: set[str] = field(default_factory=set)
+    consumed_pods: set[str] = field(default_factory=set)
+    pending_creations: dict[str, PendingWarmExecutor] = field(default_factory=dict)
+    retiring_pods: dict[str, WarmExecutorPoolKey | None] = field(default_factory=dict)
+    closed: bool = False
+    lock: threading.RLock = field(default_factory=threading.RLock)
+
+
+def is_consumed_warm_executor(pod: object) -> bool:
+    """Return true when a Pod was reserved for a task before this process started."""
+    metadata = _object_field(pod, "metadata")
+    annotations = _object_field(metadata, "annotations")
+    return _object_field(annotations, WARM_EXECUTOR_CONSUMED_ANNOTATION) == "true"

@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 
 ROOT_DIR = Path(__file__).parents[2]
 STABLE_DOCS = (
+    "agent/docs/source/conf.py",
     "baselines/docs/source/conf.py",
     "examples/docs/source/conf.py",
 )
@@ -33,17 +34,17 @@ DOCKER_READMES = {
 }
 DOCKER_TAG_GROUPS = {
     "base": (
-        ("{version}-py3.13-alpine3.22",),
+        ("{version}-py3.13-alpine3.23",),
         ("{version}-py3.13-ubuntu24.04",),
         ("{version}-py3.12-ubuntu24.04",),
         ("{version}-py3.11-ubuntu24.04",),
     ),
     "superlink": (
-        ("{version}", "{version}-py3.13-alpine3.22"),
+        ("{version}", "{version}-py3.13-alpine3.23"),
         ("{version}-py3.13-ubuntu24.04", "latest"),
     ),
     "supernode": (
-        ("{version}", "{version}-py3.13-alpine3.22"),
+        ("{version}", "{version}-py3.13-alpine3.23"),
         ("{version}-py3.13-ubuntu24.04", "latest"),
         ("{version}-py3.12-ubuntu24.04",),
         ("{version}-py3.11-ubuntu24.04",),

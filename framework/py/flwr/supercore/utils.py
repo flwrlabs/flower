@@ -17,6 +17,7 @@
 
 import ctypes
 import json
+import math
 import os
 import re
 import subprocess
@@ -24,7 +25,7 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from logging import WARN
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
 
 import requests
 
@@ -34,9 +35,8 @@ from flwr.supercore import log
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
-from .typing import JSONValue
+from .typing import JSONObject, JSONValue
 
-T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
 
 
@@ -79,6 +79,14 @@ def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
     )
 
 
+def strict_json_loads_object(raw: str | bytes | bytearray) -> JSONObject:
+    """Parse a strict JSON value and require an object."""
+    value = strict_json_loads(raw)
+    if not isinstance(value, dict):
+        raise ValueError("JSON value must be an object.")
+    return value
+
+
 def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     """Serialize a strict JSON value.
 
@@ -87,6 +95,28 @@ def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     if compact:
         return json.dumps(value, separators=(",", ":"), allow_nan=False)
     return json.dumps(value, allow_nan=False)
+
+
+def validate_node_location(location: str) -> None:
+    """Validate a SuperNode location in ``<latitude>,<longitude>`` format."""
+    try:
+        latitude_str, longitude_str = location.split(",")
+        latitude = float(latitude_str)
+        longitude = float(longitude_str)
+    except ValueError as err:
+        raise ValueError(
+            "Location must contain two comma-separated numbers: "
+            '"<latitude>,<longitude>".'
+        ) from err
+
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise ValueError("Latitude and longitude must be finite numbers.")
+
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise ValueError(
+            "Latitude must be between -90 and 90 and longitude must be between "
+            "-180 and 180."
+        )
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -403,24 +433,11 @@ def is_valid_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def find_metadata_keys(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    keys: Iterable[str],
-) -> set[str]:
-    """Return the subset of `keys` present in the gRPC metadata sequence."""
-    if metadata is None:
-        return set()
-
-    key_set = set(keys)
-    return {metadata_key for metadata_key, _ in metadata if metadata_key in key_set}
-
-
-def _get_metadata_typed_checked(
+def get_metadata_str_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
-    value_type: type[T],
-) -> T:
-    """Return exactly one non-empty string or bytes metadata value for `key`.
+) -> str:
+    """Return exactly one non-empty string metadata value for `key`.
 
     Raises
     ------
@@ -436,41 +453,11 @@ def _get_metadata_typed_checked(
     if len(values) > 1:
         raise MetadataLookupError(key, "duplicate")
     value = values[0]
-    if not isinstance(value, value_type):
+    if not isinstance(value, str):
         raise MetadataLookupError(key, "wrong_type")
     if value in ("", b""):
         raise MetadataLookupError(key, "empty")
     return value
-
-
-def get_metadata_str_checked(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    key: str,
-) -> str:
-    """Return exactly one non-empty string metadata value for `key`.
-
-    Raises
-    ------
-    MetadataLookupError
-        If the metadata value for `key` is missing, duplicated, of the wrong type,
-        or empty.
-    """
-    return _get_metadata_typed_checked(metadata, key, str)
-
-
-def get_metadata_bytes_checked(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    key: str,
-) -> bytes:
-    """Return exactly one non-empty bytes metadata value for `key`.
-
-    Raises
-    ------
-    MetadataLookupError
-        If the metadata value for `key` is missing, duplicated, of the wrong type,
-        or empty.
-    """
-    return _get_metadata_typed_checked(metadata, key, bytes)
 
 
 def get_metadata_str(
@@ -481,18 +468,6 @@ def get_metadata_str(
     found or invalid."""
     try:
         return get_metadata_str_checked(metadata, key)
-    except MetadataLookupError:
-        return None
-
-
-def get_metadata_bytes(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    key: str,
-) -> bytes | None:
-    """Return exactly one non-empty bytes metadata value for `key`, or None if not found
-    or invalid."""
-    try:
-        return get_metadata_bytes_checked(metadata, key)
     except MetadataLookupError:
         return None
 

@@ -7,10 +7,10 @@
 README.md @jafermarq @tanertopal @danieljanes
 
 # Flower Agent Docs
-/agent @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll
+/agent @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll @panh99
 
 # Flower Baselines
-/baselines @chongshenng @jafermarq @tanertopal @danieljanes
+/baselines @chongshenng @jafermarq @panh99 @tanertopal @danieljanes
 
 # Flower Benchmarks
 /benchmarks @jafermarq @tanertopal @danieljanes
@@ -19,7 +19,7 @@ README.md @jafermarq @tanertopal @danieljanes
 /datasets @jafermarq @tanertopal @danieljanes
 
 # Flower Examples
-/examples @yan-gao-GY @panh99 @chongshenng @jafermarq @tanertopal @danieljanes
+/examples @panh99 @chongshenng @jafermarq @tanertopal @danieljanes
 
 # Flower Framework
 /framework/ @panh99 @tanertopal @danieljanes
@@ -32,11 +32,15 @@ README.md @jafermarq @tanertopal @danieljanes
 # Translations
 /framework/docs/locales @charlesbvll @panh99 @tanertopal @danieljanes
 
+# Docs UI configuration
+/dev/docs-ui-config.yml @panh99 @tanertopal @danieljanes
+
 # GitHub Actions and Workflows
 /.github/actions @tanertopal @danieljanes
 /.github/workflows @tanertopal @danieljanes
 /.github/workflows/datasets-e2e.yml @jafermarq @tanertopal @danieljanes
 /.github/workflows/datasets-test.yml @jafermarq @tanertopal @danieljanes
+/.github/framework-release.json @panh99 @tanertopal @danieljanes
 
 # Docker-related files
 **/*.Dockerfile @tanertopal @danieljanes
@@ -46,3 +50,6 @@ README.md @jafermarq @tanertopal @danieljanes
 
 # Flower `flwr` CLI
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes
+
+# Connectors
+/framework/py/flwr/supercore/task_process/connector/ @tanertopal @danieljanes @dstripelis @danielnugraha @charlesbvll @panh99

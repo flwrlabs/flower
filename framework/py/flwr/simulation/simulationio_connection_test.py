@@ -46,9 +46,9 @@ class TestSimulationIoConnection(unittest.TestCase):
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
-        self.assertEqual(len(interceptors), 2)
-        self.assertIsInstance(interceptors[0], RuntimeVersionHttpInterceptor)
-        self.assertIsInstance(interceptors[1], RuntimeTokenHttpInterceptor)
+        self.assertEqual(len(interceptors), 3)
+        self.assertIsInstance(interceptors[1], RuntimeVersionHttpInterceptor)
+        self.assertIsInstance(interceptors[2], RuntimeTokenHttpInterceptor)
 
     def test_init_requires_token(self) -> None:
         """`SimulationIoConnection` should require token values."""

@@ -26,147 +26,25 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/space.proto";
+import "google/protobuf/struct.proto";
 
-service Control {
-  // Start run upon request
-  rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
-
-  // Stop run upon request
-  rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
-
-  // Start automation upon request
-  rpc StartAutomation(StartAutomationRequest)
-      returns (StartAutomationResponse) {}
-
-  // List automations
-  rpc ListAutomations(ListAutomationsRequest)
-      returns (ListAutomationsResponse) {}
-
-  // Stop automation
-  rpc StopAutomation(StopAutomationRequest) returns (StopAutomationResponse) {}
-
-  // Start log stream upon request
-  rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse) {}
-
-  // flwr ls command
-  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
-
-  // List run series
-  rpc ListRunSeries(ListRunSeriesRequest) returns (ListRunSeriesResponse) {}
-
-  // Get run series
-  rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
-
-  // Update run series description
-  rpc UpdateRunSeriesDescription(UpdateRunSeriesDescriptionRequest)
-      returns (UpdateRunSeriesDescriptionResponse) {}
-
-  // List events for all runs in a run series
-  rpc ListRunSeriesEvents(ListRunSeriesEventsRequest)
-      returns (ListRunSeriesEventsResponse) {}
-
-  // Get login details upon request
-  rpc GetLoginDetails(GetLoginDetailsRequest)
-      returns (GetLoginDetailsResponse) {}
-
-  // Get auth tokens upon request
-  rpc GetAuthTokens(GetAuthTokensRequest) returns (GetAuthTokensResponse) {}
-
-  // List OAuth connectors available to the authenticated account
-  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse) {}
-
-  // Disconnect connector credentials for the authenticated account
-  rpc DisconnectConnector(DisconnectConnectorRequest)
-      returns (DisconnectConnectorResponse) {}
-
-  // Begin OAuth connector authorization flow
-  rpc BeginConnectorOAuth(BeginConnectorOAuthRequest)
-      returns (BeginConnectorOAuthResponse) {}
-
-  // Complete OAuth connector authorization flow
-  rpc CompleteConnectorOAuth(CompleteConnectorOAuthRequest)
-      returns (CompleteConnectorOAuthResponse) {}
-
-  // Pull artifacts generated during a run (flwr pull)
-  rpc PullArtifacts(PullArtifactsRequest) returns (PullArtifactsResponse) {}
-
-  // Register SuperNode
-  rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse) {}
-
-  // Unregister SuperNode
-  rpc UnregisterNode(UnregisterNodeRequest) returns (UnregisterNodeResponse) {}
-
-  // List SuperNodes
-  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse) {}
-
-  // List Federations
-  rpc ListFederations(ListFederationsRequest)
-      returns (ListFederationsResponse) {}
-
-  // List Apps in a Federation
-  rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {}
-
-  // Add App to a Federation
-  rpc AddApp(AddAppRequest) returns (AddAppResponse) {}
-
-  // Remove App from a Federation
-  rpc RemoveApp(RemoveAppRequest) returns (RemoveAppResponse) {}
-
-  // Show Federation
-  rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
-
-  // Create Federation
-  rpc CreateFederation(CreateFederationRequest)
-      returns (CreateFederationResponse) {}
-
-  // Archive Federation
-  rpc ArchiveFederation(ArchiveFederationRequest)
-      returns (ArchiveFederationResponse) {}
-
-  // Add SuperNode to Federation
-  rpc AddNodeToFederation(AddNodeToFederationRequest)
-      returns (AddNodeToFederationResponse) {}
-
-  // Remove SuperNode from Federation
-  rpc RemoveNodeFromFederation(RemoveNodeFromFederationRequest)
-      returns (RemoveNodeFromFederationResponse) {}
-
-  // Remove Account from Federation
-  rpc RemoveAccountFromFederation(RemoveAccountFromFederationRequest)
-      returns (RemoveAccountFromFederationResponse) {}
-
-  // Create Invitation
-  rpc CreateInvitation(CreateInvitationRequest)
-      returns (CreateInvitationResponse) {}
-
-  // List Invitations
-  rpc ListInvitations(ListInvitationsRequest)
-      returns (ListInvitationsResponse) {}
-
-  // Accept Invitation
-  rpc AcceptInvitation(AcceptInvitationRequest)
-      returns (AcceptInvitationResponse) {}
-
-  // Reject Invitation
-  rpc RejectInvitation(RejectInvitationRequest)
-      returns (RejectInvitationResponse) {}
-
-  // Revoke Invitation
-  rpc RevokeInvitation(RevokeInvitationRequest)
-      returns (RevokeInvitationResponse) {}
-
-  // Set Simulation Configuration
-  rpc ConfigureSimulationFederation(ConfigureSimulationFederationRequest)
-      returns (ConfigureSimulationFederationResponse) {}
-
-  // ##############
-  // Unused for now
-  // ##############
-
-  // Start run event stream
-  rpc StreamRunEvents(StreamRunEventsRequest)
-      returns (stream StreamRunEventsResponse) {}
+message AgentConfig {
+  string name = 1;
+  optional string description = 2;
+  optional string title = 3;
+  string app_spec = 4;
 }
+message Agent {
+  uint64 id = 1;
+  AgentConfig config = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}
+message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentResponse { Agent agent = 1; }
+message ListAgentsRequest {}
+message ListAgentsResponse { repeated Agent agents = 1; }
 
 message StartRunRequest {
   Fab fab = 1;
@@ -176,6 +54,8 @@ message StartRunRequest {
   string federation = 5;
   optional uint64 series_id = 6;
   repeated string connector_refs = 7;
+  string user_prompt = 8;
+  repeated uint64 connector_ids = 9;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
@@ -224,10 +104,44 @@ message StreamLogsResponse {
 message ListRunsRequest {
   optional uint64 run_id = 1;
   optional uint64 limit = 2;
+  // Skip this many newer runs when listing runs. Ignored when run_id is set.
+  optional uint64 skip = 3;
 }
 message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
+}
+
+// Agents and Spaces only. Message history is fetched through GetSpaceMessages.
+message BootstrapRequest {}
+message BootstrapResponse {
+  repeated Agent agents = 1;
+  repeated Space spaces = 2;
+  // Feed head from the same snapshot as agents and spaces.
+  uint64 cursor = 3;
+}
+
+message Event {
+  string event_id = 1;
+  string type = 2;
+  optional string space_id = 3;
+  google.protobuf.Struct payload = 4;
+  string created_at = 5;
+}
+
+// POST /v1/control/stream-events. Accept: text/event-stream selects standard
+// SSE with protobuf JSON data; otherwise use the binary protobuf stream
+// framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
+// use their existing separate stream. The event journal is append-only;
+// replay cursors do not expire.
+message StreamEventsRequest {
+  // Exclusive user-feed cursor. Falls back to Last-Event-ID when absent.
+  optional uint64 after_seq = 1;
+}
+message StreamEventsResponse {
+  // Position in the authenticated user's feed, also used as the SSE id.
+  uint64 seq = 1;
+  Event event = 2;
 }
 
 message ListRunSeriesRequest {
@@ -275,15 +189,21 @@ message Connector {
   string display_name = 2;
   string description = 3;
   bool connected = 4;
+  uint64 connector_id = 5;
 }
 message ListConnectorsResponse { repeated Connector connectors = 1; }
 
-message DisconnectConnectorRequest { string connector_ref = 1; }
+message DisconnectConnectorRequest {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+  string federation = 3;
+}
 message DisconnectConnectorResponse {}
 
 message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
+  string federation = 3;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;
@@ -297,7 +217,10 @@ message CompleteConnectorOAuthRequest {
   string code = 2;
   string state = 3;
 }
-message CompleteConnectorOAuthResponse { string connector_ref = 1; }
+message CompleteConnectorOAuthResponse {
+  string connector_ref = 1;
+  uint64 connector_id = 2;
+}
 
 message StopRunRequest { uint64 run_id = 1; }
 message StopRunResponse { bool success = 1; }
@@ -305,7 +228,11 @@ message StopRunResponse { bool success = 1; }
 message PullArtifactsRequest { uint64 run_id = 1; }
 message PullArtifactsResponse { optional string url = 1; }
 
-message RegisterNodeRequest { bytes public_key = 1; }
+message RegisterNodeRequest {
+  bytes public_key = 1;
+  optional string location = 2;
+  optional string name = 3;
+}
 message RegisterNodeResponse { optional uint64 node_id = 1; }
 
 message UnregisterNodeRequest { uint64 node_id = 1; }
@@ -327,12 +254,18 @@ message AppInfo {
   // True for Hub apps, false for local/custom apps, and absent for legacy apps
   // whose provenance is unknown.
   optional bool is_hub_app = 4;
+  string display_name = 5;
+  string description = 6;
+  string color = 7;
 }
 message ListAppsRequest {
   string federation_id = 1;
   optional uint64 limit = 2;
 }
 message ListAppsResponse { repeated AppInfo apps = 1; }
+
+message ListAppAssociationsRequest { string app_id = 1; }
+message ListAppAssociationsResponse { repeated string federation_ids = 1; }
 
 message AddAppRequest {
   string federation_id = 1;
@@ -352,10 +285,18 @@ message ShowFederationResponse {
   string now = 2;
 }
 
+message SetFederationIconRequest {
+  string federation_name = 1;
+  optional string icon_key = 2;
+}
+message SetFederationIconResponse {}
+
 message CreateFederationRequest {
   string federation_name = 1;
   string description = 2;
   bool simulation = 3;
+  // Bare namespace handle. Omission selects the authenticated caller's handle.
+  optional string handle = 4;
 }
 message CreateFederationResponse { Federation federation = 1; }
 

@@ -34,6 +34,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -46,6 +48,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -80,6 +86,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -99,8 +107,19 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -111,12 +130,26 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import get_account, get_authn_plugin
 from flwr.superlink.dependencies.artifact_provider import get_artifact_provider
-from flwr.superlink.dependencies.fleet_api import FleetApiTypeDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.dependencies.run_source import RunSourceDependency
 from flwr.superlink.servicer.control import control_handlers
 
-router = APIRouter(prefix="/v1/control", tags=["Control"], route_class=ProtobufRoute)
+from .tracing import RunCreationTracingDependency
+
+router = APIRouter(
+    prefix="/v1/control",
+    tags=["Control"],
+    route_class=ProtobufRoute,
+    dependencies=[
+        Depends(
+            VersionDependency(
+                component_name="SuperLink",
+                connection_name="flwr CLI <-> SuperLink Control API",
+                reject_incompatible=False,
+            )
+        )
+    ],
+)
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
 AccountDependency = Annotated[AccountInfo, Depends(get_account)]
@@ -129,22 +162,40 @@ ArtifactProviderDependency = Annotated[
 ]
 
 
+@router.post("/create-agent")
+def create_agent(
+    request: Annotated[CreateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateAgentResponse:
+    """Create an agent and a Space containing the agent and its creator."""
+    return control_handlers.create_agent(request, account, linkstate)
+
+
+@router.post("/list-agents")
+def list_agents(
+    request: Annotated[ListAgentsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAgentsResponse:
+    """List agents."""
+    return control_handlers.list_agents(request, account, linkstate)
+
+
 @router.post("/start-run")
-def start_run(
+def start_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     request: Annotated[StartRunRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-    fleet_api_type: FleetApiTypeDependency,
     run_source: RunSourceDependency,
+    tracing: RunCreationTracingDependency,
 ) -> StartRunResponse:
     """Start a run."""
-    return control_handlers.start_run(
-        request,
-        account,
-        linkstate,
-        fleet_api_type,
-        source=run_source,
+    response = control_handlers.start_run(
+        request, account, linkstate, source=run_source
     )
+    tracing.set_attribute("flwr.run_id", str(response.run_id))
+    return response
 
 
 @router.post("/list-runs")
@@ -155,6 +206,46 @@ def list_runs(
 ) -> ListRunsResponse:
     """List runs."""
     return control_handlers.list_runs(request, account, linkstate)
+
+
+@router.post("/create-space")
+def create_space(
+    request: Annotated[CreateSpaceRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> CreateSpaceResponse:
+    """Create space."""
+    return control_handlers.create_space(request, account, linkstate)
+
+
+@router.post("/list-spaces")
+def list_spaces(
+    request: Annotated[ListSpacesRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListSpacesResponse:
+    """List spaces."""
+    return control_handlers.list_spaces(request, account, linkstate)
+
+
+@router.post("/get-space-messages")
+def get_space_messages(
+    request: Annotated[GetSpaceMessagesRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> GetSpaceMessagesResponse:
+    """Get space messages."""
+    return control_handlers.get_space_messages(request, account, linkstate)
+
+
+@router.post("/send-space-message")
+def send_space_message(
+    request: Annotated[SendSpaceMessageRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SendSpaceMessageResponse:
+    """Send space message."""
+    return control_handlers.send_space_message(request, account, linkstate)
 
 
 @router.post("/list-run-series")
@@ -404,15 +495,24 @@ def list_apps(
     return control_handlers.list_apps(request, account, linkstate)
 
 
+@router.post("/list-app-associations")
+def list_app_associations(
+    request: Annotated[ListAppAssociationsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> ListAppAssociationsResponse:
+    """List federations associated with an app."""
+    return control_handlers.list_app_associations(request, account, linkstate)
+
+
 @router.post("/add-app")
 def add_app(
     request: Annotated[AddAppRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
-    fleet_api_type: FleetApiTypeDependency,
 ) -> AddAppResponse:
     """Add an app to a federation."""
-    return control_handlers.add_app(request, account, linkstate, fleet_api_type)
+    return control_handlers.add_app(request, account, linkstate)
 
 
 @router.post("/remove-app")
@@ -433,6 +533,16 @@ def show_federation(
 ) -> ShowFederationResponse:
     """Show a federation."""
     return control_handlers.show_federation(request, account, linkstate)
+
+
+@router.post("/set-federation-icon")
+def set_federation_icon(
+    request: Annotated[SetFederationIconRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SetFederationIconResponse:
+    """Set or clear a federation icon."""
+    return control_handlers.set_federation_icon(request, account, linkstate)
 
 
 @router.post("/create-federation")

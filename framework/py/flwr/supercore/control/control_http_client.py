@@ -31,6 +31,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
     ConfigureSimulationFederationResponse,
+    CreateAgentRequest,
+    CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
     CreateInvitationRequest,
@@ -43,6 +45,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
+    ListAgentsRequest,
+    ListAgentsResponse,
+    ListAppAssociationsRequest,
+    ListAppAssociationsResponse,
     ListAppsRequest,
     ListAppsResponse,
     ListAutomationsRequest,
@@ -77,6 +83,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
+    SetFederationIconRequest,
+    SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
     StartAutomationRequest,
@@ -96,6 +104,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
@@ -103,6 +121,24 @@ from flwr.supercore.protobuf.client import ProtobufClient
 # pylint: disable=invalid-name
 class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Control API."""
+
+    def CreateAgent(self, request: CreateAgentRequest) -> CreateAgentResponse:
+        """Create an agent."""
+        return self._unary_unary(
+            path="/v1/control/create-agent",
+            rpc_method="/flwr.proto.Control/CreateAgent",
+            request=request,
+            response_type=CreateAgentResponse,
+        )
+
+    def ListAgents(self, request: ListAgentsRequest) -> ListAgentsResponse:
+        """List agents."""
+        return self._unary_unary(
+            path="/v1/control/list-agents",
+            rpc_method="/flwr.proto.Control/ListAgents",
+            request=request,
+            response_type=ListAgentsResponse,
+        )
 
     def StartRun(self, request: StartRunRequest) -> StartRunResponse:
         """Start a run."""
@@ -171,6 +207,46 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListRuns",
             request=request,
             response_type=ListRunsResponse,
+        )
+
+    def CreateSpace(self, request: CreateSpaceRequest) -> CreateSpaceResponse:
+        """Create space."""
+        return self._unary_unary(
+            path="/v1/control/create-space",
+            rpc_method="/flwr.proto.Control/CreateSpace",
+            request=request,
+            response_type=CreateSpaceResponse,
+        )
+
+    def ListSpaces(self, request: ListSpacesRequest) -> ListSpacesResponse:
+        """List spaces."""
+        return self._unary_unary(
+            path="/v1/control/list-spaces",
+            rpc_method="/flwr.proto.Control/ListSpaces",
+            request=request,
+            response_type=ListSpacesResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Get space messages."""
+        return self._unary_unary(
+            path="/v1/control/get-space-messages",
+            rpc_method="/flwr.proto.Control/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
+        )
+
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Send space message."""
+        return self._unary_unary(
+            path="/v1/control/send-space-message",
+            rpc_method="/flwr.proto.Control/SendSpaceMessage",
+            request=request,
+            response_type=SendSpaceMessageResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:
@@ -342,6 +418,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=ListAppsResponse,
         )
 
+    def ListAppAssociations(
+        self, request: ListAppAssociationsRequest
+    ) -> ListAppAssociationsResponse:
+        """List federations associated with an app."""
+        return self._unary_unary(
+            path="/v1/control/list-app-associations",
+            rpc_method="/flwr.proto.Control/ListAppAssociations",
+            request=request,
+            response_type=ListAppAssociationsResponse,
+        )
+
     def AddApp(self, request: AddAppRequest) -> AddAppResponse:
         """Add an app to a federation."""
         return self._unary_unary(
@@ -367,6 +454,17 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ShowFederation",
             request=request,
             response_type=ShowFederationResponse,
+        )
+
+    def SetFederationIcon(
+        self, request: SetFederationIconRequest
+    ) -> SetFederationIconResponse:
+        """Set or clear a federation icon."""
+        return self._unary_unary(
+            path="/v1/control/set-federation-icon",
+            rpc_method="/flwr.proto.Control/SetFederationIcon",
+            request=request,
+            response_type=SetFederationIconResponse,
         )
 
     def CreateFederation(

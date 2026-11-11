@@ -15,11 +15,15 @@
 """SQLAlchemy declarative model definitions for CoreState."""
 
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
+    Double,
     Float,
     ForeignKey,
     Index,
@@ -29,17 +33,66 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     String,
     Table,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    column,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from flwr.supercore.state.schema.types import UTCDateTime
+from flwr.supercore.state.schema.types import UInt64, UTCDateTime
+from flwr.supercore.typing import JSONValue
 
 
 class FlwrBase(DeclarativeBase):
     """Base class for Flower OSS state models."""
 
     metadata = MetaData()
+
+
+class Event(FlwrBase):
+    """Store a logical application event once, without a global sequence."""
+
+    __tablename__ = "events"
+
+    event_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    space_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("space.id"))
+    payload: Mapped[dict[str, JSONValue]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class UserEventFeed(FlwrBase):
+    """Track the committed sequence head of each user's append-only feed."""
+
+    __tablename__ = "user_event_feeds"
+    __table_args__ = (CheckConstraint("last_seq >= 0", name="ck_user_event_feed_seq"),)
+
+    # Accounts are owned by the authentication provider, outside CoreState.
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+class UserEvent(FlwrBase):
+    """Order shared events independently for each recipient."""
+
+    __tablename__ = "user_events"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_user_event"),
+        CheckConstraint("seq > 0", name="ck_user_event_seq"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("user_event_feeds.user_id"), primary_key=True
+    )
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    event_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("events.event_id"), nullable=False
+    )
 
 
 class NonceStore(FlwrBase):
@@ -63,12 +116,138 @@ class Fab(FlwrBase):
     verifications: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class File(FlwrBase):
+    """Represent the current head of a file, including deleted files."""
+
+    __tablename__ = "file"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    latest_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class FileRevision(FlwrBase):
+    """Represent immutable file contents at a particular revision."""
+
+    __tablename__ = "file_revision"
+
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    revision: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class Message(FlwrBase):
+    """Represent message delivery with retained metadata.
+
+    Delivery state is inferred from the flag, deadline, and closing timestamps:
+
+    - Not cleared, deadline in the future: pending and eligible for retrieval.
+    - Not cleared, deadline reached: expired, awaiting passive cleanup.
+    - Cleared, acknowledged_at set: acknowledged.
+    - Cleared, cancelled_at set: cancelled.
+    - Cleared, neither closing timestamp set: expired and cleaned up.
+
+    The expires_at deadline is always set, regardless of the closing outcome.
+    Clearing ends delivery and releases the ObjectStore reference while retaining
+    metadata. Acknowledgment and cancellation timestamps are mutually exclusive.
+    """
+
+    __tablename__ = "message"
+    __table_args__ = (
+        CheckConstraint(
+            "acknowledged_at IS NULL OR cancelled_at IS NULL",
+            name="ck_message_terminal_timestamps_exclusive",
+        ),
+        CheckConstraint(
+            "cleared OR (acknowledged_at IS NULL AND cancelled_at IS NULL)",
+            name="ck_message_terminal_timestamps_require_cleared",
+        ),
+        Index(
+            "idx_message_pending_dst_created_at",
+            "dst_node_id",
+            "created_at",
+            "message_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index(
+            "idx_message_pending_dst_run_created_at",
+            "dst_node_id",
+            "run_id",
+            "created_at",
+            "message_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index(
+            "idx_message_pending_run_id",
+            "run_id",
+            postgresql_where=column("cleared", Boolean).is_(False),
+            sqlite_where=column("cleared", Boolean).is_(False),
+        ),
+        Index("idx_message_reply_to_message_id", "reply_to_message_id"),
+    )
+
+    message_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    src_node_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    dst_node_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    src_task_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
+    dst_task_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
+    reply_to_message_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("message.message_id", ondelete="RESTRICT"), nullable=True
+    )
+    group_id: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[float] = mapped_column(Double, nullable=False)
+    ttl: Mapped[float] = mapped_column(Double, nullable=False)
+    message_type: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    cleared: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Agent(FlwrBase):
+    """Represent a persistent agent owned by a Flower account.
+
+    ``app_spec`` identifies the AgentApp and an optional version.
+    """
+
+    __tablename__ = "agent"
+    __table_args__ = (
+        Index("idx_agent_flwr_aid", "flwr_aid"),
+        {"sqlite_autoincrement": True},
+    )
+
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_spec: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
 class RunSeries(FlwrBase):
     """Represent a run series."""
 
     __tablename__ = "run_series"
 
-    series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
+    series_id: Mapped[int] = mapped_column(UInt64(), primary_key=True, nullable=False)
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
     is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -76,13 +255,93 @@ class RunSeries(FlwrBase):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
+class Space(FlwrBase):
+    """Represent a space."""
+
+    __tablename__ = "space"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+
+
+SpaceParticipantTable = Table(
+    "space_participant",
+    FlwrBase.metadata,
+    Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
+    Column("flwr_aid", String, nullable=True),
+    Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
+    Column("read_through_message_id", BigInteger, nullable=False, server_default="0"),
+    CheckConstraint(
+        "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+        "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
+        name="ck_space_participant_identity",
+    ),
+    UniqueConstraint("space_id", "flwr_aid"),
+    UniqueConstraint("space_id", "agent_id"),
+    Index("idx_space_participant_flwr_aid", "flwr_aid"),
+)
+
+
+class SpaceMessage(FlwrBase):
+    """Represent a message authored by a user or agent in a space."""
+
+    __tablename__ = "space_message"
+    __table_args__ = (
+        CheckConstraint(
+            "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+            "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
+            name="ck_space_message_identity",
+        ),
+        Index("idx_space_message_space_id_id", "space_id", "id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
+    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("agent.agent_id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class SeriesContext(FlwrBase):
     """Represent context data for a run series."""
 
     __tablename__ = "series_context"
 
-    series_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
+    series_id: Mapped[int] = mapped_column(UInt64(), primary_key=True, nullable=False)
     context: Mapped[bytes | None] = mapped_column(LargeBinary)
+
+
+class CompactedContext(FlwrBase):
+    """Represent a compacted event context for a run series.
+
+    ``through_event_id`` is an inclusive event high-water mark for the series.
+    """
+
+    __tablename__ = "compacted_contexts"
+    __table_args__ = (
+        UniqueConstraint("series_id", "through_event_id"),
+        Index("idx_compacted_contexts_series_id_id", "series_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    through_event_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class SeriesRuns(FlwrBase):
@@ -92,8 +351,8 @@ class SeriesRuns(FlwrBase):
     __table_args__ = (Index("idx_series_runs_series_id", "series_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    series_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    run_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), unique=True, nullable=False)
 
 
 class Automation(FlwrBase):
@@ -115,7 +374,7 @@ class Automation(FlwrBase):
     )
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
-    series_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     start_run_request: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -136,26 +395,43 @@ class FederationApp(FlwrBase):
             "federation_id",
             "added_at",
         ),
+        Index(
+            "idx_federation_app_app_id_federation_id",
+            "app_id",
+            "federation_id",
+        ),
     )
 
     federation_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     app_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    fab_hash: Mapped[str] = mapped_column(String, nullable=False)
     app_type: Mapped[str] = mapped_column(String, nullable=False)
     is_hub_app: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    color: Mapped[str | None] = mapped_column(String, nullable=True)
     added_by: Mapped[str] = mapped_column(String, nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class Connector(FlwrBase):
-    """Represent connector configuration for an account."""
+    """Represent connector configuration for a federation."""
 
     __tablename__ = "connector"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
-    flwr_aid: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True, nullable=False
+    )
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     credentials_json: Mapped[str] = mapped_column(String, nullable=False)
     config_json: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_by: Mapped[str] = mapped_column(String, nullable=False)
+    deleted_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ConnectorOAuthSession(FlwrBase):
@@ -167,6 +443,7 @@ class ConnectorOAuthSession(FlwrBase):
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str] = mapped_column(String, nullable=False)
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)
@@ -181,8 +458,8 @@ class RunConnector(FlwrBase):
 
     __tablename__ = "run_connector"
 
-    run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
-    connector_ref: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), primary_key=True, nullable=False)
+    connector_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
 
 
 class Task(FlwrBase):
@@ -195,12 +472,13 @@ class Task(FlwrBase):
         Index("idx_task_active_until", "active_until"),
     )
 
-    task_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    task_id: Mapped[int] = mapped_column(UInt64(), nullable=False, unique=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
-    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    connector_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token: Mapped[str | None] = mapped_column(String, nullable=True)
     active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     pending_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -226,18 +504,27 @@ class TaskEvent(FlwrBase):
         Index("idx_task_event_task_id", "task_id"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        # Both are signed 64-bit; SQLite requires INTEGER for autoincrement.
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     timestamp: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
-    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     task_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("task.task_id"), nullable=False
+        UInt64(), ForeignKey("task.task_id"), nullable=False
     )
     event: Mapped[str] = mapped_column(String, nullable=False)
     data: Mapped[str] = mapped_column(String, nullable=False)
 
 
 class TaskMessage(FlwrBase):
-    """Represent a task message."""
+    """Represent a pending task message.
+
+    Messages are removed when retrieved or expired. An empty table is normal
+    when no messages are waiting to be picked up.
+    """
 
     __tablename__ = "task_message"
     __table_args__ = (
@@ -246,12 +533,12 @@ class TaskMessage(FlwrBase):
     )
 
     message_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     src_task_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("task.task_id"), nullable=False
+        UInt64(), ForeignKey("task.task_id"), nullable=False
     )
     dst_task_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("task.task_id"), nullable=False
+        UInt64(), ForeignKey("task.task_id"), nullable=False
     )
     reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[float] = mapped_column(Float, nullable=False)
@@ -265,7 +552,7 @@ TaskLogsTable = Table(
     "task_logs",
     FlwrBase.metadata,
     Column("timestamp", Float, nullable=False),
-    Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+    Column("task_id", UInt64(), ForeignKey("task.task_id"), nullable=False),
     Column("log", String, nullable=False),
     Index("idx_task_logs_task_id_timestamp", "task_id", "timestamp"),
 )
@@ -281,13 +568,17 @@ class ObjectPushSession(FlwrBase):
     )
 
     session_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
-    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     pending_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class ObjectPushSessionRoot(FlwrBase):
-    """Represent a root object for an object push session."""
+    """Represent a root object for an object push session.
+
+    These records are removed when uploads complete or sessions are cleaned up,
+    so the table may be empty when no uploads are in progress.
+    """
 
     __tablename__ = "object_push_session_roots"
     __table_args__ = (Index("idx_object_push_session_roots_session_id", "session_id"),)
@@ -303,7 +594,11 @@ class ObjectPushSessionRoot(FlwrBase):
 
 
 class ObjectPushSessionPending(FlwrBase):
-    """Represent a pending object for an object push session."""
+    """Represent a pending object for an object push session.
+
+    Entries are removed as objects are uploaded. The table may be empty once
+    all pending uploads have finished.
+    """
 
     __tablename__ = "object_push_session_pending"
     __table_args__ = (
@@ -334,9 +629,9 @@ class TaskUsage(FlwrBase):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     task_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("task.task_id"), nullable=False
+        UInt64(), ForeignKey("task.task_id"), nullable=False
     )
     input_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

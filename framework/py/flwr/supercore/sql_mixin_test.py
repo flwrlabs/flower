@@ -17,9 +17,11 @@
 
 import unittest
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from sqlalchemy import Column, Integer, MetaData, Table
+from sqlalchemy import Column, Integer, MetaData, Table, create_engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import SingletonThreadPool
 
 from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
 
@@ -71,6 +73,24 @@ class TestSqlMixin(unittest.TestCase):
         """Set up test database for each test."""
         self.db = DummyDbSqlAlchemy(":memory:")
         self.db.initialize()
+
+    def test_initialize_accepts_engine_kwargs(self) -> None:
+        """Engine kwargs should be forwarded and override SQLite defaults."""
+        with patch(
+            "flwr.supercore.sql_mixin.create_engine", wraps=create_engine
+        ) as create_engine_mock:
+            self.db.initialize(
+                pool_pre_ping=True,
+                connect_args={"timeout": 30},
+                poolclass=SingletonThreadPool,
+            )
+
+        create_engine_mock.assert_called_once_with(
+            self.db.database_url,
+            pool_pre_ping=True,
+            connect_args={"timeout": 30},
+            poolclass=SingletonThreadPool,
+        )
 
     def test_session_commits_all_queries_atomitcally(self) -> None:
         """Test that all queries in a session are committed as a single transaction."""

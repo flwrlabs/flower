@@ -162,6 +162,14 @@ class NoOpFederationManager(FederationManager):
             ) from None
         cast(SimulationConfig, self._simulation_config).MergeFrom(config)
 
+    def set_icon_key(
+        self, flwr_aid: str, federation_id: str, icon_key: str | None
+    ) -> None:
+        """Set or clear the custom icon for a federation."""
+        raise UnsupportedError(
+            "`set_icon_key` is not supported by NoOpFederationManager."
+        )
+
     def create_federation(
         self,
         flwr_aid: str,

@@ -85,7 +85,7 @@ Deployed Flower systems have at least two types of network connections:
   always use TLS, but ``insecure`` mode is supported for local testing.
 - **SuperNode to SuperLink (Fleet API)**: In Flower terminology, a Flower federation is
   a set of SuperNodes connected to the same SuperLink. From a networking perspective,
-  each SuperNode acts as a gRPC client and the SuperLink acts as a gRPC server. This
+  each SuperNode acts as an HTTP client and the SuperLink acts as an HTTP server. This
   means that, when deploying a SuperNode, only outgoing connections are necessary to
   connect to the SuperLink. Only the SuperNodes can initiate such requests and they do
   not respond to incoming requests. The SuperNode to SuperLink connection should always
@@ -112,7 +112,8 @@ runtime, as summarized in the table below.
 .. note::
 
     Runtime API communication uses HTTP starting with Flower 1.35. Starting with Flower
-    1.37, the Flower CLI also communicates with the Control API over HTTP.
+    1.37, the Flower CLI also communicates with the Control API over HTTP. The Fleet API
+    also uses HTTP by default.
 
 .. list-table::
     :widths: 25 25 35 65
@@ -127,7 +128,7 @@ runtime, as summarized in the table below.
       - Runtime API
       - Used by the SuperExec and the ``ServerApp`` processes
     - -
-      - 9092
+      - 8000
       - Fleet API
       - Used by the SuperNodes
     - -
@@ -140,7 +141,8 @@ runtime, as summarized in the table below.
       - Runtime API
       - Used by the SuperExec and the ``ClientApp`` processes
 
-The SuperLink Runtime and Control APIs share the same HTTP server and default port.
+The SuperLink Runtime, Fleet, and Control APIs share the same HTTP server and default
+port.
 
 .. note::
 

@@ -54,7 +54,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def filter_nodes(self, node_ids: set[int], federation_id: str) -> set[int]:
-        """Given a list of node IDs, return sublist with nodes in federation."""
+        """Return the subset of node IDs in the federation, including SuperLink."""
 
     @abstractmethod
     def has_node(self, node_id: int, federation_id: str) -> bool:
@@ -130,6 +130,27 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
+    def set_icon_key(
+        self, flwr_aid: str, federation_id: str, icon_key: str | None
+    ) -> None:
+        """Set or clear the custom icon for a federation.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The ID of the account setting the icon.
+        federation_id : str
+            The federation ID.
+        icon_key : str | None
+            The icon key to store, or ``None`` to clear the custom icon.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist or the caller is not its owner.
+        """
+
+    @abstractmethod
     def create_federation(
         self,
         flwr_aid: str,
@@ -139,10 +160,14 @@ class FederationManager(ABC):
     ) -> Federation:
         """Create a new federation.
 
+        Implementations must authorize the namespace in ``federation_id`` for the
+        authenticated actor identified by ``flwr_aid`` at creation time. The actor
+        remains the requesting account when selecting another namespace.
+
         Parameters
         ----------
         flwr_aid : str
-            The ID of the account creating the federation.
+            The ID of the authenticated account creating the federation.
         federation_id : str
             The federation ID.
         description : str

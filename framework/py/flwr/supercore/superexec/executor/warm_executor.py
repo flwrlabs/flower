@@ -21,9 +21,9 @@ from pathlib import Path
 from threading import Event
 from types import FrameType
 
+from flwr.supercore.warm_executor_constants import WARM_EXECUTOR_READY_FILE
+
 WARM_EXECUTOR_MODULE = "flwr.supercore.superexec.executor.warm_executor"
-WARM_EXECUTOR_READY_DIRECTORY = "/tmp/flwr-warm-executor"
-WARM_EXECUTOR_READY_FILE = f"{WARM_EXECUTOR_READY_DIRECTORY}/ready"
 WARM_EXECUTOR_READINESS_COMMAND = (
     "python",
     "-c",

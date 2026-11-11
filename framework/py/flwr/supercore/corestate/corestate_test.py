@@ -17,14 +17,19 @@
 
 # pylint: disable=too-many-lines
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from datetime import UTC, datetime, timedelta
+from operator import attrgetter
+from threading import Event as ThreadEvent
 from typing import Any, cast
 from unittest.mock import call, patch
+from uuid import UUID
 
 from parameterized import parameterized
+from sqlalchemy import delete
 
-from flwr.app import Context, RecordDict
+from flwr.app import Context, Message, RecordDict
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -32,23 +37,36 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.control_pb2 import Automation, StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    Automation,
+    StartRunRequest,
+    StreamEventsResponse,
+)
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     TaskEvent,
     TaskStatus,
     TaskUsage,
 )
 from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
     TaskType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
-from flwr.supercore.typing import ConnectorRecord
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 
 from . import CoreState
+from .in_memory_corestate import InMemoryCoreState
+from .sql_corestate import SqlCoreState
 from .utils_test import create_task_message
 
 
@@ -87,6 +105,422 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def _patch_message_time(self, current: datetime) -> ExitStack:
+        """Freeze message lifecycle clocks without replacing datetime's type."""
+        stack = ExitStack()
+        for module in (
+            "flwr.supercore.corestate.in_memory_corestate",
+            "flwr.supercore.corestate.sql_corestate",
+            "flwr.supercore.corestate.utils",
+        ):
+            stack.enter_context(patch(f"{module}.now", return_value=current))
+        return stack
+
+    def assert_message_metadata_equal(
+        self, actual: list[Message], expected: list[Message]
+    ) -> None:
+        """Compare complete Message metadata without regard to order."""
+        self.assertEqual(
+            sorted((msg.metadata for msg in actual), key=attrgetter("message_id")),
+            sorted((msg.metadata for msg in expected), key=attrgetter("message_id")),
+        )
+
+    def test_get_file_and_list_files_when_absent(self) -> None:
+        """An empty scope has no file content or metadata."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+
+    @parameterized.expand([(b"hello",), (b"",), (b"\x00\xff",)])  # type: ignore
+    def test_put_file_and_get_file(self, data: bytes) -> None:
+        """Creating a file preserves its bytes and returns matching metadata."""
+        state = self.state_factory()
+
+        revision = state.put_file("scope", "file", data, expected_revision=None)
+
+        self.assertIsInstance(revision, int)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=revision, size_bytes=len(data)
+                ),
+                data=data,
+            ),
+        )
+
+    def test_put_file_updates_matching_revision(self) -> None:
+        """Updating a live file replaces its content and changes its revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+
+        self.assertNotEqual(updated_revision, revision)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=updated_revision, size_bytes=7
+                ),
+                data=b"updated",
+            ),
+        )
+
+    def test_put_file_rejects_conflicting_revision(self) -> None:
+        """Create-only and mismatched updates leave an existing file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"original", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        for expected_revision in (None, revision + 1):
+            with self.subTest(expected_revision=expected_revision):
+                with self.assertRaises(FlowerError) as exc:
+                    state.put_file(
+                        "scope",
+                        "file",
+                        b"conflict",
+                        expected_revision=expected_revision,
+                    )
+                self.assertEqual(
+                    exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+                )
+                self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_put_file_update_requires_live_file(self, deleted: bool) -> None:
+        """An update cannot create a missing file or revive a deleted file."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"old", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.put_file("scope", "file", b"new", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_list_files_filters_and_orders_metadata(self) -> None:
+        """List by scope, prefix and exclusive cursor before applying the limit."""
+        state = self.state_factory()
+        metadata = {}
+        for key in ("dir/c", "other", "dir/a", "dir/b"):
+            revision = state.put_file("scope", key, b"data", expected_revision=None)
+            metadata[key] = FileMetadata(key=key, revision=revision, size_bytes=4)
+        state.put_file("other-scope", "dir/b", b"other", expected_revision=None)
+
+        for prefix, start_after, limit, keys in (
+            ("", "", None, ["dir/a", "dir/b", "dir/c", "other"]),
+            ("dir/", "", None, ["dir/a", "dir/b", "dir/c"]),
+            ("dir/", "dir/a", 1, ["dir/b"]),
+            ("dir/", "dir/c", None, []),
+            ("missing/", "", None, []),
+        ):
+            with self.subTest(prefix=prefix, start_after=start_after, limit=limit):
+                self.assertEqual(
+                    list(state.list_files("scope", prefix, start_after, limit)),
+                    [metadata[key] for key in keys],
+                )
+
+    def test_delete_file_and_recreate(self) -> None:
+        """Deletion hides a file and create-only can recreate it with a new revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+        recreated_revision = state.put_file(
+            "scope", "file", b"new", expected_revision=None
+        )
+        self.assertNotEqual(recreated_revision, revision)
+        file = state.get_file("scope", "file")
+        assert file is not None
+        self.assertEqual(file.data, b"new")
+        self.assertEqual(file.metadata.revision, recreated_revision)
+
+    def test_delete_file_rejects_mismatched_revision(self) -> None:
+        """A mismatched delete leaves the live file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"data", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision + 1)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_delete_file_requires_live_file(self, deleted: bool) -> None:
+        """Deleting a missing or already deleted file raises a revision conflict."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"data", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_files_are_isolated_by_scope(self) -> None:
+        """Writing and deleting a key in one scope leaves another scope unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"first", expected_revision=None)
+        state.put_file("other-scope", "file", b"second", expected_revision=None)
+        other = state.get_file("other-scope", "file")
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+        self.assertEqual(state.get_file("other-scope", "file"), other)
+        state.delete_file("scope", "file", expected_revision=updated_revision)
+        self.assertEqual(state.get_file("other-scope", "file"), other)
+
+    def test_store_messages_returns_acceptance_results(self) -> None:
+        """Return per-Message results and accept duplicates before body upload."""
+        # Prepare: Create valid and invalid Messages without uploading their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        invalid = create_task_message(run_id=run_id)
+        invalid.metadata.__dict__["_message_id"] = ""
+        other = create_task_message(run_id=run_id, has_error=True)
+
+        # Execute & Assert: Empty batches succeed and the first body is unuploaded.
+        self.assertEqual(state.store_messages([]), [])
+        self.assertIsNone(state.object_store.get(message.metadata.message_id))
+
+        # Execute & Assert: Reject only the invalid Message and accept duplicates.
+        self.assertEqual(
+            state.store_messages([message, invalid, other]), [True, False, True]
+        )
+        self.assertEqual(state.store_messages([message, other]), [True, True])
+
+        # Assert: Only the two accepted Messages remain pending.
+        self.assert_message_metadata_equal(
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID),
+            [message, other],
+        )
+
+    def test_get_messages_intersects_destination_run_and_correlation(self) -> None:
+        """Destination always applies; omitted and empty filters differ."""
+        # Prepare: Store a Message whose ID will be used in reply_to_message_id.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        self.assertEqual(state.store_messages([message]), [True])
+        reply_to_message_id = message.metadata.message_id
+
+        # Prepare: Vary destination, run, and reply_to_message_id across Messages.
+        matching_message = create_task_message(
+            run_id=run_id, reply_to_message_id=reply_to_message_id
+        )
+        other_destination = create_task_message(
+            run_id=run_id, reply_to_message_id=reply_to_message_id
+        )
+        other_destination.metadata.dst_node_id = 123
+        other_destination.metadata.__dict__["_message_id"] = other_destination.object_id
+        other_run = create_task_message(run_id=other_run_id)
+        messages = [matching_message, other_destination, other_run]
+        self.assertEqual(state.store_messages(messages), [True] * len(messages))
+
+        # Prepare: Define results for omitted, intersecting, and empty filters.
+        cases: list[tuple[dict[str, Any], list[Message]]] = [
+            ({}, [message, matching_message, other_run]),
+            ({"run_id": run_id}, [message, matching_message]),
+            ({"reply_to_message_ids": {reply_to_message_id}}, [matching_message]),
+            (
+                {"run_id": run_id, "reply_to_message_ids": {reply_to_message_id}},
+                [matching_message],
+            ),
+            (
+                {"run_id": other_run_id, "reply_to_message_ids": {reply_to_message_id}},
+                [],
+            ),
+            ({"reply_to_message_ids": set()}, []),
+            ({"reply_to_message_ids": {"unknown"}}, []),
+        ]
+
+        # Execute & Assert: Check each filter combination within the destination inbox.
+        for filters, expected in cases:
+            with self.subTest(filters=filters):
+                self.assert_message_metadata_equal(
+                    state.get_messages(dst_node_id=SUPERLINK_NODE_ID, **filters),
+                    expected,
+                )
+
+    def test_get_messages_orders_limits_and_keeps_pending(self) -> None:
+        """Filter TTL before LIMIT and order by creation time, then Message ID."""
+        # Prepare: Create Messages with different deadlines and tied creation times.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        current = now()
+        expired = create_task_message(
+            run_id=run_id, created_at=current.timestamp() - 2, ttl=3
+        )
+        first = create_task_message(run_id=run_id, created_at=current.timestamp() - 1)
+        tied = [
+            create_task_message(run_id=run_id, created_at=current.timestamp()),
+            create_task_message(
+                run_id=run_id, created_at=current.timestamp(), has_error=True
+            ),
+        ]
+        tied.sort(key=lambda msg: msg.metadata.message_id)
+
+        # Prepare: Freeze time and store Messages out of retrieval order.
+        with self._patch_message_time(current):
+            self.assertEqual(
+                state.store_messages([tied[1], expired, tied[0], first]), [True] * 4
+            )
+
+        # Execute: Advance time past the oldest Message's TTL.
+        with self._patch_message_time(current + timedelta(seconds=2)):
+
+            # Execute & Assert: Limited reads return the same first two live Messages.
+            for _ in range(2):
+                self.assertEqual(
+                    [
+                        msg.metadata
+                        for msg in state.get_messages(
+                            dst_node_id=SUPERLINK_NODE_ID, limit=2
+                        )
+                    ],
+                    [first.metadata, tied[0].metadata],
+                )
+
+            # Execute & Assert: An unlimited read returns all live Messages in order.
+            self.assertEqual(
+                [
+                    msg.metadata
+                    for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+                ],
+                [msg.metadata for msg in [first, *tied]],
+            )
+
+    @parameterized.expand([(0,), (-1,)])  # type: ignore
+    def test_get_messages_rejects_non_positive_limit(self, limit: int) -> None:
+        """A limit must be positive even for an empty inbox."""
+        # Prepare: Use an empty inbox with the parameterized non-positive limit.
+        state = self.state_factory()
+
+        # Execute & Assert: Reject the invalid limit with ValueError.
+        with self.assertRaises(ValueError):
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID, limit=limit)
+
+    def test_acknowledge_messages_releases_only_acknowledged_bodies(self) -> None:
+        """ACK removes selected Messages from retrieval and releases their bodies."""
+        # Prepare: Store two Messages, including their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        message_id = message.metadata.message_id
+        other = create_task_message(run_id=run_id, has_error=True)
+        self.assertEqual(state.store_messages([message, other]), [True, True])
+        for msg in (message, other):
+            state._store_generated_message(msg)  # pylint: disable=protected-access
+
+        # Execute & Assert: An empty ACK preserves the Message's body.
+        state.acknowledge_messages([])
+        self.assertIsNotNone(state.object_store.get(message_id))
+
+        # Execute: ACK the same Message twice and include an unknown ID.
+        state.acknowledge_messages([message_id, "unknown"])
+        state.acknowledge_messages([message_id])
+
+        # Assert: Only the acknowledged body is released.
+        self.assertIsNone(state.object_store.get(message_id))
+        self.assertIsNotNone(state.object_store.get(other.metadata.message_id))
+
+        # Execute & Assert: Re-storing an acknowledged Message keeps its status.
+        self.assertEqual(state.store_messages([message]), [True])
+        self.assertEqual(
+            [msg.metadata for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)],
+            [other.metadata],
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("ids", [0, 2], False, [1]),
+            ("run", None, True, [2]),
+            ("intersection", [0, 2], True, [1, 2]),
+            ("empty_ids", [], False, [0, 1, 2]),
+            ("empty_ids_with_run", [], True, [0, 1, 2]),
+        ]
+    )
+    def test_cancel_messages_intersects_filters_and_releases_bodies(
+        self,
+        _name: str,
+        message_indexes: list[int] | None,
+        filter_run: bool,
+        remaining_indexes: list[int],
+    ) -> None:
+        """Cancel matching pending Messages without affecting other Messages."""
+        # Prepare: Store three Messages across two runs, including their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        messages = [
+            create_task_message(run_id=run_id),
+            create_task_message(run_id=run_id, has_error=True),
+            create_task_message(run_id=other_run_id),
+        ]
+        self.assertEqual(state.store_messages(messages), [True] * 3)
+        for message in messages:
+            state._store_generated_message(message)  # pylint: disable=protected-access
+
+        # Prepare: Select Message IDs and an optional run filter for this case.
+        message_ids = (
+            None
+            if message_indexes is None
+            else [messages[index].metadata.message_id for index in message_indexes]
+        )
+
+        # Execute: Repeat cancellation to verify idempotency.
+        for _ in range(2):
+            state.cancel_messages(
+                message_ids=message_ids, run_id=run_id if filter_run else None
+            )
+
+        # Execute & Assert: Re-storing Messages preserves their delivery status.
+        self.assertEqual(state.store_messages(messages), [True] * 3)
+
+        # Assert: Only unmatched Messages remain pending and retain their bodies.
+        self.assert_message_metadata_equal(
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID),
+            [messages[index] for index in remaining_indexes],
+        )
+        for index, message in enumerate(messages):
+            self.assertEqual(
+                state.object_store.get(message.metadata.message_id) is not None,
+                index in remaining_indexes,
+            )
+
+    def test_cancel_messages_requires_a_filter(self) -> None:
+        """Cancellation without an ID or run filter must fail."""
+        # Prepare: Use an empty state without cancellation filters.
+        state = self.state_factory()
+
+        # Execute & Assert: Reject unfiltered cancellation with ValueError.
+        with self.assertRaises(ValueError):
+            state.cancel_messages()
+
     def test_store_list_and_delete_apps(self) -> None:
         """Federation apps can be stored, listed, limited, and deleted."""
         state = self.state_factory()
@@ -105,6 +539,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             app_type=TaskType.AGENT_APP,
             added_by="account-a",
             is_hub_app=True,
+            display_name="Agent",
+            description="Agent description",
+            color="sky",
         )
         state.store_app(
             fab=Fab("", b"other", {}),
@@ -118,11 +555,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
             [
-                ("@me/z-agent", "", TaskType.AGENT_APP, True),
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
                 ("@me/server", server_hash, TaskType.SERVER_APP, False),
             ],
         )
         self.assertIsNotNone(state.get_fab(agent_hash))
+        self.assertEqual(apps[0].display_name, "Agent")
+        self.assertEqual(apps[0].description, "Agent description")
+        self.assertEqual(apps[0].color, "sky")
+        self.assertEqual(
+            (apps[1].display_name, apps[1].description, apps[1].color),
+            ("", "", ""),
+        )
         self.assertEqual(
             state.get_app("@me/fed-a", "@me/server", server_hash),
             Fab(server_hash, b"server", {}),
@@ -132,6 +576,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
             ["@me/z-agent"],
+        )
+        self.assertCountEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-a", "@me/fed-b"],
+        )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a"]),
+            ["@me/fed-a"],
+        )
+        self.assertEqual(state.list_app_associations("@me/missing", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("@me/server", []), [])
+        self.assertEqual(
+            state.list_app_associations(
+                FLOWER_AGENT_APP_ID, ["@me/fed-b", "@me/fed-a"]
+            ),
+            ["@me/fed-b", "@me/fed-a"],
         )
         self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
         with self.assertRaises(AssertionError):
@@ -147,10 +608,38 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         updated = state.list_apps("@me/fed-a")
         self.assertEqual(len(updated), 2)
-        self.assertEqual(updated[1].fab_hash, "")
+        self.assertEqual(updated[1].fab_hash, updated_hash)
         self.assertTrue(updated[1].is_hub_app)
+        self.assertEqual(updated[0].display_name, "Agent")
+        self.assertEqual(updated[0].description, "Agent description")
+        self.assertEqual(updated[0].color, "sky")
         self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
-        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", updated_hash))
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", updated_hash),
+            Fab(updated_hash, b"updated", {}),
+        )
+        refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
+        self.assertTrue(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
+        cached = state.get_hub_app("@me/fed-a", "@me/server")
+        self.assertEqual(cached[0].hash_str if cached else None, refreshed_hash)
+        self.assertEqual(state.list_apps("@me/fed-a")[1].app_type, TaskType.AGENT_APP)
+        self.assertFalse(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
 
         self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
         self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
@@ -162,50 +651,88 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [app.app_id for app in state.list_apps("@me/fed-b")],
             ["@me/server"],
         )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-b"],
+        )
         self.assertIsNotNone(state.get_fab(updated_hash))
 
-    def test_connector_upsert_get_and_delete(self) -> None:
-        """A connector can be created, updated, retrieved, and deleted."""
+    def test_connector_create_list_and_delete(self) -> None:
+        """Multiple connectors of one provider can be created and deleted by ID."""
         state = self.state_factory()
+        federation_id = "@bob/fed-a"
 
-        self.assertTrue(
-            state.upsert_connector(
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-            )
+        first_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"first"}',
+            config_json='{"calendar":"primary"}',
+            created_by="account-a",
         )
+        second_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"second"}',
+            config_json='{"calendar":"work"}',
+            created_by="account-a",
+        )
+        assert first_id is not None
+        assert second_id is not None
+        connectors = list(state.get_connectors_by_ref(federation_id, "calendar"))
+        self.assertGreater(second_id, first_id)
         self.assertEqual(
-            state.get_connector(flwr_aid="account-a", connector_ref="calendar"),
-            ConnectorRecord(
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"first"}',
-                config_json='{"calendar":"primary"}',
-            ),
+            [item.connector_id for item in connectors], [first_id, second_id]
         )
-        self.assertTrue(
-            state.upsert_connector(
-                flwr_aid="account-a",
-                connector_ref="calendar",
-                credentials_json='{"token":"updated"}',
-                config_json='{"calendar":"work"}',
-            )
-        )
-        updated = state.get_connector(flwr_aid="account-a", connector_ref="calendar")
-        assert updated is not None
-        self.assertEqual(updated.credentials_json, '{"token":"updated"}')
-        self.assertEqual(updated.config_json, '{"calendar":"work"}')
+        self.assertEqual(state.get_connector_by_id(second_id), connectors[1])
 
-        self.assertTrue(
-            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        self.assertTrue(state.delete_connector(federation_id, second_id))
+        self.assertEqual(
+            [
+                connector.connector_id
+                for connector in state.get_connectors_by_ref(federation_id, "calendar")
+            ],
+            [first_id],
         )
-        self.assertIsNone(
-            state.get_connector(flwr_aid="account-a", connector_ref="calendar")
+
+    def test_update_connector_credentials(self) -> None:
+        """Persist credential updates and roll back failures without changing config."""
+        state = self.state_factory()
+        connector_id = state.create_connector(
+            "@bob/fed-a",
+            "calendar",
+            '{"token":"old"}',
+            '{"calendar":"work"}',
+            "account-a",
         )
-        self.assertFalse(
-            state.delete_connector(flwr_aid="account-a", connector_ref="calendar")
+        assert connector_id is not None
+
+        def rotate() -> str:
+            return '{"token":"new"}'
+
+        assert (
+            state.update_connector_credentials(connector_id, '{"token":"old"}', rotate)
+            == '{"token":"new"}'
+        )
+        stored = state.get_connector_by_id(connector_id)
+        assert stored is not None
+        assert stored.credentials_json == '{"token":"new"}'
+        assert stored.config_json == '{"calendar":"work"}'
+
+        def fail() -> str:
+            raise RuntimeError("refresh failed")
+
+        assert (
+            state.update_connector_credentials(connector_id, '{"token":"old"}', fail)
+            == '{"token":"new"}'
+        )
+        with self.assertRaisesRegex(RuntimeError, "refresh failed"):
+            state.update_connector_credentials(connector_id, '{"token":"new"}', fail)
+        assert state.get_connector_by_id(connector_id) == stored
+        assert (
+            state.update_connector_credentials(
+                connector_id + 1, '{"token":"new"}', fail
+            )
+            is None
         )
 
     def test_bind_and_get_run_connectors(self) -> None:
@@ -214,19 +741,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         state.bind_connectors_to_run(
             run_id=42,
-            connector_refs=["notion", "calendar", "notion"],
+            connector_ids=[2, 1, 2],
         )
-        state.bind_connectors_to_run(run_id=42, connector_refs=["notion"])
+        state.bind_connectors_to_run(run_id=42, connector_ids=[2])
 
         self.assertEqual(
-            list(state.get_run_connector_refs(run_id=42)),
-            ["calendar", "notion"],
+            list(state.get_run_connector_ids(run_id=42)),
+            [1, 2],
         )
 
         self.assertFalse(
-            state.bind_connectors_to_run(run_id=43, connector_refs="notion")
+            state.bind_connectors_to_run(run_id=43, connector_ids="notion")  # type: ignore
         )
-        self.assertEqual(list(state.get_run_connector_refs(run_id=43)), [])
+        self.assertEqual(list(state.get_run_connector_ids(run_id=43)), [])
 
     def test_run_series_context_roundtrip(self) -> None:
         """A run series context can be stored and retrieved."""
@@ -269,6 +796,36 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated.node_config, updated_context.node_config)
         self.assertEqual(updated.run_config, updated_context.run_config)
 
+    def test_store_compacted_context(self) -> None:
+        """Store summaries at distinct event boundaries in a series."""
+        state = self.state_factory()
+        other_series_id = 2**63 + 43
+        state.store_compacted_context(42, 2**63, "First", token_count=123)
+        with self.assertRaises(ValueError):
+            state.store_compacted_context(42, 2**63, "Duplicate", token_count=123)
+        state.store_compacted_context(42, 2**63 + 100, "Second", token_count=2**63)
+        state.store_compacted_context(other_series_id, 2**63, "Other", token_count=789)
+
+        second, first = state.get_compacted_contexts(42, limit=2)
+        (other,) = state.get_compacted_contexts(other_series_id)
+
+        self.assertGreater(first.id, 0)
+        self.assertLess(first.id, second.id)
+        self.assertTrue(first.created_at)
+        self.assertEqual(first.series_id, 42)
+        self.assertEqual(first.through_event_id, 2**63)
+        self.assertEqual(first.text, "First")
+        self.assertEqual(first.token_count, 123)
+        self.assertEqual(second.through_event_id, 2**63 + 100)
+        self.assertEqual(second.text, "Second")
+        self.assertEqual(second.token_count, 2**63)
+        self.assertNotEqual(second.id, first.id)
+        self.assertEqual(
+            state.get_compacted_contexts(42, before_context_id=second.id), [first]
+        )
+        self.assertEqual(other.series_id, other_series_id)
+        self.assertEqual(other.text, "Other")
+
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
         state = self.state_factory()
@@ -277,6 +834,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         session = state.create_connector_oauth_session(
             oauth_session_id="session-1",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -284,6 +842,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             expires_at=expires_at,
         )
         assert session is not None
+        self.assertEqual(session.federation_id, "@account-a/fed-a")
         self.assertEqual(session.expires_at, expires_at.isoformat())
         self.assertIsNone(session.completed_at)
         self.assertEqual(
@@ -296,6 +855,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.create_connector_oauth_session(
                 oauth_session_id="session-1",
                 flwr_aid="account-a",
+                federation_id="@account-a/fed-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="missing-federation",
+                flwr_aid="account-a",
+                federation_id="",
                 connector_ref="calendar",
                 state="oauth-state",
                 redirect_uri="https://example.test/callback",
@@ -331,6 +903,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         expired = state.create_connector_oauth_session(
             oauth_session_id="expired-session",
             flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
             connector_ref="calendar",
             state="oauth-state",
             redirect_uri="https://example.test/callback",
@@ -563,8 +1136,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
         object_id = "a" * 64
         created_at = datetime(2026, 1, 1, tzinfo=UTC)
-        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
-            mock_datetime.now.return_value = created_at
+        with self._patch_message_time(created_at):
             session_ids = []
             for root_object_id in ("b" * 64, "c" * 64):
                 session_id = state.start_session(run_id)
@@ -579,14 +1151,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
         with (
-            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            self._patch_message_time(expired_at),
             patch.object(
                 state,
                 "_cleanup_push_session",
                 wraps=state._cleanup_push_session,  # pylint: disable=W0212
             ) as cleanup_session,
         ):
-            mock_datetime.now.return_value = expired_at
             self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
             cleanup_session.assert_not_called()
             self.assertIsNone(state.get_object(run_id, object_id))
@@ -975,11 +1546,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
 
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
             fab_hash=None,
-            model_ref="model://test",
-            connector_ref=None,
+            connector_ref="web_search",
         )
         assert task_id is not None
         tasks = state.get_tasks(task_ids=[task_id])
@@ -987,15 +1557,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
-        self.assertEqual(task.type, TaskType.MODEL)
+        self.assertEqual(task.type, TaskType.CONNECTOR)
         self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
         )
-        self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
-        self.assertFalse(task.HasField("connector_ref"))
+        self.assertEqual(task.connector_ref, "web_search")
+        self.assertFalse(task.HasField("connector_id"))
         self.assertTrue(task.pending_at)
         self.assertEqual(task.starting_at, "")
         self.assertEqual(task.running_at, "")
@@ -1013,9 +1583,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
 
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
-            model_ref="model://test",
+            connector_ref="connector://test",
             requesting_task_id=requesting_task_id,
         )
 
@@ -1031,9 +1601,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id_1 = self.task_run_id(state)
         run_id_2 = self.other_task_run_id(state)
-        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
-        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
-        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
@@ -1047,7 +1617,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
@@ -1106,7 +1676,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=run_id,
         )
         assert task_id is not None
@@ -1151,7 +1721,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Adding and retrieving task logs should preserve concatenation order."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1178,7 +1748,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Retrieving task logs after a specific timestamp should filter old logs."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1206,7 +1776,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Retrieving task logs after the last entry should return an empty result."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1226,7 +1796,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Polling with the last returned timestamp should not repeat old logs."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
         )
         assert task_id is not None
@@ -1250,7 +1820,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1276,8 +1846,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        finished_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        claimed_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        finished_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -1292,7 +1864,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1326,7 +1898,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -1367,7 +1939,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -1393,14 +1965,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
     def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
         """Expired STARTING task claims should make tasks pending again."""
-        # Prepare: create and claim a model task.
+        # Prepare: create and claim a connector task.
         state = self.state_factory()
         fixed_now = now()
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
 
@@ -1447,7 +2019,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -1479,7 +2051,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -1501,7 +2073,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
             assert task_id is not None
             assert (token := state.claim_task(task_id))
 
@@ -1525,7 +2097,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         if not hasattr(state, "session"):
             self.skipTest("SQL session test")
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert task_id is not None
 
         with state.session():
@@ -1549,7 +2121,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ) as on_expired:
             with patch("datetime.datetime") as mock_dt:
                 mock_dt.now.return_value = fixed_now
-                task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+                task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
                 assert task_id is not None
                 assert state.claim_task(task_id) is not None
 
@@ -1571,8 +2143,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        other_dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
         assert (
             src_task_id is not None
             and dst_task_id is not None
@@ -1627,15 +2201,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id = self.task_run_id(state)
         other_run_id = self.other_task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         other_run_task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=other_run_id
+            task_type=TaskType.CONNECTOR, run_id=other_run_id
         )
         finished_src_task_id = state.create_task(
             task_type=TaskType.AGENT_APP, run_id=run_id
         )
         finished_dst_task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id
         )
         assert (
             src_task_id is not None
@@ -1693,7 +2267,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
         msg_ttl = 60.0
@@ -1717,7 +2291,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -1746,8 +2320,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A source-specific claim should not consume another task's message."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        src_task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        src_task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         assert (
             src_task_id_1 is not None
@@ -1830,6 +2404,83 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(filtered, events)
         self.assertEqual(excluded, [])
         self.assertEqual(no_runs, [])
+
+    def _create_task_events_for_filter_tests(
+        self,
+    ) -> tuple[CoreState, int, int, list[TaskEvent]]:
+        """Store task events with several types and return them in ID order."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        state.store_task_events(
+            [
+                TaskEvent(
+                    run_id=run_id,
+                    task_id=task_id,
+                    event=event_type,
+                    data=f'{{"type":"{event_type}"}}',
+                )
+                for event_type in (
+                    "message",
+                    "response.created",
+                    "function_call",
+                    "message",
+                    "function_call_output",
+                )
+            ]
+        )
+        return state, run_id, task_id, list(state.get_task_events(run_ids=[run_id]))
+
+    def test_get_task_events_filters_by_type(self) -> None:
+        """Return requested event types, including types outside the summary set."""
+        state, run_id, _, events = self._create_task_events_for_filter_tests()
+
+        self.assertEqual(
+            state.get_task_events(run_ids=[run_id], event_types=["message"]),
+            [events[0], events[3]],
+        )
+        self.assertEqual(
+            state.get_task_events(run_ids=[run_id], event_types=["response.created"]),
+            [events[1]],
+        )
+        self.assertEqual(state.get_task_events(run_ids=[run_id], event_types=[]), [])
+
+    def test_get_task_events_filters_by_id(self) -> None:
+        """Treat both event ID bounds as exclusive."""
+        state, run_id, _, events = self._create_task_events_for_filter_tests()
+
+        self.assertEqual(
+            state.get_task_events(
+                run_ids=[run_id],
+                after_task_event_id=events[1].id,
+                before_task_event_id=events[4].id,
+            ),
+            events[2:4],
+        )
+
+    def test_get_task_events_returns_last_matching(self) -> None:
+        """Apply filters before selecting the newest N events in ID order."""
+        state, run_id, task_id, events = self._create_task_events_for_filter_tests()
+
+        filtered = state.get_task_events(
+            run_ids=[run_id],
+            task_ids=[task_id],
+            event_types=["message", "response.created", "function_call"],
+            after_task_event_id=events[0].id,
+            before_task_event_id=events[-1].id,
+            last_n=2,
+        )
+
+        self.assertEqual(list(filtered), [events[2], events[3]])
+        self.assertEqual(state.get_task_events(run_ids=[run_id], last_n=0), events)
+
+    def test_get_task_events_rejects_negative_last_n(self) -> None:
+        """Reject negative limits consistently across state implementations."""
+        state, run_id, _, _ = self._create_task_events_for_filter_tests()
+
+        with self.assertRaisesRegex(ValueError, "last_n must be non-negative"):
+            state.get_task_events(run_ids=[run_id], last_n=-1)
 
     @parameterized.expand(  # type: ignore
         [
@@ -1943,3 +2594,185 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                     expires_at=created_at.timestamp() + 10.0,
                 )
             )
+
+    def test_user_event_bootstrap(self) -> None:
+        """Snapshot owned state and replay shared user and agent messages."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        assert agent is not None
+        snapshot = state.get_bootstrap("alice")
+        self.assertEqual(list(snapshot.agents), [agent])
+        self.assertEqual(list(snapshot.spaces), list(state.get_spaces("alice")))
+        self.assertEqual(snapshot.cursor, 2)
+        self.assertEqual(state.get_bootstrap("bob").cursor, 0)
+        alice = SpaceParticipant(flwr_aid="alice")
+        author = SpaceParticipant(agent_id=agent.id)
+        space = state.create_space(
+            participants=[alice, SpaceParticipant(flwr_aid="bob"), author]
+        )
+        message = state.create_space_message(UUID(space.id), author, "Hello")
+        assert message is not None
+        entries = state.get_user_events("alice", snapshot.cursor)
+        self.assertEqual(
+            [(entry.seq, entry.event.type) for entry in entries],
+            [(3, "space.created"), (4, "message.created")],
+        )
+        self.assertEqual(
+            [entry.event for entry in entries],
+            [entry.event for entry in state.get_user_events("bob")],
+        )
+        self.assertEqual(entries[1].event.payload["space_id"], space.id)
+        self.assertEqual(entries[1].event.payload["id"], str(message.id))
+
+    def test_user_event_replay(self) -> None:
+        """Assign event metadata and replay immutable payloads in feed order."""
+        state = self.state_factory()
+        payload = Agent(id=2**64 - 1)
+        created_at = now()
+        with self._patch_message_time(created_at):
+            event_id = state.store_event(
+                EventType.AGENT_CREATED, payload, ["bob", "alice", "bob"]
+            )
+        first = state.get_user_events("alice")[0].event
+        self.assertEqual(first.event_id, str(event_id))
+        self.assertEqual(first.created_at, created_at.isoformat())
+        self.assertEqual(
+            [entry.event for entry in state.get_user_events("bob")], [first]
+        )
+        self.assertEqual(state.get_user_events("charlie"), [])
+        with self._patch_message_time(created_at - timedelta(days=1)):
+            state.store_event(EventType.AGENT_CREATED, Agent(), ["alice"])
+        second = state.get_user_events("alice", 1)[0].event
+        self.assertNotEqual(first.event_id, second.event_id)
+        self.assertTrue(second.HasField("payload"))
+        page = state.get_user_events("alice", limit=1)
+        self.assertEqual(page[0].event.payload["id"], str(2**64 - 1))
+        self.assertEqual(state.get_user_events("alice", page[0].seq)[0].event, second)
+        self.assertEqual(state.get_user_events("alice", 2), [])
+        payload.id = 1
+        first.type = "changed"
+        self.assertEqual(state.get_user_events("alice", limit=1), page)
+
+    def test_user_event_agent_creation_failure(self) -> None:
+        """Roll back the Agent and its event if initial Space creation fails."""
+        state = self.state_factory()
+        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+            with self.assertRaises(ValueError):
+                state.create_agent(
+                    "alice", AgentConfig(name="Agent", app_spec="@test/app")
+                )
+        snapshot = state.get_bootstrap("alice")
+        self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
+
+    def test_user_event_access(self) -> None:
+        """Filter revoked access and advance through the hidden tail after paging."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        space = state.create_space(
+            participants=[alice, SpaceParticipant(flwr_aid="bob")]
+        )
+        state.create_space_message(UUID(space.id), alice, "Private")
+        visible = state.create_space(participants=[alice])
+        state.create_space_message(UUID(visible.id), alice, "Visible")
+        state.create_space_message(UUID(space.id), alice, "Hidden tail")
+        if isinstance(state, SqlCoreState):
+            with state.session() as session:
+                session.execute(
+                    delete(SpaceParticipantTable).where(
+                        SpaceParticipantTable.c.space_id == UUID(space.id),
+                        SpaceParticipantTable.c.flwr_aid == "alice",
+                    )
+                )
+        else:
+            assert isinstance(state, InMemoryCoreState)
+            with state.lock_space_store:
+                state.space_store[UUID(space.id)].participants.remove(alice)
+        page = state.get_user_events("alice", limit=1)
+        self.assertEqual(
+            [(entry.seq, entry.event.space_id) for entry in page], [(3, visible.id)]
+        )
+        page = state.get_user_events("alice", 3, limit=1)
+        self.assertEqual(
+            [(entry.seq, entry.event.type) for entry in page], [(4, "message.created")]
+        )
+        self.assertEqual(
+            state.get_user_events("alice", 4), [StreamEventsResponse(seq=5)]
+        )
+        self.assertEqual(state.get_user_events("alice", 5), [])
+        self.assertEqual(state.get_bootstrap("alice").cursor, 5)
+
+    def test_user_event_invalid_cursors(self) -> None:
+        """Reject cursors outside the feed and nonpositive page sizes."""
+        state = self.state_factory()
+        for cursor in (-1, 1, 2**64):
+            with self.subTest(cursor=cursor), self.assertRaises(ValueError):
+                state.get_user_events("alice", cursor)
+        for limit in (0, -1):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                state.get_user_events("alice", limit=limit)
+
+    def test_user_event_bootstrap_replay(self) -> None:
+        """Allow writes during bootstrap and replay them after its captured cursor."""
+        state = self.state_factory()
+        reading, release = ThreadEvent(), ThreadEvent()
+        list_agents = state.list_agents
+
+        def paused_list_agents(flwr_aid: str) -> list[Agent]:
+            agents = list(list_agents(flwr_aid))
+            reading.set()
+            assert release.wait(5)
+            return agents
+
+        with (
+            patch.object(state, "list_agents", paused_list_agents),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            bootstrap = executor.submit(state.get_bootstrap, "alice")
+            try:
+                self.assertTrue(reading.wait(5))
+                agent = executor.submit(
+                    state.create_agent,
+                    "alice",
+                    AgentConfig(name="Agent", app_spec="@test/app"),
+                ).result(timeout=5)
+            finally:
+                release.set()
+            snapshot = bootstrap.result(timeout=5)
+        self.assertFalse(snapshot.agents or snapshot.cursor)
+        self.assertEqual(len(snapshot.spaces), 1)
+        entries = state.get_user_events("alice", snapshot.cursor)
+        assert agent is not None
+        self.assertEqual(entries[0].event.type, "agent.created")
+        self.assertEqual(entries[0].event.payload["id"], str(agent.id))
+        self.assertEqual(entries[1].event.payload["id"], snapshot.spaces[0].id)
+
+    def test_user_event_sql_transactions(self) -> None:
+        """Keep SQL events atomic, persistent, and committed in feed order."""
+        state = self.state_factory()
+        if (
+            not isinstance(state, SqlCoreState)
+            or state._is_in_memory_sqlite  # pylint: disable=protected-access
+        ):
+            self.skipTest("Requires persistent SQL state")
+        config = AgentConfig(name="Agent", app_spec="@test/app")
+        state.create_agent("alice", config)
+        snapshot = state.get_bootstrap("alice")
+        events = state.get_user_events("alice")
+        with self.assertRaises(ValueError), state.session():
+            state.create_agent("alice", config)
+            raise ValueError("abort")
+        state.initialize()
+        self.assertEqual(state.get_bootstrap("alice"), snapshot)
+        self.assertEqual(state.get_user_events("alice"), events)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with state.session():
+                state.create_agent("alice", config)
+                follower = executor.submit(state.create_agent, "alice", config)
+                with self.assertRaises(TimeoutError):
+                    follower.result(timeout=0.1)
+            follower.result(timeout=5)
+        self.assertEqual(
+            [entry.seq for entry in state.get_user_events("alice")], [1, 2, 3, 4, 5, 6]
+        )

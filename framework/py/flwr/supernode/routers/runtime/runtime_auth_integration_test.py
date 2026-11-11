@@ -15,6 +15,7 @@
 """SuperNode Runtime HTTP authentication integration tests."""
 
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -27,11 +28,17 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectResponse,
 )
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    AcquireTaskRequest,
+    AcquireTaskResponse,
     CreateTaskRequest,
     GetNodesRequest,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
+    GetRunSeriesEventsRequest,
+    GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
+    PushTaskEventsRequest,
 )
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
 from flwr.supercore.dependencies.runtime import get_runtime_state
@@ -40,11 +47,12 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.run import Run
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_PULL_PENDING_TASKS_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_ACQUIRE_TASK_METHOD = "/flwr.proto.Runtime/AcquireTask"
 
 
 @pytest.fixture(name="state")
@@ -110,7 +118,7 @@ def test_runtime_flower_error_is_translated(
 ) -> None:
     """Translate a handler FlowerError into its configured HTTP status."""
     response = _post(
-        client, "create-task", CreateTaskRequest(type=TaskType.MODEL), token=valid_token
+        client, "create-task", CreateTaskRequest(type="unknown"), token=valid_token
     )
 
     assert response.status_code == 412
@@ -152,33 +160,27 @@ def test_pull_object_allows_with_valid_metadata_token(
     )
 
 
-def test_pull_pending_tasks_denied_without_superexec_metadata(
-    client: TestClient,
+def test_acquire_task_allows_with_superexec_metadata(
+    client: TestClient, state: NodeState
 ) -> None:
-    """SuperExec routes should deny requests missing signed metadata."""
-    response = _post(client, "pull-pending-tasks", PullPendingTasksRequest())
-
-    assert response.status_code == 401
-    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
-
-
-def test_pull_pending_tasks_allows_with_superexec_metadata(
-    client: TestClient,
-) -> None:
-    """SuperExec routes should allow requests with valid signed metadata."""
-    proto_request = PullPendingTasksRequest()
+    """Signed acquisition returns a task and its claim token."""
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    assert task_id is not None
+    proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
     headers = create_superexec_auth_metadata(
         auth_secret=derive_auth_secret(_SUPEREXEC_SECRET),
-        method=_PULL_PENDING_TASKS_METHOD,
+        method=_ACQUIRE_TASK_METHOD,
         request=proto_request,
     )
 
-    response = _post(client, "pull-pending-tasks", proto_request, auth_headers=headers)
+    response = _post(client, "acquire-task", proto_request, auth_headers=headers)
 
     assert response.status_code == 200
-    assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
-    )
+    claimed = AcquireTaskResponse.FromString(response.content)
+    assert claimed.task.task_id == task_id
+    assert claimed.token
+    claimed_task = state.get_task_by_token(claimed.token)
+    assert claimed_task is not None and claimed_task.task_id == task_id
 
 
 def test_get_nodes_allows_auth_then_returns_permission_denied(
@@ -191,13 +193,72 @@ def test_get_nodes_allows_auth_then_returns_permission_denied(
     assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
 
 
-def test_pull_pending_tasks_allows_without_superexec_metadata(state: NodeState) -> None:
-    """No SuperExec signing should be required when auth is disabled."""
-    client = TestClient(_create_app(state, None))
+def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
+    """AgentApp events should be readable through the SuperNode Runtime API."""
+    run = Run.create_empty(run_id=99)
+    run.series_id = 7
+    state.store_run(run)
+    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    assert task_id is not None
+    token = state.claim_task(task_id)
+    assert token is not None
+    task_event = TaskEvent(
+        event="response.completed",
+        data='{"type":"response.completed"}',
+    )
 
-    response = _post(client, "pull-pending-tasks", PullPendingTasksRequest())
+    push_response = _post(
+        client,
+        "push-task-events",
+        PushTaskEventsRequest(events=[task_event]),
+        token=token,
+    )
+    get_response = _post(
+        client,
+        "get-run-series-events",
+        GetRunSeriesEventsRequest(),
+        token=token,
+    )
+
+    assert push_response.status_code == 200
+    assert get_response.status_code == 200
+    events = GetRunSeriesEventsResponse.FromString(get_response.content).events
+    assert len(events) == 1
+    assert events[0].run_id == run.run_id
+    assert events[0].task_id == task_id
+    assert events[0].event == task_event.event
+    assert events[0].data == task_event.data
+
+
+def test_space_events_return_only_local_events_in_authenticated_space(
+    client: TestClient, state: NodeState
+) -> None:
+    """A task token reads local events only from its run's Space."""
+    run = Run.create_empty(run_id=99)
+    run.space_id = uuid4()
+    other_run = Run.create_empty(run_id=100)
+    other_run.space_id = uuid4()
+    for current_run in (run, other_run):
+        state.store_run(current_run)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=current_run.run_id
+        )
+        assert task_id is not None
+        assert state.store_task_events(
+            [
+                TaskEvent(
+                    run_id=current_run.run_id,
+                    task_id=task_id,
+                    event="message",
+                    data="{}",
+                )
+            ]
+        )
+
+    token = state.claim_task(state.get_tasks(run_ids=[run.run_id])[0].task_id)
+    assert token is not None
+    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
 
     assert response.status_code == 200
-    assert isinstance(
-        PullPendingTasksResponse.FromString(response.content), PullPendingTasksResponse
-    )
+    events = GetSpaceEventsResponse.FromString(response.content).events
+    assert [event.run_id for event in events] == [run.run_id]

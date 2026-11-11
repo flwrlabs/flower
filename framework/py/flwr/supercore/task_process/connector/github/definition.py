@@ -14,18 +14,22 @@
 # ==============================================================================
 """GitHub connector definition."""
 
-from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
+from ..definition import (
+    ConnectorDefinition,
+    ConnectorToolSource,
+    OAuth2Definition,
+    ProviderDefinition,
+)
 from ..oauth import load_oauth_flow
-from .actions import ACTIONS
-from .executors import EXECUTORS
+from .mcp import discover_tools, execute_tool
 
 GITHUB_CONNECTOR_REF = "github"
 
 PROVIDER = ProviderDefinition(
     ref=GITHUB_CONNECTOR_REF,
     display_name="GitHub",
-    description="Search code and read files in public repositories.",
-    actions=ACTIONS,
+    description="Use GitHub tools available to the connected account.",
+    actions=(),
     oauth=OAuth2Definition(
         authorization_url="https://github.com/login/oauth/authorize",
         token_url="https://github.com/login/oauth/access_token",
@@ -35,13 +39,22 @@ PROVIDER = ProviderDefinition(
         token_auth_method="client_secret_post",
         token_headers={"Accept": "application/json"},
         use_pkce=True,
+        # GitHub Apps use installation permissions instead of OAuth scopes.
         allow_additional_scopes=False,
         expected_token_type="bearer",
+        display_name_fields=("login",),
+        display_name_url="https://api.github.com/user",
+        display_name_headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2026-03-10",
+        },
     ),
 )
 
-CONNECTOR = ConnectorDefinition(
+
+CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
-    executors=EXECUTORS,
+    executors={},
     oauth_flow=load_oauth_flow(PROVIDER),
+    tool_source=ConnectorToolSource(discover=discover_tools, execute=execute_tool),
 )

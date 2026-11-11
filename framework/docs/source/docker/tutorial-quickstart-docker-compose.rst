@@ -284,7 +284,7 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
         command:
           - --insecure
           - --superlink
-          - superlink:9092
+          - superlink:8000
           - --host
           - 0.0.0.0
           - --port
@@ -317,8 +317,6 @@ You can add more SuperNodes and ClientApps by uncommenting their definitions in 
             ENTRYPOINT ["flower-superexec"]
         command:
           - --insecure
-          - --plugin-type
-          - clientapp
           - --runtime-api-address
           - supernode-3:9096
         deploy:
@@ -340,7 +338,7 @@ If you also want to enable TLS for the new SuperNode, uncomment the definition i
       supernode-3:
         command:
           - --superlink
-          - superlink:9092
+          - superlink:8000
           - --host
           - 0.0.0.0
           - --port

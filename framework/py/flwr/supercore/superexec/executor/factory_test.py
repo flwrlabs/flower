@@ -20,11 +20,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.supercore.constant import ExecutorType
+from flwr.supercore.constant import ExecutorType, TaskType
 
 from . import factory as factory_module
 from .factory import get_executor
 from .kubernetes_executor import KubernetesExecutor
+
+FAB_HASH = "a" * 64
 
 
 def test_get_executor_requires_kubernetes_config() -> None:
@@ -41,7 +43,7 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     root_certificates_path.write_text("root-ca", encoding="utf-8")
     client = Mock()
     exec_client = Mock()
-    create_clients = Mock(return_value=(client, exec_client))
+    create_clients = Mock(return_value=(client, exec_client, Mock()))
     monkeypatch.setattr(
         factory_module, "create_incluster_kubernetes_clients", create_clients
     )
@@ -69,12 +71,13 @@ def test_get_executor_builds_kubernetes_executor_from_config(
             "volume-mounts": [{"name": "shmem", "mountPath": "/dev/shm"}],
             "resources": {"requests": {"cpu": "1"}},
             "node-selector": {"kubernetes.io/os": "linux"},
+            "log-warm-executor-output": True,
             "unknown-field": "ignored",
         },
     )
 
     assert isinstance(executor, KubernetesExecutor)
-    assert executor._client is client  # pylint: disable=protected-access
+    assert executor._resources._client is client  # pylint: disable=protected-access
     config = executor._config  # pylint: disable=protected-access
     assert config.namespace == "flower-system"
     assert config.image == "ghcr.io/flwrlabs/taskexecutor:dev"
@@ -90,17 +93,81 @@ def test_get_executor_builds_kubernetes_executor_from_config(
     assert config.volume_mounts == [{"name": "shmem", "mountPath": "/dev/shm"}]
     assert config.resources == {"requests": {"cpu": "1"}}
     assert config.node_selector == {"kubernetes.io/os": "linux"}
+    assert config.log_warm_executor_output is True
     assert not hasattr(config, "unknown_field")
     create_clients.assert_called_once_with()
 
 
+def test_get_executor_rejects_non_boolean_warm_output_logging() -> None:
+    """Warm output logging must be configured with a YAML boolean."""
+    with pytest.raises(ValueError, match="log_warm_executor_output must be a boolean"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "log-warm-executor-output": "true",
+            }
+        )
+
+
+def test_get_executor_configures_fab_specific_agentapp_pool() -> None:
+    """Preserve exact FAB identity and its deployment-provisioned path."""
+    config = factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+        {
+            "namespace": "flower-system",
+            "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+            "warm-executor-owner": "superexec-a",
+            "warm-executor-pools": [
+                {
+                    "task-type": TaskType.AGENT_APP.value,
+                    "size": 1,
+                    "fab-hash": FAB_HASH,
+                    "fab-path": "/opt/flwr/apps/gpt-agent.fab",
+                }
+            ],
+        }
+    )
+
+    pool_key = config.warm_executor_pools[0].key
+    assert pool_key.fab_hash == FAB_HASH
+    assert pool_key.fab_path == "/opt/flwr/apps/gpt-agent.fab"
+
+
+def test_get_executor_rejects_ambiguous_agentapp_pool_paths() -> None:
+    """One task FAB hash must route to only one configured warm pool."""
+    with pytest.raises(ValueError, match="must not repeat a routed identity"):
+        factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
+            {
+                "namespace": "flower-system",
+                "image": "ghcr.io/flwrlabs/taskexecutor:dev",
+                "warm-executor-owner": "superexec-a",
+                "warm-executor-pools": [
+                    {
+                        "task-type": TaskType.AGENT_APP.value,
+                        "size": 1,
+                        "fab-hash": FAB_HASH,
+                        "fab-path": "/opt/flwr/apps/one.fab",
+                    },
+                    {
+                        "task-type": TaskType.AGENT_APP.value,
+                        "size": 1,
+                        "fab-hash": FAB_HASH,
+                        "fab-path": "/opt/flwr/apps/two.fab",
+                    },
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize("insecure", [False, True])
 @pytest.mark.parametrize("ca_source", [None, "executor", "task"])
-def test_get_executor_configures_usable_agentapp_warm_executor_pool(
+@pytest.mark.parametrize("task_type", [TaskType.AGENT_APP, TaskType.CONNECTOR])
+def test_get_executor_configures_usable_typed_warm_executor_pool(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     insecure: bool,
     ca_source: str | None,
+    task_type: TaskType,
 ) -> None:
     """Provision warm pools when their Runtime API trust is known at Pod creation."""
     client = Mock()
@@ -110,14 +177,14 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     monkeypatch.setattr(
         factory_module,
         "create_incluster_kubernetes_clients",
-        Mock(return_value=(client, exec_client)),
+        Mock(return_value=(client, exec_client, Mock())),
     )
 
     executor_config: dict[str, object] = {
         "namespace": "flower-system",
         "image": "ghcr.io/flwrlabs/taskexecutor:dev",
         "warm-executor-owner": "superexec-a",
-        "warm-executor-pools": [{"task-type": "flwr-agentapp", "size": 2}],
+        "warm-executor-pools": [{"task-type": task_type.value, "size": 2}],
     }
     ca_path = tmp_path / "ca.pem"
     ca_path.write_text("root-ca", encoding="utf-8")
@@ -137,7 +204,7 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     assert bool(config.warm_executor_pools) == enabled
     if enabled:
         pool = config.warm_executor_pools[0]
-        assert pool.key.task_type.value == "flwr-agentapp"
+        assert pool.key.task_type == task_type
         assert pool.key.runtime_image == "ghcr.io/flwrlabs/taskexecutor:dev"
         assert pool.size == 2
     assert config.warm_executor_owner == "superexec-a"
@@ -146,8 +213,11 @@ def test_get_executor_configures_usable_agentapp_warm_executor_pool(
     )
     manager = executor._warm_executor_pool_manager  # pylint: disable=protected-access
     assert manager is not None
-    assert manager._exec_client is exec_client  # pylint: disable=protected-access
-    executor.reconcile()
+    # pylint: disable=protected-access
+    assert manager._resources._exec_client is exec_client
+    assert manager._resources._probe_client is not exec_client
+    # pylint: enable=protected-access
+    manager.ensure_capacity()
     assert client.create_namespaced_pod.call_count == (2 if enabled else 0)
     assert client.create_namespaced_secret.call_count == (
         2 if enabled and ca_source == "executor" else 0
@@ -172,9 +242,9 @@ def test_get_executor_rejects_non_string_warm_executor_owner() -> None:
         )
 
 
-def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
-    """The first warm dispatch feature must not enable Model or Connector pools."""
-    with pytest.raises(ValueError, match="flwr-agentapp"):
+def test_get_executor_rejects_unsupported_warm_pool() -> None:
+    """Warm pools should reject task types without a shared token handoff."""
+    with pytest.raises(ValueError, match="only task types"):
         factory_module._kubernetes_executor_config_from_mapping(  # pylint: disable=protected-access
             {
                 "namespace": "flower-system",
@@ -182,7 +252,7 @@ def test_get_executor_rejects_non_agentapp_warm_pool() -> None:
                 "warm-executor-owner": "superexec-a",
                 "warm-executor-pools": [
                     {
-                        "task-type": "flwr-model",
+                        "task-type": "flwr-serverapp",
                         "size": 1,
                     }
                 ],

@@ -15,6 +15,7 @@
 """Tests for generated connector loading."""
 
 import sys
+from dataclasses import replace
 from types import ModuleType
 
 import pytest
@@ -25,10 +26,11 @@ from .definition import ConnectorDefinition, ProviderDefinition
 _PACKAGE = "flwr.supercore.task_process.connector.example"
 
 
-def test_load_connectors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Registered definition modules should provide connector definitions."""
+@pytest.mark.parametrize("grouped", [False, True])
+def test_load_oauth_connectors(monkeypatch: pytest.MonkeyPatch, grouped: bool) -> None:
+    """Packages can export a single connector or several distinct connectors."""
     module = ModuleType(f"{_PACKAGE}.definition")
-    connector = ConnectorDefinition(
+    connector = ConnectorDefinition.from_provider(
         provider=ProviderDefinition(
             ref="example",
             display_name="Example",
@@ -37,19 +39,25 @@ def test_load_connectors(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         executors={},
     )
-    module.__dict__["CONNECTOR"] = connector
+    connectors: tuple[ConnectorDefinition, ...]
+    if grouped:
+        connectors = (connector, replace(connector, ref="other"))
+        module.__dict__["CONNECTORS"] = connectors
+    else:
+        connectors = (connector,)
+        module.__dict__["CONNECTOR"] = connector
     monkeypatch.setattr(loader, "CONNECTOR_PACKAGES", (_PACKAGE,))
     monkeypatch.setitem(sys.modules, f"{_PACKAGE}.definition", module)
 
-    assert loader.load_connectors() == (connector,)
+    assert loader.load_oauth_connectors() == connectors
 
 
-def test_load_connectors_rejects_package_mismatch(
+def test_load_oauth_connectors_rejects_package_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A connector reference should match its package name."""
     module = ModuleType(f"{_PACKAGE}.definition")
-    module.__dict__["CONNECTOR"] = ConnectorDefinition(
+    module.__dict__["CONNECTOR"] = ConnectorDefinition.from_provider(
         provider=ProviderDefinition(
             ref="other",
             display_name="Other",
@@ -62,4 +70,4 @@ def test_load_connectors_rejects_package_mismatch(
     monkeypatch.setitem(sys.modules, f"{_PACKAGE}.definition", module)
 
     with pytest.raises(ValueError, match="must match reference"):
-        loader.load_connectors()
+        loader.load_oauth_connectors()

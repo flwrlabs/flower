@@ -21,25 +21,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-import grpc
 import pytest
 
-from flwr.common.constant import (
-    FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
-    FLWR_INTERNAL_GRPC_CONTROL_API,
-)
+from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.interceptors import (
-    RpcErrorTranslationServerInterceptor,
-    RuntimeVersionServerInterceptor,
-)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
 from .flower_superlink import (
-    SuperLinkLifespan,
     _obtain_superlink_certificates,
     _parse_args_run_superlink,
     _parse_superlink_lifespan_config,
@@ -47,34 +38,6 @@ from .flower_superlink import (
 
 app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 config_loader_module = importlib.import_module("flwr.superlink.config_loader")
-
-
-@pytest.mark.parametrize(
-    ("env_value", "expected_call_count"),
-    [(None, 0), ("0", 0), ("1", 1)],
-)
-def test_superlink_lifespan_starts_grpc_control_api_only_when_enabled(
-    env_value: str | None,
-    expected_call_count: int,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SuperLink should require an explicit opt-in for the gRPC Control API."""
-    if env_value is None:
-        monkeypatch.delenv(FLWR_INTERNAL_GRPC_CONTROL_API, raising=False)
-    else:
-        monkeypatch.setenv(FLWR_INTERNAL_GRPC_CONTROL_API, env_value)
-
-    state_factory = Mock()
-    lifespan = SuperLinkLifespan(Mock(), state_factory)
-    start_control_api = Mock()
-    monkeypatch.setattr(lifespan, "_start_control_api", start_control_api)
-    monkeypatch.setattr(lifespan, "_start_fleet_api", Mock())
-    monkeypatch.setattr(lifespan, "_start_superexec_if_needed", Mock())
-    monkeypatch.setattr(lifespan, "_start_health_server_if_needed", Mock())
-
-    lifespan.startup()
-
-    assert start_control_api.call_count == expected_call_count
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -96,9 +59,6 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
-    assert config.fleet_api_address == app_module.FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-    assert config.health_server_address is None
     assert config.certificates is None
     assert config.superexec_auth_secret is None
     assert config.host == app_module.UVICORN_DEFAULT_HOST
@@ -109,19 +69,33 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
     assert config.database == FLWR_IN_MEMORY_DB_NAME
 
 
-def test_parse_superlink_lifespan_config_keeps_fleet_address_unset_for_simulation(
+def test_parse_superlink_lifespan_config_loads_event_log_plugins(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Simulation config should not synthesize a Fleet API address."""
+    """Load Control and Fleet writers when event logging is enabled."""
+    control_plugin = Mock()
+    fleet_plugin = Mock()
+    monkeypatch.setattr(
+        app_module,
+        "add_ee_args_superlink",
+        lambda parser: parser.add_argument("--enable-event-log", action="store_true"),
+    )
+    monkeypatch.setattr(
+        app_module, "load_control_event_log_plugin", Mock(return_value=control_plugin)
+    )
+    monkeypatch.setattr(
+        app_module, "load_fleet_event_log_plugin", Mock(return_value=fleet_plugin)
+    )
     monkeypatch.setattr(
         app_module.sys,
         "argv",
-        ["flower-superlink", "--insecure", "--simulation"],
+        ["flower-superlink", "--insecure", "--enable-event-log"],
     )
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.fleet_api_address is None
+    assert config.event_log_plugin is control_plugin
+    assert config.fleet_event_log_plugin is fleet_plugin
 
 
 def test_parse_superlink_lifespan_config_disables_all_tls_when_insecure(
@@ -348,31 +322,6 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
 
     obtain_server_certificates_mock.assert_not_called()
     assert result is None
-
-
-def test_run_fleet_api_grpc_rere_orders_default_interceptors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Fleet gRPC-rere server should translate errors before auth interceptors."""
-    grpc_server = Mock()
-    grpc_server.bound_address = "127.0.0.1:9092"
-    create_grpc_server = Mock(return_value=grpc_server)
-    existing_interceptor = Mock(spec=grpc.ServerInterceptor)
-    monkeypatch.setattr(app_module, "generic_create_grpc_server", create_grpc_server)
-
-    app_module._run_fleet_api_grpc_rere(  # pylint: disable=protected-access
-        address="127.0.0.1:9092",
-        state_factory=Mock(),
-        objectstore_factory=Mock(),
-        enable_supernode_auth=False,
-        certificates=None,
-        interceptors=[existing_interceptor],
-    )
-
-    interceptors = create_grpc_server.call_args.kwargs["interceptors"]
-    assert isinstance(interceptors[0], RpcErrorTranslationServerInterceptor)
-    assert interceptors[1] is existing_interceptor
-    assert isinstance(interceptors[2], RuntimeVersionServerInterceptor)
 
 
 @pytest.mark.parametrize(

@@ -20,7 +20,7 @@ from unittest.mock import Mock, patch
 import httpx
 import pytest
 
-from flwr.proto.runtime_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import AcquireTaskRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
@@ -36,7 +36,7 @@ from flwr.supercore.protobuf.client import ProtobufRequestContext
 
 from .superexec_auth import SuperExecAuthHttpInterceptor
 
-_RPC_METHOD = "/flwr.proto.Runtime/PullPendingTasks"
+_RPC_METHOD = "/flwr.proto.Runtime/AcquireTask"
 _PROTECTED_METHODS = frozenset({_RPC_METHOD})
 _TIMESTAMP = 1000
 _NONCE = "nonce"
@@ -46,7 +46,7 @@ def _context(rpc_method: str = _RPC_METHOD) -> ProtobufRequestContext:
     """Create a representative protobuf HTTP request context."""
     return ProtobufRequestContext(
         rpc_method=rpc_method,
-        message=PullPendingTasksRequest(),
+        message=AcquireTaskRequest(),
         request=httpx.Request("POST", "http://runtime.example"),
     )
 

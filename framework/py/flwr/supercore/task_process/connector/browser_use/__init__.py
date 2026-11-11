@@ -17,8 +17,9 @@
 
 import os
 
-from flwr.supercore.task_process.usage import TaskUsageRecorder
 from flwr.supercore.typing import JSONObject
+
+from ..definition import ConnectorDefinition, ConnectorExecutionContext, build_executor
 
 # Prevent browser-use from configuring logging and duplicating Flower logs
 os.environ["BROWSER_USE_SETUP_LOGGING"] = "false"
@@ -29,7 +30,7 @@ def invoke_browser_use_provider(
     allowed_domains: list[str] | None = None,
     model: str | None = None,
     *,
-    usage_recorder: TaskUsageRecorder,
+    context: ConnectorExecutionContext,
 ) -> JSONObject:
     """Invoke Browser Use when the optional dependency is installed."""
     try:
@@ -49,7 +50,7 @@ def invoke_browser_use_provider(
         task,
         allowed_domains=allowed_domains,
         model=model,
-        usage_recorder=usage_recorder,
+        usage_recorder=context.usage_recorder,
     )
 
 
@@ -76,8 +77,11 @@ def make_browser_use_tool() -> JSONObject:
     }
 
 
-__all__ = [
-    "BROWSER_USE_CONNECTOR_NAME",
-    "invoke_browser_use_provider",
-    "make_browser_use_tool",
-]
+CONNECTOR = ConnectorDefinition(
+    ref=BROWSER_USE_CONNECTOR_NAME,
+    tools=(make_browser_use_tool(),),
+    executors={BROWSER_USE_CONNECTOR_NAME: build_executor(invoke_browser_use_provider)},
+)
+
+
+__all__ = ["CONNECTOR"]

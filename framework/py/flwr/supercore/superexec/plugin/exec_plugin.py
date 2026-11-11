@@ -33,13 +33,13 @@ class ExecPlugin(ABC):
         insecure: bool,
         root_certificates_path: str | None,
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
-        executor: Executor | None = None,
+        *,
+        executor: Executor,
     ) -> None:
         self.runtime_api_address = runtime_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.runtime_dependency_install = runtime_dependency_install
-        # Non-ephemeral plugins use the executor to start task processes.
         self.executor = executor
 
     @abstractmethod
@@ -58,21 +58,6 @@ class ExecPlugin(ABC):
         -------
         Optional[int]
             The selected run ID, or None if no suitable candidate is found.
-        """
-
-    @abstractmethod
-    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
-        """Select a task to execute from a set of pending tasks.
-
-        Parameters
-        ----------
-        candidate_tasks : Sequence[Task]
-            A set of pending tasks to choose from.
-
-        Returns
-        -------
-        Optional[Task]
-            The selected task, or None if no suitable task is found.
         """
 
     @abstractmethod

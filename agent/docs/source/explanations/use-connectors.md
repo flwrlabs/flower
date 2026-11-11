@@ -142,7 +142,7 @@ request. When the model answers before the limit, the app reuses that response.
 It makes a final request without tools only when all three rounds requested
 tools. In both cases, `final_response` contains the result. This abbreviated
 loop omits streaming, error recovery, and conversation-state handling. Use the
-complete [collaborative research agent](../tutorials/build-a-collaborative-agent.md)
+complete [Build a research agent](../tutorials/build-a-research-agent.md)
 for copy/pasteable code.
 
 ## Handle failure deliberately

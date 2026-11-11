@@ -154,7 +154,7 @@ jobs:
 
               # Add stable aliases explicitly for the current release variants.
               case "${repository_name}:${tag_suffix}" in
-                "superlink:-py3.13-alpine3.22"|"supernode:-py3.13-alpine3.22")
+                "superlink:-py3.13-alpine3.23"|"supernode:-py3.13-alpine3.23")
                   tag_args+=(-t "${repository}:${VERSION}")
                   ;;
                 "superlink:-py3.13-ubuntu24.04"|"supernode:-py3.13-ubuntu24.04")
@@ -195,3 +195,13 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --title "Flower ${VERSION}" \
             --notes-file release-body.md
+
+      - name: Dispatch release blog
+        env:
+          GH_TOKEN: ${{ secrets.FLWRMACHINE_TOKEN }}
+          WEBSITE_WORKFLOW_REPOSITORY: ${{ secrets.WEBSITE_WORKFLOW_REPOSITORY }}
+        run: |
+          gh workflow run website-release-blog.yml \
+            --repo "${WEBSITE_WORKFLOW_REPOSITORY}" \
+            --ref main \
+            --field "version=${VERSION}"

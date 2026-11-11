@@ -50,6 +50,7 @@ class ExitCode:
     SUPERNODE_NODE_AUTH_KEY_INVALID = 302
     SUPERNODE_STARTED_WITHOUT_TLS_BUT_NODE_AUTH_ENABLED = 303
     SUPERNODE_INVALID_TRUSTED_ENTITIES = 304
+    SUPERNODE_CONNECTION_ERROR = 305
 
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
@@ -150,6 +151,9 @@ EXIT_CODE_HELP = {
         "Please ensure that a valid file is provided using "
         "the `--trusted-entities` option."
     ),
+    ExitCode.SUPERNODE_CONNECTION_ERROR: (
+        "The SuperNode could not establish a connection to the SuperLink."
+    ),
     # SuperExec-specific exit codes (400-499)
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (
         "The YAML configuration for the SuperExec plugin is invalid."
@@ -169,7 +173,8 @@ EXIT_CODE_HELP = {
     ),
     # Common exit codes (600-699)
     ExitCode.COMMON_ADDRESS_INVALID: (
-        "Please provide a valid URL, IPv4 or IPv6 address."
+        "Please provide a domain name, IPv4 or IPv6 address with a port, "
+        "without a URL prefix (e.g. api.flower.ai:443)."
     ),
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
     ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (

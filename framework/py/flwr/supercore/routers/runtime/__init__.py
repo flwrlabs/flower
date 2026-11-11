@@ -14,6 +14,7 @@
 # ==============================================================================
 """Shared Runtime API router."""
 
-from .router import router
+from .responses import router as responses_router
+from .router import create_runtime_router, router
 
-__all__ = ["router"]
+__all__ = ["create_runtime_router", "responses_router", "router"]

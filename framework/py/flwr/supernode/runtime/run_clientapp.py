@@ -69,11 +69,13 @@ from flwr.supercore.interceptors import (
 from flwr.supercore.retry import make_simple_http_retry_invoker
 from flwr.supercore.run import Run
 from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.superexec.dependency_installer import (
     RuntimeDependencyInstallationError,
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.telemetry import EventType, event
 
 
@@ -98,6 +100,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
+            RuntimeTracingInterceptor(),
             RuntimeVersionHttpInterceptor(component_name="flwr-clientapp"),
             RuntimeTokenHttpInterceptor(token),
         ],
@@ -235,6 +238,9 @@ def pull_task_input(client: RuntimeHttpClient) -> tuple[Message, Context, Run, F
     """Pull TaskInput from SuperNode."""
     # Pull Context, Run and FAB
     res: PullTaskInputResponse = client.PullTaskInput(PullTaskInputRequest())
+    TaskIdentity.task_id = res.task_id
+    TaskIdentity.run_id = res.run.run_id
+    TaskIdentity.node_id = res.context.node_id
     context = context_from_proto(res.context)
     run = run_from_proto(res.run)
     fab = fab_from_proto(res.fab)

@@ -21,6 +21,7 @@ from unittest.mock import Mock, patch
 import httpx
 import pytest
 
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.run import RunNotRunningException
 
 from .http_retry import make_simple_http_retry_invoker
@@ -96,12 +97,44 @@ def test_does_not_retry_permanent_http_failures(exception: Exception) -> None:
     target.assert_called_once_with()
 
 
-def test_forbidden_response_raises_run_not_running() -> None:
-    """Translate a forbidden response into a stopped-run signal."""
-    target = Mock(side_effect=_http_status_error(httpx.codes.FORBIDDEN))
+@pytest.mark.parametrize(
+    "content",
+    [
+        "",
+        "<html>Forbidden</html>",
+        '{"code": 3010}',
+        '{"code": "3010", "detail": "Forbidden"}',
+        '{"code": 2007, "detail": "Run status does not allow this operation."}',
+        '{"code": 3007, "detail": "Task creation is not allowed."}',
+    ],
+)
+def test_other_forbidden_responses_preserve_run_not_running(content: str) -> None:
+    """Retain stopped-run handling for other errors and legacy responses."""
+    error = _http_status_error(httpx.codes.FORBIDDEN)
+    error.response = httpx.Response(403, content=content, request=error.request)
+    target = Mock(side_effect=error)
 
     with pytest.raises(RunNotRunningException):
         _make_test_invoker().invoke(target)
+    target.assert_called_once_with()
+
+
+def test_unavailable_connector_preserves_http_error() -> None:
+    """Let callers handle connector authorization without retrying or stopping."""
+    error = _http_status_error(httpx.codes.FORBIDDEN)
+    error.response = httpx.Response(
+        403,
+        json=FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE, "Unavailable connector"
+        ).to_json("Connector is not available to this run."),
+        request=error.request,
+    )
+    target = Mock(side_effect=error)
+
+    with pytest.raises(httpx.HTTPStatusError) as raised:
+        _make_test_invoker().invoke(target)
+
+    assert raised.value is error
     target.assert_called_once_with()
 
 

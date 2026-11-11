@@ -17,20 +17,39 @@
 # pylint: disable=too-many-lines
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     StartRunRequest,
+    StreamEventsResponse,
 )
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
-from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
+    CompactedContext,
+    RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -40,10 +59,23 @@ from ..object_store import ObjectStore
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
+    @abstractmethod
+    def get_node_id(self) -> int:
+        """Return the ID of the node owning this CoreState."""
+
     @property
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    def _store_generated_message(self, message: Message) -> None:
+        """Store a generated Message in the object store."""
+        with no_object_id_recompute():
+            self.object_store.preregister(
+                message.metadata.run_id, get_object_tree(message)
+            )
+            for object_id, obj in get_all_nested_objects(message).items():
+                self.object_store.put(object_id, obj.deflate())
 
     @abstractmethod
     def start_session(self, run_id: int) -> str:
@@ -111,8 +143,176 @@ class CoreState(ABC):  # pylint: disable=R0904
     def _cleanup_push_session(self, session_id: str, *, cleanup_messages: bool) -> None:
         """Remove an object push session and optionally its messages."""
 
-    def _on_push_session_expired(self, message_object_ids: set[str]) -> None:
-        """Handle messages when a push session expires."""
+    @abstractmethod
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+        data : bytes
+            File content to store.
+        expected_revision : int | None
+            None for create-only, which fails if a live file exists. Otherwise,
+            the current live file revision must match for the update to succeed.
+
+        Returns
+        -------
+        int
+            The new revision ID.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if a live
+            file exists for a create-only write, or if an update has no live
+            file or its current revision does not match expected_revision.
+        """
+
+    @abstractmethod
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+
+        Returns
+        -------
+        File | None
+            The current file content and metadata, or None if absent or deleted.
+        """
+
+    @abstractmethod
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        prefix : str
+            Include only files whose keys start with this prefix.
+        start_after : str
+            Exclusive cursor; include only keys greater than this value.
+        limit : int | None
+            Maximum number of files to return. If None, no limit is applied.
+
+        Returns
+        -------
+        Sequence[FileMetadata]
+            Matching live file metadata ordered lexicographically by key.
+        """
+
+    @abstractmethod
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history.
+
+        Parameters
+        ----------
+        scope : str
+            Opaque file namespace.
+        key : str
+            File key within the scope.
+        expected_revision : int
+            The current live file revision, which must match for deletion to
+            succeed. After deletion, the file is excluded from reads and lists,
+            but its revision history is retained.
+
+        Raises
+        ------
+        FlowerError
+            With code ``ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT`` if the file
+            is absent or deleted, or its current revision does not match
+            expected_revision.
+        """
+
+    @abstractmethod
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create an agent and its initial Space atomically.
+
+        The untitled Space contains the agent and its owning account.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        config : AgentConfig
+            Agent name, app specification, and optional title and description.
+            Duplicate names are allowed. Optional fields must be nonempty when set.
+
+        Returns
+        -------
+        Agent | None
+            The agent with a generated ID and matching UTC creation and update
+            timestamps as ISO-formatted strings, or None if the account ID, a
+            required configuration field, or a set optional field is empty.
+            Ownership is stored separately and is not part of the returned message.
+        """
+
+    @abstractmethod
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agents.
+
+        Returns
+        -------
+        Sequence[Agent]
+            Agents belonging to the account, or an empty sequence if none exist.
+        """
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching owned Agents and participating Spaces.
+
+        Concurrent changes may appear in both this response and subsequent replay.
+        """
+
+    @abstractmethod
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Store a shared event and its ordered deliveries, returning its UUID.
+
+        Each call creates a new event with a generated UUID and creation timestamp.
+        SQL callers can use an enclosing session to commit application changes
+        with the event.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Replay accessible events after an exclusive cursor in user-feed order.
+
+        Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        If all remaining entries are inaccessible, return a cursor-only response
+        with no event. Clients apply present events before saving seq; cursor-only
+        responses only advance the client's cursor.
+        Reading does not consume entries or advance a shared cursor.
+        """
 
     @abstractmethod
     def store_fab(self, fab: Fab) -> str:
@@ -121,24 +321,26 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def store_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        fab: Fab | None,
+        fab: Fab,
         federation_id: str,
         app_id: str,
         app_type: str,
         added_by: str,
         is_hub_app: bool = False,
+        display_name: str | None = None,
+        description: str | None = None,
+        color: str | None = None,
     ) -> str:
-        """Store an optional FAB and associate its app with a federation.
+        """Store a FAB and associate its app with a federation.
 
         A federation has at most one association for each app ID. Storing the app
-        again updates its FAB hash, when applicable, and type while preserving when
-        and by whom it was first added.
+        again updates its FAB hash and type while preserving when and by whom it was
+        first added.
 
         Parameters
         ----------
-        fab : Fab | None
-            FAB content and verification metadata to store. Required for custom
-            apps and optional for Hub apps.
+        fab : Fab
+            FAB content and verification metadata to store.
         federation_id : str
             ID of the federation to associate with the app.
         app_id : str
@@ -147,15 +349,20 @@ class CoreState(ABC):  # pylint: disable=R0904
             Type of the app.
         added_by : str
             ID of the account adding the app to the federation.
-        is_hub_app : bool, default=False
+        is_hub_app : bool, (default: False)
             Whether the app was fetched from Flower Hub. Hub app associations do
             not retain a FAB hash so future runs resolve the latest version.
+        display_name : str | None, (default: None)
+            Human-readable app name from the FAB configuration.
+        description : str | None, (default: None)
+            App description from the FAB project metadata.
+        color : str | None, (default: None)
+            App color theme from the FAB configuration.
 
         Returns
         -------
         str
-            Canonical SHA-256 hash of the stored FAB, or an empty string when no
-            FAB was provided.
+            Canonical SHA-256 hash of the stored FAB.
         """
 
     @abstractmethod
@@ -167,71 +374,118 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return a FAB only when it matches the federation-app association."""
 
     @abstractmethod
+    def get_hub_app(
+        self, federation_id: str, app_id: str
+    ) -> tuple[Fab, datetime] | None:
+        """Return the cached Hub FAB and its last update time, if present."""
+
+    @abstractmethod
+    def update_hub_app(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        federation_id: str,
+        app_id: str,
+        previous_fab_hash: str,
+        fab_hash: str,
+        app_type: str,
+    ) -> bool:
+        """Update a Hub app if it still points to the previous FAB."""
+
+    @abstractmethod
     def list_apps(
         self, federation_id: str, limit: int | None = None
     ) -> Sequence[AppInfo]:
         """List apps associated with a federation, newest first."""
 
     @abstractmethod
+    def list_app_associations(
+        self, app_id: str, federation_ids: Sequence[str]
+    ) -> Sequence[str]:
+        """List candidate federation IDs associated with an app.
+
+        The built-in Flower Agent is associated with every candidate federation.
+        """
+
+    @abstractmethod
     def delete_app(self, federation_id: str, app_id: str) -> bool:
         """Delete one federation-app association; its FAB remains in state."""
 
     @abstractmethod
-    def upsert_connector(
+    def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
-    ) -> bool:
-        """Create or update a connector for an account.
+        created_by: str,
+    ) -> int | None:
+        """Create a connector for a federation.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference.
         credentials_json : str
             Serialized connector credentials.
         config_json : str
             Serialized connector configuration.
+        created_by : str
+            Account ID creating the connector.
 
         Returns
         -------
-        bool
-            ``True`` if the connector was stored, otherwise ``False``.
+        int | None
+            The connector ID if the connector is created, otherwise ``None``.
         """
 
     @abstractmethod
-    def get_connector(
-        self, flwr_aid: str, connector_ref: str
-    ) -> ConnectorRecord | None:
-        """Return an account's connector, if present.
+    def get_connectors_by_ref(
+        self, federation_id: str, connector_ref: str
+    ) -> Sequence[ConnectorRecord]:
+        """Return a federation's connectors for one provider.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
+        federation_id : str
+            Federation ID owning the connector.
         connector_ref : str
-            Connector reference unique within the account.
+            Connector reference.
 
         Returns
         -------
-        ConnectorRecord | None
-            The stored connector, or `None` if it does not exist.
+        Sequence[ConnectorRecord]
+            The stored connectors.
         """
 
     @abstractmethod
-    def delete_connector(self, flwr_aid: str, connector_ref: str) -> bool:
-        """Delete an account's connector if it exists.
+    def get_connector_by_id(self, connector_id: int) -> ConnectorRecord | None:
+        """Return a connector by ID, if present."""
+
+    @abstractmethod
+    def update_connector_credentials(
+        self,
+        connector_id: int,
+        current_credentials: str,
+        update_credentials: Callable[[], str],
+    ) -> str | None:
+        """Atomically read, transform, and persist one connector's credentials.
+
+        Invoke the callback only if stored credentials still match the caller's
+        snapshot. Otherwise return the newer stored credentials. Return ``None``
+        if the connector no longer exists. Callback errors leave state unchanged.
+        """
+
+    @abstractmethod
+    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
+        """Delete a federation's connector if it exists.
 
         Parameters
         ----------
-        flwr_aid : str
-            Account ID owning the connector.
-        connector_ref : str
-            Connector reference unique within the account.
+        federation_id : str
+            Federation ID owning the connector.
+        connector_id : int
+            ID of the connector to delete.
 
         Returns
         -------
@@ -240,20 +494,19 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def bind_connectors_to_run(
-        self, run_id: int, connector_refs: Sequence[str]
-    ) -> bool:
-        """Associate connector references with a run."""
+    def bind_connectors_to_run(self, run_id: int, connector_ids: Sequence[int]) -> bool:
+        """Associate connector IDs with a run."""
 
     @abstractmethod
-    def get_run_connector_refs(self, run_id: int) -> Sequence[str]:
-        """Return connector references associated with a run."""
+    def get_run_connector_ids(self, run_id: int) -> Sequence[int]:
+        """Return connector IDs associated with a run."""
 
     @abstractmethod
     def create_connector_oauth_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         oauth_session_id: str,
         flwr_aid: str,
+        federation_id: str,
         connector_ref: str,
         state: str,
         redirect_uri: str,
@@ -268,6 +521,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Unique ID of the OAuth session.
         flwr_aid : str
             Account ID owning the OAuth session.
+        federation_id : str
+            Federation receiving the connector.
         connector_ref : str
             Reference of the connector being authorized.
         state : str
@@ -326,6 +581,110 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def store_messages(self, messages: Sequence[Message]) -> list[bool]:
+        """Store one or more Messages.
+
+        Each Message is accepted or rejected independently. If a Message has
+        already been stored, it is accepted without changing its delivery status.
+        A Message can be accepted before its body has been fully uploaded.
+
+        Parameters
+        ----------
+        messages : Sequence[Message]
+            The Messages to store.
+
+        Returns
+        -------
+        list[bool]
+            A list of booleans indicating whether each Message was accepted,
+            in the same order as the provided Messages.
+        """
+
+    @abstractmethod
+    def get_messages(
+        self,
+        *,
+        dst_node_id: int,
+        run_id: int | None = None,
+        reply_to_message_ids: Collection[str] | None = None,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get pending Messages for the provided destination node ID.
+
+        If multiple filters are provided, they are combined using AND logic.
+        Retrieved Messages are not acknowledged and can be returned again by
+        subsequent calls until they are acknowledged, cancelled, or expired.
+
+        Parameters
+        ----------
+        dst_node_id : int
+            The destination node ID to filter Messages by.
+        run_id : int | None (default: None)
+            The run ID to filter by. If None, Messages from all runs are included.
+        reply_to_message_ids : Collection[str] | None (default: None)
+            The Message IDs to filter reply_to_message_id by. If None, no
+            correlation filter is applied. If empty, no Messages are returned.
+        limit : int | None (default: None)
+            Maximum number of Messages to return. If None, no limit is applied.
+
+        Returns
+        -------
+        list[Message]
+            A list of unexpired pending Messages matching the specified filters,
+            ordered by created_at and then message_id.
+
+        Raises
+        ------
+        ValueError
+            If limit is less than or equal to zero.
+        """
+
+    @abstractmethod
+    def acknowledge_messages(self, message_ids: Collection[str]) -> None:
+        """Acknowledge Messages based on the provided Message IDs.
+
+        Acknowledged Messages are no longer returned by get_messages. Their
+        bodies are released, but their metadata is retained.
+
+        If a Message ID is unknown or already acknowledged, it is ignored.
+
+        Parameters
+        ----------
+        message_ids : Collection[str]
+            The IDs of Messages to acknowledge after receiving them in full.
+            If empty, no Messages are acknowledged.
+        """
+
+    @abstractmethod
+    def cancel_messages(
+        self,
+        *,
+        message_ids: Collection[str] | None = None,
+        run_id: int | None = None,
+    ) -> None:
+        """Cancel pending Messages based on the specified filters.
+
+        If multiple filters are provided, they are combined using AND logic.
+        Cancelled Messages are no longer returned by get_messages. Their bodies
+        are released, but their metadata is retained.
+
+        If a Message is no longer pending, it is ignored.
+
+        Parameters
+        ----------
+        message_ids : Collection[str] | None (default: None)
+            The Message IDs to filter by. If None, no ID filter is applied.
+            If empty, no Messages are cancelled.
+        run_id : int | None (default: None)
+            The run ID to filter by. If None, no run filter is applied.
+
+        Raises
+        ------
+        ValueError
+            If neither message_ids nor run_id is supplied.
+        """
+
+    @abstractmethod
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
     ) -> tuple[bool, list[str]]:
@@ -346,6 +705,70 @@ class CoreState(ABC):  # pylint: disable=R0904
             A tuple containing a boolean indicating whether the Message was
             stored and a list of object IDs that still need to be pushed. If
             storing the Message fails, returns `(False, [])`.
+        """
+
+    @abstractmethod
+    def create_space(
+        self,
+        *,
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+
+    @abstractmethod
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """List spaces the user participates in."""
+
+    @abstractmethod
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
+        """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def get_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Read a page and advance the participant's read cursor.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the messages.
+        participant : SpaceParticipant
+            User or agent reading the messages.
+        limit : int (default: 50)
+            Maximum number of messages to return.
+        before_id : int | None (default: None)
+            Exclusive upper message ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower message ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceMessage] | None
+            Messages in ascending ID order, selecting the newest page by default.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or the supplied ID range is invalid.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
         """
 
     @abstractmethod
@@ -412,6 +835,22 @@ class CoreState(ABC):  # pylint: disable=R0904
         Context | None
             The shared RunSeries context, or `None` if no context is stored.
         """
+
+    @abstractmethod
+    def get_compacted_contexts(
+        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+    ) -> Sequence[CompactedContext]:
+        """Return a series's summaries newest first, before an optional ID."""
+
+    @abstractmethod
+    def store_compacted_context(
+        self,
+        series_id: int,
+        through_event_id: int,
+        text: str,
+        token_count: int,
+    ) -> None:
+        """Store a summary; raise ValueError for an existing series/event pair."""
 
     @abstractmethod
     def set_run_series_context(self, series_id: int, context: Context) -> None:
@@ -677,6 +1116,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        connector_id: int | None = None,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a new task.
@@ -693,6 +1133,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Model reference associated with the task, if applicable.
         connector_ref : Optional[str] (default: None)
             Connector reference associated with the task, if applicable.
+        connector_id : Optional[int] (default: None)
+            Connector ID associated with the task, if applicable.
         requesting_task_id : Optional[int] (default: None)
             Task requesting creation of the new task. If set, task creation fails
             when the requesting task does not exist or is already finished.
@@ -949,12 +1391,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_task_events(
+    def get_task_events(  # pylint: disable=too-many-arguments
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
+        before_task_event_id: int | None = None,
+        event_types: Sequence[str] | None = None,
+        last_n: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events matching the filters.
 
@@ -963,17 +1409,31 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_ids : Optional[Sequence[int]] (default: None)
             If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        space_id : Optional[UUID] (default: None)
+            If set, return only events from runs in this space.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.
+        before_task_event_id : Optional[int] (default: None)
+            Return only events with an ID less than this cursor.
+        event_types : Optional[Sequence[str]] (default: None)
+            Return only events with one of these types.
+        last_n : Optional[int] (default: None)
+            Return the newest N matching events. Zero means no limit. Must be
+            non-negative.
 
         Returns
         -------
         Sequence[TaskEvent]
             Task events ordered by ID.
         """
+
+    # pylint: disable=unused-argument
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return run IDs associated with a space, if this state stores runs."""
+        return []
 
     @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

@@ -7,7 +7,7 @@ continue an earlier conversation.
 Prefer the browser? Start with [Chat in your browser](quickstart.md).
 
 ```{note}
-This tutorial targets Flower 1.35.0. Flower Agent and `flwr chat` are
+This tutorial targets Flower {{ stable_flwr_version }}. Flower Agent and `flwr chat` are
 experimental and may change between releases.
 ```
 
@@ -26,9 +26,11 @@ You don't need to provide model credentials for a SuperGrid run.
 
 Use `uvx` to run the documented version in an isolated environment:
 
-```console
-$ uvx --from flwr==1.35.0 flwr --version
-flwr, version 1.35.0
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr --version
+flwr, version |stable_flwr_version|
 ```
 
 Running an explicit version keeps every command in this tutorial on the same
@@ -47,8 +49,10 @@ address = "api.flower.ai"
 
 If you maintain a custom file, ensure that section exists. Then log in:
 
-```console
-$ uvx --from flwr==1.35.0 flwr login supergrid
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr login supergrid
 ```
 
 Open the printed authentication link and complete sign-in. The CLI stores the
@@ -56,8 +60,10 @@ resulting account credentials for later SuperGrid commands.
 
 ## Start a chat
 
-```console
-$ uvx --from flwr==1.35.0 flwr chat
+```{code-block} console
+:substitutions:
+
+$ uvx --from flwr==|stable_flwr_version| flwr chat
 ```
 
 ```{figure} ../_static/screenshots/flwr-chat.png
@@ -67,7 +73,7 @@ Flower Chat shows the selected agent above the prompt.
 ```
 
 Flower verifies your stored login before opening the full-screen interface. At
-startup, it selects your `@account/personal` federation. At the `❯` prompt,
+startup, it selects your `@<account>/personal` federation. At the `❯` prompt,
 ask:
 
 ```text
@@ -103,7 +109,7 @@ available in the active federation. Select one, add a request, and press
 {kbd}`Enter`:
 
 ```text
-@publisher/agent Describe what you can help me with.
+@<publisher>/<agent> Describe what you can help me with.
 ```
 
 Only a leading app spec selects an agent. After a successful selection, the
@@ -120,7 +126,7 @@ Enter `/federation` to open the federation completion menu. Select a federation
 visible to your account, or type its full name:
 
 ```text
-/federation @account/federation-name
+/federation @<account>/<federation-name>
 ```
 
 Flower clears the current transcript, selects the default Flower Agent, and
@@ -135,6 +141,7 @@ Type `/` to open the command menu:
 - `/new` makes the next message start a new run series
 - `/federation` selects a federation and starts a new conversation there
 - `/history` shows conversations from the active federation
+- `/load` builds and selects an AgentApp from a local project directory
 - `/quit` leaves Flower Chat
 
 After entering `/history`, use the arrow keys to select a conversation, press
@@ -154,7 +161,7 @@ You can also press {kbd}`Ctrl+C`:
 Each submitted message started one `AgentApp` run. SuperGrid supplied:
 
 - an OpenAI-compatible endpoint for model requests
-- an `AgentSession` for connector calls and frontend-visible events
+- an `AgentSession` for the prompt, connector calls, and frontend-visible events
 - a Flower `Context` containing run configuration and persistent series state
 - the selected AgentApp, resolved from its app spec or FAB hash
 - a federation in which the run and its series are stored
@@ -166,7 +173,7 @@ model.
 ## Next steps
 
 - [Write your first AgentApp](write-your-first-agentapp.md)
-- [Build a collaborative research agent](build-a-collaborative-agent.md)
+- [Build a research agent](build-a-research-agent.md)
 - [Use connectors](../explanations/use-connectors.md)
 - [Run an AgentApp on
   SuperGrid](../how-to-guides/run-on-supergrid.md)

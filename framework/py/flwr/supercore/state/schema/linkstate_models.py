@@ -14,6 +14,8 @@
 # ==============================================================================
 """SQLAlchemy declarative model definitions for LinkState."""
 
+from uuid import UUID
+
 from sqlalchemy import (
     BigInteger,
     Float,
@@ -22,9 +24,13 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     String,
+    Uuid,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from flwr.supercore.state.schema.corestate_models import Agent, Space
+from flwr.supercore.state.schema.types import UInt64
 
 
 class LinkStateBase(DeclarativeBase):
@@ -43,7 +49,7 @@ class Node(LinkStateBase):
         Index("idx_online_until", "online_until"),
     )
 
-    node_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
+    node_id: Mapped[int | None] = mapped_column(UInt64(), unique=True, nullable=True)
     owner_aid: Mapped[str | None] = mapped_column(String, nullable=True)
     owner_name: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -56,6 +62,8 @@ class Node(LinkStateBase):
     public_key: Mapped[bytes | None] = mapped_column(
         LargeBinary, unique=True, nullable=True
     )
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __mapper_args__ = {"primary_key": [node_id]}
 
@@ -64,9 +72,12 @@ class Run(LinkStateBase):
     """Represent a run."""
 
     __tablename__ = "run"
-    __table_args__ = (Index("idx_run_series_id", "series_id"),)
+    __table_args__ = (
+        Index("idx_run_series_id", "series_id"),
+        Index("idx_run_space_id", "space_id"),
+    )
 
-    run_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
+    run_id: Mapped[int | None] = mapped_column(UInt64(), unique=True, nullable=True)
     fab_id: Mapped[str | None] = mapped_column(String, nullable=True)
     fab_version: Mapped[str | None] = mapped_column(String, nullable=True)
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -75,65 +86,20 @@ class Run(LinkStateBase):
         String, nullable=False, server_default=text("''")
     )
     federation_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    primary_task_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    primary_task_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     federation_config: Mapped[str | None] = mapped_column(String, nullable=True)
-    series_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    series_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
+    space_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(Space.id, name="fk_run_space_id"),
+        nullable=True,
+    )
     flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey(Agent.agent_id, name="fk_run_agent_id"), nullable=True
+    )
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")
 
     __mapper_args__ = {"primary_key": [run_id]}
-
-
-class MessageIns(LinkStateBase):
-    """Represent an instruction message."""
-
-    __tablename__ = "message_ins"
-
-    message_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
-    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("run.run_id"), nullable=True
-    )
-    src_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    dst_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    delivered_at: Mapped[str | None] = mapped_column(String, nullable=True)
-    ttl: Mapped[float | None] = mapped_column(Float, nullable=True)
-    message_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
-    __mapper_args__ = {"primary_key": [message_id]}
-
-
-class MessageRes(LinkStateBase):
-    """Represent a reply message."""
-
-    __tablename__ = "message_res"
-    __table_args__ = (
-        Index(
-            "idx_message_res_reply_to_message_id_unique",
-            "reply_to_message_id",
-            unique=True,
-        ),
-    )
-
-    message_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
-    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("run.run_id"), nullable=True
-    )
-    src_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    dst_node_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    reply_to_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[float | None] = mapped_column(Float, nullable=True)
-    delivered_at: Mapped[str | None] = mapped_column(String, nullable=True)
-    ttl: Mapped[float | None] = mapped_column(Float, nullable=True)
-    message_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    error: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
-    __mapper_args__ = {"primary_key": [message_id]}

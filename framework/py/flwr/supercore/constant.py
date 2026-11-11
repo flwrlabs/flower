@@ -61,6 +61,7 @@ FLWR_IN_MEMORY_SQLITE_DB_URL = "sqlite:///:memory:"
 APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 FLWR_SUPERGRID_API_URL = os.getenv("FLWR_SUPERGRID_API_URL", "https://api.flower.ai/v1")
+HUB_APP_REFRESH_INTERVAL = timedelta(minutes=5)
 
 # Constants for Flower CLI update check
 FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
@@ -152,6 +153,10 @@ MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
 # Runtime auth constants
 TASK_TOKEN_HEADER = "flwr-task-token"
 
+# Fleet HTTP node auth constants
+FLEET_HTTP_PUBLIC_KEY_HEADER = "flwr-public-key"
+FLEET_HTTP_SIGNATURE_HEADER = "flwr-signature"
+
 # SuperExec auth constants
 SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
 SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
@@ -215,6 +220,17 @@ AUTOMATION_BATCH_LIMIT = 1
 
 FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
 
+AGENT_MESSAGE_CONTENT_RECORD_KEY = "agent"
+AGENT_MESSAGE_TEXT_KEY = "text"
+
+
+class EventType(StrEnum):
+    """Application events delivered through user feeds."""
+
+    AGENT_CREATED = "agent.created"
+    SPACE_CREATED = "space.created"
+    MESSAGE_CREATED = "message.created"
+
 
 class AutomationStatus(StrEnum):
     """Status of an automation."""
@@ -246,7 +262,6 @@ class TaskType(StrEnum):
     CLIENT_APP = "flwr-clientapp"
     SIMULATION = "flwr-simulation"
     AGENT_APP = "flwr-agentapp"
-    MODEL = "flwr-model"
     CONNECTOR = "flwr-connector"
 
 
@@ -254,7 +269,6 @@ TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
     TaskType.AGENT_APP: "--runtime-api-address",
     TaskType.CLIENT_APP: "--runtime-api-address",
     TaskType.CONNECTOR: "--runtime-api-address",
-    TaskType.MODEL: "--runtime-api-address",
     TaskType.SERVER_APP: "--runtime-api-address",
     TaskType.SIMULATION: "--runtime-api-address",
 }
@@ -262,7 +276,6 @@ TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",
     TaskType.CLIENT_APP: "flwr-clientapp",
     TaskType.CONNECTOR: "flwr-connector",
-    TaskType.MODEL: "flwr-model",
     TaskType.SERVER_APP: "flwr-serverapp",
     TaskType.SIMULATION: "flwr-simulation",
 }
@@ -280,7 +293,6 @@ TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
         TaskType.AGENT_APP,
     }
 )
-TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
 TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
     {TaskType.CONNECTOR}
 )

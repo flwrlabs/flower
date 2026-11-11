@@ -21,43 +21,22 @@ import os
 import subprocess
 import sys
 import threading
-from collections.abc import Sequence
 from logging import INFO, WARN
 from pathlib import Path
 from time import sleep
-from typing import cast
 
-import grpc
 import uvicorn
 
 from flwr.common.args import (
+    add_args_removed_health_server,
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
 )
 from flwr.common.constant import (
     CONTROL_API_DEFAULT_SERVER_ADDRESS,
-    FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
-    FLWR_INTERNAL_GRPC_CONTROL_API,
     ISOLATION_MODE_PROCESS,
     ISOLATION_MODE_SUBPROCESS,
-    TRANSPORT_TYPE_GRPC_ADAPTER,
-    TRANSPORT_TYPE_GRPC_RERE,
-    EventLogWriterType,
-    ExecPluginType,
-)
-from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
-    add_FleetServicer_to_server,
-)
-from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
-from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
-from flwr.server.superlink.fleet.grpc_adapter.grpc_adapter_servicer import (
-    GrpcAdapterServicer,
-)
-from flwr.server.superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
-from flwr.server.superlink.fleet.grpc_rere.node_auth_server_interceptor import (
-    NodeAuthServerInterceptor,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore import log
@@ -72,15 +51,8 @@ from flwr.supercore.constant import (
     UVICORN_DEFAULT_HOST,
 )
 from flwr.supercore.exit import ExitCode, flwr_exit
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH, generic_create_grpc_server
-from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.http_logging import get_uvicorn_log_config
-from flwr.supercore.interceptors import (
-    RpcErrorTranslationServerInterceptor,
-    create_fleet_runtime_version_server_interceptor,
-)
 from flwr.supercore.logger import configure_superlink_log_file, console_handler
-from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
 from flwr.supercore.tls import get_client_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
@@ -91,15 +63,11 @@ from flwr.superlink.config_loader import (
     SuperLinkLifespanConfig,
     load_control_authn_plugin,
     load_control_event_log_plugin,
+    load_fleet_event_log_plugin,
 )
-from flwr.superlink.servicer.control import run_control_api_grpc
 
 try:
-    from flwr.ee import (
-        add_ee_args_superlink,
-        get_ee_artifact_provider,
-        get_fleet_event_log_writer_plugins,
-    )
+    from flwr.ee import add_ee_args_superlink, get_ee_artifact_provider
 except ImportError:
 
     # pylint: disable-next=unused-argument
@@ -110,21 +78,9 @@ except ImportError:
         """Return the EE artifact provider."""
         raise NotImplementedError("No artifact provider is currently supported.")
 
-    def get_fleet_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
-        """Return all Fleet API event log writer plugins."""
-        raise NotImplementedError(
-            "No event log writer plugins are currently supported."
-        )
 
-
-class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
-    """Own the shared SuperLink lifespan state and legacy network servers.
-
-    Long-term, the gRPC-specific parts of this class should shrink until it only
-    initializes shared services used by FastAPI routers. During the migration,
-    FastAPI lifespan can use this object to start the existing gRPC APIs as
-    compatibility adapters.
-    """
+class SuperLinkLifespan:
+    """Own the shared SuperLink lifespan state and network services."""
 
     def __init__(
         self,
@@ -132,15 +88,13 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         state_factory: LinkStateFactory,
     ) -> None:
         self.config = config
-        self.grpc_servers: list[grpc.Server] = []
         self.bckg_threads: list[threading.Thread] = []
         self.superexec_process: subprocess.Popen[bytes] | None = None
-        self.objectstore_factory = state_factory.objectstore_factory
         self.state_factory = state_factory
         self._started = False
 
     def startup(self) -> None:
-        """Start shared lifespan and legacy SuperLink gRPC servers."""
+        """Start shared lifespan resources."""
         log(INFO, "SuperLinkLifespan: start")
         if self._started:
             return
@@ -148,27 +102,14 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         # Force initialization before starting network servers
         self.state_factory.state()
 
-        if os.getenv(FLWR_INTERNAL_GRPC_CONTROL_API) == "1":
-            self._start_control_api()
-        self._start_fleet_api()
         self._start_superexec_if_needed()
-        self._start_health_server_if_needed()
         self._started = True
 
     def shutdown(self) -> None:
-        """Stop legacy gRPC servers started by this lifespan."""
+        """Stop services started by this lifespan."""
         log(INFO, "SuperLinkLifespan: stop")
-        if (
-            not self._started
-            and not self.grpc_servers
-            and self.superexec_process is None
-        ):
+        if not self._started and self.superexec_process is None:
             return
-
-        # Stop in reverse startup order so dependent services disappear before
-        # their backing state is considered unavailable.
-        for grpc_server in reversed(self.grpc_servers):
-            grpc_server.stop(grace=1)
 
         if self.superexec_process is not None:
             self.superexec_process.terminate()
@@ -177,83 +118,17 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
             except subprocess.TimeoutExpired:
                 log(WARN, "SuperExec subprocess did not terminate within 1 second.")
 
-        self.grpc_servers.clear()
         self.superexec_process = None
         self._started = False
 
     def wait_until_background_thread_exits(self) -> None:
         """Block like the historical `flower-superlink` command.
 
-        With only gRPC servers, `self.bckg_threads` is empty and `all([])` is
-        intentionally true, so this loop blocks until a signal handler exits the
-        process. This preserves the current CLI behavior.
+        With no background threads, `all([])` is intentionally true, so this loop
+        blocks until a signal handler exits the process.
         """
         while all(thread.is_alive() for thread in self.bckg_threads):
             sleep(0.1)
-
-    def _start_control_api(self) -> None:
-        config = self.config
-        control_server: grpc.Server = run_control_api_grpc(
-            address=config.control_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            certificates=config.certificates,
-            authn_plugin=config.authn_plugin,
-            event_log_plugin=config.event_log_plugin,
-            artifact_provider=config.artifact_provider,
-            fleet_api_type=config.fleet_api_type,
-        )
-        self.grpc_servers.append(control_server)
-
-    def _start_fleet_api(self) -> None:
-        config = self.config
-        if config.simulation:
-            return
-
-        fleet_api_address = config.fleet_api_address
-        if not fleet_api_address:
-            if config.fleet_api_type in [
-                TRANSPORT_TYPE_GRPC_RERE,
-                TRANSPORT_TYPE_GRPC_ADAPTER,
-            ]:
-                fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-
-        fleet_address, _, _ = _format_address(cast(str, fleet_api_address))
-        if config.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-            self._start_legacy_fleet_grpc_rere(fleet_address)
-        elif config.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
-            self._start_legacy_fleet_grpc_adapter(fleet_address)
-        else:
-            raise ValueError(f"Unknown fleet_api_type: {config.fleet_api_type}")
-
-    def _start_legacy_fleet_grpc_rere(self, fleet_address: str) -> None:
-        """Start the current Fleet gRPC request-response API."""
-        interceptors = [NodeAuthServerInterceptor(self.state_factory)]
-        if self.config.enable_event_log:
-            fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
-            if fleet_log_plugin is not None:
-                interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
-                log(INFO, "Flower Fleet event logging enabled")
-
-        fleet_server = _run_fleet_api_grpc_rere(
-            address=fleet_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            enable_supernode_auth=self.config.enable_supernode_auth,
-            certificates=self.config.certificates,
-            interceptors=interceptors,
-        )
-        self.grpc_servers.append(fleet_server)
-
-    def _start_legacy_fleet_grpc_adapter(self, fleet_address: str) -> None:
-        """Start the current Fleet GrpcAdapter compatibility API."""
-        fleet_server = _run_fleet_api_grpc_adapter(
-            address=fleet_address,
-            state_factory=self.state_factory,
-            objectstore_factory=self.objectstore_factory,
-            certificates=self.config.certificates,
-        )
-        self.grpc_servers.append(fleet_server)
 
     def _start_superexec_if_needed(self) -> None:
         config = self.config
@@ -271,13 +146,6 @@ class SuperLinkLifespan:  # pylint: disable=too-many-instance-attributes
         )
         # pylint: disable-next=consider-using-with
         self.superexec_process = subprocess.Popen(command, **get_popen_detach_kwargs())
-
-    def _start_health_server_if_needed(self) -> None:
-        if self.config.health_server_address is None:
-            return
-
-        health_server = run_health_server_grpc_no_tls(self.config.health_server_address)
-        self.grpc_servers.append(health_server)
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -312,11 +180,18 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             "now operates over HTTP. Use `--host` and `--port` instead.",
         )
 
-    # Parse IP addresses
-    control_address, _, _ = _format_address(args.control_api_address)
-    health_server_address = None
-    if args.health_server_address is not None:
-        health_server_address, _, _ = _format_address(args.health_server_address)
+    if "--fleet-api-type" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-type` argument is deprecated. The Fleet API now "
+            "operates over HTTP.",
+        )
+    if "--fleet-api-address" in explicit_args:
+        log(
+            WARN,
+            "The `--fleet-api-address` argument is deprecated. The Fleet API "
+            "now operates over HTTP. Use `--host` and `--port` instead.",
+        )
 
     # Obtain certificates
     certificates = _obtain_superlink_certificates(args)
@@ -354,6 +229,11 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         if getattr(args, "enable_event_log", False)
         else None
     )
+    fleet_event_log_plugin = (
+        load_fleet_event_log_plugin()
+        if getattr(args, "enable_event_log", False)
+        else None
+    )
 
     # Load artifact provider if the args.artifact_provider_config is provided
     artifact_provider = None
@@ -374,13 +254,6 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
                 "`--ssl-certfile`, `--ssl-keyfile` and `--ssl-ca-certfile` "
                 "arguments to your SuperLink. Please refer to the Flower "
                 f"documentation for more information: {url_v}{page}",
-            )
-        if args.fleet_api_type != TRANSPORT_TYPE_GRPC_RERE:
-            flwr_exit(
-                ExitCode.SUPERLINK_INVALID_ARGS,
-                "The `--enable-supernode-auth` flag is only supported "
-                "with the gRPC-rere Fleet API transport. Please set "
-                f"`--fleet-api-type` to `{TRANSPORT_TYPE_GRPC_RERE}`.",
             )
         if args.simulation:
             log(
@@ -409,17 +282,7 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
             f" to the Flower documentation for more information: {url_v}{page}",
         )
 
-    fleet_api_address = args.fleet_api_address
-    if not args.simulation and not fleet_api_address:
-        if args.fleet_api_type in [
-            TRANSPORT_TYPE_GRPC_RERE,
-            TRANSPORT_TYPE_GRPC_ADAPTER,
-        ]:
-            fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
-
     return SuperLinkLifespanConfig(
-        control_address=control_address,
-        health_server_address=health_server_address,
         host=args.host,
         port=args.port,
         insecure=args.insecure,
@@ -427,11 +290,10 @@ def _parse_superlink_lifespan_config() -> SuperLinkLifespanConfig:
         superexec_auth_secret=superexec_auth_secret,
         authn_plugin=authn_plugin,
         event_log_plugin=event_log_plugin,
+        fleet_event_log_plugin=fleet_event_log_plugin,
         enable_event_log=getattr(args, "enable_event_log", False),
         artifact_provider=artifact_provider,
         enable_supernode_auth=enable_supernode_auth,
-        fleet_api_type=args.fleet_api_type,
-        fleet_api_address=fleet_api_address,
         simulation=args.simulation,
         ssl_ca_certfile=(
             str(Path(args.ssl_ca_certfile).expanduser())
@@ -464,8 +326,7 @@ def flower_superlink() -> None:
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    # Blocking: FastAPI serves the Runtime and Control HTTP APIs while its lifespan
-    # owns the Fleet gRPC server and, when enabled, the gRPC Control API server.
+    # Blocking: FastAPI serves the Runtime, Control, and Fleet HTTP APIs.
     _run_superlink_http_api(lifespan_config=config)
 
 
@@ -500,10 +361,13 @@ def _run_superlink_http_api(lifespan_config: SuperLinkLifespanConfig) -> None:
         lifespan_config.host,
         lifespan_config.port,
     )
+    log(
+        INFO,
+        "Starting the SuperLink Fleet HTTP API on %s:%s.",
+        lifespan_config.host,
+        lifespan_config.port,
+    )
 
-    # Uvicorn workers must stay at 1 while the lifespan starts gRPC servers. With
-    # multiple workers, every worker process would try to bind the same enabled
-    # gRPC API and Runtime API ports.
     uvicorn.run(
         app=fastapi_app,
         host=lifespan_config.host,
@@ -546,7 +410,6 @@ def _get_superexec_command(
         root_certificates_path=runtime_root_certificates_path,
     )
     command += ["--runtime-api-address", runtime_address]
-    command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
     if runtime_dependency_install:
         # SuperLink subprocess isolation owns this SuperExec, so install dependencies.
@@ -557,92 +420,6 @@ def _get_superexec_command(
 def _runtime_dependency_install_default() -> bool:
     """Return default runtime dependency installation setting."""
     return os.getenv(FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION) != "1"
-
-
-def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
-    """Return an instance of the Fleet Servicer event log writer plugin."""
-    try:
-        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
-            get_fleet_event_log_writer_plugins()
-        )
-        plugin_class = all_plugins[EventLogWriterType.STDOUT]
-        return plugin_class()
-    except KeyError:
-        sys.exit("No Fleet API event log writer plugin is provided.")
-    except NotImplementedError:
-        sys.exit("No Fleet API event log writer plugins are currently supported.")
-
-
-def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
-    address: str,
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    enable_supernode_auth: bool,
-    certificates: tuple[bytes, bytes, bytes] | None,
-    interceptors: Sequence[grpc.ServerInterceptor] | None = None,
-) -> grpc.Server:
-    """Run Fleet API (gRPC, request-response)."""
-    interceptors = [
-        RpcErrorTranslationServerInterceptor(),
-        *list(interceptors or []),
-    ]
-    interceptors.append(create_fleet_runtime_version_server_interceptor())
-
-    # Create Fleet API gRPC server
-    fleet_servicer = FleetServicer(
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-        enable_supernode_auth=enable_supernode_auth,
-    )
-    fleet_add_servicer_to_server_fn = add_FleetServicer_to_server
-    fleet_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-        interceptors=interceptors,
-    )
-
-    log(
-        INFO,
-        "Flower Deployment Runtime: Starting Fleet API (gRPC-rere) on %s",
-        fleet_grpc_server.bound_address,
-    )
-    fleet_grpc_server.start()
-
-    return fleet_grpc_server
-
-
-# pylint: disable=R0913, R0917
-def _run_fleet_api_grpc_adapter(
-    address: str,
-    state_factory: LinkStateFactory,
-    objectstore_factory: ObjectStoreFactory,
-    certificates: tuple[bytes, bytes, bytes] | None,
-) -> grpc.Server:
-    """Run Fleet API (GrpcAdapter)."""
-    # Create Fleet API gRPC server
-    fleet_servicer = GrpcAdapterServicer(
-        state_factory=state_factory,
-        objectstore_factory=objectstore_factory,
-        enable_supernode_auth=False,
-    )
-    fleet_add_servicer_to_server_fn = add_GrpcAdapterServicer_to_server
-    fleet_grpc_server = generic_create_grpc_server(
-        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
-        server_address=address,
-        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        certificates=certificates,
-    )
-
-    log(
-        INFO,
-        "Flower Deployment Runtime: Starting Fleet API (GrpcAdapter) on %s",
-        fleet_grpc_server.bound_address,
-    )
-    fleet_grpc_server.start()
-
-    return fleet_grpc_server
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
@@ -663,7 +440,7 @@ def _parse_args_run_superlink() -> argparse.ArgumentParser:
     _add_args_runtime_api(parser=parser)
     _add_args_fleet_api(parser=parser)
     _add_args_control_api(parser=parser)
-    add_args_health(parser=parser)
+    add_args_removed_health_server(parser)
 
     return parser
 
@@ -673,7 +450,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         "--insecure",
         action="store_true",
         help="Run the server without HTTPS, regardless of whether certificate "
-        "paths are provided. Data transmitted between the gRPC client and server "
+        "paths are provided. Data transmitted between the client and server "
         "is not encrypted. By default, the server runs with HTTPS enabled. "
         "Use this flag only if you understand the risks.",
     )
@@ -837,17 +614,17 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
     # Fleet API transport layer type
     parser.add_argument(
         "--fleet-api-type",
-        default=TRANSPORT_TYPE_GRPC_RERE,
+        default="grpc-rere",
         type=str,
         choices=[
-            TRANSPORT_TYPE_GRPC_RERE,
-            TRANSPORT_TYPE_GRPC_ADAPTER,
+            "grpc-rere",
+            "grpc-adapter",
         ],
-        help="Start a Fleet API server.",
+        help="Deprecated. The Fleet API now operates over HTTP.",
     )
     parser.add_argument(
         "--fleet-api-address",
-        help="Fleet API server address (IPv4, IPv6, or a domain name).",
+        help="Deprecated. Use `--host` and `--port` for the Fleet HTTP API.",
     )
 
 

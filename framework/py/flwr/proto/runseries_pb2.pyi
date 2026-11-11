@@ -62,3 +62,33 @@ class RunSeries(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "description", b"description", "federation", b"federation", "last_run_status", b"last_run_status", "run_ids", b"run_ids", "series_id", b"series_id", "updated_at", b"updated_at"]) -> None: ...
 
 global___RunSeries = RunSeries
+
+@typing.final
+class CompactedContext(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    THROUGH_EVENT_ID_FIELD_NUMBER: builtins.int
+    TEXT_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    TOKEN_COUNT_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    series_id: builtins.int
+    through_event_id: builtins.int
+    text: builtins.str
+    created_at: builtins.str
+    token_count: builtins.int
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        series_id: builtins.int = ...,
+        through_event_id: builtins.int = ...,
+        text: builtins.str = ...,
+        created_at: builtins.str = ...,
+        token_count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "series_id", b"series_id", "text", b"text", "through_event_id", b"through_event_id", "token_count", b"token_count"]) -> None: ...
+
+global___CompactedContext = CompactedContext

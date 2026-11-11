@@ -24,6 +24,8 @@ from flwr.supercore.typing import JSONObject
 
 MODEL_INFERENCE_USAGE_TYPE = "model_inference"
 WEB_SEARCH_USAGE_TYPE = "web_search"
+FILESYSTEM_LIST_DIRECTORY_USAGE_TYPE = "filesystem_list_directory"
+FILESYSTEM_READ_FILE_USAGE_TYPE = "filesystem_read_file"
 
 
 class _TaskUsageStub(Protocol):

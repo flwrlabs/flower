@@ -34,7 +34,11 @@ class ObjectStoreBase(DeclarativeBase):
 
 
 class StoredObject(ObjectStoreBase):
-    """Represent stored object content and reference counts."""
+    """Represent stored object content and reference counts.
+
+    Objects are removed during cleanup when they are no longer needed. The
+    table may therefore be empty after run cleanup.
+    """
 
     __tablename__ = "objects"
     __table_args__ = (
@@ -53,7 +57,11 @@ class StoredObject(ObjectStoreBase):
 
 
 class ObjectChild(ObjectStoreBase):
-    """Represent a parent-child relationship between stored objects."""
+    """Represent a parent-child relationship between stored objects.
+
+    Relationships are removed along with their objects. The table may be empty
+    after cleanup or when the stored objects have no children.
+    """
 
     __tablename__ = "object_children"
     __table_args__ = (PrimaryKeyConstraint("parent_id", "child_id"),)
@@ -71,7 +79,11 @@ class ObjectChild(ObjectStoreBase):
 
 
 class RunObject(ObjectStoreBase):
-    """Represent an object registered for a run."""
+    """Represent an object registered for a run.
+
+    Run cleanup removes the corresponding object registrations, so the table
+    may be empty when no runs have objects registered in the store.
+    """
 
     __tablename__ = "run_objects"
     __table_args__ = (PrimaryKeyConstraint("run_id", "object_id"),)

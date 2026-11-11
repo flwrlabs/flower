@@ -49,6 +49,8 @@ def flwr_exit(
     message: str | None = None,
     event_type: EventType | None = None,
     event_details: dict[str, Any] | None = None,
+    *,
+    emit_telemetry: bool = True,
 ) -> NoReturn:
     """Handle application exit with an optional message.
 
@@ -86,7 +88,9 @@ def flwr_exit(
         exit_message += f"\n\nFor more information, visit: <{_get_code_url(code)}>"
 
     # Telemetry event
-    event_type = event_type or _try_obtain_telemetry_event()
+    event_type = (
+        (event_type or _try_obtain_telemetry_event()) if emit_telemetry else None
+    )
     event_future = None
     if event_type:
         event_details = event_details or {}
@@ -129,8 +133,6 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.RUN_SUPERNODE_LEAVE
     if sys.argv[0].endswith("flwr-agentapp"):
         return EventType.FLWR_AGENTAPP_RUN_LEAVE
-    if sys.argv[0].endswith("flwr-model"):
-        return EventType.FLWR_MODEL_RUN_LEAVE
     if sys.argv[0].endswith("flwr-connector"):
         return EventType.FLWR_CONNECTOR_RUN_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):

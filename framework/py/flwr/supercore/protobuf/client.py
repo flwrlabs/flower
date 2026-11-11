@@ -155,13 +155,14 @@ class ProtobufClient:
             retry_invoker=retry_invoker,
         )
 
-    def _unary_unary(
+    def _unary_unary(  # pylint: disable=too-many-arguments
         self,
         *,
         path: str,
         rpc_method: str,
         request: Message,
         response_type: type[ResponseT],
+        timeout: float | None = None,
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
@@ -176,6 +177,7 @@ class ProtobufClient:
                     "content-type": PROTOBUF_MEDIA_TYPE,
                     "accept": PROTOBUF_MEDIA_TYPE,
                 },
+                timeout=self._client.timeout if timeout is None else timeout,
             )
             context = ProtobufRequestContext(
                 rpc_method=rpc_method,

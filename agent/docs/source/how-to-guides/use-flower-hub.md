@@ -2,7 +2,7 @@
 
 Flower Hub lets you discover AgentApps that you can run on SuperGrid and share
 your own AgentApps with other Flower users. Published apps use an app spec such
-as `@publisher/agent-name`.
+as `@<publisher>/<agent>`.
 
 ## Explore AgentApps
 
@@ -19,41 +19,36 @@ button, choose one of your active federations, and select **Confirm**.
 Open that federation from the Flower Agent sidebar and select **New chat**.
 The AgentApp is now available in the agent selector above the prompt.
 
-### Run an AgentApp from the terminal
-
-Use the publisher and project name from the app spec:
-
-```console
-$ uvx --from flwr==1.35.0 flwr run @publisher/agent-name supergrid \
-    --run-config 'agent.input="What can you help me with?"' \
-    --stream
+```{tip}
+To chat with a Hub AgentApp from your terminal, see {ref}`get-an-agentapp-project`
+and {ref}`load-an-agentapp-in-flower-chat`.
 ```
-
-See [Run an AgentApp on SuperGrid](run-on-supergrid.md) to choose a federation,
-inspect logs, and stop a run.
 
 ## Publish your AgentApp
 
 Start with a working project from [Write your first
 AgentApp](../tutorials/write-your-first-agentapp.md). This guide targets Flower
-1.35.0.
+{{ stable_flwr_version }}.
 
 ### Prepare the project
 
 Check the public metadata in `pyproject.toml`:
 
-```toml
+```{code-block} toml
+:substitutions:
+
 [project]
 name = "hello-agent"
 version = "0.1.0"
 description = "Answer questions with a Flower AgentApp"
 license = { file = "LICENSE" }
-dependencies = ["flwr>=1.35.0,<2.0"]
+dependencies = ["flwr>=|stable_flwr_version|,<2.0", "openai>=2.16.0,<3.0.0"]
 
 [tool.flwr.app]
 publisher = "your-username"
 display-name = "Hello Agent"
-flwr-version-target = "1.35.0"
+fab-format-version = 1
+flwr-version-target = "|stable_flwr_version|"
 
 [tool.flwr.app.components]
 agentapp = "hello_agent.agent_app:app"

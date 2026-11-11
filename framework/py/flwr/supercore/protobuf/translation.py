@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import cast
 
 from fastapi import Depends, Request
@@ -32,12 +32,15 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     BeginConnectorOAuthRequest,
     CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
+    CreateAgentRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
     DisconnectConnectorRequest,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
     GetRunSeriesRequest,
+    ListAgentsRequest,
+    ListAppAssociationsRequest,
     ListAppsRequest,
     ListAutomationsRequest,
     ListConnectorsRequest,
@@ -55,6 +58,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
+    SetFederationIconRequest,
     ShowFederationRequest,
     StartAutomationRequest,
     StartRunRequest,
@@ -65,28 +69,51 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeRequest,
     UpdateRunSeriesDescriptionRequest,
 )
+from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
+from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
+    ActivateNodeRequest,
+    DeactivateNodeRequest,
+    PullMessagesRequest,
+    PushMessagesRequest,
+    RegisterNodeFleetRequest,
+    UnregisterNodeFleetRequest,
+)
+from flwr.proto.heartbeat_pb2 import SendNodeHeartbeatRequest  # pylint: disable=E0611
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     PullObjectRequest,
     PushObjectRequest,
 )
+from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
+    AcquireTaskRequest,
     CreateTaskRequest,
+    DeleteFileRequest,
+    GetCompactedContextsRequest,
     GetConnectorRequest,
+    GetFileRequest,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
+    GetSpaceEventsRequest,
+    ListFilesRequest,
     PullAppMessagesRequest,
-    PullPendingTasksRequest,
     PullTaskInputRequest,
     PullTaskMessageRequest,
     PushAppMessagesRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
     PushTaskOutputRequest,
+    PutCompactedContextRequest,
+    PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    GetSpaceMessagesRequest,
+    ListSpacesRequest,
+    SendSpaceMessageRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
@@ -103,6 +130,24 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
+    ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
+    ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
+    ("POST", "/v1/fleet/unregister-node"): UnregisterNodeFleetRequest,
+    ("POST", "/v1/fleet/send-node-heartbeat"): SendNodeHeartbeatRequest,
+    ("POST", "/v1/fleet/pull-messages"): PullMessagesRequest,
+    ("POST", "/v1/fleet/push-messages"): PushMessagesRequest,
+    ("POST", "/v1/fleet/get-run"): GetRunRequest,
+    ("POST", "/v1/fleet/get-fab"): GetFabRequest,
+    ("POST", "/v1/fleet/push-object"): PushObjectRequest,
+    ("POST", "/v1/fleet/pull-object"): PullObjectRequest,
+    ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
+    ("POST", "/v1/control/create-agent"): CreateAgentRequest,
+    ("POST", "/v1/control/list-agents"): ListAgentsRequest,
+    ("POST", "/v1/control/create-space"): CreateSpaceRequest,
+    ("POST", "/v1/control/list-spaces"): ListSpacesRequest,
+    ("POST", "/v1/control/get-space-messages"): GetSpaceMessagesRequest,
+    ("POST", "/v1/control/send-space-message"): SendSpaceMessageRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
@@ -130,10 +175,12 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/unregister-node"): UnregisterNodeRequest,
     ("POST", "/v1/control/list-nodes"): ListNodesRequest,
     ("POST", "/v1/control/list-apps"): ListAppsRequest,
+    ("POST", "/v1/control/list-app-associations"): ListAppAssociationsRequest,
     ("POST", "/v1/control/add-app"): AddAppRequest,
     ("POST", "/v1/control/remove-app"): RemoveAppRequest,
     ("POST", "/v1/control/list-federations"): ListFederationsRequest,
     ("POST", "/v1/control/show-federation"): ShowFederationRequest,
+    ("POST", "/v1/control/set-federation-icon"): SetFederationIconRequest,
     ("POST", "/v1/control/create-federation"): CreateFederationRequest,
     ("POST", "/v1/control/archive-federation"): ArchiveFederationRequest,
     ("POST", "/v1/control/add-node-to-federation"): AddNodeToFederationRequest,
@@ -154,8 +201,11 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
         "POST",
         "/v1/control/configure-simulation-federation",
     ): ConfigureSimulationFederationRequest,
-    ("POST", "/v1/runtime/pull-pending-tasks"): PullPendingTasksRequest,
-    ("POST", "/v1/runtime/claim-task"): ClaimTaskRequest,
+    ("POST", "/v1/runtime/put-file"): PutFileRequest,
+    ("POST", "/v1/runtime/get-file"): GetFileRequest,
+    ("POST", "/v1/runtime/list-files"): ListFilesRequest,
+    ("POST", "/v1/runtime/delete-file"): DeleteFileRequest,
+    ("POST", "/v1/runtime/acquire-task"): AcquireTaskRequest,
     ("POST", "/v1/runtime/send-task-heartbeat"): SendTaskHeartbeatRequest,
     ("POST", "/v1/runtime/pull-task-input"): PullTaskInputRequest,
     ("POST", "/v1/runtime/push-task-output"): PushTaskOutputRequest,
@@ -170,6 +220,9 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
     ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
     ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
+    ("POST", "/v1/runtime/get-space-events"): GetSpaceEventsRequest,
+    ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
+    ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,
     ("POST", "/v1/runtime/record-task-usage"): RecordTaskUsageRequest,
     ("POST", "/v1/runtime/get-connector"): GetConnectorRequest,
@@ -264,11 +317,11 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
                 content=result.SerializeToString(), media_type=PROTOBUF_MEDIA_TYPE
             )
 
-        # Synchronous generators and other iterables are streamed lazily too.
+        # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
-        if isinstance(result, Iterable):
+        if isinstance(result, Iterator):
             content = (
-                frame_message(message) for message in cast(Iterable[Message], result)
+                frame_message(message) for message in cast(Iterator[Message], result)
             )
             return CancellableProtobufStreamingResponse(
                 content,
@@ -279,7 +332,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
             "Invalid response returned from Control handler: expected a protobuf "
-            "Message or Iterable[Message], got "
+            "Message or Iterator[Message], got "
             f"{result!r} ({type(result).__name__})",
         )
 

@@ -15,22 +15,22 @@
 """History command helpers for Flower Chat."""
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import click
 from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.utils import get_cwidth
 
-from flwr.app import ConfigRecord
-from flwr.common.serde import context_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    GetRunSeriesRequest,
+    ListRunSeriesEventsRequest,
     ListRunSeriesRequest,
 )
-from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.control import ControlHttpClient
 
+from ..constant import CHAT_TERMINAL_EVENTS, CHAT_TEXT_DELTA_EVENT
 from ..utils import flwr_cli_exc_handler
 
 
@@ -60,15 +60,15 @@ def load_conversation(
     stub: ControlHttpClient, entry: RunSeries, federation: str
 ) -> list[tuple[str, str]]:
     """Load displayable messages for one conversation."""
-    with flwr_cli_exc_handler():
-        response = stub.GetRunSeries(GetRunSeriesRequest(series_id=entry.series_id))
-    if response.series.federation != federation:
+    if entry.federation != federation:
         raise click.ClickException(
             f"Conversation {entry.series_id} does not belong to {federation}."
         )
-    if not response.HasField("context"):
-        return []
-    return _parse_conversation_context(response.context)
+    with flwr_cli_exc_handler():
+        response = stub.ListRunSeriesEvents(
+            ListRunSeriesEventsRequest(series_id=entry.series_id)
+        )
+    return _parse_conversation_events(response.events)
 
 
 def render_history(block: HistoryBlock, width: int) -> StyleAndTextTuples:
@@ -97,47 +97,89 @@ def render_history(block: HistoryBlock, width: int) -> StyleAndTextTuples:
     return fragments
 
 
-def _parse_conversation_context(  # pylint: disable=too-many-branches
-    context_proto: ProtoContext,
-) -> list[tuple[str, str]]:
-    """Extract displayable user and assistant messages from RunSeries context."""
-    context = context_from_proto(context_proto)
-    record = context.state.get("items")
-    if not isinstance(record, ConfigRecord):
-        return []
-    raw_items = record.get("json")
-    if not isinstance(raw_items, list):
-        return []
-
+def _parse_conversation_events(events: Iterable[TaskEvent]) -> list[tuple[str, str]]:
+    """Extract displayable messages from persisted run-series events."""
     messages: list[tuple[str, str]] = []
-    for raw_item in raw_items:
-        if not isinstance(raw_item, str):
-            continue
+    assistant_parts: list[str] = []
+
+    def flush_assistant_parts() -> None:
+        if assistant_parts:
+            messages.append(("assistant", "".join(assistant_parts)))
+            assistant_parts.clear()
+
+    for event in events:
         try:
-            item = json.loads(raw_item)
+            payload = json.loads(event.data)
         except json.JSONDecodeError:
             continue
-        if not isinstance(item, dict) or item.get("type") != "message":
+        if not isinstance(payload, dict):
             continue
-        role = item.get("role")
-        if role not in {"user", "assistant"}:
-            continue
-        content = item.get("content")
-        if isinstance(content, str):
-            text = content
-        elif isinstance(content, list):
-            parts: list[str] = []
-            for part in content:
-                if isinstance(part, str):
-                    parts.append(part)
-                elif isinstance(part, dict) and isinstance(part.get("text"), str):
-                    parts.append(part["text"])
-            text = "".join(parts)
-        else:
-            continue
-        if text:
-            messages.append((role, text))
+
+        event_type = event.event
+        if not event_type and isinstance(payload.get("type"), str):
+            event_type = payload["type"]
+        if event_type == CHAT_TEXT_DELTA_EVENT:
+            delta = payload.get("delta")
+            if isinstance(delta, str):
+                assistant_parts.append(delta)
+        elif event_type in CHAT_TERMINAL_EVENTS:
+            response_text = _parse_response_text(payload)
+            if response_text:
+                assistant_parts.clear()
+                messages.append(("assistant", response_text))
+            else:
+                flush_assistant_parts()
+        elif event_type == "message":
+            role = payload.get("role")
+            if role not in {"user", "assistant"}:
+                continue
+            flush_assistant_parts()
+            text = _parse_message_content(payload.get("content"))
+            if text:
+                messages.append((role, text))
+
+    flush_assistant_parts()
     return messages
+
+
+def _parse_message_content(content: object) -> str | None:
+    """Extract text from an Open Responses message item."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                parts.append(part["text"])
+        return "".join(parts)
+    return None
+
+
+def _parse_response_text(payload: dict[str, object]) -> str | None:
+    """Extract final assistant text from a terminal Open Responses event."""
+    response = payload.get("response")
+    if not isinstance(response, dict):
+        return None
+    output_text = response.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+    output = response.get("output")
+    if not isinstance(output, list):
+        return None
+    parts: list[str] = []
+    for item in output:
+        if (
+            not isinstance(item, dict)
+            or item.get("type") != "message"
+            or item.get("role") != "assistant"
+        ):
+            continue
+        text = _parse_message_content(item.get("content"))
+        if text:
+            parts.append(text)
+    return "".join(parts) or None
 
 
 def _truncate_to_width(text: str, width: int) -> str:
