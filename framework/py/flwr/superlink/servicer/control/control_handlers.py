@@ -241,10 +241,9 @@ def stream_events(
     def generate() -> Generator[StreamEventsResponse, None, None]:
         cursor = after_seq
         batch = initial
-        deadline = time.monotonic() + 270
-        while is_active() and time.monotonic() < deadline:
+        while is_active():
             for entry in batch:
-                if not is_active() or time.monotonic() >= deadline:
+                if not is_active():
                     return
                 cursor = entry.seq
                 yield entry

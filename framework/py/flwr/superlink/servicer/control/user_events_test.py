@@ -69,19 +69,3 @@ def test_stream_replays_pages_polls_and_stops_on_disconnect() -> None:
         call("alice", after_seq=3),
         call("alice", after_seq=3),
     ]
-
-
-def test_idle_stream_expires_without_heartbeats() -> None:
-    """Close the stream after 270 seconds even when the feed remains empty."""
-    state = Mock(spec=LinkState)
-    state.get_user_events.return_value = []
-    stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, lambda: True)
-    with (
-        patch(
-            "flwr.superlink.servicer.control.control_handlers.time.monotonic",
-            side_effect=[0, 0, 270],
-        ),
-        patch("flwr.superlink.servicer.control.control_handlers.time.sleep") as sleep,
-    ):
-        assert not list(stream)
-    sleep.assert_called_once_with(0.5)
