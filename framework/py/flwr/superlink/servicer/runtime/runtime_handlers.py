@@ -124,21 +124,13 @@ def get_space_events(
     task: Task,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    space_id = runs[0].space_id
-    if space_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "This endpoint is only available to Space tasks.",
-        )
+    space_id, _ = _task_space(state, task)
     return core_runtime_handlers.get_space_events(request, state, space_id)
 
 
-def _task_space(requested_id: str, state: LinkState, task: Task) -> tuple[UUID, Run]:
+def _task_space(
+    state: LinkState, task: Task, requested_id: str = ""
+) -> tuple[UUID, Run]:
     """Resolve the task's Space and reject requests for another Space."""
     runs = state.get_run_info(run_ids=[task.run_id])
     if not runs:
@@ -152,15 +144,16 @@ def _task_space(requested_id: str, state: LinkState, task: Task) -> tuple[UUID, 
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             "This endpoint is only available to Space tasks.",
         )
-    if requested_id:
-        try:
-            matches = UUID(requested_id) == space_id
-        except ValueError as exc:
-            raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
-        if not matches:
-            raise FlowerError(
-                ApiErrorCode.SPACE_NOT_FOUND, "The task cannot access this Space."
-            )
+    if not requested_id:
+        return space_id, run
+    try:
+        requested_space_id = UUID(requested_id)
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if requested_space_id != space_id:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND, "The task cannot access this Space."
+        )
     return space_id, run
 
 
@@ -168,13 +161,13 @@ def get_space_messages(
     request: GetSpaceMessagesRequest, state: LinkState, task: Task
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
-    space_id, run = _task_space(request.space_id, state, task)
+    space_id, run = _task_space(state, task, request.space_id)
     if run.agent_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
             "Space message reads require an agent binding.",
         )
-    limit = request.limit if request.HasField("limit") else 50
+    limit = request.limit if request.HasField("limit") else 100
     if limit > 100:
         raise FlowerError(
             ApiErrorCode.INVALID_SPACE_REQUEST, "limit must be at most 100."
@@ -199,7 +192,7 @@ def send_space_message(
     request: SendSpaceMessageRequest, state: LinkState, task: Task
 ) -> SendSpaceMessageResponse:
     """Publish with the primary AgentApp's server-bound agent identity."""
-    space_id, run = _task_space(request.space_id, state, task)
+    space_id, run = _task_space(state, task, request.space_id)
     if (
         run.agent_id is None
         or task.type != TaskType.AGENT_APP
