@@ -254,7 +254,7 @@ def test_space_messages_use_authenticated_run(
     response = _post(
         client,
         "send-space-message",
-        SendSpaceMessageRequest(content="Hello"),
+        SendSpaceMessageRequest(space_id="ignored", content="Hello"),
         token=token,
     )
     assert response.status_code == 200
@@ -266,7 +266,7 @@ def test_space_messages_use_authenticated_run(
         response = _post(
             client,
             "get-space-messages",
-            GetSpaceMessagesRequest(unread_only=True),
+            GetSpaceMessagesRequest(space_id="ignored", unread_only=True),
             token=token,
         )
         assert response.status_code == 200
