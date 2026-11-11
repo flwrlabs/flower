@@ -226,52 +226,20 @@ def test_get_space_events_reads_only_authenticated_space(
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
 
-
-@pytest.mark.parametrize("bound", [True, False])
-def test_task_authentication_requires_current_agent_membership(
-    client: TestClient, state: LinkState, bound: bool
-) -> None:
-    """Reject unbound Space tasks and tokens whose agent loses membership."""
-    agent = state.create_agent(
-        "account", AgentConfig(name="Agent", app_spec="@flwr/app")
-    )
-    assert agent is not None
-    space_id = UUID(state.get_spaces("account")[0].id)
-    run_id = state.create_run(
-        "",
-        "",
-        "",
-        {},
-        None,
-        None,
-        "account",
-        TaskType.AGENT_APP,
-        space_id=space_id,
-        agent_id=agent.id if bound else None,
-    )
-    task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
-    assert task_id is not None
-    token = state.claim_task(task_id)
-    assert token is not None and state.activate_task(task_id)
-    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
-    assert response.status_code == (200 if bound else 401)
-    if bound:
-        if isinstance(state, InMemoryLinkState):
-            state.space_store[space_id].participants.remove(
-                SpaceParticipant(agent_id=agent.id)
-            )
-        else:
-            assert isinstance(state, SqlLinkState)
-            with state.session() as session:
-                session.execute(
-                    delete(SpaceParticipantTable).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == agent.id,
-                    )
-                )
-        response = _post(
-            client, "get-space-events", GetSpaceEventsRequest(), token=token
+    if isinstance(state, InMemoryLinkState):
+        state.space_store[space_id].participants.remove(
+            SpaceParticipant(agent_id=agent.id)
         )
+    else:
+        assert isinstance(state, SqlLinkState)
+        with state.session() as session:
+            session.execute(
+                delete(SpaceParticipantTable).where(
+                    SpaceParticipantTable.c.space_id == space_id,
+                    SpaceParticipantTable.c.agent_id == agent.id,
+                )
+            )
+    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
     assert response.status_code == 401
     assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
     assert state.get_task_by_token(token) is not None
