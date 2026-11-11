@@ -20,9 +20,16 @@ from uuid import UUID
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
+from flwr.supercore.state.schema.corestate_models import (
+    Event,
+    FlwrBase,
+    Task,
+    TaskLogsTable,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.typing import JSONObject
 
 CORESTATE_TABLE_NAMES = {
     "nonce_store",
@@ -69,6 +76,32 @@ def test_declarative_metadata_covers_all_mappable_core_tables() -> None:
 def test_task_mapper_uses_task_id_as_identity_key() -> None:
     """Ensure the mapper-only primary key uses the existing unique task_id column."""
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
+
+
+def test_event_payload_round_trips_nested_json() -> None:
+    """Map and persist recursive JSON values through the Event ORM model."""
+    payload: JSONObject = {
+        "nested": {"values": [None, True, 42, 1.5, "text", {"items": []}]},
+    }
+    engine = create_engine("sqlite:///:memory:")
+    FlwrBase.metadata.tables["events"].create(engine)
+    event_id = UUID(int=1)
+
+    with Session(engine) as session:
+        session.add(
+            Event(
+                event_id=event_id,
+                type="test",
+                payload=payload,
+                created_at=datetime.now(UTC),
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        event = session.get(Event, event_id)
+        assert event is not None
+        assert event.payload == payload
 
 
 def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() -> None:
