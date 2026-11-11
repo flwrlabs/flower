@@ -28,7 +28,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -275,6 +277,41 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[Agent]
             Agents belonging to the account, or an empty sequence if none exist.
+        """
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching owned Agents and participating Spaces.
+
+        Concurrent changes may appear in both this response and subsequent replay.
+        """
+
+    @abstractmethod
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Store a shared event and its ordered deliveries, returning its UUID.
+
+        Each call creates a new event with a generated UUID and creation timestamp.
+        SQL callers can use an enclosing session to commit application changes
+        with the event.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Replay accessible events after an exclusive cursor in user-feed order.
+
+        Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        If all remaining entries are inaccessible, return a cursor-only response
+        with no event. Clients apply present events before saving seq; cursor-only
+        responses only advance the client's cursor.
+        Reading does not consume entries or advance a shared cursor.
         """
 
     @abstractmethod
