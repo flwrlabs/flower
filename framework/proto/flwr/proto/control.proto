@@ -26,6 +26,8 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/space.proto";
+import "google/protobuf/struct.proto";
 
 message AgentConfig {
   string name = 1;
@@ -110,51 +112,37 @@ message ListRunsResponse {
   string now = 2;
 }
 
-message SpaceParticipant {
-  oneof participant {
-    string flwr_aid = 1;
-    uint64 agent_id = 2;
-  }
+// Agents and Spaces only. Message history is fetched through GetSpaceMessages.
+message BootstrapRequest {}
+message BootstrapResponse {
+  repeated Agent agents = 1;
+  repeated Space spaces = 2;
+  // Feed head from the same snapshot as agents and spaces.
+  uint64 cursor = 3;
 }
 
-message Space {
-  string id = 1;
-  string title = 2;
-  string created_at = 3;
-  repeated SpaceParticipant participants = 4;
+message Event {
+  string event_id = 1;
+  string type = 2;
+  optional string space_id = 3;
+  google.protobuf.Struct payload = 4;
+  string created_at = 5;
 }
 
-message CreateSpaceRequest { repeated SpaceParticipant participants = 1; }
-message CreateSpaceResponse { Space space = 1; }
-
-message ListSpacesRequest {}
-message ListSpacesResponse { repeated Space spaces = 1; }
-
-message SpaceMessage {
-  uint64 id = 1;
-  string space_id = 2;
-  SpaceParticipant author = 3;
-  string created_at = 4;
-  string content = 5;
+// POST /v1/control/stream-events. Accept: text/event-stream selects standard
+// SSE with protobuf JSON data; otherwise use the binary protobuf stream
+// framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
+// use their existing separate stream. The event journal is append-only;
+// replay cursors do not expire.
+message StreamEventsRequest {
+  // Exclusive user-feed cursor. Falls back to Last-Event-ID when absent.
+  optional uint64 after_seq = 1;
 }
-
-message GetSpaceMessagesRequest {
-  string space_id = 1;
-  // Exclusive upper ID bound. Absent selects the newest page.
-  optional uint64 before_id = 2;
-  // Absent uses the server's default page size.
-  optional uint32 limit = 3;
+message StreamEventsResponse {
+  // Position in the authenticated user's feed, also used as the SSE id.
+  uint64 seq = 1;
+  Event event = 2;
 }
-message GetSpaceMessagesResponse {
-  // Messages in the selected page, ordered by ascending ID.
-  repeated SpaceMessage messages = 1;
-}
-
-message SendSpaceMessageRequest {
-  string space_id = 1;
-  string content = 2;
-}
-message SendSpaceMessageResponse { SpaceMessage message = 1; }
 
 message ListRunSeriesRequest {
   optional string updated_before = 1;
@@ -307,6 +295,8 @@ message CreateFederationRequest {
   string federation_name = 1;
   string description = 2;
   bool simulation = 3;
+  // Bare namespace handle. Omission selects the authenticated caller's handle.
+  optional string handle = 4;
 }
 message CreateFederationResponse { Federation federation = 1; }
 

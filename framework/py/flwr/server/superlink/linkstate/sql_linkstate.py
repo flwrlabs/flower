@@ -50,6 +50,7 @@ from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -79,6 +80,17 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.session() as session:
+            return [
+                run_id
+                for run_id in session.scalars(
+                    select(RunModel.run_id).where(RunModel.space_id == space_id)
+                )
+                if run_id is not None
+            ]
 
     def get_metadata(self) -> MetaData:
         """Return combined SQLAlchemy MetaData for LinkState and CoreState tables."""
@@ -384,6 +396,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -394,6 +407,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             series_description=series_description,
             connector_ids=connector_ids,
             primary_task_type=primary_task_type,
+            agent_id=agent_id,
         )
         if initial_task_event is not None:
             try:
@@ -410,6 +424,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
         with self.session() as session:
+            if agent_id is not None:
+                participant = session.scalar(
+                    select(SpaceParticipantTable.c.agent_id).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.agent_id == agent_id,
+                    )
+                )
+                if participant is None:
+                    return 0
             existing_run_id = session.scalar(
                 select(RunModel.run_id).where(RunModel.run_id == run_id)
             )
@@ -442,6 +465,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         usage_reported_at="",
                         series_id=resolved_series_id,
                         space_id=space_id,
+                        agent_id=agent_id,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -854,4 +878,6 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         clientapp_runtime=cast(float, run.clientapp_runtime),
         primary_task_type=task.type,
         series_id=run.series_id or 0,
+        space_id=run.space_id,
+        agent_id=run.agent_id,
     )

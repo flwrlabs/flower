@@ -386,7 +386,7 @@ class VirtualClientEngineActorPool(ActorPool):
             self._idle_actors.extend(new_actors)
             self.num_actors += num_actors
 
-    def submit(self, fn: Any, value: tuple[ClientAppFn, Message, str, Context]) -> None:
+    def submit(self, fn: Any, value: Any) -> None:
         """Take an idle actor and assign it to run a client app and Message.
 
         Submit a job to an actor by first removing it from the list of idle actors, then

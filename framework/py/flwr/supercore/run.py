@@ -16,6 +16,7 @@
 
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from flwr.app.user_config import UserConfig
 from flwr.supercore.constant import TaskType
@@ -53,6 +54,8 @@ class Run:  # pylint: disable=too-many-instance-attributes
     primary_task_type: str = ""
     series_id: int = 0
     account_name: str = ""
+    space_id: UUID | None = None
+    agent_id: int | None = None
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":

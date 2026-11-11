@@ -70,6 +70,14 @@ erDiagram
     VARCHAR state
   }
 
+  events {
+    CHAR(32) event_id PK
+    CHAR(32) space_id FK "nullable"
+    TIMESTAMP created_at
+    JSON payload
+    TEXT type
+  }
+
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -181,6 +189,7 @@ erDiagram
   }
 
   run {
+    BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
@@ -247,6 +256,7 @@ erDiagram
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
+    BIGINT seen_through_message_id
   }
 
   task {
@@ -308,12 +318,25 @@ erDiagram
     VARCHAR usage_type
   }
 
+  user_event_feeds {
+    VARCHAR user_id PK
+    BIGINT last_seq
+  }
+
+  user_events {
+    BIGINT seq PK
+    VARCHAR user_id PK,FK
+    CHAR(32) event_id FK
+  }
+
+  space ||--o{ events : space_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
+  agent ||--o{ run : agent_id
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
@@ -324,6 +347,13 @@ erDiagram
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
   task ||--o{ task_usage : task_id
+  user_event_feeds ||--o| user_events : user_id
+  events ||--o{ user_events : event_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
+
+The `user_events` primary key is `(user_id, seq)`, so each `user_event_feeds` row
+can have many `user_events` rows. Paracelsus renders this relationship as
+zero-or-one because it treats each column in a composite primary key as
+individually unique.

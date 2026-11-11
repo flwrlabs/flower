@@ -38,6 +38,7 @@ from flwr.common.constant import (
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.supercore import log
@@ -102,10 +103,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
-        run = self.run_ids[run_id].run
+        record = self.run_ids[run_id]
+        run = record.run
         task = self.task_store[cast(int, run.primary_task_id)]
         return replace(
             run,
+            space_id=record.space_id,
             pending_at=task.pending_at,
             starting_at=task.starting_at,
             running_at=task.running_at,
@@ -123,6 +126,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if task is None:
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
+
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return IDs of runs associated with the given space."""
+        with self.lock:
+            return [
+                run_id
+                for run_id, record in self.run_ids.items()
+                if record.space_id == space_id
+            ]
 
     def store_message_and_object_tree(
         self, message: Message, object_tree: ObjectTree, session_id: str
@@ -345,6 +357,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -355,6 +368,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             series_description=series_description,
             connector_ids=connector_ids,
             primary_task_type=primary_task_type,
+            agent_id=agent_id,
         )
         if initial_task_event is not None:
             try:
@@ -364,7 +378,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock_task_store, self.lock, self.lock_task_event_store:
             if space_id is not None:
                 with self.lock_space_store:
-                    if space_id not in self.space_store:
+                    space = self.space_store.get(space_id)
+                    if space is None or (
+                        agent_id is not None
+                        and SpaceParticipant(agent_id=agent_id)
+                        not in space.participants
+                    ):
                         return 0
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
@@ -413,6 +432,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     clientapp_runtime=0.0,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
+                    agent_id=agent_id,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,

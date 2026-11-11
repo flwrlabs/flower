@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -78,8 +79,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    CreateSpaceRequest,
-    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -88,8 +87,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -112,8 +109,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
-    ListSpacesRequest,
-    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -130,13 +125,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
-    SpaceParticipant,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -158,6 +150,17 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -1980,10 +1983,20 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Construct federation ID
+    # Keep explicitly selected namespaces compatible with federation ID consumers.
+    handle = request.handle if request.HasField("handle") else account.account_name
+    if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must contain only ASCII letters, digits, "
+            "hyphens, or underscores.",
+        )
+
+    # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation_id = f"@{account.account_name}/{request.federation_name}"
+    federation_id = f"@{handle}/{request.federation_name}"
 
     runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
     state.federation_manager.can_execute(
@@ -1996,7 +2009,7 @@ def create_federation(
         ),
     )
 
-    # Create federation
+    # The manager authorizes the selected namespace for the authenticated actor.
     federation = state.federation_manager.create_federation(
         federation_id=federation_id,
         description=request.description,
