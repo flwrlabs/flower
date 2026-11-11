@@ -21,12 +21,17 @@ from uuid import uuid4
 
 import pytest
 
-from flwr.proto.control_pb2 import Agent, AgentConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    StartRunRequest,
+)
 from flwr.server.superlink.linkstate import LinkState
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.fab import Fab
 
 from . import control_handlers
-from .control_handlers import process_pending_agent_runs
+from .control_handlers import process_pending_agent_runs, start_run
 
 
 @pytest.fixture(name="agent_app_config")
@@ -124,3 +129,19 @@ def test_process_pending_agent_runs_rejects_invalid_bundle(
         process_pending_agent_runs(state)
     state.store_fab.assert_not_called()
     state.create_agent_run.assert_not_called()
+
+
+def test_start_run_preserves_oversized_fab_response() -> None:
+    """Shared FAB preparation preserves the legacy empty response for oversized FABs."""
+    state = Mock(spec=LinkState)
+    state.federation_manager = Mock()
+    request = StartRunRequest(federation="federation")
+    request.fab.content = b"oversized"
+    with (
+        patch.object(control_handlers, "FAB_MAX_SIZE", 0),
+        patch.object(control_handlers, "get_fab_config") as parse_config,
+    ):
+        response = start_run(request, AccountInfo("alice", "alice"), state)
+    assert not response.HasField("run_id")
+    parse_config.assert_not_called()
+    state.create_run.assert_not_called()

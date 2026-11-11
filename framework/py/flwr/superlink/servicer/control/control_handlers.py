@@ -655,6 +655,21 @@ def _refresh_hub_app_in_thread(
     Thread(target=refresh, daemon=True).start()
 
 
+def _prepare_fab(
+    content: bytes, verifications: dict[str, str]
+) -> tuple[Fab, dict[str, Any]] | None:
+    """Validate FAB size, parse its configuration, and calculate its hash."""
+    if len(content) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return None
+    config = get_fab_config(content)
+    return Fab(hashlib.sha256(content).hexdigest(), content, verifications), config
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -741,27 +756,25 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     else:
         fab_file = request.fab.content
 
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
-        return StartRunResponse()
-
-    override_config = user_config_from_proto(request.override_config)
-    connector_ids = _validate_run_connector_ids(
-        [
-            *request.connector_ids,
-            *_resolve_run_connector_refs(request.connector_refs, state, federation_id),
-        ],
-        state,
-        federation_id,
-    )
-
     try:
+        prepared = _prepare_fab(fab_file, verification_dict)
+        if prepared is None:
+            return StartRunResponse()
+        fab, fab_config = prepared
+
+        override_config = user_config_from_proto(request.override_config)
+        connector_ids = _validate_run_connector_ids(
+            [
+                *request.connector_ids,
+                *_resolve_run_connector_refs(
+                    request.connector_refs, state, federation_id
+                ),
+            ],
+            state,
+            federation_id,
+        )
+
         # Validate user config overrides matches keys in run config in FAB
-        fab_config = get_fab_config(fab_file)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
         fuse_dicts(run_config, override_config, check_keys=True)
 
@@ -795,11 +808,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
 
         # Create run
-        fab = Fab(
-            hashlib.sha256(fab_file).hexdigest(),
-            fab_file,
-            verification_dict,
-        )
         fab_id, fab_version = get_metadata_from_config(fab_config)
         fab_app_id = f"@{fab_id}"
         if app_id is None:
@@ -1208,17 +1216,16 @@ def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
         try:
             # Resolve the configured FAB and validate its size and app type.
             content, verifications, _ = _get_remote_fab(agent.config.app_spec)
-            if len(content) > FAB_MAX_SIZE:
-                raise ValueError("AgentApp FAB exceeds the size limit.")
-            config = get_fab_config(content)
+            prepared = _prepare_fab(content, verifications)
+            if prepared is None:
+                continue
+            fab, config = prepared
             if _get_app_type(config) != TaskType.AGENT_APP:
                 raise ValueError("The agent must use an AgentApp bundle.")
 
             # Store the resolved FAB before creating a Run that references it.
             fab_id, version = get_metadata_from_config(config)
-            fab_hash = state.store_fab(
-                Fab(hashlib.sha256(content).hexdigest(), content, verifications)
-            )
+            fab_hash = state.store_fab(fab)
 
             # Recheck eligibility atomically; another poll may have opened a Run.
             run_id = state.create_agent_run(
