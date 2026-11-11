@@ -26,6 +26,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/space.proto";
 import "google/protobuf/struct.proto";
 
 message AgentConfig {
@@ -110,52 +111,6 @@ message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
 }
-
-message SpaceParticipant {
-  oneof participant {
-    string flwr_aid = 1;
-    uint64 agent_id = 2;
-  }
-}
-
-message Space {
-  string id = 1;
-  string title = 2;
-  string created_at = 3;
-  repeated SpaceParticipant participants = 4;
-}
-
-message CreateSpaceRequest { repeated SpaceParticipant participants = 1; }
-message CreateSpaceResponse { Space space = 1; }
-
-message ListSpacesRequest {}
-message ListSpacesResponse { repeated Space spaces = 1; }
-
-message SpaceMessage {
-  uint64 id = 1;
-  string space_id = 2;
-  SpaceParticipant author = 3;
-  string created_at = 4;
-  string content = 5;
-}
-
-message GetSpaceMessagesRequest {
-  string space_id = 1;
-  // Exclusive upper ID bound. Absent selects the newest page.
-  optional uint64 before_id = 2;
-  // Absent uses the server's default page size.
-  optional uint32 limit = 3;
-}
-message GetSpaceMessagesResponse {
-  // Messages in the selected page, ordered by ascending ID.
-  repeated SpaceMessage messages = 1;
-}
-
-message SendSpaceMessageRequest {
-  string space_id = 1;
-  string content = 2;
-}
-message SendSpaceMessageResponse { SpaceMessage message = 1; }
 
 // Agents and Spaces only. Message history is fetched through GetSpaceMessages.
 message BootstrapRequest {}
@@ -340,6 +295,8 @@ message CreateFederationRequest {
   string federation_name = 1;
   string description = 2;
   bool simulation = 3;
+  // Bare namespace handle. Omission selects the authenticated caller's handle.
+  optional string handle = 4;
 }
 message CreateFederationResponse { Federation federation = 1; }
 

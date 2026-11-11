@@ -447,6 +447,16 @@ def _as_dict(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _created_cold_pod(client: Mock) -> dict[str, Any]:
+    """Find the task Pod independently of background warm-pool creation order."""
+    pods = [
+        _as_dict(entry.args[1]) for entry in client.create_namespaced_pod.call_args_list
+    ]
+    cold_pods = [pod for pod in pods if _TASK_ID_LABEL in pod["metadata"]["labels"]]
+    assert len(cold_pods) == 1
+    return cold_pods[0]
+
+
 def _appio_root_certificates(
     spec: ExecutionSpec, config: KubernetesExecutorConfig
 ) -> str | None:
@@ -867,7 +877,7 @@ def test_launch_falls_back_to_cold_pod_when_no_ready_warm_pod_exists(
 
     assert result.status == LaunchResultStatus.ACCEPTED
     client.create_namespaced_secret.assert_called_once()
-    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    cold_pod = _created_cold_pod(client)
     assert cold_pod["spec"]["containers"][0]["command"] == [task_command]
 
 
@@ -890,7 +900,7 @@ def test_launch_falls_back_to_cold_pod_when_warm_pods_cannot_be_listed() -> None
     )
 
     assert result.status == LaunchResultStatus.ACCEPTED
-    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    cold_pod = _created_cold_pod(client)
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
 
 
@@ -939,7 +949,7 @@ def test_launch_retires_warm_pod_when_consumption_cannot_be_persisted(
         assert not manager.has_ready_pod(TaskType.AGENT_APP)
         # pylint: disable-next=protected-access
         assert manager._dispatcher._take_ready_pod(config.warm_executor_pools) is None
-    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    cold_pod = _created_cold_pod(client)
     assert cold_pod["spec"]["containers"][0]["command"] == ["flwr-agentapp"]
     executor.close()
 
@@ -985,7 +995,7 @@ def test_launch_retires_warm_pod_when_dispatch_cannot_open(
         namespace="flower-system",
         grace_period_seconds=0,
     )
-    cold_pod = _as_dict(client.create_namespaced_pod.call_args.args[1])
+    cold_pod = _created_cold_pod(client)
     assert cold_pod["spec"]["containers"][0]["command"] == [task_command]
 
     executor.close()

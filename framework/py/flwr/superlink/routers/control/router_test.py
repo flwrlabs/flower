@@ -17,6 +17,7 @@
 # pylint: disable=too-many-lines
 
 import inspect
+import json
 from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import Mock, call, patch
@@ -49,8 +50,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     CreateAgentRequest,
     CreateAgentResponse,
-    CreateSpaceRequest,
-    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     Event,
@@ -58,23 +57,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListConnectorsRequest,
     ListConnectorsResponse,
     ListRunsRequest,
     ListRunsResponse,
-    ListSpacesRequest,
-    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
     RefreshAuthTokensResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
-    SpaceParticipant,
     StartRunRequest,
     StartRunResponse,
     StreamEventsRequest,
@@ -84,6 +76,17 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsRequest,
     StreamRunEventsResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import (
@@ -92,7 +95,7 @@ from flwr.supercore.auth.typing import (
     AccountInfo,
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
+from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -188,6 +191,7 @@ def test_space_routes(
     assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
         message
     ]
+    assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
 
 
@@ -228,10 +232,11 @@ def test_create_space_rejects_other_users_agent(
     assert not state.get_spaces(_ACCOUNT.flwr_aid)
 
 
+@pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
 def test_space_history_pagination(
-    space_client: tuple[TestClient, LinkState],
+    space_client: tuple[TestClient, LinkState], unread_only: bool, expected_index: int
 ) -> None:
-    """Apply the HTTP request's exclusive cursor and page size."""
+    """Apply the HTTP request's cursor, page size, and unread filter."""
     client, state = space_client
     space = state.create_space(
         participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
@@ -244,12 +249,12 @@ def test_space_history_pagination(
     response = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(
-            space_id=space.id, before_id=last.id, limit=1
+            space_id=space.id, before_id=last.id, limit=1, unread_only=unread_only
         ).SerializeToString(),
     )
     assert response.status_code == 200
     assert list(GetSpaceMessagesResponse.FromString(response.content).messages) == [
-        messages[1]
+        messages[expected_index]
     ]
 
 
@@ -1331,40 +1336,42 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
     }
 
 
-def test_bootstrap_uses_authenticated_account() -> None:
-    """Serialize the account's state and committed feed head together."""
-    state = Mock(spec=LinkState)
-    state.get_bootstrap.return_value = BootstrapResponse(cursor=42)
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: state
-    response = TestClient(app).post(
+def test_bootstrap_uses_authenticated_account(
+    space_client: tuple[TestClient, LinkState],
+) -> None:
+    """Return the caller's Agents, Spaces, and cursor without message history."""
+    client, state = space_client
+    config = AgentConfig(name="Agent", app_spec="@test/app")
+    state.create_agent(_ACCOUNT.flwr_aid, config)
+    state.create_agent("other-account", config)
+    response = client.post(
         "/v1/control/bootstrap",
         content=BootstrapRequest().SerializeToString(),
-        headers={
-            "authorization": "Bearer access-token",
-            "content-type": PROTOBUF_MEDIA_TYPE,
-        },
     )
     assert response.status_code == 200
-    assert BootstrapResponse.FromString(response.content).cursor == 42
-    state.get_bootstrap.assert_called_once_with(_ACCOUNT.flwr_aid)
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    snapshot = BootstrapResponse.FromString(response.content)
+    assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
+    assert len(snapshot.agents) == len(snapshot.spaces) == 1
+    assert snapshot.cursor == 2
 
 
-def test_user_event_stream_sse_has_recipient_id_and_shared_event_id() -> None:
-    """Serve standard SSE frames and forward the reconnect cursor to the handler."""
+@pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, SSE_MEDIA_TYPE])
+def test_user_event_stream_framing(accept: str) -> None:
+    """Negotiate framing while preserving IDs, uint64 values, and cursor markers."""
     state = Mock(spec=LinkState)
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     event_id = str(uuid4())
+    expected = [
+        StreamEventsResponse(
+            seq=2**63 - 2, event=Event(event_id=event_id, type="agent.created")
+        ),
+        StreamEventsResponse(seq=2**63 - 1),
+    ]
     with patch(
         "flwr.superlink.routers.control.router.control_handlers.stream_events",
-        return_value=iter(
-            [
-                StreamEventsResponse(
-                    seq=101, event=Event(event_id=event_id, type="agent.updated")
-                )
-            ]
-        ),
+        return_value=iter(expected),
     ) as stream:
         response = TestClient(app).post(
             "/v1/control/stream-events",
@@ -1372,36 +1379,61 @@ def test_user_event_stream_sse_has_recipient_id_and_shared_event_id() -> None:
             headers={
                 "authorization": "Bearer access-token",
                 "content-type": PROTOBUF_MEDIA_TYPE,
-                "accept": "text/event-stream",
+                "accept": accept,
                 "Last-Event-ID": "100",
             },
         )
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.text.startswith("id: 101\ndata: ") and response.text.endswith(
-        "\n\n"
-    )
-    assert event_id in response.text
+    assert response.headers["content-type"].startswith(accept)
+    if accept == SSE_MEDIA_TYPE:
+        frames = response.text.rstrip("\n").split("\n\n")
+        for frame, entry in zip(frames, expected, strict=True):
+            event_id_line, data = frame.splitlines()
+            assert event_id_line == f"id: {entry.seq}"
+            payload = json.loads(data.removeprefix("data: "))
+            assert payload["seq"] == str(entry.seq)
+            assert ParseDict(payload, StreamEventsResponse()) == entry
+        assert response.headers["cache-control"] == "no-cache"
+        assert response.headers["x-accel-buffering"] == "no"
+    else:
+        assert response.content == b"".join(frame_message(entry) for entry in expected)
     assert stream.call_args.args[1] is _ACCOUNT
     assert stream.call_args.args[-1] == "100"
 
 
-def test_invalid_user_cursor_returns_error_before_sse_headers() -> None:
+@pytest.mark.parametrize(
+    ("after_seq", "last_event_id"),
+    [(None, "invalid"), (None, "-1"), (None, str(2**64)), (1, None)],
+)
+def test_invalid_user_cursor_returns_error_before_sse_headers(
+    space_client: tuple[TestClient, LinkState],
+    after_seq: int | None,
+    last_event_id: str | None,
+) -> None:
     """Reject invalid cursors before opening the SSE response."""
-    state = Mock(spec=LinkState)
-    state.get_user_events.side_effect = FlowerError(
-        ApiErrorCode.INVALID_USER_EVENT_CURSOR, "Cursor exceeds the feed head"
-    )
-    app = _create_app()
-    app.dependency_overrides[get_linkstate] = lambda: state
-    response = TestClient(app).post(
+    client, _ = space_client
+    headers = {"accept": SSE_MEDIA_TYPE}
+    if last_event_id is not None:
+        headers["Last-Event-ID"] = last_event_id
+    response = client.post(
         "/v1/control/stream-events",
-        content=StreamEventsRequest(after_seq=3).SerializeToString(),
-        headers={
-            "authorization": "Bearer access-token",
-            "content-type": PROTOBUF_MEDIA_TYPE,
-            "accept": "text/event-stream",
-        },
+        content=StreamEventsRequest(after_seq=after_seq).SerializeToString(),
+        headers=headers,
     )
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/json"
+    assert response.json()["code"] == ApiErrorCode.INVALID_USER_EVENT_CURSOR.value
+
+
+@pytest.mark.parametrize("endpoint", ["bootstrap", "stream-events"])
+def test_user_event_routes_require_authentication(endpoint: str) -> None:
+    """Authenticate both routes before serving account state or starting a stream."""
+    authn_plugin = Mock()
+    app = _create_app(authn_plugin)
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    response = TestClient(app).post(
+        f"/v1/control/{endpoint}",
+        content=b"",
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+    assert response.status_code == 401

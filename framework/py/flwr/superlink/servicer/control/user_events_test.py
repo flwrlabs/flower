@@ -12,102 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Authenticated event replay, cursors, and current Space visibility."""
+"""Tests for user-event replay and connection lifecycle."""
 
-from uuid import UUID, uuid4
+from unittest.mock import Mock, call, patch
 
 import pytest
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    Event,
-    SpaceParticipant,
     StreamEventsRequest,
+    StreamEventsResponse,
 )
-from flwr.server.superlink.linkstate import InMemoryLinkState
+from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
-from flwr.supercore.date import now
-from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_handlers import stream_events
 
-
-def test_stream_replays_the_account_cursor_and_shared_identity() -> None:
-    """Resume using the feed seq and keep the shared event UUID stable on replay."""
-    state = InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
-    state.store_event(
-        Event(
-            event_id=str(uuid4()), type="agent.updated", created_at=now().isoformat()
-        ),
-        ["alice"],
-    )
-    event = Event(
-        event_id=str(uuid4()),
-        type="agent.updated",
-        created_at=now().isoformat(),
-    )
-    event.payload["name"] = "shared"
-    state.store_event(event, ["alice", "bob"])
-    active = True
-    account = AccountInfo(flwr_aid="alice", account_name="Alice")
-    stream = stream_events(StreamEventsRequest(), account, state, lambda: active, "1")
-    result = next(stream)
-    assert result.seq == 2 and result.event.event_id == event.event_id
-    assert result.event.payload["name"] == "shared"
-    active = False
-    assert not list(stream)
-    active = True
-    replay = stream_events(
-        StreamEventsRequest(after_seq=1), account, state, lambda: active
-    )
-    assert next(replay) == result
-    replay.close()
-    bob = stream_events(
-        StreamEventsRequest(),
-        AccountInfo(flwr_aid="bob", account_name="Bob"),
-        state,
-        lambda: active,
-    )
-    assert next(bob).seq == 1
-    bob.close()
+_ACCOUNT = AccountInfo(flwr_aid="alice", account_name="Alice")
 
 
-def test_stream_skips_spaces_the_user_can_no_longer_access() -> None:
-    """Historical feed membership does not grant current access to a Space."""
-    state = InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
-    space = state.create_space(
-        participants=[
-            SpaceParticipant(flwr_aid="alice"),
-            SpaceParticipant(flwr_aid="bob"),
-        ]
-    )
-    state.space_store[UUID(space.id)].participants.remove(
-        SpaceParticipant(flwr_aid="bob")
-    )
-    event = Event(
-        event_id=str(uuid4()), type="agent.updated", created_at=now().isoformat()
-    )
-    state.store_event(event, ["bob"])
+@pytest.mark.parametrize(
+    ("after_seq", "last_event_id", "expected"),
+    [(None, None, 0), (None, "7", 7), (3, "invalid", 3), (0, "7", 0)],
+)
+def test_stream_cursor_precedence(
+    after_seq: int | None, last_event_id: str | None, expected: int
+) -> None:
+    """Prefer the protobuf cursor, then Last-Event-ID, then zero."""
+    state = Mock(spec=LinkState)
     stream = stream_events(
-        StreamEventsRequest(),
-        AccountInfo(flwr_aid="bob", account_name="Bob"),
+        StreamEventsRequest(after_seq=after_seq),
+        _ACCOUNT,
         state,
         lambda: True,
+        last_event_id,
     )
-    assert next(stream).event.event_id == event.event_id
+    state.get_user_events.assert_called_once_with("alice", after_seq=expected)
     stream.close()
 
 
-@pytest.mark.parametrize("cursor", ["invalid", "-1", str(2**64)])
-def test_bad_cursor_is_rejected_before_streaming(cursor: str) -> None:
-    """Return an ordinary API error before starting an invalid stream."""
-    state = InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
-    with pytest.raises(FlowerError) as error:
-        stream_events(
-            StreamEventsRequest(),
-            AccountInfo(flwr_aid="alice", account_name="Alice"),
-            state,
-            lambda: True,
-            cursor,
-        )
-    assert error.value.code == ApiErrorCode.INVALID_USER_EVENT_CURSOR
+def test_stream_replays_pages_polls_and_stops_on_disconnect() -> None:
+    """Forward events and cursor markers, then poll from the last delivered seq."""
+    state = Mock(spec=LinkState)
+    entries = [StreamEventsResponse(seq=seq) for seq in range(1, 5)]
+    entries[0].event.type = "agent.created"
+    entries[-1].event.type = "message.created"
+    state.get_user_events.side_effect = [entries[:2], entries[2:3], [], entries[3:]]
+    active = Mock(return_value=True)
+    stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, active)
+    with patch("flwr.superlink.servicer.control.control_handlers.time.sleep") as sleep:
+        assert [next(stream) for _ in entries] == entries
+        active.return_value = False
+        assert not list(stream)
+    sleep.assert_called_once_with(0.5)
+    assert state.get_user_events.call_args_list == [
+        call("alice", after_seq=0),
+        call("alice", after_seq=2),
+        call("alice", after_seq=3),
+        call("alice", after_seq=3),
+    ]
+
+
+def test_idle_stream_expires_without_heartbeats() -> None:
+    """Close the stream after 270 seconds even when the feed remains empty."""
+    state = Mock(spec=LinkState)
+    state.get_user_events.return_value = []
+    stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, lambda: True)
+    with (
+        patch(
+            "flwr.superlink.servicer.control.control_handlers.time.monotonic",
+            side_effect=[0, 0, 270],
+        ),
+        patch("flwr.superlink.servicer.control.control_handlers.time.sleep") as sleep,
+    ):
+        assert not list(stream)
+    sleep.assert_called_once_with(0.5)

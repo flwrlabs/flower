@@ -15,49 +15,26 @@
 """Utility functions for CoreState."""
 
 
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from os import urandom
-from uuid import UUID
-
-from google.protobuf.json_format import MessageToDict
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
-from flwr.proto.control_pb2 import Event  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
-from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
 
 
-def validate_event(
-    event: Event, recipients: Sequence[str]
-) -> tuple[JSONObject, list[str]]:
-    """Validate shared event content and order recipient locks consistently."""
-    UUID(event.event_id)
-    if event.HasField("space_id"):
-        UUID(event.space_id)
-    if datetime.fromisoformat(event.created_at).tzinfo is None:
-        raise ValueError("Event timestamps must include a timezone.")
-    if not event.type.strip():
-        raise ValueError("Events require a type.")
-    if any(not recipient for recipient in recipients):
-        raise ValueError("Event recipients must have account IDs.")
-    return MessageToDict(event.payload), sorted(set(recipients))
-
-
-def validate_user_event_cursor(after_seq: int, head: int) -> None:
-    """Require a cursor within the user's committed feed range."""
+def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
+    """Reject cursors outside the committed feed and invalid page sizes."""
     if not 0 <= after_seq <= head:
-        raise FlowerError(
-            ApiErrorCode.INVALID_USER_EVENT_CURSOR, "Cursor is outside the user's feed."
-        )
+        raise ValueError("after_seq must be between zero and the feed head")
+    if limit <= 0:
+        raise ValueError("limit must be positive")
 
 
 def generate_rand_int_from_bytes(

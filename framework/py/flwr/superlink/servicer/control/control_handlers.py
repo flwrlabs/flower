@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -80,8 +81,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    CreateSpaceRequest,
-    CreateSpaceResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -90,8 +89,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
     GetRunSeriesRequest,
     GetRunSeriesResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListAgentsRequest,
     ListAgentsResponse,
     ListAppAssociationsRequest,
@@ -114,8 +111,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
-    ListSpacesRequest,
-    ListSpacesResponse,
     PullArtifactsRequest,
     PullArtifactsResponse,
     RefreshAuthTokensRequest,
@@ -132,13 +127,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveNodeFromFederationResponse,
     RevokeInvitationRequest,
     RevokeInvitationResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SetFederationIconRequest,
     SetFederationIconResponse,
     ShowFederationRequest,
     ShowFederationResponse,
-    SpaceParticipant,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -162,6 +154,17 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
@@ -212,7 +215,7 @@ from .conversation_title import start_title_generation
 def bootstrap(
     request: BootstrapRequest, account: AccountInfo, state: LinkState
 ) -> BootstrapResponse:
-    """Read visible Agents, Spaces, and the feed head from one snapshot."""
+    """Read the account's feed cursor followed by its visible Agents and Spaces."""
     del request
     return state.get_bootstrap(account.flwr_aid)
 
@@ -225,40 +228,25 @@ def stream_events(
     last_event_id: str | None = None,
 ) -> Generator[StreamEventsResponse, None, None]:
     """Validate replay before starting the authenticated account's stream."""
-    after_seq = request.after_seq if request.HasField("after_seq") else 0
-    if not request.HasField("after_seq") and last_event_id is not None:
-        try:
+    after_seq = request.after_seq
+    try:
+        if not request.HasField("after_seq") and last_event_id is not None:
             if not last_event_id.isascii() or not last_event_id.isdecimal():
-                raise ValueError
+                raise ValueError("Last-Event-ID must be a nonnegative integer.")
             after_seq = int(last_event_id)
-        except ValueError as exc:
-            raise FlowerError(
-                ApiErrorCode.INVALID_USER_EVENT_CURSOR,
-                "Last-Event-ID must be a nonnegative integer.",
-            ) from exc
-    if not 0 <= after_seq <= INT64_MAX_VALUE:
-        raise FlowerError(
-            ApiErrorCode.INVALID_USER_EVENT_CURSOR,
-            "Cursor exceeds the supported feed range.",
-        )
-    initial = state.get_user_events(account.flwr_aid, after_seq=after_seq)
+        initial = state.get_user_events(account.flwr_aid, after_seq=after_seq)
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_USER_EVENT_CURSOR, str(exc)) from exc
 
     def generate() -> Generator[StreamEventsResponse, None, None]:
         cursor = after_seq
         batch = initial
-        while is_active():
-            visible_spaces: set[str] = set()
-            if any(entry.event.HasField("space_id") for entry in batch):
-                visible_spaces = {
-                    space.id for space in state.get_spaces(account.flwr_aid)
-                }
+        deadline = time.monotonic() + 270
+        while is_active() and time.monotonic() < deadline:
             for entry in batch:
-                if not is_active():
+                if not is_active() or time.monotonic() >= deadline:
                     return
                 cursor = entry.seq
-                event = entry.event
-                if event.HasField("space_id") and event.space_id not in visible_spaces:
-                    continue
                 yield entry
             if not batch:
                 time.sleep(0.5)
@@ -1436,9 +1424,10 @@ def get_space_messages(
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
-            account.flwr_aid,
+            SpaceParticipant(flwr_aid=account.flwr_aid),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc
@@ -2043,10 +2032,20 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Construct federation ID
+    # Keep explicitly selected namespaces compatible with federation ID consumers.
+    handle = request.handle if request.HasField("handle") else account.account_name
+    if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must contain only ASCII letters, digits, "
+            "hyphens, or underscores.",
+        )
+
+    # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation_id = f"@{account.account_name}/{request.federation_name}"
+    federation_id = f"@{handle}/{request.federation_name}"
 
     runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
     state.federation_manager.can_execute(
@@ -2059,7 +2058,7 @@ def create_federation(
         ),
     )
 
-    # Create federation
+    # The manager authorizes the selected namespace for the authenticated actor.
     federation = state.federation_manager.create_federation(
         federation_id=federation_id,
         description=request.description,

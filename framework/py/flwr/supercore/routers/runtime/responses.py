@@ -53,7 +53,7 @@ from flwr.supercore.model_provider import (
     validate_model_response,
 )
 from flwr.supercore.task_process.usage import task_usage_from_open_response
-from flwr.supercore.tracing import TraceSpan, trace_span
+from flwr.supercore.tracing import PhaseTimings, TraceSpan, trace_span
 from flwr.supercore.typing import JSONObject
 
 router = APIRouter(prefix="/v1/runtime", tags=["Runtime"])
@@ -90,9 +90,23 @@ async def create_runtime_response(
     request: Request, state: RuntimeStateDependency
 ) -> Response:
     """Authenticate, validate and return one directly executed model response."""
+    # Authentication precedes task identity, so publish its original timing afterward.
+    timings = PhaseTimings()
     try:
-        task = await run_in_threadpool(_authenticate, request, state)
-        payload = _normalize_model_request_payload(await _read_request_payload(request))
+        with timings.measure("model.request_authenticate"):
+            task = await run_in_threadpool(_authenticate, request, state)
+        with timings.measure("model.request_decode"):
+            payload = _normalize_model_request_payload(
+                await _read_request_payload(request)
+            )
+        timings.publish(
+            "model.request_prepare",
+            attributes={
+                "flwr.component": "superlink",
+                "flwr.run_id": str(task.run_id),
+                "flwr.task_id": str(task.task_id),
+            },
+        )
         return ModelResponse(state, task, payload)
     except _ResponsesError as error:
         return _error_response(error)

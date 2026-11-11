@@ -36,12 +36,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateAgentRequest,
     CreateFederationRequest,
     CreateInvitationRequest,
-    CreateSpaceRequest,
     DisconnectConnectorRequest,
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
     GetRunSeriesRequest,
-    GetSpaceMessagesRequest,
     ListAgentsRequest,
     ListAppAssociationsRequest,
     ListAppsRequest,
@@ -53,7 +51,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListRunSeriesEventsRequest,
     ListRunSeriesRequest,
     ListRunsRequest,
-    ListSpacesRequest,
     PullArtifactsRequest,
     RefreshAuthTokensRequest,
     RegisterNodeRequest,
@@ -62,7 +59,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RemoveAppRequest,
     RemoveNodeFromFederationRequest,
     RevokeInvitationRequest,
-    SendSpaceMessageRequest,
     SetFederationIconRequest,
     ShowFederationRequest,
     StartAutomationRequest,
@@ -114,6 +110,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    GetSpaceMessagesRequest,
+    ListSpacesRequest,
+    SendSpaceMessageRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
@@ -329,26 +331,17 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterator):
-            if use_sse:
-                response = CancellableProtobufStreamingResponse(
-                    (
-                        encode_sse_message(message)
-                        for message in cast(Iterator[Message], result)
-                    ),
-                    stream_context,
-                    SSE_MEDIA_TYPE,
-                )
-                response.headers["Cache-Control"] = "no-cache"
-                response.headers["X-Accel-Buffering"] = "no"
-                return response
-            content = (
-                frame_message(message) for message in cast(Iterator[Message], result)
-            )
-            return CancellableProtobufStreamingResponse(
+            encode = encode_sse_message if use_sse else frame_message
+            content = (encode(message) for message in cast(Iterator[Message], result))
+            response = CancellableProtobufStreamingResponse(
                 content,
                 stream_context,
-                PROTOBUF_STREAM_MEDIA_TYPE,
+                SSE_MEDIA_TYPE if use_sse else PROTOBUF_STREAM_MEDIA_TYPE,
             )
+            if use_sse:
+                response.headers["Cache-Control"] = "no-cache"
+                response.headers["X-Accel-Buffering"] = "no"
+            return response
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,
