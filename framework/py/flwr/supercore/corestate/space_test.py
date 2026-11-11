@@ -84,15 +84,18 @@ def test_participation_controls_message_access(state: CoreState) -> None:
     message = state.create_space_message(space_id, bob, "Hello")
     assert message is not None and message.author == bob
     assert state.get_space_messages(space_id, "bob") == [message]
+    assert state.get_space_messages(space_id, None) == [message]
     assert state.get_space_messages(space_id, "alice") == [message]
     assert state.get_space_messages(space_id, "charlie") is None
 
 
-def test_message_history_and_pagination(state: CoreState) -> None:
+@pytest.mark.parametrize("flwr_aid", ["alice", None])
+def test_message_history_and_pagination(state: CoreState, flwr_aid: str | None) -> None:
     """Keep messages ordered, preserve text, and isolate space history."""
     author = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[author]).id)
     other_id = UUID(state.create_space(participants=[author]).id)
+    assert state.get_space_messages(space_id, flwr_aid) == []
     first = state.create_space_message(space_id, author, "Hello, €100.\nNext.")
     other = state.create_space_message(other_id, author, "Other space")
     second = state.create_space_message(space_id, author, "Second")
@@ -104,21 +107,26 @@ def test_message_history_and_pagination(state: CoreState) -> None:
         and other is not None
     )
     assert first.content == "Hello, €100.\nNext."
-    assert state.get_space_messages(space_id, "alice", limit=2) == [
+    assert state.get_space_messages(space_id, flwr_aid, limit=2) == [
         second,
         third,
     ]
-    assert state.get_space_messages(space_id, "alice", before_id=second.id) == [first]
-    assert state.get_space_messages(space_id, "alice", before_id=first.id) == []
-    assert state.get_space_messages(other_id, "alice") == [other]
-    assert state.get_space_messages(space_id, "alice", after_id=first.id, limit=1) == [
+    assert state.get_space_messages(space_id, flwr_aid, before_id=second.id) == [first]
+    assert state.get_space_messages(space_id, flwr_aid, before_id=first.id) == []
+    assert state.get_space_messages(other_id, flwr_aid) == [other]
+    assert state.get_space_messages(space_id, flwr_aid, after_id=first.id, limit=1) == [
         second
     ]
     assert state.get_space_messages(
-        space_id, "alice", after_id=first.id, before_id=third.id
+        space_id, flwr_aid, after_id=first.id, before_id=third.id
     ) == [second]
-    assert state.get_space_messages(space_id, "alice", after_id=0, limit=1) == [first]
-    assert state.get_space_messages(space_id, "alice", after_id=2**64 - 1) == []
+    assert state.get_space_messages(space_id, flwr_aid, after_id=0, limit=1) == [first]
+    assert state.get_space_messages(space_id, flwr_aid, after_id=2**64 - 1) == []
+    assert state.get_space_messages(space_id, flwr_aid, before_id=2**64 - 1) == [
+        first,
+        second,
+        third,
+    ]
 
 
 @pytest.mark.parametrize(
@@ -152,6 +160,7 @@ def test_unknown_space(state: CoreState) -> None:
     author = SpaceParticipant(flwr_aid="alice")
     assert state.create_space_message(space_id, author, "Hello") is None
     assert state.get_space_messages(space_id, "alice") is None
+    assert state.get_space_messages(space_id, None) is None
 
 
 @pytest.mark.parametrize("before_id,after_id", [(1, 1), (1, 2)])

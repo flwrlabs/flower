@@ -46,6 +46,7 @@ from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
+from flwr.proto.space_pb2 import GetSpaceMessagesRequest, SendSpaceMessageRequest
 from flwr.supercore.constant import TaskType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
@@ -143,6 +144,17 @@ def test_agent_messages_proto_roundtrip() -> None:
         ListAgentsResponse.FromString(list_response.SerializeToString())
         == list_response
     )
+
+
+def test_space_messages_proto_roundtrip() -> None:
+    """Preserve optional cursors and content in shared Space wire types."""
+    request = GetSpaceMessagesRequest(after_id=0, before_id=2**64 - 1, limit=1)
+    actual = GetSpaceMessagesRequest.FromString(request.SerializeToString())
+    assert actual == request
+    assert actual.HasField("after_id")
+    assert not GetSpaceMessagesRequest().HasField("after_id")
+    send = SendSpaceMessageRequest(content="Hello\nworld")
+    assert SendSpaceMessageRequest.FromString(send.SerializeToString()) == send
 
 
 def test_status_to_proto() -> None:

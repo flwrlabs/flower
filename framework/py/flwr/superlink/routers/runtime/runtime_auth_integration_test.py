@@ -22,7 +22,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from google.protobuf.message import Message
 from httpx import Response
+from sqlalchemy import delete
 
+from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -31,8 +33,20 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
-from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.server.superlink.linkstate import (
+    InMemoryLinkState,
+    LinkState,
+    LinkStateFactory,
+    SqlLinkState,
+)
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -45,15 +59,16 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 
-@pytest.fixture(name="state")
-def fixture_state() -> LinkState:
-    """Create an in-memory LinkState."""
+@pytest.fixture(name="state", params=[FLWR_IN_MEMORY_DB_NAME, ":memory:"])
+def fixture_state(request: pytest.FixtureRequest) -> LinkState:
+    """Create in-memory and SQLite LinkState backends."""
     return LinkStateFactory(
-        FLWR_IN_MEMORY_DB_NAME,
+        request.param,
         NoOpFederationManager(),
         ObjectStoreFactory(),
     ).state()
@@ -90,11 +105,24 @@ def _post(
 
 
 def _create_running_task(
-    state: LinkState, primary_task_type: str = TaskType.SERVER_APP
+    state: LinkState,
+    primary_task_type: str = TaskType.SERVER_APP,
+    *,
+    space_id: UUID | None = None,
+    agent_id: int | None = None,
 ) -> str:
     """Create and activate a primary task, returning its token."""
     run_id = state.create_run(
-        "", "", "", {}, NOOP_FEDERATION_ID, None, "", primary_task_type
+        "",
+        "",
+        "",
+        {},
+        NOOP_FEDERATION_ID if space_id is None else None,
+        None,
+        "",
+        primary_task_type,
+        space_id=space_id,
+        agent_id=agent_id,
     )
     task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
     assert task_id is not None
@@ -211,3 +239,160 @@ def test_get_space_events_reads_only_authenticated_space(
     events = GetSpaceEventsResponse.FromString(response.content).events
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
+
+
+# pylint: disable-next=too-many-locals
+def test_space_messages_use_authenticated_run(
+    client: TestClient, state: LinkState
+) -> None:
+    """Read and publish with the authenticated Run's Space and agent identity."""
+    agents = []
+    for name in ("first", "second"):
+        agent = state.create_agent(
+            "alice", AgentConfig(name=name, app_spec="@flwr/app")
+        )
+        assert agent is not None
+        agents.append(agent)
+    author = SpaceParticipant(flwr_aid="alice")
+    space = state.create_space(
+        participants=[author, *(SpaceParticipant(agent_id=a.id) for a in agents)]
+    )
+    other = state.create_space(participants=[author])
+    token = _create_running_task(
+        state, TaskType.AGENT_APP, space_id=UUID(space.id), agent_id=agents[0].id
+    )
+    assert (
+        _post(client, "get-space-messages", GetSpaceMessagesRequest()).status_code
+        == 401
+    )
+    assert (
+        _post(client, "send-space-message", SendSpaceMessageRequest()).status_code
+        == 401
+    )
+    response = _post(
+        client, "get-space-messages", GetSpaceMessagesRequest(), token=token
+    )
+    assert response.status_code == 200
+    assert not GetSpaceMessagesResponse.FromString(response.content).messages
+
+    first = state.create_space_message(UUID(space.id), author, "Hello")
+    assert first is not None
+    assert state.create_space_message(UUID(other.id), author, "Private") is not None
+    response = _post(
+        client,
+        "send-space-message",
+        SendSpaceMessageRequest(content="Reply\nas agent"),
+        token=token,
+    )
+    assert response.status_code == 200
+    reply = SendSpaceMessageResponse.FromString(response.content).message
+    assert reply.author == SpaceParticipant(agent_id=agents[0].id)
+    assert reply.space_id == space.id and reply.content == "Reply\nas agent"
+
+    request: Message
+    for request, expected in (
+        (GetSpaceMessagesRequest(), [first, reply]),
+        (GetSpaceMessagesRequest(after_id=0, limit=1), [first]),
+        (GetSpaceMessagesRequest(before_id=reply.id), [first]),
+        (GetSpaceMessagesRequest(after_id=first.id), [reply]),
+    ):
+        response = _post(client, "get-space-messages", request, token=token)
+        assert response.status_code == 200
+        assert (
+            GetSpaceMessagesResponse.FromString(response.content).messages == expected
+        )
+
+    for path, request in (
+        ("get-space-messages", GetSpaceMessagesRequest(space_id=other.id)),
+        (
+            "send-space-message",
+            SendSpaceMessageRequest(space_id=other.id, content="No"),
+        ),
+    ):
+        response = _post(client, path, request, token=token)
+        assert response.status_code == 404
+        assert response.json()["code"] == ApiErrorCode.SPACE_NOT_FOUND
+
+    for path, request in (
+        ("get-space-messages", GetSpaceMessagesRequest(limit=0)),
+        ("get-space-messages", GetSpaceMessagesRequest(limit=101)),
+        ("get-space-messages", GetSpaceMessagesRequest(space_id="invalid")),
+        ("get-space-messages", GetSpaceMessagesRequest(after_id=2, before_id=1)),
+        ("send-space-message", SendSpaceMessageRequest(content=" \n")),
+    ):
+        response = _post(client, path, request, token=token)
+        assert response.status_code == 400
+        assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
+
+    if isinstance(state, InMemoryLinkState):
+        state.space_store[UUID(space.id)].participants.remove(
+            SpaceParticipant(agent_id=agents[0].id)
+        )
+    else:
+        assert isinstance(state, SqlLinkState)
+        with state.session() as session:
+            session.execute(
+                delete(SpaceParticipantTable).where(
+                    SpaceParticipantTable.c.space_id == UUID(space.id),
+                    SpaceParticipantTable.c.agent_id == agents[0].id,
+                )
+            )
+    for path, request in (
+        ("get-space-messages", GetSpaceMessagesRequest()),
+        ("send-space-message", SendSpaceMessageRequest(content="No")),
+    ):
+        response = _post(client, path, request, token=token)
+        assert response.status_code == 401
+        assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert state.get_task_by_token(token) is not None
+
+
+def test_send_space_message_requires_bound_agent_identity(
+    client: TestClient, state: LinkState
+) -> None:
+    """A Space task cannot publish without a server-bound author."""
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@flwr/app"))
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+    token = _create_running_task(state, TaskType.AGENT_APP, space_id=space_id)
+    response = _post(
+        client,
+        "send-space-message",
+        SendSpaceMessageRequest(content="Reply"),
+        token=token,
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert state.get_space_messages(space_id, None) == []
+
+
+@pytest.mark.parametrize(
+    "path,proto_request",
+    [
+        ("get-space-messages", GetSpaceMessagesRequest()),
+        ("send-space-message", SendSpaceMessageRequest(content="Hello")),
+    ],
+)
+def test_space_messages_reject_legacy_tasks(
+    client: TestClient, state: LinkState, path: str, proto_request: Message
+) -> None:
+    """A legacy Run does not grant access to Space messages."""
+    response = _post(client, path, proto_request, token=_create_running_task(state))
+    assert response.status_code == 403
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    "path,proto_request",
+    [
+        ("get-space-messages", GetSpaceMessagesRequest()),
+        ("send-space-message", SendSpaceMessageRequest(content="Hello")),
+    ],
+)
+def test_space_messages_reject_invalid_task_tokens(
+    client: TestClient, path: str, proto_request: Message
+) -> None:
+    """Reject invalid task tokens before resolving Space access."""
+    response = _post(client, path, proto_request, token="invalid-token")
+    assert response.status_code == 401
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED

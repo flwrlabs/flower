@@ -18,6 +18,7 @@
 
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
+from uuid import UUID
 
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import (
@@ -64,6 +65,13 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
@@ -72,6 +80,7 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
@@ -127,6 +136,87 @@ def get_space_events(
             "This endpoint is only available to Space tasks.",
         )
     return core_runtime_handlers.get_space_events(request, state, space_id)
+
+
+def _task_space(requested_id: str, state: LinkState, task: Task) -> tuple[UUID, Run]:
+    """Resolve the task's Space and reject requests for another Space."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    run = runs[0]
+    space_id = run.space_id
+    if space_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint is only available to Space tasks.",
+        )
+    if run.agent_id is None or not state.is_agent_in_space(space_id, run.agent_id):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+            "Runtime task-token authentication failed.",
+        )
+    if requested_id:
+        try:
+            matches = UUID(requested_id) == space_id
+        except ValueError as exc:
+            raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+        if not matches:
+            raise FlowerError(
+                ApiErrorCode.SPACE_NOT_FOUND, "The task cannot access this Space."
+            )
+    return space_id, run
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: LinkState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Read messages within the authenticated task's Space grant."""
+    space_id, _ = _task_space(request.space_id, state, task)
+    limit = request.limit if request.HasField("limit") else 50
+    if limit > 100:
+        raise FlowerError(
+            ApiErrorCode.INVALID_SPACE_REQUEST, "limit must be at most 100."
+        )
+    try:
+        messages = state.get_space_messages(
+            space_id,
+            flwr_aid=None,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+            after_id=request.after_id if request.HasField("after_id") else None,
+        )
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if messages is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space not found.")
+    return GetSpaceMessagesResponse(messages=messages)
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: LinkState, task: Task
+) -> SendSpaceMessageResponse:
+    """Publish with the primary AgentApp's server-bound agent identity."""
+    space_id, run = _task_space(request.space_id, state, task)
+    if (
+        run.agent_id is None
+        or task.type != TaskType.AGENT_APP
+        or task.task_id != run.primary_task_id
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Only the primary AgentApp task can publish Space messages.",
+        )
+    try:
+        message = state.create_space_message(
+            space_id, SpaceParticipant(agent_id=run.agent_id), request.content
+        )
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if message is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space participant not found.")
+    return SendSpaceMessageResponse(message=message)
 
 
 def get_compacted_contexts(

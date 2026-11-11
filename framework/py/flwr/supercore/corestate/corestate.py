@@ -683,6 +683,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List spaces the user participates in."""
 
     @abstractmethod
+    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
+        """Return whether the agent is a current participant in the Space."""
+
+    @abstractmethod
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
@@ -692,7 +696,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        flwr_aid: str | None,
         *,
         limit: int = 50,
         before_id: int | None = None,
@@ -703,6 +707,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         Bounds are exclusive. With after_id, select the earliest matching page;
         otherwise select the latest. Return None for missing spaces or
         nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
+        Pass flwr_aid=None only after authorizing access to the Space, such as
+        through an authenticated Runtime task's Run.
         """
 
     @abstractmethod

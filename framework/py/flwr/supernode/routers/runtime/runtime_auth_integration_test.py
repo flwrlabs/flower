@@ -38,6 +38,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetSpaceEventsResponse,
     PushTaskEventsRequest,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    SendSpaceMessageRequest,
+)
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.auth import create_superexec_auth_metadata, derive_auth_secret
 from flwr.supercore.constant import TASK_TOKEN_HEADER, TaskType
@@ -189,6 +193,22 @@ def test_get_nodes_allows_auth_then_returns_permission_denied(
     """GetNodes should authenticate, then reject ClientApp tasks."""
     response = _post(client, "get-nodes", GetNodesRequest(), token=valid_token)
 
+    assert response.status_code == 403
+    assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    "path,proto_request",
+    [
+        ("get-space-messages", GetSpaceMessagesRequest()),
+        ("send-space-message", SendSpaceMessageRequest(content="Hello")),
+    ],
+)
+def test_space_messages_unavailable_on_supernode(
+    client: TestClient, valid_token: str, path: str, proto_request: Message
+) -> None:
+    """Space message operations belong to SuperLink."""
+    response = _post(client, path, proto_request, token=valid_token)
     assert response.status_code == 403
     assert response.json()["code"] == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
 

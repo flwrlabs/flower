@@ -1274,6 +1274,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     space.participants.add(agent_id=member_agent_id)
             return list(spaces.values())
 
+    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
+        """Return whether the agent is a current participant in the Space."""
+        with self.session() as session:
+            return (
+                session.scalar(
+                    select(SpaceParticipantTable.c.agent_id).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.agent_id == agent_id,
+                    )
+                )
+                is not None
+            )
+
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
@@ -1314,21 +1327,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        flwr_aid: str | None,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Return an authorized Space history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
         forward = after_id is not None
-        message_conditions = [
-            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
-        ]
+        source = SpaceModel.__table__ if flwr_aid is None else SpaceParticipantTable
+        source_id = source.c.id if flwr_aid is None else source.c.space_id
+        message_conditions = [SpaceMessageModel.space_id == source_id]
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             message_conditions.append(SpaceMessageModel.id < before_id)
@@ -1336,17 +1349,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             message_conditions.append(SpaceMessageModel.id > min(after_id, 2**63 - 1))
         query = (
             select(SpaceMessageModel)
-            .select_from(SpaceParticipantTable)
+            .select_from(source)
             .outerjoin(SpaceMessageModel, and_(*message_conditions))
-            .where(
-                SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c.flwr_aid == flwr_aid,
-            )
+            .where(source_id == space_id)
             .order_by(
                 SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
+        if flwr_aid is not None:
+            query = query.where(SpaceParticipantTable.c.flwr_aid == flwr_aid)
         with self.session() as session:
             models = list(session.scalars(query))
             if not models:

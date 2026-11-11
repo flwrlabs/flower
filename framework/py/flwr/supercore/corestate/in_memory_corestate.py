@@ -1023,6 +1023,15 @@ class InMemoryCoreState(
             spaces.sort(key=lambda item: item.created_at, reverse=True)
             return spaces
 
+    def is_agent_in_space(self, space_id: UUID, agent_id: int) -> bool:
+        """Return whether the agent is a current participant in the Space."""
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            return (
+                space is not None
+                and SpaceParticipant(agent_id=agent_id) in space.participants
+            )
+
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
@@ -1047,21 +1056,23 @@ class InMemoryCoreState(
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        flwr_aid: str | None,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Return an authorized Space history page in ascending ID order."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        viewer = SpaceParticipant(flwr_aid=flwr_aid)
+        viewer = SpaceParticipant(flwr_aid=flwr_aid) if flwr_aid is not None else None
         with self.lock_space_store:
             space = self.space_store.get(space_id)
-            if space is None or viewer not in space.participants:
+            if space is None or (
+                viewer is not None and viewer not in space.participants
+            ):
                 return None
             messages = [
                 message
