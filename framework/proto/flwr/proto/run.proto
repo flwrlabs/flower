@@ -42,6 +42,8 @@ message Run {
   string account_name = 19;
   // Present when the run belongs to a Space.
   optional string space_id = 20;
+  // Present when the server binds the run to an executing agent.
+  optional uint64 agent_id = 21;
 }
 
 message RunStatus {
