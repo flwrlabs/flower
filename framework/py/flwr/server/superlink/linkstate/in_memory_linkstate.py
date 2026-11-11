@@ -525,7 +525,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if not federation_ids:
                     return []
                 federation_id_set = set(federation_ids)
-                # Run DTOs normalize absent federation IDs; inspect the stored scope.
+                # Returned Run objects use an empty string for absent federation IDs.
+                # Inspect the stored scope to identify Space runs.
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
