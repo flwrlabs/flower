@@ -260,6 +260,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetSpaceMessages",
             request=request,
             response_type=GetSpaceMessagesResponse,
+            retry=False,
         )
 
     def SendSpaceMessage(
@@ -271,6 +272,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/SendSpaceMessage",
             request=request,
             response_type=SendSpaceMessageResponse,
+            retry=False,
         )
 
     def GetCompactedContexts(
