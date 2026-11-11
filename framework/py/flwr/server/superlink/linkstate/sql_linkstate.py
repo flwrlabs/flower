@@ -570,6 +570,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not federation_ids:
                 return []
             federation_conditions = [RunModel.federation_id.in_(federation_ids)]
+            # SQL IN does not match NULL; include Space runs explicitly.
             if None in federation_ids:
                 federation_conditions.append(RunModel.federation_id.is_(None))
             stmt = stmt.where(or_(*federation_conditions))
