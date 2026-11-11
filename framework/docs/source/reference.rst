@@ -26,6 +26,7 @@ Information-oriented API reference and other reference material.
     :caption: Reference docs
 
     ref-flower-configuration
+    ref-agentapp-space-messages
     ref-example-projects
     ref-telemetry
     ref-changelog

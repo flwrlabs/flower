@@ -20,7 +20,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 
-from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES
+from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -91,16 +91,19 @@ def test_emit_event_pushes_task_event() -> None:
     )
 
 
-def test_runtime_agent_session_exposes_prompt() -> None:
-    """Expose the initial prompt without additional runtime calls."""
+def test_runtime_agent_session_exposes_prompt_and_space() -> None:
+    """Expose the initial prompt and Space capability without runtime calls."""
+    space = Mock(spec=AgentSpace)
     session = RuntimeAgentSession(
         prompt="Initial prompt",
         connectors=Mock(),
         events=Mock(),
         grid=Mock(),
+        space=space,
     )
 
     assert session.prompt == "Initial prompt"
+    assert session.space is space
 
 
 def test_close_drains_events_before_worker_stops() -> None:
