@@ -83,7 +83,10 @@ from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_han
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    _process_pending_agent_runs,
+    process_due_automations,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
@@ -94,9 +97,27 @@ def get_run_series_events(
     state: LinkState,
     task: Task,
 ) -> GetRunSeriesEventsResponse:
-    """Get events from all runs in the authenticated task's series."""
+    """Get execution events from the authenticated task's series or Space."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
     run = state.get_run_info(run_ids=[task.run_id])[0]
+    if run.space_id is not None:
+        return GetRunSeriesEventsResponse(
+            events=state.get_task_events(
+                space_id=run.space_id,
+                event_types=request.event_types or None,
+                after_task_event_id=(
+                    request.after_event_id
+                    if request.HasField("after_event_id")
+                    else None
+                ),
+                before_task_event_id=(
+                    request.before_event_id
+                    if request.HasField("before_event_id")
+                    else None
+                ),
+                last_n=request.last_n or None,
+            )
+        )
     series = state.get_run_series(series_ids=[run.series_id])[0]
     series_runs = state.get_run_info(run_ids=series.run_ids)
     primary_task_ids = [
@@ -187,8 +208,17 @@ def put_compacted_context(
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
-    """Process due automations, then acquire an eligible pending task."""
+    """Claim queued work or admit agent Runs when an AgentApp worker is idle."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    response = core_runtime_handlers.acquire_task(request, state)
+    if response.HasField("task"):
+        return response
+    if (
+        TaskType.AGENT_APP not in request.supported_task_types
+        and not request.agentapp_fab_hashes
+    ):
+        return response
+    _process_pending_agent_runs(state)
     return core_runtime_handlers.acquire_task(request, state)
 
 
