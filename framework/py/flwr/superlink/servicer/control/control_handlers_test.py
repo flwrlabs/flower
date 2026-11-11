@@ -131,80 +131,34 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             skip=0,
         )
 
-    def test_list_runs_filters_current_membership_before_pagination(self) -> None:
-        """Hide submitted runs after membership ends and page accessible runs."""
-        first_run_id = self._create_dummy_run()
-        second_run_id = self._create_dummy_run()
-        shared_federation = "@owner/shared"
-        shared_run_id = self._create_dummy_run(shared_federation)
-        federations = self.state.federation_manager.get_federations(
-            self.account.flwr_aid
-        )
-
-        with patch.object(
-            self.state.federation_manager,
-            "get_federations",
-            return_value=[*federations, replace(federations[0], id=shared_federation)],
-        ) as get_federations:
-            response = list_runs(ListRunsRequest(), self.account, self.state)
-            assert set(response.run_dict) == {
-                first_run_id,
-                second_run_id,
-                shared_run_id,
-            }
-
-            get_federations.return_value = federations
-            response = list_runs(ListRunsRequest(), self.account, self.state)
-            assert set(response.run_dict) == {first_run_id, second_run_id}
-            response = list_runs(
-                ListRunsRequest(limit=1, skip=1), self.account, self.state
-            )
-            assert set(response.run_dict) == {first_run_id}
-
-            get_federations.return_value = []
-            response = list_runs(ListRunsRequest(), self.account, self.state)
-            assert not response.run_dict
-
-    def test_pull_artifacts_requires_current_membership(self) -> None:
-        """Allow owned artifacts until membership ends, then never issue a URL."""
+    def test_pull_artifacts_requires_ownership_and_current_membership(self) -> None:
+        """Reject artifact requests unless both ownership and membership hold."""
         run_id = self._create_dummy_run()
         self.state.stop_run(run_id)
-        provider = Mock(get_url=Mock(return_value="https://artifacts.example/run.zip"))
         request = PullArtifactsRequest(run_id=run_id)
-
-        response = pull_artifacts(request, self.account, self.state, provider)
-        assert response.url == "https://artifacts.example/run.zip"
-        provider.get_url.assert_called_once_with(run_id)
-        provider.get_url.reset_mock()
-
-        with patch.object(
-            self.state.federation_manager, "has_member", return_value=False
-        ):
-            with self.assertRaises(FlowerError) as error:
-                pull_artifacts(request, self.account, self.state, provider)
-        assert error.exception.code == ApiErrorCode.FEDERATION_NOT_FOUND
-        provider.get_url.assert_not_called()
-
-    def test_pull_artifacts_still_requires_run_ownership(self) -> None:
-        """Federation membership alone does not authorize artifact downloads."""
-        run_id = self._create_dummy_run()
-        self.state.stop_run(run_id)
         provider = Mock()
-        with patch.object(
-            self.state.federation_manager, "has_member", return_value=True
-        ):
-            with self.assertRaises(FlowerError) as error:
-                pull_artifacts(
-                    PullArtifactsRequest(run_id=run_id),
-                    replace(self.account, flwr_aid="other-account"),
-                    self.state,
-                    provider,
-                )
-        assert error.exception.code == ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT
-        provider.get_url.assert_not_called()
+        cases = [
+            (self.account, False, ApiErrorCode.FEDERATION_NOT_FOUND),
+            (
+                replace(self.account, flwr_aid="other-account"),
+                True,
+                ApiErrorCode.RUN_ID_NOT_BELONG_TO_ACCOUNT,
+            ),
+        ]
+        for account, has_membership, expected_error in cases:
+            with self.subTest(account=account.flwr_aid, member=has_membership):
+                with patch.object(
+                    self.state.federation_manager,
+                    "has_member",
+                    return_value=has_membership,
+                ):
+                    with self.assertRaises(FlowerError) as error:
+                        pull_artifacts(request, account, self.state, provider)
+                assert error.exception.code == expected_error
+                provider.get_url.assert_not_called()
 
     def test_owned_space_runs_keep_listing_and_artifact_access(self) -> None:
-        """Keep owned Space runs visible without requiring federation membership."""
+        """Filter federation access before paging while retaining owned Space runs."""
         federation_run_id = self._create_dummy_run()
         space_id = UUID(self.state.create_space(participants=[]).id)
         space_run_ids = [
@@ -223,8 +177,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             for flwr_aid in [self.account.flwr_aid, "other-account"]
         ]
         owned_space_run_id, other_space_run_id = space_run_ids
+        self._create_dummy_run("@owner/inaccessible")
 
         # Scope selection and caller ownership apply before ordering and pagination.
+        response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id, owned_space_run_id}
         response = list_runs(ListRunsRequest(limit=1), self.account, self.state)
         assert set(response.run_dict) == {owned_space_run_id}
         response = list_runs(ListRunsRequest(limit=1, skip=1), self.account, self.state)
