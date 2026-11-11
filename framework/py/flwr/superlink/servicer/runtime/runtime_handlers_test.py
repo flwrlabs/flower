@@ -72,7 +72,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
 )
-from flwr.proto.space_pb2 import SendSpaceMessageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -92,7 +91,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
@@ -100,32 +98,6 @@ from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 # pylint: disable=broad-except,too-many-lines
-
-
-@pytest.mark.parametrize(
-    "task,agent_id",
-    [
-        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
-        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
-        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
-    ],
-)
-def test_send_space_message_requires_bound_primary_agent(
-    task: Task, agent_id: int | None
-) -> None:
-    """Publishing requires a bound agent and the Run's primary AgentApp task."""
-    state = Mock(spec=LinkState)
-    run = Run.create_empty(123)
-    run.space_id = UUID("12345678-1234-5678-1234-567812345678")
-    run.agent_id = agent_id
-    run.primary_task_id = 1
-    state.get_run_info.return_value = [run]
-    with pytest.raises(FlowerError) as error:
-        runtime_handlers.send_space_message(
-            SendSpaceMessageRequest(content="No"), state, task
-        )
-    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
-    state.create_space_message.assert_not_called()
 
 
 def test_get_nodes_returns_metadata() -> None:

@@ -19,7 +19,9 @@ import unittest
 from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
+import pytest
 from fastapi import status
 
 from flwr.common.constant import SUPERLINK_NODE_ID
@@ -42,14 +44,42 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
+from flwr.proto.space_pb2 import SendSpaceMessageRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
+
+
+@pytest.mark.parametrize(
+    "task,agent_id",
+    [
+        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
+        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
+        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
+    ],
+)
+def test_send_space_message_requires_bound_primary_agent(
+    task: Task, agent_id: int | None
+) -> None:
+    """Publishing requires a bound agent and the Run's primary AgentApp task."""
+    state = Mock(spec=CoreState)
+    run = Run.create_empty(123)
+    run.space_id = UUID("12345678-1234-5678-1234-567812345678")
+    run.agent_id = agent_id
+    run.primary_task_id = 1
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.send_space_message(
+            SendSpaceMessageRequest(content="No"), state, task, run
+        )
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.create_space_message.assert_not_called()
 
 
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
