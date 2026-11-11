@@ -275,7 +275,7 @@ def get_space_events(
 
 
 @router.post("/get-space-messages")
-def get_space_messages(
+def runtime_get_space_messages(
     request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
@@ -286,7 +286,7 @@ def get_space_messages(
 
 
 @router.post("/send-space-message")
-def send_space_message(
+def runtime_send_space_message(
     request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
     handlers: RuntimeHandlersDependency,
