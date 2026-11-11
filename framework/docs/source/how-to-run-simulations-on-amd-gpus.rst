@@ -138,57 +138,67 @@ framework, and only then install Flower:
  Point Ray at the ROCm SMI library
 ***********************************
 
-Ray enumerates AMD GPUs by opening ``$ROCM_PATH/lib/librocm_smi64.so``, where
-``ROCM_PATH`` defaults to ``/opt/rocm``. Two details matter:
-
-- Ray opens the library by its **unversioned** name. A ROCm tree that ships only a
-  versioned ``librocm_smi64.so.<N>`` (for example ``librocm_smi64.so.1``) and no
-  ``librocm_smi64.so`` symlink is not sufficient.
-- If you installed ROCm from Python wheels rather than system packages, there is usually
-  no ``/opt/rocm`` at all, so ``ROCM_PATH`` must be set explicitly.
-
-Confirm the library is where Ray will look for it. Use the same unset-vs-empty test as
-``ROCR_VISIBLE_DEVICES`` below rather than a plain ``${ROCM_PATH:-/opt/rocm}``
-substitution: ``:-`` falls back to ``/opt/rocm`` both when ``ROCM_PATH`` is unset *and*
-when it is set to an empty string, but Ray 2.55.1 only applies its own ``/opt/rocm``
-default when ``ROCM_PATH`` is completely absent from the environment -- an explicit
-``ROCM_PATH=""`` is kept as-is and Ray ends up opening ``/lib/librocm_smi64.so``
-instead. A check using ``:-`` would still find the library under ``/opt/rocm`` and
-misleadingly print "ROCm SMI found" in that case, even though Ray reports zero GPUs:
-
-.. code-block:: shell
-
-    if [ -n "${ROCM_PATH+x}" ]; then
-        _rocm_path="$ROCM_PATH"
-    else
-        _rocm_path="/opt/rocm"
-    fi
-    test -f "$_rocm_path/lib/librocm_smi64.so" && echo "ROCm SMI found"
-    unset _rocm_path
-
-If that prints nothing, set ``ROCM_PATH`` to a ROCm root that contains the unversioned
-symlink and re-check. When ROCm is installed from wheels, the ``rocm-sdk`` tool reports
-the correct root:
-
-.. code-block:: shell
-
-    export ROCM_PATH="$(rocm-sdk path --root)"
-
-``rocm-sdk`` is provided by the ``devel`` extra. If it reports that ``rocm[devel]`` is
-not installed, install it -- that package supplies the root you need here.
+Ray (this repo pins Ray 2.56.0) no longer opens ``librocm_smi64.so`` directly: it
+discovers AMD GPUs through the ``amdsmi`` Python package, via
+``ray._private.thirdparty.pyamdsmi``, which does ``import amdsmi`` and calls into it.
 
 .. important::
 
-    A wheel-based ROCm installation may expose more than one root. Only the root that
-    ships the unversioned ``librocm_smi64.so`` symlink works for Ray: in current AMD
-    wheel layouts that is ``_rocm_sdk_devel``, while ``_rocm_sdk_core`` ships only the
-    versioned ``librocm_smi64.so.<N>``. Your ML framework locates HIP independently and
-    works with either, which is why this misconfiguration shows up as a Ray-only
-    failure.
+    A missing or unimportable ``amdsmi`` fails silently. Ray's AMD accelerator manager
+    catches the resulting ``ImportError`` and simply reports zero GPUs -- there is no
+    visible error anywhere in Ray's own logs. If Ray reports ``GPU=0`` while
+    ``/dev/kfd`` and an AMD-backed render node are both accessible (see
+    `Troubleshooting`_ below), this is almost always the cause.
 
-    Published ROCm container recipes commonly set ``ROCM_PATH`` to the *core* root,
-    which is correct for the ML framework but leaves Ray unable to enumerate GPUs. If
-    you adapt such an image for the Simulation Runtime, override ``ROCM_PATH`` for Ray.
+Confirm ``amdsmi`` is importable in the **exact same Python environment Ray runs in**
+-- a venv created with ``uv`` or ``python -m venv`` does not see packages installed
+into the system/apt Python by default, which is a common trap:
+
+.. code-block:: shell
+
+    python -c "import amdsmi; print(amdsmi.__file__)"
+
+If that fails, install ``amdsmi`` one of two ways:
+
+- **System package** (``apt install amd-smi-lib`` or your distribution's
+  equivalent): installs ``amdsmi`` into the **system** Python's site-packages via the
+  package's post-install script, together with its own bundled ``libamd_smi.so``.
+  This is invisible to an isolated virtual environment unless that environment has
+  system-site-packages access.
+- **Pip wheel** (``pip install amdsmi``): installs a pure-Python wrapper with no
+  bundled ``.so``. It locates the native library itself, checking ``ROCM_HOME``
+  before ``ROCM_PATH`` (the opposite order from the rest of this guide), then
+  ``lib/libamd_smi.so`` under whichever of those is set -- the same
+  unversioned-shared-library requirement as ``librocm_smi64.so`` above, just a
+  different filename. Use the same unset-vs-empty check, substituting
+  ``libamd_smi.so``:
+
+  .. code-block:: shell
+
+      if [ -n "${ROCM_HOME+x}" ]; then
+          _rocm_root="$ROCM_HOME"
+      elif [ -n "${ROCM_PATH+x}" ]; then
+          _rocm_root="$ROCM_PATH"
+      else
+          _rocm_root="/opt/rocm"
+      fi
+      test -f "$_rocm_root/lib/libamd_smi.so" && echo "amd_smi library found"
+      unset _rocm_root
+
+  When ROCm is installed from wheels, the same root split as above applies: only
+  ``_rocm_sdk_devel`` (the ``devel`` extra) ships the unversioned ``libamd_smi.so``
+  symlink -- ``_rocm_sdk_core`` ships only the versioned ``libamd_smi.so.<N>``. Point
+  ``ROCM_HOME``/``ROCM_PATH`` at the root ``rocm-sdk path --root`` reports, same as
+  above. Installing ``rocm[devel]`` does **not** itself provide the importable
+  ``amdsmi`` package -- it bundles the package's source and native library for its own
+  CLI tooling, but neither is placed on Python's import path. The pip wheel above is
+  still required even with ``rocm[devel]`` installed.
+
+.. note::
+
+    Pinned to an older Ray release (before 2.56)? AMD GPU discovery there opens
+    ``librocm_smi64.so`` directly, exactly as described under this section's previous
+    approach -- the ``amdsmi`` requirement above does not apply.
 
 *************************************
  Set ``HIP_VISIBLE_DEVICES`` for Ray
@@ -230,10 +240,12 @@ verification steps later in this guide still report zero GPUs with no indication
 
 A value can also be in range and syntactically well-formed while still being wrong: a
 repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only looks at
-each value in isolation. Ray 2.55.1 sizes its advertised GPU resources from the length
-of this mask, so a duplicate ordinal creates two schedulable slots that both map to the
-same ROCr-visible device, letting concurrent ClientApps collide on it instead of each
-getting a distinct GPU. A duplicate can also hide behind a leading-zero alias -- ``0``
+each value in isolation. Ray 2.56.0 sizes its advertised GPU resources from the length
+of this mask -- unaffected by the ``amdsmi`` switch above, since ``smi_get_device_count``
+still reports the node's total physical device count rather than anything already
+filtered by ``HIP_VISIBLE_DEVICES`` -- so a duplicate ordinal creates two schedulable
+slots that both map to the same ROCr-visible device, letting concurrent ClientApps
+collide on it instead of each getting a distinct GPU. A duplicate can also hide behind a leading-zero alias -- ``0``
 and ``00`` are the same ordinal to HIP, but two distinct strings to a naive comparison
 -- so the snippet normalizes each value before comparing, rather than comparing the
 spellings it was given. It also rejects the mask in that case rather than accepting a
@@ -417,13 +429,14 @@ exported, silently leaving Ray's original import failure in place:
     restarting only the Flower-managed SuperLink -- changes nothing for nodes Ray itself
     started, since Flower does not manage those processes.
 
-    For a manually started Ray cluster, ``ROCM_PATH`` and the
-    ``HIP_VISIBLE_DEVICES``/``ROCR_VISIBLE_DEVICES`` handling above must therefore be
-    exported in the shell on **every** node -- head and each worker -- *before* that
-    node's ``ray start`` command runs. If a cluster is already running with the wrong
-    environment, stop it (``ray stop`` on every node, or tear the cluster down and
-    restart it) so each node redoes GPU discovery with the corrected environment; those
-    nodes will keep reporting ``GPU=0`` until they are individually fixed and restarted.
+    For a manually started Ray cluster, ``amdsmi`` being importable, plus ``ROCM_PATH``/
+    ``ROCM_HOME`` and the ``HIP_VISIBLE_DEVICES``/``ROCR_VISIBLE_DEVICES`` handling
+    above, must therefore all hold in the shell on **every** node -- head and each
+    worker -- *before* that node's ``ray start`` command runs. If a cluster is already
+    running with the wrong environment, stop it (``ray stop`` on every node, or tear the
+    cluster down and restart it) so each node redoes GPU discovery with the corrected
+    environment; those nodes will keep reporting ``GPU=0`` until they are individually
+    fixed and restarted.
 
 *************************************
  Verify that Ray detects the AMD GPU
@@ -500,9 +513,9 @@ fixes elsewhere in this guide:
 - Ray's GPU resources were limited deliberately, for example via ``flwr federation
   simulation-config --init-args-num-gpus 0``. Lowering ``client-resources-num-gpus``
   will not help here either -- no non-zero value can be satisfied by a cluster reporting
-  ``GPUs=0`` -- but neither will ``ROCM_PATH`` or ``HIP_VISIBLE_DEVICES``, since the
-  limit is applied at ``ray.init()`` and never reaches ROCm. Review, or raise, the
-  configured ``init-args-num-gpus`` value instead.
+  ``GPUs=0`` -- but neither will ``amdsmi``, ``ROCM_PATH``, or ``HIP_VISIBLE_DEVICES``,
+  since the limit is applied at ``ray.init()`` and never reaches ROCm. Review, or raise,
+  the configured ``init-args-num-gpus`` value instead.
 - ROCm reaches the GPU but Ray did not discover it. Work through `Point Ray at the ROCm
   SMI library`_ and `Set HIP_VISIBLE_DEVICES for Ray`_, then re-run the verification
   above.

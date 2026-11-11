@@ -267,6 +267,56 @@ class TestPoolSizeFromResources(TestCase):
         self.assertIn("no accessible `/dev/dri/renderD*` node", output)
         self.assertIn("render", output)
 
+    def test_multi_node_cluster_skips_driver_host_diagnostics(self) -> None:
+        """Test that a multi-node cluster skips the driver-only KFD diagnostic.
+
+        `_log_kfd_diagnostics` only inspects the driver host's own `/dev/kfd` and
+        render nodes. On a multi-node cluster that is misleading -- the driver's
+        device state says nothing about which worker node lacks access -- so the
+        single-node diagnostics must not run, and a generic per-node check message
+        must be logged instead.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[
+                    {"Resources": {"CPU": 8}},
+                    {"Resources": {"CPU": 8}},
+                ],
+            ),
+            # These would normally trigger the "points at the SMI library" branch on
+            # a single-node cluster -- proving the gate suppresses it, not just that
+            # it adds extra text.
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.os.access",
+                return_value=True,
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.glob.glob",
+                return_value=["/dev/dri/renderD128"],
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+                return_value=True,
+            ),
+        ):
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        output = "\n".join(logs.output)
+        self.assertIn("multi-node Ray cluster", output)
+        self.assertIn("each node individually", output)
+        self.assertNotIn("librocm_smi64.so` (ROCM_PATH", output)
+        self.assertNotIn("cannot open it", output)
+        self.assertNotIn("not AMD-backed", output)
+        self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
+
     def test_case_with_no_usable_node(self) -> None:
         """Test that a cluster with no usable node raises ValueError.
 

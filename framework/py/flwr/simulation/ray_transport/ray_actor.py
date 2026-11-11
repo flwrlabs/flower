@@ -219,6 +219,11 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # node" when node order doesn't match node capacity. Track the actual best alongside
     # `max_actors_by_cpu` so the two stay consistent.
     max_num_cpus: int | float = 0
+    # AMD GPU discovery (the diagnostic below) only inspects the driver host. Track how
+    # many nodes actually report resources so that diagnostic can be skipped on a
+    # multi-node cluster, where the driver's own device state says nothing about which
+    # worker node is missing access.
+    active_node_count = 0
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -234,6 +239,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         # however, its resources will be empty.
         if not node_resources:
             continue
+        active_node_count += 1
 
         # Fallback to zero when resource quantity is not configured on the ray node
         # e.g.: node without GPU; head node set up not to run tasks (zero resources)
@@ -294,7 +300,24 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                     client_resources.get("num_cpus"),
                     max_num_cpus,
                 )
-            _log_kfd_diagnostics()
+            if active_node_count > 1:
+                # `_log_kfd_diagnostics` only inspects the driver host's own device
+                # nodes. On a multi-node cluster, AMD GPU discovery already ran
+                # independently on each node at `ray start` time, so a driver-only
+                # check cannot say which node is missing access -- naming the driver's
+                # state here would misleadingly implicate it instead.
+                log(
+                    WARNING,
+                    "This is a multi-node Ray cluster (%s nodes reporting resources). "
+                    "AMD GPU discovery runs independently on each node when `ray "
+                    "start` executes there, so checking only this driver host cannot "
+                    "identify which node is missing device access. Check `/dev/kfd` "
+                    "and `/dev/dri/renderD*` access on each node individually, not "
+                    "just here.",
+                    active_node_count,
+                )
+            else:
+                _log_kfd_diagnostics()
         else:
             log(
                 WARNING,
