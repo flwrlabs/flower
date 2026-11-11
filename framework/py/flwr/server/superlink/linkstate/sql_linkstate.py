@@ -434,26 +434,40 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                # Serialize admission for this agent and Space before rechecking.
+                # Serialize admission before checking for an open Run.
                 session.execute(
                     update(SpaceParticipantTable)
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         SpaceParticipantTable.c.agent_id == agent_id,
                     )
-                    .values(
-                        read_through_message_id=SpaceParticipantTable.c.read_through_message_id
-                    )
+                    .values(agent_id=agent_id)
                 )
-                candidate = session.execute(
-                    _agent_run_candidates_query().where(
+                open_run = (
+                    select(RunModel.run_id)
+                    .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                    .where(
+                        RunModel.space_id == space_id,
+                        RunModel.agent_id == agent_id,
+                        TaskModel.finished_at.is_(None),
+                    )
+                    .exists()
+                )
+                agent = session.scalar(
+                    select(AgentModel)
+                    .join(
+                        SpaceParticipantTable,
+                        SpaceParticipantTable.c.agent_id == AgentModel.agent_id,
+                    )
+                    .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         AgentModel.agent_id == agent_id,
+                        ~open_run,
                     )
-                ).one_or_none()
-                if candidate is None:
+                    .execution_options(populate_existing=True)
+                )
+                if agent is None:
                     return 0
-                _, agent = candidate
                 app_id, version = parse_app_spec(agent.app_spec)
                 if app_id != f"@{fab_id}" or (version and version != fab_version):
                     return 0
@@ -545,7 +559,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_agent_run_candidates(
         self, *, limit: int | None = None
     ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread user input and no open Run."""
+        """Find participating agents with unread messages and no open Run."""
         if limit is not None and limit <= 0:
             return []
         self._cleanup_expired_task_tokens()
@@ -926,12 +940,11 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
 
 
 def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
-    """Select participating agents with unread user input and no open primary Task."""
+    """Select participating agents with unread messages and no open primary Task."""
     unread = (
         select(SpaceMessageModel.id)
         .where(
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
-            SpaceMessageModel.flwr_aid.is_not(None),
             SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
         )
         .exists()

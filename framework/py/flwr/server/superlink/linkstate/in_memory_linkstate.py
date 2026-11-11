@@ -387,7 +387,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return 0
             if space_id is not None and agent_id is not None:
                 self._cleanup_expired_task_tokens_locked()
-                if not self._agent_can_start_run(space_id, agent_id):
+                space = self.space_store[space_id]
+                if SpaceParticipant(
+                    agent_id=agent_id
+                ) not in space.participants or self._agent_has_open_run(
+                    space_id, agent_id
+                ):
                     return 0
                 flwr_aid, agent = next(
                     (owner, agents[agent_id])
@@ -488,32 +493,20 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             return run_id
 
-    def _agent_can_start_run(self, space_id: UUID, agent_id: int) -> bool:
-        """Check eligibility while the task, Run, and Space locks are held."""
-        space = self.space_store.get(space_id)
-        if (
-            space is None
-            or SpaceParticipant(agent_id=agent_id) not in space.participants
-        ):
-            return False
-        if any(
+    def _agent_has_open_run(self, space_id: UUID, agent_id: int) -> bool:
+        """Check for an unfinished primary Task while state locks are held."""
+        return any(
             record.space_id == space_id
             and record.run.agent_id == agent_id
             and self.task_store[cast(int, record.run.primary_task_id)].status.status
             != Status.FINISHED
             for record in self.run_ids.values()
-        ):
-            return False
-        cursor = self.space_participant_cursors.get((space_id, agent_id), 0)
-        return any(
-            message.id > cursor and message.author.HasField("flwr_aid")
-            for message in self.space_message_store[space_id]
         )
 
     def get_agent_run_candidates(
         self, *, limit: int | None = None
     ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread user input and no open Run."""
+        """Find participating agents with unread messages and no open Run."""
         if limit is not None and limit <= 0:
             return []
         with (
@@ -531,8 +524,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             candidates = []
             for space_id, space in self.space_store.items():
                 for member in space.participants:
-                    if member.agent_id in agents and self._agent_can_start_run(
+                    if member.agent_id not in agents or self._agent_has_open_run(
                         space_id, member.agent_id
+                    ):
+                        continue
+                    cursor = self.space_participant_cursors.get(
+                        (space_id, member.agent_id), 0
+                    )
+                    if any(
+                        message.id > cursor
+                        for message in self.space_message_store[space_id]
                     ):
                         candidates.append((space_id, agents[member.agent_id]))
                         if limit is not None and len(candidates) == limit:

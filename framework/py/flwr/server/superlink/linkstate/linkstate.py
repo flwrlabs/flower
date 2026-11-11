@@ -318,9 +318,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             with federation configuration, a series, or federation connectors.
         agent_id : int | None (default: None)
             Executing agent assigned by the server for a Space run. Creation
-            returns 0 unless the agent participates, has unread user input,
-            has no open Run, and its app matches the resolved FAB. The FAB must
-            already be stored.
+            returns 0 unless the agent participates, has no open Run, and its
+            app matches the resolved FAB. The FAB must already be stored.
 
         Returns
         -------
@@ -338,7 +337,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_agent_run_candidates(
         self, *, limit: int | None = None
     ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread user messages and no open Run.
+        """Find participating agents with unread messages and no open Run.
 
         Parameters
         ----------

@@ -71,13 +71,13 @@ from flwr.superlink.federation import NoOpFederationManager
 
 from . import control_handlers
 from .control_handlers import (
+    _process_pending_agent_runs,
     add_app,
     list_app_associations,
     list_apps,
     list_automations,
     list_run_series_events,
     list_runs,
-    process_pending_agent_runs,
     refresh_auth_tokens,
     remove_app,
     start_automation,
@@ -116,7 +116,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_process_pending_agent_runs(self) -> None:
-        """Resolve an AgentApp and create one Run for its unread Space input."""
+        """Resolve an AgentApp and create one Run for an unread agent message."""
         agent = self.state.create_agent(
             self.account.flwr_aid,
             AgentConfig(name="Agent", app_spec="@publisher/app"),
@@ -124,7 +124,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         assert agent is not None
         space_id = UUID(self.state.get_spaces(self.account.flwr_aid)[0].id)
         self.state.create_space_message(
-            space_id, SpaceParticipant(flwr_aid=self.account.flwr_aid), "Input"
+            space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
         )
         config = {
             "project": {"name": "app", "version": "1.0"},
@@ -143,8 +143,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             ) as resolve,
             patch.object(control_handlers, "get_fab_config", return_value=config),
         ):
-            process_pending_agent_runs(self.state)
-            process_pending_agent_runs(self.state)
+            _process_pending_agent_runs(self.state)
+            _process_pending_agent_runs(self.state)
         resolve.assert_called_once_with(agent.config.app_spec)
         runs = self.state.get_run_info()
         assert len(runs) == 1 and runs[0].agent_id == agent.id

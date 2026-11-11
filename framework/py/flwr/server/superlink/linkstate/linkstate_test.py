@@ -2385,7 +2385,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         return self.states
 
     def test_agent_run_admission_is_atomic(self) -> None:
-        """Unread input admits one Run even when two replicas poll together."""
+        """Two replicas admit one Run even after the triggering message is read."""
         with tempfile.TemporaryDirectory() as tmpdir:
             states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
             state = states[0]
@@ -2397,9 +2397,11 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             fab_hash = state.store_fab(Fab("", b"fab", {}))
             assert not state.get_agent_run_candidates()
             state.create_space_message(
-                space_id, SpaceParticipant(flwr_aid="alice"), "Input"
+                space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
             )
             assert state.get_agent_run_candidates() == [(space_id, agent)]
+            state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
+            assert not state.get_agent_run_candidates()
             barrier = Barrier(2)
 
             def start(backend: LinkState) -> int:
