@@ -1198,6 +1198,42 @@ def dispatch_automation(
     )
 
 
+def process_pending_agent_runs(state: LinkState, *, limit: int = 10) -> None:
+    """Resolve eligible AgentApps and attempt to open execution windows."""
+    created = 0
+    for space_id, agent in state.get_agent_run_candidates():
+        if created >= limit:
+            break
+        try:
+            content, verifications, _ = _get_remote_fab(agent.config.app_spec)
+            if len(content) > FAB_MAX_SIZE:
+                raise ValueError("AgentApp FAB exceeds the size limit.")
+            config = get_fab_config(content)
+            if _get_app_type(config) != TaskType.AGENT_APP:
+                raise ValueError("The agent must use an AgentApp bundle.")
+            fab_id, version = get_metadata_from_config(config)
+            fab_hash = state.store_fab(
+                Fab(hashlib.sha256(content).hexdigest(), content, verifications)
+            )
+            run_id = state.create_agent_run(
+                space_id,
+                agent.id,
+                fab_id=fab_id,
+                fab_version=version,
+                fab_hash=fab_hash,
+            )
+            if run_id is not None:
+                created += 1
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log(
+                ERROR,
+                "Unable to start agent %d in Space %s: %s",
+                agent.id,
+                space_id,
+                exc,
+            )
+
+
 def process_due_automations(
     state: LinkState,
     *,
