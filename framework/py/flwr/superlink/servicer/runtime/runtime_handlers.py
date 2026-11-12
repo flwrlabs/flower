@@ -167,28 +167,22 @@ def send_space_message(
 def get_compacted_contexts(
     request: GetCompactedContextsRequest, state: LinkState, task: Task
 ) -> GetCompactedContextsResponse:
-    """Get summaries for the authenticated task's run series."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
+    """Get summaries for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.get_compacted_contexts(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
 def put_compacted_context(
     request: PutCompactedContextRequest, state: LinkState, task: Task
 ) -> PutCompactedContextResponse:
-    """Store a summary for the authenticated task's run series."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
+    """Store a summary for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.put_compacted_context(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
