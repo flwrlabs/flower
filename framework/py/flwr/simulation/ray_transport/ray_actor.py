@@ -203,6 +203,91 @@ def _log_kfd_diagnostics() -> None:
         )
 
 
+def _log_node_locality_diagnostics(
+    active_node_count: int, active_node_id: str | None
+) -> None:
+    """Log a GPU-discovery hint appropriate to where the active node(s) are.
+
+    Split out of `pool_size_from_resources` purely to keep that function's branch
+    count manageable; this covers only the no-GPU-detected diagnostic path.
+    """
+    if active_node_count == 0:
+        # Nothing registered any resources at all (empty `ray.nodes()`, or every
+        # entry detached with empty `Resources`). There is no active node whose GPU
+        # discovery could be at fault, so neither the multi-node nor the
+        # driver-local diagnostics below describe the problem -- probing this
+        # host's `/dev/kfd` here would hand out an AMD permissions/amdsmi remedy
+        # for what is actually a cluster that never came up.
+        log(
+            WARNING,
+            "No active Ray node reported resources: `ray.nodes()` returned "
+            "either no entries, or only detached ones with empty `Resources`. "
+            "This is not a per-node GPU discovery problem to fix on this host -- "
+            "check why the Ray cluster has no usable node (for example, it "
+            "failed to start or every node has disconnected) with "
+            '`python -c "import ray; ray.init(); print(ray.nodes())"`.',
+        )
+    elif active_node_count > 1:
+        # `_log_kfd_diagnostics` only inspects the driver host's own device
+        # nodes. On a multi-node cluster, AMD GPU discovery already ran
+        # independently on each node at `ray start` time, so a driver-only
+        # check cannot say which node is missing access -- naming the driver's
+        # state here would misleadingly implicate it instead. This must still
+        # fire unconditionally (a CPU-only driver can front a pool of AMD GPU
+        # workers, so gating on this host's own `/dev/kfd` would suppress the
+        # one warning that tells the user where to look), but the driver's
+        # `/dev/kfd` state also cannot establish that any worker is AMD, so the
+        # device-node specifics are phrased as conditional within the message
+        # rather than asserted.
+        log(
+            WARNING,
+            "This is a multi-node Ray cluster (%s nodes reporting "
+            "resources). GPU discovery runs independently on each node "
+            "when `ray start` executes there, so checking only this "
+            "driver host cannot identify which node is missing device "
+            "access. If AMD GPUs are in use, check `/dev/kfd` and "
+            "`/dev/dri/renderD*` access on each node individually, not "
+            "just here.",
+            active_node_count,
+        )
+    elif ray.util.client.ray.is_connected():  # type: ignore[no-untyped-call]
+        # `ray.init("ray://host:port")` (Ray Client) proxies
+        # `get_runtime_context()` into the remote cluster, so it returns the
+        # *server's* node ID -- which then trivially equals the sole
+        # `active_node_id` from `ray.nodes()` even though this process's own
+        # `/dev` is on the client host, not the cluster node. A NodeID
+        # comparison can therefore never detect this remote case; checking
+        # `ray.util.client.ray.is_connected()` instead.
+        log(
+            WARNING,
+            "This process connected to the Ray cluster over Ray Client "
+            "(a `ray://` address), so it runs on a different host than the "
+            "cluster node (NodeID=%s) that reported zero GPUs. Checking "
+            "`/dev/kfd` and `/dev/dri/renderD*` on this host cannot "
+            "diagnose a device on the remote cluster node; check device "
+            "access there instead.",
+            active_node_id,
+        )
+    elif active_node_id != (driver_node_id := ray.get_runtime_context().get_node_id()):
+        # A single reporting node that is not this driver's own node means
+        # `init_args` connected this process to a remote single-node cluster
+        # (for example via `address="<ip>:<port>"`). Probing this host's
+        # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine.
+        log(
+            WARNING,
+            "The only node reporting resources (NodeID=%s) is not this "
+            "driver's own node (NodeID=%s) -- `ray.init()` connected to a "
+            "remote cluster. Checking `/dev/kfd` and `/dev/dri/renderD*` on "
+            "this host cannot diagnose a device on a different machine; "
+            "check device access on the node that reported zero GPUs "
+            "instead.",
+            active_node_id,
+            driver_node_id,
+        )
+    else:
+        _log_kfd_diagnostics()
+
+
 def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     """Calculate number of Actors that fit in the cluster.
 
@@ -226,9 +311,10 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # `max_actors_by_cpu` so the two stay consistent.
     max_num_cpus: int | float = 0
     # AMD GPU discovery (the diagnostic below) only inspects the driver host. Track how
-    # many nodes actually report resources so that diagnostic can be skipped on a
-    # multi-node cluster, where the driver's own device state says nothing about which
-    # worker node is missing access.
+    # many nodes actually report resources so that diagnostic can be skipped both when
+    # no node is active at all (nothing to diagnose on this host) and on a multi-node
+    # cluster, where the driver's own device state says nothing about which worker node
+    # is missing access.
     active_node_count = 0
     # The single active node's own ID, if there is exactly one. `init_args` can hand
     # `ray.init()` an `address` that joins this driver to a single-node cluster running
@@ -312,49 +398,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                     client_resources.get("num_cpus"),
                     max_num_cpus,
                 )
-            if active_node_count > 1:
-                # `_log_kfd_diagnostics` only inspects the driver host's own device
-                # nodes. On a multi-node cluster, AMD GPU discovery already ran
-                # independently on each node at `ray start` time, so a driver-only
-                # check cannot say which node is missing access -- naming the driver's
-                # state here would misleadingly implicate it instead. This must still
-                # fire unconditionally (a CPU-only driver can front a pool of AMD GPU
-                # workers, so gating on this host's own `/dev/kfd` would suppress the
-                # one warning that tells the user where to look), but the driver's
-                # `/dev/kfd` state also cannot establish that any worker is AMD, so the
-                # device-node specifics are phrased as conditional within the message
-                # rather than asserted.
-                log(
-                    WARNING,
-                    "This is a multi-node Ray cluster (%s nodes reporting "
-                    "resources). GPU discovery runs independently on each node "
-                    "when `ray start` executes there, so checking only this "
-                    "driver host cannot identify which node is missing device "
-                    "access. If AMD GPUs are in use, check `/dev/kfd` and "
-                    "`/dev/dri/renderD*` access on each node individually, not "
-                    "just here.",
-                    active_node_count,
-                )
-            elif active_node_id is not None and active_node_id != (
-                driver_node_id := ray.get_runtime_context().get_node_id()
-            ):
-                # A single reporting node that is not this driver's own node means
-                # `init_args` connected this process to a remote single-node cluster
-                # (for example via `address="<ip>:<port>"`). Probing this host's
-                # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine.
-                log(
-                    WARNING,
-                    "The only node reporting resources (NodeID=%s) is not this "
-                    "driver's own node (NodeID=%s) -- `ray.init()` connected to a "
-                    "remote cluster. Checking `/dev/kfd` and `/dev/dri/renderD*` on "
-                    "this host cannot diagnose a device on a different machine; "
-                    "check device access on the node that reported zero GPUs "
-                    "instead.",
-                    active_node_id,
-                    driver_node_id,
-                )
-            else:
-                _log_kfd_diagnostics()
+            _log_node_locality_diagnostics(active_node_count, active_node_id)
         else:
             log(
                 WARNING,
