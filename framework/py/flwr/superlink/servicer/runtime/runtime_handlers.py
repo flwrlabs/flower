@@ -208,16 +208,8 @@ def put_compacted_context(
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
-    """Claim queued work or admit agent Runs when an AgentApp worker is idle."""
+    """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
-    response = core_runtime_handlers.acquire_task(request, state)
-    if response.HasField("task"):
-        return response
-    if (
-        TaskType.AGENT_APP not in request.supported_task_types
-        and not request.agentapp_fab_hashes
-    ):
-        return response
     _process_pending_agent_runs(state)
     return core_runtime_handlers.acquire_task(request, state)
 
