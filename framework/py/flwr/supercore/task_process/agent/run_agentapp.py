@@ -302,7 +302,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             ):
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
-                    prompt, instruction_metadata = pull_prompt(grid)
+                    prompt = ""
+                    instruction_metadata: Metadata | None = None
+                    if run.space_id is None:
+                        prompt, instruction_metadata = pull_prompt(grid)
                     self._agent_events = RuntimeAgentEvents(grid._runtime_client)
                     agent_grid = RuntimeAgentGrid(
                         grid,
@@ -310,9 +313,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                         self._context.node_id,
                         instruction_metadata,
                     )
-                    self._agent_events.emit(
-                        {"type": "message", "role": "user", "content": prompt}
-                    )
+                    if instruction_metadata is not None:
+                        self._agent_events.emit(
+                            {"type": "message", "role": "user", "content": prompt}
+                        )
                     agent_runtime = AgentRuntime(
                         stub=grid._runtime_client,
                         run_id=self._context.run_id,

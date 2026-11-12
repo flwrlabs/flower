@@ -36,6 +36,7 @@ from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -72,6 +73,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
 )
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -98,6 +100,56 @@ from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 # pylint: disable=broad-except,too-many-lines
+
+
+@pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
+def test_acquire_task_admits_space_runs_before_claiming_queued_work(
+    database: str,
+) -> None:
+    """Admit unread Space input even when an eligible task is already queued."""
+    state = LinkStateFactory(
+        database, NoOpFederationManager(), ObjectStoreFactory()
+    ).state()
+    queued_run_id = state.create_run(
+        "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.AGENT_APP
+    )
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@flwr/demo")
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+    assert (
+        state.create_space_message(
+            space_id, SpaceParticipant(flwr_aid="alice"), "Hello"
+        )
+        is not None
+    )
+    config = {
+        "project": {"name": "demo", "version": "1.0"},
+        "tool": {
+            "flwr": {
+                "app": {"publisher": "flwr", "components": {"agentapp": "demo:app"}}
+            }
+        },
+    }
+    with (
+        patch(
+            "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
+            return_value=(b"fab", {}, None),
+        ),
+        patch(
+            "flwr.superlink.servicer.control.control_handlers.get_fab_config",
+            return_value=config,
+        ),
+    ):
+        response = runtime_handlers.acquire_task(
+            AcquireTaskRequest(supported_task_types=[TaskType.AGENT_APP]), state
+        )
+
+    assert response.token and response.task.run_id == queued_run_id
+    pending = state.get_run_info(statuses=[Status.PENDING])
+    assert len(pending) == 1
+    assert pending[0].space_id == space_id and pending[0].agent_id == agent.id
 
 
 def test_get_nodes_returns_metadata() -> None:

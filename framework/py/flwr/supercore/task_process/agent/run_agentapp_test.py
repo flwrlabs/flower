@@ -24,12 +24,15 @@ import threading
 from pathlib import Path
 from queue import Queue
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import pytest
 
 from flwr.agentapp import AgentApp, LoadAgentAppError
-from flwr.app import ConfigRecord, Message, RecordDict
-from flwr.common.constant import SubStatus
+from flwr.app import ConfigRecord, Context, Message, RecordDict
+from flwr.common.constant import SUPERLINK_NODE_ID, SubStatus
+from flwr.common.serde import context_to_proto, fab_to_proto, run_to_proto
+from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -160,6 +163,67 @@ def test_pull_prompt_rejects_multiple_instructions() -> None:
 
     with pytest.raises(RuntimeError, match="exactly one"):
         pull_prompt(grid)
+
+
+@pytest.mark.parametrize("space_run", [False, True])
+def test_lifecycle_initializes_space_runs_without_task_prompt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, space_run: bool
+) -> None:
+    """Reach the AgentApp with Space input or the legacy task instruction."""
+    grid, app = Mock(), Mock()
+    run = Run.create_empty(456)
+    if space_run:
+        run.space_id, run.agent_id = uuid4(), 42
+    context = Context(
+        run_id=run.run_id,
+        node_id=SUPERLINK_NODE_ID,
+        node_config={},
+        run_config={},
+        state=RecordDict(),
+    )
+    grid._runtime_client.PullTaskInput.return_value = PullTaskInputResponse(
+        task_id=123,
+        run=run_to_proto(run),
+        context=context_to_proto(context),
+        fab=fab_to_proto(Fab("", b"fab", {})),
+    )
+    grid.pull_messages.return_value = (
+        [] if space_run else [_payload_message(SUPERLINK_NODE_ID, SYSTEM_MESSAGE_TYPE)]
+    )
+    for name, value in {
+        "HttpGrid": Mock(return_value=grid),
+        "HeartbeatSender": Mock(),
+        "start_log_uploader": Mock(),
+        "get_fused_config_from_dir": Mock(return_value={}),
+        "_set_runtime_environment": Mock(),
+        "event": Mock(),
+    }.items():
+        monkeypatch.setattr(run_agentapp_module, name, value)
+    lifecycle = _AgentAppTaskLifecycle(
+        runtime_api_address="runtime.example:9092",
+        log_queue=Queue(),
+        token="task-token",
+        insecure=True,
+        certificates=None,
+        certificates_path=None,
+        runtime_dependency_install=False,
+        preloaded=None,
+    )
+    monkeypatch.setattr(
+        lifecycle, "_prepare_task_app", Mock(return_value=(tmp_path, app, None))
+    )
+
+    assert lifecycle.run() == ExitCode.SUCCESS
+
+    app.assert_called_once()
+    agent = app.call_args.kwargs["agent"]
+    assert agent.prompt == ("" if space_run else "hello world!")
+    assert (agent.space is not None) == space_run
+    if space_run:
+        grid.pull_messages.assert_not_called()
+        grid._runtime_client.PushTaskEvents.assert_not_called()
+    else:
+        grid.pull_messages.assert_called_once_with()
 
 
 def test_preload_agentapp_installs_the_verified_bytes(

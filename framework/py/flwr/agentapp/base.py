@@ -175,7 +175,7 @@ class AgentSession(ABC):
     @property
     @abstractmethod
     def prompt(self) -> str:
-        """Return the initial prompt for this AgentApp run."""
+        """Return the initial task prompt, or an empty string for Space Runs."""
 
     @property
     @abstractmethod
