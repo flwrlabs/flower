@@ -1,0 +1,39 @@
+
+num_clients: 500
+num_rounds: 4000
+
+defaults:
+  - partitioning: iid
+  - strategy: fedavg
+
+dataset:
+  num_clients: ${num_clients}
+  batch_size: 10
+  batch_size_evaluate: 100
+  partitioners: ${partitioning}
+  federated_dataset:
+    _convert_: all # needed to ensure the dict{} passes with `partitioners` is of type Dict and not DictConfig
+    _target_: flwr_datasets.FederatedDataset
+    dataset: cifar10
+  partition_key: train
+
+
+model:
+  _target_: fedopt.models.get_resnet18_model
+  num_classes: 10
+
+
+client:
+  lr: 0.03162
+  train_fn:
+    _target_: fedopt.models.train
+    learning_rate: ${client.lr}
+    epochs: 1
+  evaluate_fn: # used for centralised evaluation
+    _target_: fedopt.models.evaluate
+  model_cfg: ${model}
+
+server_device: cpu
+client_resources:
+  num_cpus: 2
+  num_gpus: 0.0
