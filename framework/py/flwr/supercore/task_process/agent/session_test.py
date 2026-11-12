@@ -58,7 +58,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
 from .session import (
@@ -143,11 +143,9 @@ def test_space_session_reads_messages() -> None:
     assert [message["id"] for message in messages] == [1, 2]
 
 
-@pytest.mark.parametrize(
-    "arguments", [None, {"content": "Hello"}, '{"content":"Hello"}']
-)
-def test_space_session_sends_messages(arguments: JSONObject | str | None) -> None:
-    """Publish directly or through a model tool using the server-assigned author."""
+@pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
+def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
+    """Publish through a model tool using the server-assigned author."""
     stub, events = Mock(), Mock()
     stub.SendSpaceMessage.return_value = SendSpaceMessageResponse(
         message=SpaceMessage(
@@ -158,18 +156,12 @@ def test_space_session_sends_messages(arguments: JSONObject | str | None) -> Non
         Mock(_runtime_client=stub), events, PullTaskInputResponse()
     )
     assert agent.space is not None
-    message: JSONValue
-    if arguments is None:
-        message = agent.space.send_message("Hello")
-        events.emit.assert_not_called()
-    else:
-        assert [tool["name"] for tool in agent.space.tools()] == ["send_space_message"]
-        output = agent.space.call(
-            {"name": "send_space_message", "call_id": "call-1", "arguments": arguments}
-        )
-        message = strict_json_loads(str(output["output"]))
-        events.emit.assert_called_with(output)
-    assert message == {
+    assert [tool["name"] for tool in agent.space.tools()] == ["send_space_message"]
+    output = agent.space.call(
+        {"name": "send_space_message", "call_id": "call-1", "arguments": arguments}
+    )
+    events.emit.assert_called_with(output)
+    assert strict_json_loads(str(output["output"])) == {
         "id": 7,
         "space_id": "",
         "author": {"agent_id": 42},

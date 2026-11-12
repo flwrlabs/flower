@@ -163,7 +163,6 @@ class ProtobufClient:
         request: Message,
         response_type: type[ResponseT],
         timeout: float | None = None,
-        retry: bool = True,
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
@@ -191,7 +190,7 @@ class ProtobufClient:
 
         response = (
             self._retry_invoker.invoke(send)
-            if retry and self._retry_invoker is not None
+            if self._retry_invoker is not None
             else send()
         )
 

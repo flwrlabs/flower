@@ -161,21 +161,6 @@ class AgentSpace(ABC):
         """
 
     @abstractmethod
-    def send_message(self, content: str) -> JSONObject:
-        """Publish a message as the authenticated agent.
-
-        Parameters
-        ----------
-        content : str
-            Nonempty message text.
-
-        Returns
-        -------
-        JSONObject
-            Persisted message with its server-assigned ID and author.
-        """
-
-    @abstractmethod
     def tools(self) -> list[JSONObject]:
         """Return the model-facing send_space_message tool schema."""
 

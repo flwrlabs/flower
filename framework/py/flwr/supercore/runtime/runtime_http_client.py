@@ -260,8 +260,6 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetSpaceMessages",
             request=request,
             response_type=GetSpaceMessagesResponse,
-            # Retrying after a lost response could consume another unread page.
-            retry=False,
         )
 
     def SendSpaceMessage(
@@ -273,8 +271,6 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/SendSpaceMessage",
             request=request,
             response_type=SendSpaceMessageResponse,
-            # Retrying after a lost response could publish the message twice.
-            retry=False,
         )
 
     def GetCompactedContexts(

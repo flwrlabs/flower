@@ -73,11 +73,6 @@ class RuntimeAgentSpace(AgentSpace):
         )
         return [_message_to_json(message) for message in response.messages]
 
-    def send_message(self, content: str) -> JSONObject:
-        """Publish text using the authenticated agent's Space and identity."""
-        response = self._stub.SendSpaceMessage(SendSpaceMessageRequest(content=content))
-        return _message_to_json(response.message)
-
     def tools(self) -> list[JSONObject]:
         """Return the send_space_message tool schema."""
         return [
@@ -110,11 +105,13 @@ class RuntimeAgentSpace(AgentSpace):
                 "arguments": strict_json_dumps(arguments, compact=True),
             }
         )
-        message = self.send_message(content)
+        response = self._stub.SendSpaceMessage(SendSpaceMessageRequest(content=content))
         output: JSONObject = {
             "type": "function_call_output",
             "call_id": call_id,
-            "output": strict_json_dumps(message, compact=True),
+            "output": strict_json_dumps(
+                _message_to_json(response.message), compact=True
+            ),
         }
         self._events.emit(output)
         return output

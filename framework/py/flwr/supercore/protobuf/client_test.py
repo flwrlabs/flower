@@ -59,14 +59,13 @@ def _response(status_code: int, content: bytes = b"") -> httpx.Response:
     )
 
 
-def _call(client: ProtobufClient, *, retry: bool = True) -> AcquireTaskResponse:
+def _call(client: ProtobufClient) -> AcquireTaskResponse:
     """Call one representative unary protobuf operation."""
     return client._unary_unary(  # pylint: disable=protected-access
         path=_PATH,
         rpc_method=_METHOD,
         request=_REQUEST,
         response_type=AcquireTaskResponse,
-        retry=retry,
     )
 
 
@@ -173,9 +172,8 @@ def test_unary_unary_raises_for_http_error() -> None:
 
 
 @pytest.mark.parametrize("translate_errors", [False, True])
-@pytest.mark.parametrize("retry", [False, True])
-def test_unary_unary_uses_retry_invoker(translate_errors: bool, retry: bool) -> None:
-    """Retry transient failures unless the operation disables retries."""
+def test_unary_unary_uses_retry_invoker(translate_errors: bool) -> None:
+    """Retry a transient HTTP response before parsing the protobuf response."""
     retry_invoker = make_simple_http_retry_invoker()
     retry_invoker.max_tries = 2
     retry_invoker.jitter = None
@@ -185,18 +183,16 @@ def test_unary_unary_uses_retry_invoker(translate_errors: bool, retry: bool) -> 
         "flwr.supercore.protobuf.client.httpx.Client.send",
         side_effect=[_response(503), _response(200, _RESPONSE.SerializeToString())],
     ) as send:
-        client = ProtobufClient(
-            "http://api.example",
-            interceptors=[FlowerErrorHttpInterceptor()] if translate_errors else [],
-            retry_invoker=retry_invoker,
+        result = _call(
+            ProtobufClient(
+                "http://api.example",
+                interceptors=[FlowerErrorHttpInterceptor()] if translate_errors else [],
+                retry_invoker=retry_invoker,
+            )
         )
-        if retry:
-            assert _call(client) == _RESPONSE
-        else:
-            with pytest.raises(httpx.HTTPStatusError):
-                _call(client, retry=False)
 
-    assert send.call_count == (2 if retry else 1)
+    assert result == _RESPONSE
+    assert send.call_count == 2
 
 
 def test_retry_rebuilds_request_before_applying_interceptors() -> None:
