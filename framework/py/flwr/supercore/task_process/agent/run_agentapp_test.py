@@ -626,9 +626,15 @@ def test_worker_uses_separate_input_paths(
     if space_run:
         pull.assert_not_called()
         assert agent.prompt == ""
-        assert agent.connectors.tools(["web_search", "slack", "start_automation"]) == []
-        with pytest.raises(NotImplementedError):
-            agent.connectors.call({"name": "web_search"})
+        assert {
+            tool["name"]
+            for tool in agent.connectors.tools(
+                ["web_search", "web_fetch", "browser_use", "slack", "start_automation"]
+            )
+        } == {"web_search", "web_fetch", "browser_use"}
+        for name in ("start_automation", "slack_search"):
+            with pytest.raises(NotImplementedError):
+                agent.connectors.call({"name": name})
         with pytest.raises(NotImplementedError):
             agent.events.get_compacted_contexts()
         with pytest.raises(NotImplementedError):

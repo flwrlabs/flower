@@ -15,13 +15,23 @@
 """Space AgentApp session capabilities."""
 
 from collections.abc import Sequence
+from typing import cast
 
-from flwr.agentapp import AgentConnectors
+from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
+from flwr.supercore.task_process.connector.registry import (
+    get_connector_ref,
+    has_builtin_connector,
+)
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .grid import RuntimeAgentGrid
-from .session import RuntimeAgentEvents, RuntimeAgentSession
+from .session import (
+    AgentRuntime,
+    RuntimeAgentConnectors,
+    RuntimeAgentEvents,
+    RuntimeAgentSession,
+)
 
 
 class SpaceAgentEvents(RuntimeAgentEvents):
@@ -40,20 +50,27 @@ class SpaceAgentEvents(RuntimeAgentEvents):
         raise NotImplementedError("Space sessions do not support compacted contexts.")
 
 
-class _SpaceAgentConnectors(AgentConnectors):
-    """Disable connector and automation tools for Space sessions."""
+class _SpaceAgentConnectors(RuntimeAgentConnectors):
+    """Expose built-in connectors without federation-owned tools or automations."""
 
     def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
-        """Expose no connector or automation tool schemas."""
-        return []
+        """Return schemas for the requested built-in connectors."""
+        return super().tools(
+            [name for name in names if has_builtin_connector(name)], refresh=refresh
+        )
 
     def call(self, tool_call: JSONObject) -> JSONObject:
-        """Reject connector and automation calls before making Runtime requests."""
-        raise NotImplementedError("Space sessions do not support connector tools.")
+        """Execute built-ins and reject unsupported tools before Runtime requests."""
+        name = cast(str, tool_call["name"]).strip().lower()
+        if not has_builtin_connector(get_connector_ref(name)):
+            raise NotImplementedError(
+                "Space sessions only support built-in connectors."
+            )
+        return super().call(tool_call)
 
 
 def create_space_session(
-    grid: HttpGrid, events: SpaceAgentEvents, node_id: int
+    grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -63,17 +80,23 @@ def create_space_session(
         Task-authenticated Runtime connection.
     events : SpaceAgentEvents
         Task event publisher shared with the worker lifecycle.
-    node_id : int
-        Node identity for the session's Grid capabilities.
+    task_input : PullTaskInputResponse
+        Accepted Run, Task, and node identifiers.
 
     Returns
     -------
     RuntimeAgentSession
-        Session with connectors, automations, and compacted contexts disabled.
+        Session with built-in connectors and no automations or compacted contexts.
     """
+    runtime = AgentRuntime(
+        stub=grid._runtime_client,  # pylint: disable=protected-access
+        run_id=task_input.run.run_id,
+        task_id=task_input.task_id,
+        events=events,
+    )
     return RuntimeAgentSession(
         prompt="",
-        connectors=_SpaceAgentConnectors(),
+        connectors=_SpaceAgentConnectors(runtime),
         events=events,
-        grid=RuntimeAgentGrid(grid, events, node_id),
+        grid=RuntimeAgentGrid(grid, events, task_input.context.node_id),
     )

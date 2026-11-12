@@ -309,7 +309,7 @@ class AgentRuntime:
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
-        start_run_request: StartRunRequest,
+        start_run_request: StartRunRequest | None = None,
         events: AgentEvents,
     ) -> None:
         self._stub = stub
@@ -490,6 +490,8 @@ class AgentRuntime:
         self, *, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Create an automation and emit/persist its activity events."""
+        if self._start_run_request is None:
+            raise NotImplementedError("Automations are unavailable in this session.")
         function_call: JSONObject = {
             "type": "function_call",
             "call_id": call_id,

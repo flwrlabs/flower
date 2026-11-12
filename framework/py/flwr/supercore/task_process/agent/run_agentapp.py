@@ -300,9 +300,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 with trace_span("agentapp.session"):
                     if run.agent_id is not None:
                         self._agent_events = SpaceAgentEvents(grid._runtime_client)
-                        agent = create_space_session(
-                            grid, self._agent_events, self._context.node_id
-                        )
+                        agent = create_space_session(grid, self._agent_events, res)
                     else:
                         agent = self._create_legacy_session(res, run, fab)
 

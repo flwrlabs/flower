@@ -35,6 +35,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetCompactedContextsResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    PullTaskInputResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
@@ -57,6 +58,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
+from .space_session import create_space_session
 
 
 @pytest.fixture(autouse=True)
@@ -495,37 +497,46 @@ def test_create_connector_response_resolves_canonical_name() -> None:
     assert output == "done"
 
 
-def test_create_connector_response_uses_connector_task_for_filesystem() -> None:
-    """Filesystem calls should execute through a Connector task."""
+@pytest.mark.parametrize(
+    ("connector_ref", "tool_name"),
+    [
+        ("web_search", "web_search"),
+        ("web_fetch", "web_fetch"),
+        ("browser_use", "browser_use"),
+        ("filesystem", "filesystem_list_directory"),
+    ],
+)
+def test_space_builtin_connectors_use_child_tasks(
+    connector_ref: str, tool_name: str
+) -> None:
+    """Space built-ins use the existing connector Task and event path."""
     stub = Mock()
     stub.CreateTask.return_value = CreateTaskResponse(task_id=456)
-    agent_runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=Mock(),
-    )
+    grid = Mock(_runtime_client=stub)
+    task_input = PullTaskInputResponse(task_id=789)
+    task_input.run.run_id = 123
+    events = Mock()
+    agent = create_space_session(grid, events, task_input)
     reply = ConnectorResponse(
         dst_task_id=789,
-        name="filesystem_list_directory",
+        name=tool_name,
         call_id="call-1",
-        output={"entries": []},
+        output="done",
         error=None,
         reply_to_message_id="request-message-id",
     )
 
-    with patch.object(agent_runtime, "_send_and_receive", return_value=reply):
-        output = agent_runtime.create_connector_response(
-            name="filesystem_list_directory",
-            call_id="call-1",
-            arguments={"path": "/allowed"},
+    with patch.object(AgentRuntime, "_send_and_receive", return_value=reply):
+        output = agent.connectors.call(
+            {"name": tool_name, "call_id": "call-1", "arguments": {}}
         )
 
-    assert output == {"entries": []}
+    assert output["output"] == '"done"'
     stub.CreateTask.assert_called_once_with(
-        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref="filesystem")
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
     )
+    assert events.emit.call_count == 2
+    stub.StartAutomation.assert_not_called()
 
 
 def test_runtime_discovers_and_caches_tools() -> None:
