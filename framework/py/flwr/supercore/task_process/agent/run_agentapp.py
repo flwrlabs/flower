@@ -42,7 +42,11 @@ from flwr.common.config import (
     get_project_config,
     get_project_dir,
 )
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
+from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
+    SUPERLINK_NODE_ID,
+    SubStatus,
+)
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -103,6 +107,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
+from .space import RuntimeAgentSpace
 
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
@@ -297,7 +302,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             ):
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
-                    prompt, instruction_metadata = pull_prompt(grid)
+                    prompt = ""
+                    instruction_metadata: Metadata | None = None
+                    if run.space_id is None:
+                        prompt, instruction_metadata = pull_prompt(grid)
                     self._agent_events = RuntimeAgentEvents(grid._runtime_client)
                     agent_grid = RuntimeAgentGrid(
                         grid,
@@ -305,9 +313,10 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                         self._context.node_id,
                         instruction_metadata,
                     )
-                    self._agent_events.emit(
-                        {"type": "message", "role": "user", "content": prompt}
-                    )
+                    if instruction_metadata is not None:
+                        self._agent_events.emit(
+                            {"type": "message", "role": "user", "content": prompt}
+                        )
                     agent_runtime = AgentRuntime(
                         stub=grid._runtime_client,
                         run_id=self._context.run_id,
@@ -321,11 +330,21 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                         ),
                         events=self._agent_events,
                     )
+                    agent_space = None
+                    if (
+                        self._context.node_id == SUPERLINK_NODE_ID
+                        and run.space_id is not None
+                        and run.agent_id is not None
+                    ):
+                        agent_space = RuntimeAgentSpace(
+                            grid._runtime_client, self._agent_events
+                        )
                     agent = RuntimeAgentSession(
                         prompt=prompt,
                         connectors=RuntimeAgentConnectors(agent_runtime),
                         events=self._agent_events,
                         grid=agent_grid,
+                        space=agent_space,
                     )
 
                 app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)

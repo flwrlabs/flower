@@ -559,7 +559,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_agent_run_candidates(
         self, *, limit: int | None = None
     ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run."""
+        """Find agents with unread messages from others and no open Run."""
         if limit is not None and limit <= 0:
             return []
         self._cleanup_expired_task_tokens()
@@ -944,12 +944,16 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
 
 
 def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
-    """Select participating agents with unread messages and no open primary Task."""
+    """Select agents with unread messages from others and no open primary Task."""
     unread = (
         select(SpaceMessageModel.id)
         .where(
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
             SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
+            or_(
+                SpaceMessageModel.agent_id.is_(None),
+                SpaceMessageModel.agent_id != SpaceParticipantTable.c.agent_id,
+            ),
         )
         .exists()
     )
