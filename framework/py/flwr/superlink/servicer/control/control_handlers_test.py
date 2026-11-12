@@ -14,12 +14,14 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+# pylint: disable=too-many-lines
 
 import hashlib
 import unittest
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
+from uuid import UUID
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -30,6 +32,7 @@ from flwr.common.constant import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
+    AgentConfig,
     AppInfo,
     ListAppAssociationsRequest,
     ListAppsRequest,
@@ -47,6 +50,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
@@ -65,7 +69,9 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.extensions import RESULT_DELIVERY_CHANNEL_CHAT
 from flwr.superlink.federation import NoOpFederationManager
 
+from . import control_handlers
 from .control_handlers import (
+    _process_pending_agent_runs,
     add_app,
     list_app_associations,
     list_apps,
@@ -96,33 +102,104 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             account_name=NOOP_ACCOUNT_NAME,
         )
 
-    def _create_dummy_run(self) -> int:
+    def _create_dummy_run(self, federation_id: str = NOOP_FEDERATION_ID) -> int:
         """Create a run owned by the test account."""
         return self.state.create_run(
             "flwr/demo",
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION_ID,
+            federation_id,
             None,
             self.account.flwr_aid,
             TaskType.SERVER_APP,
         )
 
+    def test_process_pending_agent_runs(self) -> None:
+        """Resolve an AgentApp and create one Run for an unread agent message."""
+        agent = self.state.create_agent(
+            self.account.flwr_aid,
+            AgentConfig(name="Agent", app_spec="@publisher/app"),
+        )
+        assert agent is not None
+        space_id = UUID(self.state.get_spaces(self.account.flwr_aid)[0].id)
+        self.state.create_space_message(
+            space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+        )
+        config = {
+            "project": {"name": "app", "version": "1.0"},
+            "tool": {
+                "flwr": {
+                    "app": {
+                        "publisher": "publisher",
+                        "components": {"agentapp": "app:app"},
+                    }
+                }
+            },
+        }
+        with (
+            patch.object(
+                control_handlers, "_get_remote_fab", return_value=(b"fab", {}, None)
+            ) as resolve,
+            patch.object(control_handlers, "get_fab_config", return_value=config),
+        ):
+            _process_pending_agent_runs(self.state)
+            _process_pending_agent_runs(self.state)
+        resolve.assert_called_once_with(agent.config.app_spec)
+        runs = self.state.get_run_info()
+        assert len(runs) == 1 and runs[0].agent_id == agent.id
+
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply the default page size in the shared Control handler."""
         state = Mock(spec=LinkState)
+        state.federation_manager = NoOpFederationManager()
         state.get_run_info.return_value = []
 
         list_runs(ListRunsRequest(), self.account, state)
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.flwr_aid],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=20,
             skip=0,
         )
+
+    def test_list_runs_filters_membership_and_retains_owned_space_runs(self) -> None:
+        """Filter federation access before paging while retaining owned Space runs."""
+        federation_run_id = self._create_dummy_run()
+        space_id = UUID(self.state.create_space(participants=[]).id)
+        space_run_ids = [
+            self.state.create_run(
+                "flwr/demo",
+                "v0.0.1",
+                "hash123",
+                {},
+                None,
+                None,
+                flwr_aid,
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            for flwr_aid in [self.account.flwr_aid, "other-account"]
+        ]
+        owned_space_run_id = space_run_ids[0]
+        self._create_dummy_run("@owner/inaccessible")
+
+        # Scope selection and caller ownership apply before ordering and pagination.
+        response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id, owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1, skip=1), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id}
+        with patch.object(
+            self.state.federation_manager, "get_federations", return_value=[]
+        ):
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
 
     def _create_dummy_run_series(
         self, series_id: int, run_ids: list[int] | None = None

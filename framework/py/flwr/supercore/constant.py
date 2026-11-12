@@ -216,12 +216,21 @@ class InvitationStatus(StrEnum):
     EXPIRED = "expired"
 
 
+AGENT_RUN_BATCH_LIMIT = 10
 AUTOMATION_BATCH_LIMIT = 1
 
 FLOWER_AGENT_APP_ID = "@flwrlabs/flwr-agent"
 
 AGENT_MESSAGE_CONTENT_RECORD_KEY = "agent"
 AGENT_MESSAGE_TEXT_KEY = "text"
+
+
+class EventType(StrEnum):
+    """Application events delivered through user feeds."""
+
+    AGENT_CREATED = "agent.created"
+    SPACE_CREATED = "space.created"
+    MESSAGE_CREATED = "message.created"
 
 
 class AutomationStatus(StrEnum):
