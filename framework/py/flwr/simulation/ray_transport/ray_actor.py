@@ -210,24 +210,12 @@ def _log_node_locality_diagnostics(
 
     Split out of `pool_size_from_resources` purely to keep that function's branch
     count manageable; this covers only the no-GPU-detected diagnostic path.
+    Callers must only reach this once at least one Ray node is known to be
+    active -- the empty-cluster case (`active_node_count == 0`) is diagnosed
+    separately, before the GPU-specific split, since it also needs to fire for
+    CPU-only requests.
     """
-    if active_node_count == 0:
-        # Nothing registered any resources at all (empty `ray.nodes()`, or every
-        # entry detached with empty `Resources`). There is no active node whose GPU
-        # discovery could be at fault, so neither the multi-node nor the
-        # driver-local diagnostics below describe the problem -- probing this
-        # host's `/dev/kfd` here would hand out an AMD permissions/amdsmi remedy
-        # for what is actually a cluster that never came up.
-        log(
-            WARNING,
-            "No active Ray node reported resources: `ray.nodes()` returned "
-            "either no entries, or only detached ones with empty `Resources`. "
-            "This is not a per-node GPU discovery problem to fix on this host -- "
-            "check why the Ray cluster has no usable node (for example, it "
-            "failed to start or every node has disconnected) with "
-            '`python -c "import ray; ray.init(); print(ray.nodes())"`.',
-        )
-    elif active_node_count > 1:
+    if active_node_count > 1:
         # `_log_kfd_diagnostics` only inspects the driver host's own device
         # nodes. On a multi-node cluster, AMD GPU discovery already ran
         # independently on each node at `ray start` time, so a driver-only
@@ -268,11 +256,18 @@ def _log_node_locality_diagnostics(
             "access there instead.",
             active_node_id,
         )
-    elif active_node_id != (driver_node_id := ray.get_runtime_context().get_node_id()):
+    elif active_node_id is not None and active_node_id != (
+        driver_node_id := ray.get_runtime_context().get_node_id()
+    ):
         # A single reporting node that is not this driver's own node means
         # `init_args` connected this process to a remote single-node cluster
         # (for example via `address="<ip>:<port>"`). Probing this host's
-        # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine.
+        # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine. When
+        # the node dict has no `NodeID` at all (active_node_id is None), there is
+        # nothing to compare against the driver's own ID -- querying the runtime
+        # context here would either hit an unconnected global Ray worker or
+        # compare against a value that can never match, misclassifying a local
+        # node as remote. Fall through to the local KFD probe instead.
         log(
             WARNING,
             "The only node reporting resources (NodeID=%s) is not this "
@@ -361,7 +356,23 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
 
     if total_num_actors == 0:
         requested_gpus = client_resources.get("num_gpus", 0)
-        if requested_gpus > 0 and not cluster_num_gpus:
+        if active_node_count == 0:
+            # Nothing registered any resources at all (empty `ray.nodes()`, or
+            # every entry detached with empty `Resources`). This is unrelated to
+            # GPU discovery and must be surfaced regardless of whether a GPU was
+            # requested -- a CPU-only client with `num_gpus=0` hits this branch
+            # just as easily as a GPU request would.
+            log(
+                WARNING,
+                "No active Ray node reported resources: `ray.nodes()` returned "
+                "either no entries, or only detached ones with empty "
+                "`Resources`. This is not a per-node GPU discovery problem to "
+                "fix on this host -- check why the Ray cluster has no usable "
+                "node (for example, it failed to start or every node has "
+                "disconnected) with "
+                '`python -c "import ray; ray.init(); print(ray.nodes())"`.',
+            )
+        elif requested_gpus > 0 and not cluster_num_gpus:
             # No node in the cluster reported a GPU while each client asks for a
             # fraction of one. Only `num_gpus=0` is satisfiable here, so the generic
             # "lower your resources" advice does not describe the fix. Zero advertised
