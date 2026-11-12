@@ -594,11 +594,12 @@ def test_worker_uses_separate_input_paths(
     for name in (
         "HeartbeatSender",
         "start_log_uploader",
-        "RuntimeAgentEvents",
         "event",
         "_set_runtime_environment",
     ):
         monkeypatch.setattr(run_agentapp_module, name, Mock())
+    if not space_run:
+        monkeypatch.setattr(run_agentapp_module, "RuntimeAgentEvents", Mock())
     pull = Mock(return_value=("hello world!", _payload_message(789).metadata))
     if space_run:
         pull.side_effect = AssertionError("Bound Space Runs have no Grid prompt")
@@ -638,15 +639,14 @@ def test_worker_uses_separate_input_paths(
         for name in ("start_automation", "slack_search"):
             with pytest.raises(NotImplementedError):
                 agent.connectors.call({"name": name})
-        with pytest.raises(NotImplementedError):
-            agent.events.get_compacted_contexts()
-        with pytest.raises(NotImplementedError):
-            agent.events.put_compacted_context(
-                through_event_id=1, text="Summary", token_count=1
-            )
+        grid._runtime_client.GetCompactedContexts.return_value.contexts = []
+        assert agent.events.get_compacted_contexts() == []
+        agent.events.put_compacted_context(
+            through_event_id=1, text="Summary", token_count=1
+        )
         grid._runtime_client.CreateTask.assert_not_called()
-        grid._runtime_client.GetCompactedContexts.assert_not_called()
-        grid._runtime_client.PutCompactedContext.assert_not_called()
+        grid._runtime_client.GetCompactedContexts.assert_called_once()
+        grid._runtime_client.PutCompactedContext.assert_called_once()
         grid._runtime_client.PushTaskEvents.assert_not_called()
         grid._runtime_client.GetNodes.assert_not_called()
         grid._runtime_client.PushMessages.assert_not_called()

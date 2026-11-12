@@ -34,22 +34,6 @@ from .session import (
 )
 
 
-class SpaceAgentEvents(RuntimeAgentEvents):
-    """Publish events and read traces without exposing RunSeries compaction."""
-
-    def get_compacted_contexts(
-        self, *, limit: int = 1, before_context_id: int | None = None
-    ) -> list[JSONObject]:
-        """Reject compacted-context reads for Space sessions."""
-        raise NotImplementedError("Space sessions do not support compacted contexts.")
-
-    def put_compacted_context(
-        self, *, through_event_id: int, text: str, token_count: int
-    ) -> None:
-        """Reject compacted-context writes for Space sessions."""
-        raise NotImplementedError("Space sessions do not support compacted contexts.")
-
-
 class _SpaceAgentConnectors(RuntimeAgentConnectors):
     """Expose built-in connectors without federation-owned tools or automations."""
 
@@ -84,7 +68,7 @@ class _SpaceAgentGrid(AgentGrid):
 
 
 def create_space_session(
-    grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
+    grid: HttpGrid, events: RuntimeAgentEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -92,7 +76,7 @@ def create_space_session(
     ----------
     grid : HttpGrid
         Task-authenticated Runtime connection.
-    events : SpaceAgentEvents
+    events : RuntimeAgentEvents
         Task event publisher shared with the worker lifecycle.
     task_input : PullTaskInputResponse
         Accepted Run and Task identifiers.
