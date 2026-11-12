@@ -533,6 +533,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     )
                     if any(
                         message.id > cursor
+                        and message.author.agent_id != member.agent_id
                         for message in self.space_message_store[space_id]
                     ):
                         candidates.append((space_id, agents[member.agent_id]))

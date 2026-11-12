@@ -103,6 +103,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
+from .space_session import SpaceAgentEvents, create_space_session
 
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
@@ -297,36 +298,11 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             ):
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
-                    prompt, instruction_metadata = pull_prompt(grid)
-                    self._agent_events = RuntimeAgentEvents(grid._runtime_client)
-                    agent_grid = RuntimeAgentGrid(
-                        grid,
-                        self._agent_events,
-                        self._context.node_id,
-                        instruction_metadata,
-                    )
-                    self._agent_events.emit(
-                        {"type": "message", "role": "user", "content": prompt}
-                    )
-                    agent_runtime = AgentRuntime(
-                        stub=grid._runtime_client,
-                        run_id=self._context.run_id,
-                        task_id=task_id,
-                        start_run_request=StartRunRequest(
-                            fab=fab_to_proto(fab),
-                            override_config=user_config_to_proto(run.override_config),
-                            override_federation_config=res.federation_config,
-                            federation=run.federation_id,
-                            series_id=run.series_id,
-                        ),
-                        events=self._agent_events,
-                    )
-                    agent = RuntimeAgentSession(
-                        prompt=prompt,
-                        connectors=RuntimeAgentConnectors(agent_runtime),
-                        events=self._agent_events,
-                        grid=agent_grid,
-                    )
+                    if run.agent_id is not None:
+                        self._agent_events = SpaceAgentEvents(grid._runtime_client)
+                        agent = create_space_session(grid, self._agent_events, res)
+                    else:
+                        agent = self._create_legacy_session(res, run, fab)
 
                 app_path, agent_app, agent_app_attr = self._prepare_task_app(fab, run)
                 self._context.run_config = get_fused_config_from_dir(
@@ -355,6 +331,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 "task.events_drain",
                 attributes=self._trace_attributes,
             ):
+                assert self._agent_events is not None
                 self._agent_events.close()
 
             # Set sub_status and details for successful completion
@@ -381,6 +358,41 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 exit_code = ExitCode.COMMON_RUNTIME_DEPENDENCY_INSTALLATION_ERROR
 
         return exit_code
+
+    def _create_legacy_session(
+        self, res: PullTaskInputResponse, run: Run, fab: Fab
+    ) -> RuntimeAgentSession:
+        """Initialize the existing Grid prompt and reply session."""
+        assert self._context is not None
+        grid = self._grid
+        prompt, instruction_metadata = pull_prompt(grid)
+        self._agent_events = RuntimeAgentEvents(grid._runtime_client)
+        agent_grid = RuntimeAgentGrid(
+            grid,
+            self._agent_events,
+            self._context.node_id,
+            instruction_metadata,
+        )
+        self._agent_events.emit({"type": "message", "role": "user", "content": prompt})
+        agent_runtime = AgentRuntime(
+            stub=grid._runtime_client,
+            run_id=self._context.run_id,
+            task_id=res.task_id,
+            start_run_request=StartRunRequest(
+                fab=fab_to_proto(fab),
+                override_config=user_config_to_proto(run.override_config),
+                override_federation_config=res.federation_config,
+                federation=run.federation_id,
+                series_id=run.series_id,
+            ),
+            events=self._agent_events,
+        )
+        return RuntimeAgentSession(
+            prompt=prompt,
+            connectors=RuntimeAgentConnectors(agent_runtime),
+            events=self._agent_events,
+            grid=agent_grid,
+        )
 
     def _prepare_task_app(
         self, fab: Fab, run: Run

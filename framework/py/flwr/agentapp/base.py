@@ -123,6 +123,52 @@ class AgentGrid(ABC):
         """Execute one Grid function_call and return a function_call_output item."""
 
 
+class AgentSpace(ABC):
+    """Read and publish messages in the authenticated agent's Space."""
+
+    @abstractmethod
+    def get_messages(
+        self,
+        *,
+        limit: int = 100,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> list[JSONObject]:
+        """Read messages and advance this agent's read cursor.
+
+        Parameters
+        ----------
+        limit : int (default: 100)
+            Maximum number of messages to return, between 1 and 100.
+        before_id : int | None (default: None)
+            Exclusive upper message ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after this agent's read cursor.
+
+        Returns
+        -------
+        list[JSONObject]
+            Messages in ascending ID order, with id, space_id, author, created_at,
+            and content. Author contains either flwr_aid or agent_id.
+
+        Notes
+        -----
+        Reads select the newest page by default. Every read advances the cursor
+        through the newest returned message, including history reads.
+        """
+
+    @abstractmethod
+    def tools(self) -> list[JSONObject]:
+        """Return the model-facing send_space_message tool schema."""
+
+    @abstractmethod
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Publish a message and return a function_call_output item."""
+
+
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
 
@@ -145,6 +191,11 @@ class AgentSession(ABC):
     @abstractmethod
     def grid(self) -> AgentGrid:
         """Model-facing federation Grid API."""
+
+    @property
+    def space(self) -> AgentSpace | None:
+        """Space messaging API, or None when unavailable for this session."""
+        return None
 
 
 AgentAppCallable = Callable[[AgentSession, Context], None]

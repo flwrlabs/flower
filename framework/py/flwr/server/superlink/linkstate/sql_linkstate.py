@@ -950,6 +950,10 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
         .where(
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
             SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
+            or_(
+                SpaceMessageModel.agent_id.is_(None),
+                SpaceMessageModel.agent_id != SpaceParticipantTable.c.agent_id,
+            ),
         )
         .exists()
     )
