@@ -12,19 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Space AgentApp session setup, independent of Grid prompt delivery."""
+"""Space AgentApp session capabilities."""
 
-from flwr.agentapp import AgentEvents
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
-from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
+from collections.abc import Sequence
+
+from flwr.agentapp import AgentConnectors
+from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
 from .grid import RuntimeAgentGrid
-from .session import AgentRuntime, RuntimeAgentConnectors, RuntimeAgentSession
+from .session import RuntimeAgentEvents, RuntimeAgentSession
+
+
+class SpaceAgentEvents(RuntimeAgentEvents):
+    """Publish events and read traces without exposing RunSeries compaction."""
+
+    def get_compacted_contexts(
+        self, *, limit: int = 1, before_context_id: int | None = None
+    ) -> list[JSONObject]:
+        """Reject compacted-context reads for Space sessions."""
+        raise NotImplementedError("Space sessions do not support compacted contexts.")
+
+    def put_compacted_context(
+        self, *, through_event_id: int, text: str, token_count: int
+    ) -> None:
+        """Reject compacted-context writes for Space sessions."""
+        raise NotImplementedError("Space sessions do not support compacted contexts.")
+
+
+class _SpaceAgentConnectors(AgentConnectors):
+    """Disable connector and automation tools for Space sessions."""
+
+    def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
+        """Expose no connector or automation tool schemas."""
+        return []
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Reject connector and automation calls before making Runtime requests."""
+        raise NotImplementedError("Space sessions do not support connector tools.")
 
 
 def create_space_session(
-    grid: HttpGrid, events: AgentEvents, task_input: PullTaskInputResponse
+    grid: HttpGrid, events: SpaceAgentEvents, node_id: int
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -32,29 +61,19 @@ def create_space_session(
     ----------
     grid : HttpGrid
         Task-authenticated Runtime connection.
-    events : AgentEvents
+    events : SpaceAgentEvents
         Task event publisher shared with the worker lifecycle.
-    task_input : PullTaskInputResponse
-        Accepted Run, FAB, and task identifiers.
+    node_id : int
+        Node identity for the session's Grid capabilities.
 
     Returns
     -------
     RuntimeAgentSession
-        Session without an initial prompt or Grid instruction to reply to.
+        Session with connectors, automations, and compacted contexts disabled.
     """
-    runtime = AgentRuntime(
-        stub=grid._runtime_client,  # pylint: disable=protected-access
-        run_id=task_input.run.run_id,
-        task_id=task_input.task_id,
-        start_run_request=StartRunRequest(
-            fab=task_input.fab,
-            override_config=task_input.run.override_config,
-        ),
-        events=events,
-    )
     return RuntimeAgentSession(
         prompt="",
-        connectors=RuntimeAgentConnectors(runtime),
+        connectors=_SpaceAgentConnectors(),
         events=events,
-        grid=RuntimeAgentGrid(grid, events, task_input.context.node_id),
+        grid=RuntimeAgentGrid(grid, events, node_id),
     )

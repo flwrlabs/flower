@@ -623,13 +623,25 @@ def test_worker_uses_separate_input_paths(
     assert lifecycle.run() == ExitCode.SUCCESS
     app.assert_called_once()
     agent = app.call_args.kwargs["agent"]
-    publisher = run_agentapp_module.RuntimeAgentEvents.return_value
-    assert agent.events is publisher
     if space_run:
         pull.assert_not_called()
         assert agent.prompt == ""
-        publisher.emit.assert_not_called()
+        assert agent.connectors.tools(["web_search", "slack", "start_automation"]) == []
+        with pytest.raises(NotImplementedError):
+            agent.connectors.call({"name": "web_search"})
+        with pytest.raises(NotImplementedError):
+            agent.events.get_compacted_contexts()
+        with pytest.raises(NotImplementedError):
+            agent.events.put_compacted_context(
+                through_event_id=1, text="Summary", token_count=1
+            )
+        grid._runtime_client.CreateTask.assert_not_called()
+        grid._runtime_client.GetCompactedContexts.assert_not_called()
+        grid._runtime_client.PutCompactedContext.assert_not_called()
+        grid._runtime_client.PushTaskEvents.assert_not_called()
     else:
+        publisher = run_agentapp_module.RuntimeAgentEvents.return_value
+        assert agent.events is publisher
         pull.assert_called_once_with(grid)
         assert agent.prompt == "hello world!"
         publisher.emit.assert_called_once_with(
