@@ -337,7 +337,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def get_agent_run_candidates(
         self, *, limit: int | None = None
     ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run.
+        """Find agents with unread messages from others and no open Run.
 
         Parameters
         ----------

@@ -568,6 +568,37 @@ class StateTest(CoreStateTest):
             )
         assert state.get_run_info() == [] and state.get_tasks() == []
 
+    def test_agent_run_candidates_ignore_self_authored_messages(self) -> None:
+        """Own messages wake other agents without consuming unread input."""
+        state = self.state_factory()
+        sender = state.create_agent(
+            "alice", AgentConfig(name="Sender", app_spec="@publisher/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@publisher/app")
+        )
+        assert sender is not None and other is not None
+        author = SpaceParticipant(agent_id=sender.id)
+        user = SpaceParticipant(flwr_aid="alice")
+        space_id = UUID(
+            state.create_space(
+                participants=[user, author, SpaceParticipant(agent_id=other.id)]
+            ).id
+        )
+        state.create_space_message(space_id, author, "Own response")
+        assert state.get_agent_run_candidates() == [(space_id, other)]
+        state.get_space_messages(space_id, author)
+
+        incoming = state.create_space_message(space_id, user, "New input")
+        reply = state.create_space_message(space_id, author, "Own followup")
+
+        assert (space_id, sender) in state.get_agent_run_candidates()
+        assert state.get_space_messages(space_id, author, unread_only=True) == [
+            incoming,
+            reply,
+        ]
+        assert state.get_agent_run_candidates() == [(space_id, other)]
+
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (TaskType.AGENT_APP, "Hello AgentApp", 1),
@@ -2431,7 +2462,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             fab_hash = state.store_fab(Fab("", b"fab", {}))
             assert not state.get_agent_run_candidates()
             state.create_space_message(
-                space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+                space_id, SpaceParticipant(flwr_aid="alice"), "User message"
             )
             assert state.get_agent_run_candidates() == [(space_id, agent)]
             state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))

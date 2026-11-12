@@ -116,7 +116,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_process_pending_agent_runs(self) -> None:
-        """Resolve an AgentApp and create one Run for an unread agent message."""
+        """Resolve an AgentApp and create one Run for an unread Space message."""
         agent = self.state.create_agent(
             self.account.flwr_aid,
             AgentConfig(name="Agent", app_spec="@publisher/app"),
@@ -124,7 +124,9 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         assert agent is not None
         space_id = UUID(self.state.get_spaces(self.account.flwr_aid)[0].id)
         self.state.create_space_message(
-            space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+            space_id,
+            SpaceParticipant(flwr_aid=self.account.flwr_aid),
+            "User message",
         )
         config = {
             "project": {"name": "app", "version": "1.0"},
