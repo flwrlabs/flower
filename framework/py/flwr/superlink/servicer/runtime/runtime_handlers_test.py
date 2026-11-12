@@ -36,7 +36,6 @@ from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
-    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -73,7 +72,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
 )
-from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -266,7 +264,7 @@ def test_ack_rejects_run_id_mismatch() -> None:
 def test_get_run_series_events_uses_authenticated_task_series() -> None:
     """GetRunSeriesEvents should derive the series from task authentication."""
     state = Mock(spec=LinkState)
-    current_run = Mock(run_id=123, series_id=456, primary_task_id=789, space_id=None)
+    current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
     series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
     state.get_run_info.side_effect = [[current_run], series_runs]
     state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
@@ -670,54 +668,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             assert self.state.activate_task(task_id)
         if num_transitions > 2:
             assert self.state.finish_task(task_id, "", "")
-
-    def test_acquire_task_starts_space_agent(self) -> None:
-        """Acquire a Space Run and initialize it without a RunSeries or Grid prompt."""
-        agent = self.state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
-        )
-        assert agent is not None
-        space_id = UUID(self.state.get_spaces("alice")[0].id)
-        self.state.create_space_message(
-            space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
-        )
-        config = {
-            "project": {"name": "app", "version": "1.0"},
-            "tool": {
-                "flwr": {
-                    "app": {
-                        "publisher": "publisher",
-                        "components": {"agentapp": "app:app"},
-                    }
-                }
-            },
-        }
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_handlers._get_remote_fab",
-                return_value=(b"fab", {}, None),
-            ),
-            patch(
-                "flwr.superlink.servicer.control.control_handlers.get_fab_config",
-                return_value=config,
-            ),
-        ):
-            acquired = runtime_handlers.acquire_task(
-                AcquireTaskRequest(
-                    agentapp_fab_hashes=[hashlib.sha256(b"fab").hexdigest()]
-                ),
-                self.state,
-            )
-        assert acquired.token
-        response = runtime_handlers.pull_task_input(
-            PullTaskInputRequest(), self.state, acquired.task
-        )
-        assert response.run.agent_id == agent.id
-        assert response.run.space_id == str(space_id)
-        assert not response.run.series_id
-        assert not self.state.get_messages(
-            dst_node_id=SUPERLINK_NODE_ID, run_id=acquired.task.run_id
-        )
 
     def test_acquire_task_processes_due_automations(self) -> None:
         """A SuperExec poll should create and claim a due automation's task."""
