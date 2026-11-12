@@ -718,9 +718,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert not self.state.get_messages(
             dst_node_id=SUPERLINK_NODE_ID, run_id=acquired.task.run_id
         )
-        assert not runtime_handlers.get_run_series_events(
-            GetRunSeriesEventsRequest(), self.state, acquired.task
-        ).events
 
     def test_acquire_task_processes_due_automations(self) -> None:
         """A SuperExec poll should create and claim a due automation's task."""

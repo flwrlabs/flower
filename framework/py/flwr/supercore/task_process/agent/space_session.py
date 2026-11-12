@@ -35,6 +35,21 @@ from .session import (
 from .space import RuntimeAgentSpace
 
 
+class SpaceAgentEvents(RuntimeAgentEvents):
+    """Disable trace reads while retaining event publication and compaction."""
+
+    def get_trace(
+        self,
+        *,
+        event_types: Sequence[str] | None = None,
+        after_event_id: int | None = None,
+        before_event_id: int | None = None,
+        last_n: int | None = None,
+    ) -> list[JSONObject]:
+        """Reject trace reads before making Runtime requests."""
+        raise NotImplementedError("Space sessions do not support trace reads.")
+
+
 class _SpaceAgentConnectors(RuntimeAgentConnectors):
     """Expose built-in connectors without federation-owned tools or automations."""
 
@@ -69,7 +84,7 @@ class _SpaceAgentGrid(AgentGrid):
 
 
 def create_space_session(
-    grid: HttpGrid, events: RuntimeAgentEvents, task_input: PullTaskInputResponse
+    grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -77,7 +92,7 @@ def create_space_session(
     ----------
     grid : HttpGrid
         Task-authenticated Runtime connection.
-    events : RuntimeAgentEvents
+    events : SpaceAgentEvents
         Task event publisher shared with the worker lifecycle.
     task_input : PullTaskInputResponse
         Accepted Run and Task identifiers.

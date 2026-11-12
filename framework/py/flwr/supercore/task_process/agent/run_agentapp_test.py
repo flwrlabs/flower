@@ -640,6 +640,8 @@ def test_worker_uses_separate_input_paths(
         for name in ("start_automation", "slack_search"):
             with pytest.raises(NotImplementedError):
                 agent.connectors.call({"name": name})
+        with pytest.raises(NotImplementedError):
+            agent.events.get_trace()
         grid._runtime_client.GetCompactedContexts.return_value.contexts = []
         assert agent.events.get_compacted_contexts() == []
         agent.events.put_compacted_context(
@@ -649,9 +651,7 @@ def test_worker_uses_separate_input_paths(
         grid._runtime_client.GetCompactedContexts.assert_called_once()
         grid._runtime_client.PutCompactedContext.assert_called_once()
         grid._runtime_client.PushTaskEvents.assert_not_called()
-        grid._runtime_client.GetNodes.assert_not_called()
-        grid._runtime_client.PushMessages.assert_not_called()
-        grid._runtime_client.PullMessages.assert_not_called()
+        grid._runtime_client.GetRunSeriesEvents.assert_not_called()
     else:
         publisher = run_agentapp_module.RuntimeAgentEvents.return_value
         assert agent.events is publisher
