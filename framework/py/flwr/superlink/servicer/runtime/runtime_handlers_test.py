@@ -365,31 +365,64 @@ def test_get_space_events_rejects_unknown_run() -> None:
     state.get_task_events.assert_not_called()
 
 
-def test_get_compacted_contexts_uses_authenticated_series() -> None:
-    """Summary requests use the authenticated task's series."""
+def test_get_compacted_contexts_uses_authenticated_agent() -> None:
+    """Summary requests use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [Mock(series_id=456)]
+    state.get_run_info.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     state.get_compacted_contexts.return_value = []
-    task = Task(run_id=123)
+    task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
     runtime_handlers.get_compacted_contexts(GetCompactedContextsRequest(), state, task)
 
     state.get_compacted_contexts.assert_called_once_with(
-        456, limit=1, before_context_id=None
+        789, limit=1, before_context_id=None
     )
 
 
-def test_put_compacted_context_uses_authenticated_series() -> None:
-    """Summary writes use the authenticated task's series."""
+def test_put_compacted_context_uses_authenticated_agent() -> None:
+    """Summary writes use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [Mock(series_id=456)]
+    state.get_run_info.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     request = PutCompactedContextRequest(
         context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
     )
 
-    runtime_handlers.put_compacted_context(request, state, Task(run_id=123))
+    runtime_handlers.put_compacted_context(
+        request, state, Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
+    )
 
-    state.store_compacted_context.assert_called_once_with(456, 9, "Summary", 123)
+    state.store_compacted_context.assert_called_once_with(789, 9, "Summary", 123)
+
+
+@pytest.mark.parametrize("operation", ["get", "put"])
+@pytest.mark.parametrize("agent_id,task_id", [(None, 1), (789, 2)])
+def test_compacted_contexts_require_primary_agent(
+    operation: str, agent_id: int | None, task_id: int
+) -> None:
+    """Only the bound primary AgentApp task can access compacted contexts."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [
+        Mock(agent_id=agent_id, space_id=UUID(int=1), primary_task_id=1)
+    ]
+    task = Task(task_id=task_id, run_id=123, type=TaskType.AGENT_APP)
+
+    with pytest.raises(FlowerError) as error:
+        if operation == "get":
+            runtime_handlers.get_compacted_contexts(
+                GetCompactedContextsRequest(), state, task
+            )
+        else:
+            runtime_handlers.put_compacted_context(
+                PutCompactedContextRequest(), state, task
+            )
+
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_compacted_contexts.assert_not_called()
+    state.store_compacted_context.assert_not_called()
 
 
 def _create_shared_runtime(
