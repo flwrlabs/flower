@@ -317,23 +317,24 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                 # nodes. On a multi-node cluster, AMD GPU discovery already ran
                 # independently on each node at `ray start` time, so a driver-only
                 # check cannot say which node is missing access -- naming the driver's
-                # state here would misleadingly implicate it instead. Nothing else so
-                # far establishes that AMD hardware is even involved, though: only emit
-                # the AMD-specific remedy when this host's own ROCm driver node is
-                # present, which is the same signal `_log_kfd_diagnostics` uses to
-                # decide a host is AMD-capable. A cluster of CPU-only or NVIDIA nodes
-                # should not be pointed at `/dev/kfd`.
-                if os.path.exists("/dev/kfd"):
-                    log(
-                        WARNING,
-                        "This is a multi-node Ray cluster (%s nodes reporting "
-                        "resources). AMD GPU discovery runs independently on each "
-                        "node when `ray start` executes there, so checking only "
-                        "this driver host cannot identify which node is missing "
-                        "device access. Check `/dev/kfd` and `/dev/dri/renderD*` "
-                        "access on each node individually, not just here.",
-                        active_node_count,
-                    )
+                # state here would misleadingly implicate it instead. This must still
+                # fire unconditionally (a CPU-only driver can front a pool of AMD GPU
+                # workers, so gating on this host's own `/dev/kfd` would suppress the
+                # one warning that tells the user where to look), but the driver's
+                # `/dev/kfd` state also cannot establish that any worker is AMD, so the
+                # device-node specifics are phrased as conditional within the message
+                # rather than asserted.
+                log(
+                    WARNING,
+                    "This is a multi-node Ray cluster (%s nodes reporting "
+                    "resources). GPU discovery runs independently on each node "
+                    "when `ray start` executes there, so checking only this "
+                    "driver host cannot identify which node is missing device "
+                    "access. If AMD GPUs are in use, check `/dev/kfd` and "
+                    "`/dev/dri/renderD*` access on each node individually, not "
+                    "just here.",
+                    active_node_count,
+                )
             elif active_node_id is not None and active_node_id != (
                 driver_node_id := ray.get_runtime_context().get_node_id()
             ):
