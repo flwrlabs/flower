@@ -797,22 +797,30 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated.run_config, updated_context.run_config)
 
     def test_store_compacted_context(self) -> None:
-        """Store summaries at distinct event boundaries in a series."""
+        """Store summaries at distinct event boundaries for an agent."""
         state = self.state_factory()
-        other_series_id = 2**63 + 43
-        state.store_compacted_context(42, 2**63, "First", token_count=123)
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
+        state.store_compacted_context(agent.id, 2**63, "First", token_count=123)
         with self.assertRaises(ValueError):
-            state.store_compacted_context(42, 2**63, "Duplicate", token_count=123)
-        state.store_compacted_context(42, 2**63 + 100, "Second", token_count=2**63)
-        state.store_compacted_context(other_series_id, 2**63, "Other", token_count=789)
+            state.store_compacted_context(agent.id, 2**63, "Duplicate", token_count=123)
+        state.store_compacted_context(
+            agent.id, 2**63 + 100, "Second", token_count=2**63
+        )
+        state.store_compacted_context(other.id, 2**63, "Other", token_count=789)
 
-        second, first = state.get_compacted_contexts(42, limit=2)
-        (other,) = state.get_compacted_contexts(other_series_id)
+        second, first = state.get_compacted_contexts(agent.id, limit=2)
+        (other_context,) = state.get_compacted_contexts(other.id)
 
         self.assertGreater(first.id, 0)
         self.assertLess(first.id, second.id)
         self.assertTrue(first.created_at)
-        self.assertEqual(first.series_id, 42)
+        self.assertEqual(first.agent_id, agent.id)
         self.assertEqual(first.through_event_id, 2**63)
         self.assertEqual(first.text, "First")
         self.assertEqual(first.token_count, 123)
@@ -821,10 +829,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(second.token_count, 2**63)
         self.assertNotEqual(second.id, first.id)
         self.assertEqual(
-            state.get_compacted_contexts(42, before_context_id=second.id), [first]
+            state.get_compacted_contexts(agent.id, before_context_id=second.id), [first]
         )
-        self.assertEqual(other.series_id, other_series_id)
-        self.assertEqual(other.text, "Other")
+        self.assertEqual(other_context.agent_id, other.id)
+        self.assertEqual(other_context.text, "Other")
 
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""

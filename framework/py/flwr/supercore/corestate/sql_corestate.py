@@ -1586,13 +1586,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return context_from_bytes(row.context)
 
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         query = select(CompactedContextModel).where(
-            CompactedContextModel.series_id == series_id
+            CompactedContextModel.agent_id == agent_id
         )
         # Autoincremented context IDs cannot exceed the signed BIGINT range.
         if before_context_id is not None:
@@ -1605,7 +1605,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
@@ -1614,7 +1614,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             self.dialect_insert(CompactedContextModel)
             .values(
-                series_id=series_id,
+                agent_id=agent_id,
                 through_event_id=through_event_id,
                 text=text,
                 token_count=token_count,
@@ -1622,7 +1622,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             .on_conflict_do_nothing(
                 index_elements=[
-                    CompactedContextModel.series_id,
+                    CompactedContextModel.agent_id,
                     CompactedContextModel.through_event_id,
                 ]
             )
@@ -2755,7 +2755,7 @@ def _compacted_context_from_model(model: CompactedContextModel) -> CompactedCont
     """Convert a compacted context model to its proto representation."""
     return CompactedContext(
         id=model.id,
-        series_id=model.series_id,
+        agent_id=model.agent_id,
         through_event_id=model.through_event_id,
         text=model.text,
         token_count=model.token_count,
