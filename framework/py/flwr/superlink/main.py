@@ -34,6 +34,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.dependencies.runtime import RuntimeHandlers
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.http_logging import configure_uvicorn_logging
+from flwr.supercore.protobuf.docs import add_protobuf_docs
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
 from flwr.supercore.routers import health
 from flwr.supercore.routers.runtime import create_runtime_router, responses_router
@@ -186,12 +187,13 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app = FastAPI(
         title="SuperLink API",
         version=package_version,
-        docs_url="/docs",
+        docs_url=None,
         redoc_url=None,
         lifespan=lifespan,
         generate_unique_id_function=generate_unique_route_id,
         middleware=_get_middleware(),
     )
+    add_protobuf_docs(fastapi_app)
     fastapi_app.state.superlink_lifespan = superlink_lifespan
     fastapi_app.state.linkstate_factory = linkstate_factory
     fastapi_app.state.enable_supernode_auth = (

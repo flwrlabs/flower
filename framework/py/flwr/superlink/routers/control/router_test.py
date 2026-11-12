@@ -26,7 +26,7 @@ import pytest
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import Parse, ParseDict
 from google.protobuf.message import Message
 
 from flwr.common.constant import (
@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     CreateAgentRequest,
     CreateAgentResponse,
+    CreateFederationRequest,
+    CreateFederationResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     Event,
@@ -337,6 +339,36 @@ def test_all_control_routes_have_protobuf_request_types() -> None:
         if route_key[1].startswith("/v1/control/")
     }
     assert route_keys == control_request_types
+
+
+def test_create_federation_documents_protobuf_messages() -> None:
+    """Expose readable, serializable examples without advertising JSON support."""
+    paths = _create_app().openapi()["paths"]
+    operation = paths["/v1/control/create-federation"]["post"]
+    request_description = operation["requestBody"]["description"]
+    response_description = operation["responses"]["200"]["description"]
+
+    assert "flwr.proto.CreateFederationRequest" in request_description
+    assert "**`handle`** (string, field 4, explicit presence)" in request_description
+    assert "Omission selects the authenticated caller's handle" in request_description
+    assert "flwr.proto.CreateFederationResponse" in response_description
+    assert "flwr.proto.Federation" in response_description
+    assert "federation.proto" in response_description
+    assert "SerializeToString()" in operation["description"]
+
+    for description, message_type in (
+        (request_description, CreateFederationRequest),
+        (response_description, CreateFederationResponse),
+    ):
+        example_json = description.split("```json\n")[1].split("```", 1)[0]
+        example = Parse(example_json, message_type())
+        assert message_type.FromString(example.SerializeToString()) == example
+        assert "not the HTTP wire format" in description
+
+    # Other endpoints keep their existing metadata until explicitly documented.
+    other = paths["/v1/control/archive-federation"]["post"]
+    assert "description" not in other["requestBody"]
+    assert other["responses"]["200"]["description"] == "Successful Response"
 
 
 def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:

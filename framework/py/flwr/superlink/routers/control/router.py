@@ -111,6 +111,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
+from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
@@ -124,6 +125,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.dependencies.version import VersionDependency
+from flwr.supercore.protobuf.openapi import protobuf_message_description
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -572,13 +574,80 @@ def set_federation_icon(
     return control_handlers.set_federation_icon(request, account, linkstate)
 
 
-@router.post("/create-federation")
+@router.post(
+    "/create-federation",
+    openapi_extra={
+        "requestBody": {
+            "description": protobuf_message_description(
+                CreateFederationRequest(
+                    federation_name="my-federation",
+                    description="Federation for simulation experiments",
+                    simulation=True,
+                ),
+                {
+                    "federation_name": "Required by the API. Bare federation name, "
+                    "without the namespace prefix. Must start with a letter and "
+                    "contain only letters, digits, and hyphens.",
+                    "description": "Human-readable description. Defaults to an empty "
+                    "string when omitted.",
+                    "simulation": "True for simulation, false for deployment. "
+                    "Defaults to false when omitted.",
+                    "handle": "Optional bare namespace handle (no @). Omission "
+                    "selects the authenticated caller's handle. Explicit values must "
+                    "contain only ASCII letters, digits, hyphens, or underscores. "
+                    "The caller must be authorized to create in that namespace.",
+                },
+            )
+        }
+    },
+    responses={
+        200: {
+            "description": protobuf_message_description(
+                CreateFederationResponse(
+                    federation=Federation(
+                        name="@alice/my-federation",
+                        description="Federation for simulation experiments",
+                        simulation=True,
+                        member_count=1,
+                    )
+                ),
+                {
+                    "federation": "Created federation, including its qualified name "
+                    "(@handle/name), description, members, member count, runtime mode, "
+                    "and caller permissions. Follow the type link for nested fields."
+                },
+            )
+        }
+    },
+)
 def create_federation(
     request: Annotated[CreateFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
     account: AccountDependency,
 ) -> CreateFederationResponse:
-    """Create a federation."""
+    """Create a federation.
+
+    The request and successful response use binary protobuf. The decoded examples
+    below illustrate the messages, and cannot be sent as JSON to this endpoint.
+
+    Serialize the request with the generated Python message class:
+
+    ```python
+    from pathlib import Path
+    from flwr.proto.control_pb2 import CreateFederationRequest, CreateFederationResponse
+
+    request = CreateFederationRequest(
+        federation_name="my-federation",
+        description="Federation for simulation experiments",
+        simulation=True,
+    )
+    Path("request.pb").write_bytes(request.SerializeToString())
+    ```
+
+    Upload `request.pb` with **Try it out**, using the configured authentication.
+    Decode a successful response with
+    `CreateFederationResponse.FromString(response_bytes)`.
+    """
     return control_handlers.create_federation(request, account, linkstate)
 
 
