@@ -32,6 +32,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
+from .space import RuntimeAgentSpace
 
 
 class _SpaceAgentConnectors(RuntimeAgentConnectors):
@@ -86,8 +87,9 @@ def create_space_session(
     RuntimeAgentSession
         Session with built-in connectors and federation Grid tools disabled.
     """
+    stub = grid._runtime_client  # pylint: disable=protected-access
     runtime = AgentRuntime(
-        stub=grid._runtime_client,  # pylint: disable=protected-access
+        stub=stub,
         run_id=task_input.run.run_id,
         task_id=task_input.task_id,
         events=events,
@@ -97,4 +99,5 @@ def create_space_session(
         connectors=_SpaceAgentConnectors(runtime),
         events=events,
         grid=_SpaceAgentGrid(),
+        space=RuntimeAgentSpace(stub, events),
     )

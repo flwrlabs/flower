@@ -624,6 +624,7 @@ def test_worker_uses_separate_input_paths(
     assert lifecycle.run() == ExitCode.SUCCESS
     app.assert_called_once()
     agent = app.call_args.kwargs["agent"]
+    assert (agent.space is not None) == space_run
     if space_run:
         pull.assert_not_called()
         assert agent.prompt == ""

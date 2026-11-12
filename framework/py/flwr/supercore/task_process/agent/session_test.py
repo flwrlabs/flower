@@ -20,7 +20,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 
-from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES
+from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
@@ -41,6 +41,14 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskEventsRequest,
     PutCompactedContextRequest,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceMessage,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode
@@ -50,7 +58,8 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_loads
 
 from .session import (
     AgentRuntime,
@@ -103,6 +112,73 @@ def test_runtime_agent_session_exposes_prompt() -> None:
     )
 
     assert session.prompt == "Initial prompt"
+    assert session.space is None
+
+
+def test_space_session_reads_messages() -> None:
+    """Forward message filters and preserve user and agent authors."""
+    stub = Mock()
+    stub.GetSpaceMessages.return_value = GetSpaceMessagesResponse(
+        messages=[
+            SpaceMessage(id=1, author=SpaceParticipant(flwr_aid="alice"), content="Hi"),
+            SpaceMessage(id=2, author=SpaceParticipant(agent_id=42), content="Hello"),
+        ]
+    )
+    agent = create_space_session(
+        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
+    )
+    assert isinstance(agent.space, AgentSpace)
+
+    messages = agent.space.get_messages(
+        limit=2, before_id=3, after_id=0, unread_only=True
+    )
+
+    stub.GetSpaceMessages.assert_called_once_with(
+        GetSpaceMessagesRequest(limit=2, before_id=3, after_id=0, unread_only=True)
+    )
+    assert [message["author"] for message in messages] == [
+        {"flwr_aid": "alice"},
+        {"agent_id": 42},
+    ]
+    assert [message["id"] for message in messages] == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "arguments", [None, {"content": "Hello"}, '{"content":"Hello"}']
+)
+def test_space_session_sends_messages(arguments: JSONObject | str | None) -> None:
+    """Publish directly or through a model tool using the server-assigned author."""
+    stub, events = Mock(), Mock()
+    stub.SendSpaceMessage.return_value = SendSpaceMessageResponse(
+        message=SpaceMessage(
+            id=7, author=SpaceParticipant(agent_id=42), content="Hello"
+        )
+    )
+    agent = create_space_session(
+        Mock(_runtime_client=stub), events, PullTaskInputResponse()
+    )
+    assert agent.space is not None
+    message: JSONValue
+    if arguments is None:
+        message = agent.space.send_message("Hello")
+        events.emit.assert_not_called()
+    else:
+        assert [tool["name"] for tool in agent.space.tools()] == ["send_space_message"]
+        output = agent.space.call(
+            {"name": "send_space_message", "call_id": "call-1", "arguments": arguments}
+        )
+        message = strict_json_loads(str(output["output"]))
+        events.emit.assert_called_with(output)
+    assert message == {
+        "id": 7,
+        "space_id": "",
+        "author": {"agent_id": 42},
+        "created_at": "",
+        "content": "Hello",
+    }
+    stub.SendSpaceMessage.assert_called_once_with(
+        SendSpaceMessageRequest(content="Hello")
+    )
 
 
 def test_close_drains_events_before_worker_stops() -> None:
