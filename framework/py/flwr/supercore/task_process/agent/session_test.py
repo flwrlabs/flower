@@ -206,7 +206,7 @@ def test_get_compacted_contexts_returns_without_emitting() -> None:
         contexts=[
             CompactedContext(
                 id=12,
-                series_id=42,
+                agent_id=42,
                 through_event_id=9,
                 text="Private summary",
                 created_at="2026-10-16T12:00:00+00:00",
@@ -226,7 +226,7 @@ def test_get_compacted_contexts_returns_without_emitting() -> None:
     assert contexts == [
         {
             "id": 12,
-            "series_id": 42,
+            "agent_id": 42,
             "through_event_id": 9,
             "text": "Private summary",
             "created_at": "2026-10-16T12:00:00+00:00",

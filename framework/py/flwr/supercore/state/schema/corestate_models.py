@@ -321,15 +321,17 @@ class SeriesContext(FlwrBase):
 
 
 class CompactedContext(FlwrBase):
-    """Represent a compacted event context for a run series.
+    """Represent a compacted event context for an agent.
 
-    ``through_event_id`` is an inclusive event high-water mark for the series.
+    ``through_event_id`` is the inclusive event high-water mark covered by the summary.
     """
 
     __tablename__ = "compacted_contexts"
     __table_args__ = (
-        UniqueConstraint("series_id", "through_event_id"),
-        Index("idx_compacted_contexts_series_id_id", "series_id", "id"),
+        UniqueConstraint(
+            "agent_id", "through_event_id", name="uq_compacted_contexts_agent_event"
+        ),
+        Index("idx_compacted_contexts_agent_id_id", "agent_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(
@@ -337,7 +339,11 @@ class CompactedContext(FlwrBase):
         primary_key=True,
         autoincrement=True,
     )
-    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    agent_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("agent.agent_id", name="fk_compacted_contexts_agent_id"),
+        nullable=False,
+    )
     through_event_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(UInt64(), nullable=False)

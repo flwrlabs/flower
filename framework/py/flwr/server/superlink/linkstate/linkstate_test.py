@@ -1953,16 +1953,14 @@ class InMemoryStateTest(StateTest):
         return InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
 
     def test_get_compacted_contexts(self) -> None:
-        """Read one series newest first with an exclusive cursor."""
+        """Read one agent newest first with an exclusive cursor."""
         state = self.state_factory()
         state.compacted_context_store = {
             context.id: context
             for context in (
-                CompactedContext(id=1, series_id=42, through_event_id=10, text="First"),
-                CompactedContext(
-                    id=2, series_id=42, through_event_id=20, text="Second"
-                ),
-                CompactedContext(id=3, series_id=43, through_event_id=30, text="Other"),
+                CompactedContext(id=1, agent_id=42, through_event_id=10, text="First"),
+                CompactedContext(id=2, agent_id=42, through_event_id=20, text="Second"),
+                CompactedContext(id=3, agent_id=43, through_event_id=30, text="Other"),
             )
         }
 
@@ -2014,21 +2012,28 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         return state
 
     def test_get_compacted_contexts(self) -> None:
-        """Read only one series in newest-first order with an exclusive cursor."""
+        """Read only one agent in newest-first order with an exclusive cursor."""
         state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
         with state.session() as session:
             rows = [
                 CompactedContextModel(
-                    series_id=series_id,
+                    agent_id=agent_id,
                     through_event_id=event_id,
                     text=text,
                     token_count=1,
                     created_at=now(),
                 )
-                for series_id, event_id, text in (
-                    (42, 10, "First"),
-                    (42, 20, "Second"),
-                    (43, 30, "Other"),
+                for agent_id, event_id, text in (
+                    (agent.id, 10, "First"),
+                    (agent.id, 20, "Second"),
+                    (other.id, 30, "Other"),
                 )
             ]
             session.add_all(rows)
@@ -2036,24 +2041,27 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             first_id, second_id = rows[0].id, rows[1].id
 
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(42, limit=2)],
+            [
+                context.text
+                for context in state.get_compacted_contexts(agent.id, limit=2)
+            ],
             ["Second", "First"],
         )
         self.assertEqual(
-            [context.id for context in state.get_compacted_contexts(42)],
+            [context.id for context in state.get_compacted_contexts(agent.id)],
             [second_id],
         )
         self.assertEqual(
             [
                 context.id
                 for context in state.get_compacted_contexts(
-                    42, before_context_id=second_id
+                    agent.id, before_context_id=second_id
                 )
             ],
             [first_id],
         )
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(43)],
+            [context.text for context in state.get_compacted_contexts(other.id)],
             ["Other"],
         )
 

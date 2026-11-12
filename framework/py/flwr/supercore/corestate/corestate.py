@@ -838,19 +838,19 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
 
     @abstractmethod
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
     ) -> None:
-        """Store a summary; raise ValueError for an existing series/event pair."""
+        """Store a summary; raise ValueError for an existing agent/event pair."""
 
     @abstractmethod
     def set_run_series_context(self, series_id: int, context: Context) -> None:

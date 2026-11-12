@@ -151,9 +151,9 @@ def send_space_message(
 
 
 def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: CoreState, series_id: int
+    request: GetCompactedContextsRequest, state: CoreState, agent_id: int
 ) -> GetCompactedContextsResponse:
-    """Get compacted contexts for the authenticated task's series."""
+    """Get compacted contexts for the agent."""
     limit = request.limit if request.HasField("limit") else 1
     if limit == 0:
         raise FlowerError(
@@ -161,7 +161,7 @@ def get_compacted_contexts(
             "Limit must be positive.",
         )
     contexts = state.get_compacted_contexts(
-        series_id,
+        agent_id,
         limit=limit,
         before_context_id=(
             request.before_context_id if request.HasField("before_context_id") else None
@@ -171,23 +171,23 @@ def get_compacted_contexts(
 
 
 def put_compacted_context(
-    request: PutCompactedContextRequest, state: CoreState, series_id: int
+    request: PutCompactedContextRequest, state: CoreState, agent_id: int
 ) -> PutCompactedContextResponse:
-    """Store a compacted context in the authenticated task's series."""
+    """Store a compacted context for the agent."""
     if not request.HasField("context") or not request.context.text:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
             "Compacted context text is required.",
         )
     context = request.context
-    if context.series_id and context.series_id != series_id:
+    if context.agent_id and context.agent_id != agent_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
-            "Compacted context series does not match the authenticated task.",
+            "Compacted context agent does not match the authenticated task.",
         )
     try:
         state.store_compacted_context(
-            series_id,
+            agent_id,
             context.through_event_id,
             context.text,
             context.token_count,
@@ -195,7 +195,7 @@ def put_compacted_context(
     except ValueError as exc:
         raise FlowerError(
             ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
-            f"Compacted context already exists for series {series_id} "
+            f"Compacted context already exists for agent {agent_id} "
             f"and event {context.through_event_id}.",
         ) from exc
     return PutCompactedContextResponse()
