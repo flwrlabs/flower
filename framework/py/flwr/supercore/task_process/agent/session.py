@@ -125,7 +125,7 @@ class RuntimeAgentEvents(AgentEvents):
     def get_compacted_contexts(
         self, *, limit: int = 1, before_context_id: int | None = None
     ) -> list[JSONObject]:
-        """Get summaries from the current run series."""
+        """Get summaries for the agent."""
         response = self._stub.GetCompactedContexts(
             GetCompactedContextsRequest(
                 limit=limit, before_context_id=before_context_id
@@ -134,7 +134,7 @@ class RuntimeAgentEvents(AgentEvents):
         return [
             {
                 "id": context.id,
-                "series_id": context.series_id,
+                "agent_id": context.agent_id,
                 "through_event_id": context.through_event_id,
                 "text": context.text,
                 "created_at": context.created_at,
@@ -146,7 +146,7 @@ class RuntimeAgentEvents(AgentEvents):
     def put_compacted_context(
         self, *, through_event_id: int, text: str, token_count: int
     ) -> None:
-        """Store a summary in the current run series."""
+        """Store a summary for the agent."""
         self._stub.PutCompactedContext(
             PutCompactedContextRequest(
                 context=CompactedContext(

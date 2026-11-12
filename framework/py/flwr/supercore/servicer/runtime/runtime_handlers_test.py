@@ -103,7 +103,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_get_compacted_contexts(self) -> None:
         """Apply the default limit and reject zero."""
         context = CompactedContext(
-            id=1, series_id=42, through_event_id=9, text="Summary"
+            id=1, agent_id=42, through_event_id=9, text="Summary"
         )
         self.state.get_compacted_contexts.return_value = [context]
 
@@ -125,10 +125,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_put_compacted_context(self) -> None:
-        """Store only a valid summary for the authenticated series."""
+        """Store only a valid summary for the authenticated agent."""
         request = PutCompactedContextRequest(
             context=CompactedContext(
-                series_id=42, through_event_id=9, text="Summary", token_count=123
+                agent_id=42, through_event_id=9, text="Summary", token_count=123
             )
         )
 
@@ -139,7 +139,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             42, 9, "Summary", 123
         )
 
-        request.context.series_id = 43
+        request.context.agent_id = 43
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.put_compacted_context(request, self.state, 42)
         self.assertEqual(
