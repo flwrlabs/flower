@@ -28,7 +28,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -275,6 +277,41 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[Agent]
             Agents belonging to the account, or an empty sequence if none exist.
+        """
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching owned Agents and participating Spaces.
+
+        Concurrent changes may appear in both this response and subsequent replay.
+        """
+
+    @abstractmethod
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Store a shared event and its ordered deliveries, returning its UUID.
+
+        Each call creates a new event with a generated UUID and creation timestamp.
+        SQL callers can use an enclosing session to commit application changes
+        with the event.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Replay accessible events after an exclusive cursor in user-feed order.
+
+        Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        If all remaining entries are inaccessible, return a cursor-only response
+        with no event. Clients apply present events before saving seq; cursor-only
+        responses only advance the client's cursor.
+        Reading does not consume entries or advance a shared cursor.
         """
 
     @abstractmethod
@@ -692,17 +729,46 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a message page in ascending ID order.
+        """Read a page and advance the participant's read cursor.
 
-        Bounds are exclusive. With after_id, select the earliest matching page;
-        otherwise select the latest. Return None for missing spaces or
-        nonparticipants. Raise ValueError for a nonpositive limit or invalid range.
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the messages.
+        participant : SpaceParticipant
+            User or agent reading the messages.
+        limit : int (default: 50)
+            Maximum number of messages to return.
+        before_id : int | None (default: None)
+            Exclusive upper message ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower message ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceMessage] | None
+            Messages in ascending ID order, selecting the newest page by default.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or the supplied ID range is invalid.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
         """
 
     @abstractmethod

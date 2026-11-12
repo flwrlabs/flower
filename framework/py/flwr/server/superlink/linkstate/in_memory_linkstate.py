@@ -35,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -48,7 +49,7 @@ from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
-from flwr.supercore.utils import uint64_to_int64
+from flwr.supercore.utils import parse_app_spec, uint64_to_int64
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -375,16 +376,34 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 validate_task_event_data(initial_task_event.data)
             except ValueError:
                 return 0
-        with self.lock_task_store, self.lock, self.lock_task_event_store:
-            if space_id is not None:
-                with self.lock_space_store:
-                    space = self.space_store.get(space_id)
-                    if space is None or (
-                        agent_id is not None
-                        and SpaceParticipant(agent_id=agent_id)
-                        not in space.participants
-                    ):
-                        return 0
+        with (
+            self.lock_task_store,
+            self.lock,
+            self.lock_task_event_store,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            if space_id is not None and space_id not in self.space_store:
+                return 0
+            if space_id is not None and agent_id is not None:
+                self._cleanup_expired_task_tokens_locked()
+                space = self.space_store[space_id]
+                if SpaceParticipant(
+                    agent_id=agent_id
+                ) not in space.participants or self._agent_has_open_run(
+                    space_id, agent_id
+                ):
+                    return 0
+                flwr_aid, agent = next(
+                    (owner, agents[agent_id])
+                    for owner, agents in self.agent_store.items()
+                    if agent_id in agents
+                )
+                app_id, version = parse_app_spec(agent.config.app_spec)
+                if app_id != f"@{fab_id}" or (version and version != fab_version):
+                    return 0
+                if not fab_hash or self.get_fab(fab_hash) is None:
+                    raise ValueError("The resolved AgentApp FAB must be stored first.")
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -474,13 +493,60 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
             return run_id
 
+    def _agent_has_open_run(self, space_id: UUID, agent_id: int) -> bool:
+        """Check for an unfinished primary Task while state locks are held."""
+        return any(
+            record.space_id == space_id
+            and record.run.agent_id == agent_id
+            and self.task_store[cast(int, record.run.primary_task_id)].status.status
+            != Status.FINISHED
+            for record in self.run_ids.values()
+        )
+
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread messages and no open Run."""
+        if limit is not None and limit <= 0:
+            return []
+        with (
+            self.lock_task_store,
+            self.lock,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            self._cleanup_expired_task_tokens_locked()
+            agents = {
+                agent.id: agent
+                for owned in self.agent_store.values()
+                for agent in owned.values()
+            }
+            candidates = []
+            for space_id, space in self.space_store.items():
+                for member in space.participants:
+                    if member.agent_id not in agents or self._agent_has_open_run(
+                        space_id, member.agent_id
+                    ):
+                        continue
+                    cursor = self.space_participant_cursors.get(
+                        (space_id, member.agent_id), 0
+                    )
+                    if any(
+                        message.id > cursor
+                        for message in self.space_message_store[space_id]
+                    ):
+                        candidates.append((space_id, agents[member.agent_id]))
+                        if limit is not None and len(candidates) == limit:
+                            return candidates
+            return candidates
+
     def get_run_info(
         self,
         *,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -525,10 +591,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if not federation_ids:
                     return []
                 federation_id_set = set(federation_ids)
+                # Returned Run objects use an empty string for absent federation IDs.
+                # Inspect the stored scope to identify Space runs.
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
                     if self.run_ids[run_id].run.federation_id in federation_id_set
+                    or (
+                        None in federation_id_set
+                        and self.run_ids[run_id].space_id is not None
+                    )
                 }
 
             runs = [self._get_run(run_id) for run_id in matched_run_ids]
