@@ -83,7 +83,10 @@ from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_han
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    process_pending_agent_runs,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
@@ -187,8 +190,9 @@ def put_compacted_context(
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
-    """Process due automations, then acquire an eligible pending task."""
+    """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    process_pending_agent_runs(state)
     return core_runtime_handlers.acquire_task(request, state)
 
 

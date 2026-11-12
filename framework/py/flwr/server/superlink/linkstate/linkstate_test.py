@@ -2439,7 +2439,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             fab_hash = state.store_fab(Fab("", b"fab", {}))
             assert not state.get_agent_run_candidates()
             state.create_space_message(
-                space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+                space_id, SpaceParticipant(flwr_aid="alice"), "User message"
             )
             assert state.get_agent_run_candidates() == [(space_id, agent)]
             state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
