@@ -50,7 +50,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import AgentConfig, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -58,6 +58,7 @@ from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
@@ -2416,6 +2417,47 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             state.initialize()
             self.states.append(state)
         return self.states
+
+    def test_agent_run_admission_is_atomic(self) -> None:
+        """Two replicas admit one Run even after the triggering message is read."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
+            state = states[0]
+            agent = state.create_agent(
+                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+            )
+            assert agent is not None
+            space_id = UUID(state.get_spaces("alice")[0].id)
+            fab_hash = state.store_fab(Fab("", b"fab", {}))
+            assert not state.get_agent_run_candidates()
+            state.create_space_message(
+                space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+            )
+            assert state.get_agent_run_candidates() == [(space_id, agent)]
+            state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
+            assert not state.get_agent_run_candidates()
+            barrier = Barrier(2)
+
+            def start(backend: LinkState) -> int:
+                barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
+                return backend.create_run(
+                    fab_id="publisher/app",
+                    fab_version="1.0",
+                    fab_hash=fab_hash,
+                    override_config={},
+                    federation_id=None,
+                    federation_config=None,
+                    flwr_aid=None,
+                    primary_task_type=TaskType.AGENT_APP,
+                    space_id=space_id,
+                    agent_id=agent.id,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                run_ids = list(pool.map(start, states))
+            assert sum(bool(run_id) for run_id in run_ids) == 1
+            assert len(state.get_run_info()) == 1
+            assert not state.get_agent_run_candidates()
 
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""

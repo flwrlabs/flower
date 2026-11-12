@@ -62,6 +62,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
@@ -314,6 +320,26 @@ def get_space_events(
             "This endpoint is only available to Space tasks.",
         )
     return core_runtime_handlers.get_space_events(request, state, run.space_id)
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: NodeState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Reject Space message reads on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space messages are only available on SuperLink.",
+    )
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: NodeState, task: Task
+) -> SendSpaceMessageResponse:
+    """Reject Space message publication on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space messages are only available on SuperLink.",
+    )
 
 
 def get_compacted_contexts(

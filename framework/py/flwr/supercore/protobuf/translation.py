@@ -225,6 +225,8 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
     ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
     ("POST", "/v1/runtime/get-space-events"): GetSpaceEventsRequest,
+    ("POST", "/v1/runtime/get-space-messages"): GetSpaceMessagesRequest,
+    ("POST", "/v1/runtime/send-space-message"): SendSpaceMessageRequest,
     ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
     ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,

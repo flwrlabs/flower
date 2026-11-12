@@ -169,6 +169,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AGENT_RUN_BATCH_LIMIT,
     DEFAULT_FEDERATION_SIMULATION,
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
@@ -707,6 +708,18 @@ def _refresh_hub_app_in_thread(
     Thread(target=refresh, daemon=True).start()
 
 
+def _prepare_fab(content: bytes, verifications: dict[str, str]) -> Fab | None:
+    """Validate FAB size and calculate its content hash."""
+    if len(content) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return None
+    return Fab(hashlib.sha256(content).hexdigest(), content, verifications)
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -793,12 +806,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     else:
         fab_file = request.fab.content
 
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
+    fab = _prepare_fab(fab_file, verification_dict)
+    if fab is None:
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
@@ -813,7 +822,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     try:
         # Validate user config overrides matches keys in run config in FAB
-        fab_config = get_fab_config(fab_file)
+        fab_config = get_fab_config(fab.content)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
         fuse_dicts(run_config, override_config, check_keys=True)
 
@@ -847,11 +856,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
 
         # Create run
-        fab = Fab(
-            hashlib.sha256(fab_file).hexdigest(),
-            fab_file,
-            verification_dict,
-        )
         fab_id, fab_version = get_metadata_from_config(fab_config)
         fab_app_id = f"@{fab_id}"
         if app_id is None:
@@ -1248,6 +1252,55 @@ def dispatch_automation(
             else AutomationStatus.FAILED
         ),
     )
+
+
+def _process_pending_agent_runs(
+    state: LinkState, *, limit: int = AGENT_RUN_BATCH_LIMIT
+) -> None:
+    """Resolve eligible AgentApps and attempt to open execution windows."""
+    created = 0
+    # Scan eligible agents; limit successful admissions rather than candidates.
+    for space_id, agent in state.get_agent_run_candidates():
+        if created >= limit:
+            break
+        try:
+            # Resolve the configured FAB and validate its size and app type.
+            content, verifications, _ = _get_remote_fab(agent.config.app_spec)
+            fab = _prepare_fab(content, verifications)
+            if fab is None:
+                continue
+            config = get_fab_config(fab.content)
+            if _get_app_type(config) != TaskType.AGENT_APP:
+                raise ValueError("The agent must use an AgentApp bundle.")
+
+            # Store the resolved FAB before creating a Run that references it.
+            fab_id, version = get_metadata_from_config(config)
+            fab_hash = state.store_fab(fab)
+
+            # Enforce one open Run per agent and Space during creation.
+            run_id = state.create_run(
+                fab_id=fab_id,
+                fab_version=version,
+                fab_hash=fab_hash,
+                override_config={},
+                federation_id=None,
+                federation_config=None,
+                flwr_aid=None,
+                primary_task_type=TaskType.AGENT_APP,
+                space_id=space_id,
+                agent_id=agent.id,
+            )
+            if run_id:
+                created += 1
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            # A failed candidate must not prevent other eligible agents from starting.
+            log(
+                ERROR,
+                "Unable to start agent %d in Space %s: %s",
+                agent.id,
+                space_id,
+                exc,
+            )
 
 
 def process_due_automations(
