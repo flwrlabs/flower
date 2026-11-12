@@ -15,7 +15,6 @@
 """Tests for protobuf-over-HTTP stream cancellation helpers."""
 
 import asyncio
-import json
 import time
 from collections.abc import Iterator
 from threading import Event
@@ -24,12 +23,9 @@ import pytest
 from fastapi import Request
 from starlette.types import Message
 
-from flwr.proto.control_pb2 import StreamEventsResponse  # pylint: disable=E0611
-
 from .streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
-    encode_sse_message,
     get_protobuf_stream_context,
 )
 
@@ -132,18 +128,3 @@ def test_disconnect_unblocks_synchronous_stream_iteration(
     asyncio.run(run_response())
 
     assert not context.is_active()
-
-
-def test_sse_keeps_large_sequence_and_escapes_payload_newlines() -> None:
-    """Preserve exact cursor digits and keep JSON newlines inside one SSE frame."""
-    event = StreamEventsResponse(seq=2**63 - 1)
-    event.event.event_id = "shared-event"
-    event.event.payload.update({"text": "first\nsecond"})
-    frame = encode_sse_message(event).decode()
-    lines = frame.splitlines()
-    assert lines[0] == "id: 9223372036854775807"
-    assert len(lines) == 3
-    payload = json.loads(lines[1].removeprefix("data: "))
-    assert payload["seq"] == "9223372036854775807"
-    assert payload["event"]["eventId"] == "shared-event"
-    assert payload["event"]["payload"]["text"] == "first\nsecond"

@@ -578,11 +578,10 @@ global___Event = Event
 
 @typing.final
 class StreamEventsRequest(google.protobuf.message.Message):
-    """POST /v1/control/stream-events. Accept: text/event-stream selects standard
-    SSE with protobuf JSON data; otherwise use the binary protobuf stream
-    framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
-    use their existing separate stream. The event journal is append-only;
-    replay cursors do not expire.
+    """POST /v1/control/stream-events uses binary protobuf stream framing.
+    Resume from Bootstrap.cursor or the last consumed seq. Task events use their
+    existing separate stream. The event journal is append-only; replay cursors
+    do not expire.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

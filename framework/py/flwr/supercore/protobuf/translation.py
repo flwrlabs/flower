@@ -121,13 +121,11 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
-    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.streaming import (
     CancellableProtobufStreamingResponse,
     ProtobufStreamContext,
-    encode_sse_message,
     get_protobuf_stream_context,
 )
 
@@ -277,9 +275,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
         result = request.state.protobuf_response
         protobuf_response = self._response_for(
-            result,
-            get_protobuf_stream_context(request),
-            use_sse=request.headers.get("accept") == SSE_MEDIA_TYPE,
+            result, get_protobuf_stream_context(request)
         )
         del request.state.protobuf_response
         # Preserve metadata set by inner middleware, but not placeholder body headers.
@@ -315,7 +311,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _response_for(
-        result: object, stream_context: ProtobufStreamContext, *, use_sse: bool = False
+        result: object, stream_context: ProtobufStreamContext
     ) -> Response:
         """Return the HTTP response matching a protobuf handler result."""
         # ``Message`` is also the most specific contract and must be checked
@@ -328,17 +324,14 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         # Synchronous iterators are streamed lazily.
         # Starlette advances a synchronous iterator outside the event loop.
         if isinstance(result, Iterator):
-            encode = encode_sse_message if use_sse else frame_message
-            content = (encode(message) for message in cast(Iterator[Message], result))
-            response = CancellableProtobufStreamingResponse(
+            content = (
+                frame_message(message) for message in cast(Iterator[Message], result)
+            )
+            return CancellableProtobufStreamingResponse(
                 content,
                 stream_context,
-                SSE_MEDIA_TYPE if use_sse else PROTOBUF_STREAM_MEDIA_TYPE,
+                PROTOBUF_STREAM_MEDIA_TYPE,
             )
-            if use_sse:
-                response.headers["Cache-Control"] = "no-cache"
-                response.headers["X-Accel-Buffering"] = "no"
-            return response
 
         raise FlowerError(
             ApiErrorCode.INVALID_HANDLER_RESPONSE,

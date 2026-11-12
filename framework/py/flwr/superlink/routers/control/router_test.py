@@ -17,7 +17,6 @@
 # pylint: disable=too-many-lines
 
 import inspect
-import json
 from collections.abc import Callable
 from datetime import datetime
 from unittest.mock import Mock, call, patch
@@ -100,7 +99,6 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
-    SSE_MEDIA_TYPE,
 )
 from flwr.supercore.protobuf.framing import frame_message
 from flwr.supercore.protobuf.translation import (
@@ -369,10 +367,7 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
         assert request_body["content"] == {
             PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
         }
-        expected_types = {expected_media_type}
-        if route.path in stream_paths:
-            expected_types.add(SSE_MEDIA_TYPE)
-        assert set(success_content) == expected_types
+        assert set(success_content) == {expected_media_type}
         assert success_content[expected_media_type]["schema"] == {
             "type": "string",
             "format": "binary",
@@ -1361,9 +1356,9 @@ def test_bootstrap_uses_authenticated_account(
     assert snapshot.cursor == 2
 
 
-@pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, SSE_MEDIA_TYPE])
+@pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
 def test_user_event_stream_framing(accept: str) -> None:
-    """Negotiate framing while preserving IDs, uint64 values, and cursor markers."""
+    """Use binary protobuf framing regardless of the Accept header."""
     state = Mock(spec=LinkState)
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
@@ -1389,19 +1384,8 @@ def test_user_event_stream_framing(accept: str) -> None:
             },
         )
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith(accept)
-    if accept == SSE_MEDIA_TYPE:
-        frames = response.text.rstrip("\n").split("\n\n")
-        for frame, entry in zip(frames, expected, strict=True):
-            event_id_line, data = frame.splitlines()
-            assert event_id_line == f"id: {entry.seq}"
-            payload = json.loads(data.removeprefix("data: "))
-            assert payload["seq"] == str(entry.seq)
-            assert ParseDict(payload, StreamEventsResponse()) == entry
-        assert response.headers["cache-control"] == "no-cache"
-        assert response.headers["x-accel-buffering"] == "no"
-    else:
-        assert response.content == b"".join(frame_message(entry) for entry in expected)
+    assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
+    assert response.content == b"".join(frame_message(entry) for entry in expected)
     assert stream.call_args.args[1] is _ACCOUNT
     assert stream.call_args.args[-1] == "100"
 
@@ -1410,14 +1394,14 @@ def test_user_event_stream_framing(accept: str) -> None:
     ("after_seq", "last_event_id"),
     [(None, "invalid"), (None, "-1"), (None, str(2**64)), (1, None)],
 )
-def test_invalid_user_cursor_returns_error_before_sse_headers(
+def test_invalid_user_cursor_returns_error_before_streaming(
     space_client: tuple[TestClient, LinkState],
     after_seq: int | None,
     last_event_id: str | None,
 ) -> None:
-    """Reject invalid cursors before opening the SSE response."""
+    """Reject invalid cursors before opening the protobuf stream."""
     client, _ = space_client
-    headers = {"accept": SSE_MEDIA_TYPE}
+    headers = {"accept": PROTOBUF_STREAM_MEDIA_TYPE}
     if last_event_id is not None:
         headers["Last-Event-ID"] = last_event_id
     response = client.post(
