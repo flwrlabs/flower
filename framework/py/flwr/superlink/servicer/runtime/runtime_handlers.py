@@ -169,12 +169,10 @@ def get_compacted_contexts(
 ) -> GetCompactedContextsResponse:
     """Get summaries for the agent."""
     run = _get_task_run(state, task)
-    if run.agent_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "Compacted contexts require a Run bound to an agent.",
-        )
-    return core_runtime_handlers.get_compacted_contexts(request, state, run.agent_id)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    return core_runtime_handlers.get_compacted_contexts(
+        request, state, participant.agent_id
+    )
 
 
 def put_compacted_context(
@@ -182,12 +180,10 @@ def put_compacted_context(
 ) -> PutCompactedContextResponse:
     """Store a summary for the agent."""
     run = _get_task_run(state, task)
-    if run.agent_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "Compacted contexts require a Run bound to an agent.",
-        )
-    return core_runtime_handlers.put_compacted_context(request, state, run.agent_id)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    return core_runtime_handlers.put_compacted_context(
+        request, state, participant.agent_id
+    )
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:

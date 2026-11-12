@@ -70,9 +70,11 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """Summary requests derive the agent from the authenticated run."""
         self.state.get_run.return_value = Run.create_empty(run_id=123)
         self.state.get_run.return_value.series_id = 456
+        self.state.get_run.return_value.space_id = UUID(int=1)
         self.state.get_run.return_value.agent_id = 789
+        self.state.get_run.return_value.primary_task_id = 1
         self.state.get_compacted_contexts.return_value = []
-        task = Task(run_id=123)
+        task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         runtime_handlers.get_compacted_contexts(
             GetCompactedContextsRequest(), self.state, task
@@ -86,14 +88,20 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """Summary writes derive the agent from the authenticated run."""
         self.state.get_run.return_value = Run.create_empty(run_id=123)
         self.state.get_run.return_value.series_id = 456
+        self.state.get_run.return_value.space_id = UUID(int=1)
         self.state.get_run.return_value.agent_id = 789
+        self.state.get_run.return_value.primary_task_id = 1
         request = PutCompactedContextRequest(
             context=CompactedContext(
                 through_event_id=9, text="Summary", token_count=123
             )
         )
 
-        runtime_handlers.put_compacted_context(request, self.state, Task(run_id=123))
+        runtime_handlers.put_compacted_context(
+            request,
+            self.state,
+            Task(task_id=1, run_id=123, type=TaskType.AGENT_APP),
+        )
 
         self.state.store_compacted_context.assert_called_once_with(
             789, 9, "Summary", 123
@@ -102,10 +110,13 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
     def test_compacted_contexts_require_agent_id(self) -> None:
         """A run without an agent cannot access compacted contexts."""
         self.state.get_run.return_value = Run.create_empty(run_id=123)
+        self.state.get_run.return_value.space_id = UUID(int=1)
+        self.state.get_run.return_value.primary_task_id = 1
+        task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_compacted_contexts(
-                GetCompactedContextsRequest(), self.state, Task(run_id=123)
+                GetCompactedContextsRequest(), self.state, task
             )
         self.assertEqual(
             error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
@@ -113,7 +124,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.put_compacted_context(
-                PutCompactedContextRequest(), self.state, Task(run_id=123)
+                PutCompactedContextRequest(), self.state, task
             )
         self.assertEqual(
             error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
