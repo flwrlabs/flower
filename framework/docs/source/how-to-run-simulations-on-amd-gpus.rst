@@ -529,8 +529,9 @@ warning right after this one, naming that CPU shortage explicitly -- in that cas
 setting ``num_gpus=0`` alone will not be enough; also lower
 ``client-resources-num-cpus`` or add CPU capacity to the cluster.
 
-If ``/dev/kfd`` exists, Flower follows the warning above with a second one that depends
-on what else it can detect about device access:
+On a **single-node** Ray cluster where the driver process runs on that same node, and
+``/dev/kfd`` exists, Flower follows the warning above with a second one that depends on
+what else it can detect about device access:
 
 - If the process cannot open ``/dev/kfd`` -- the missing ``render``-group access covered
   in `Check that ROCm can reach the GPU`_ -- Flower reports a permissions problem and
@@ -553,6 +554,19 @@ on what else it can detect about device access:
 
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
+
+None of the four checks above run outside that single-node, driver-co-located case,
+since the driver's own ``/dev/kfd``/render-node state cannot diagnose a different
+machine:
+
+- On a **multi-node** cluster, AMD GPU discovery already ran independently on each node
+  when ``ray start`` executed there, so Flower instead reports the node count and asks
+  you to check ``/dev/kfd`` and ``/dev/dri/renderD*`` on each node individually, not just
+  on the driver host.
+- On a **single-node** cluster where ``init_args`` joined the driver to a node on another
+  host (for example via ``address="<ip>:<port>"``), Flower instead names both the
+  reporting node's and the driver's own node ID, and points you at checking device
+  access on the node that actually reported zero GPUs, not on this host.
 
 CPU or GPU capacity is too small for even one client
 ----------------------------------------------------

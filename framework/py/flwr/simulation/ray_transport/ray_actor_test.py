@@ -318,6 +318,63 @@ class TestPoolSizeFromResources(TestCase):
         self.assertNotIn("not AMD-backed", output)
         self.assertNotIn("no accessible `/dev/dri/renderD*` node", output)
 
+    def test_single_remote_node_skips_local_kfd_probe(self) -> None:
+        """Test that a single-node cluster not co-located with the driver skips the
+        local `/dev/kfd` probe.
+
+        `init_args` can hand `ray.init()` an `address` that joins this driver to a
+        single-node cluster running on another host. `active_node_count == 1` alone
+        does not mean the driver shares a host with that node, so the driver's own
+        `/dev/kfd`/render-node state must not be probed or named in that case.
+        """
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}, "NodeID": "remote-node"}],
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.get_runtime_context"
+            ) as mock_get_runtime_context,
+            patch(
+                "flwr.simulation.ray_transport.ray_actor._log_kfd_diagnostics"
+            ) as mock_log_kfd_diagnostics,
+        ):
+            mock_get_runtime_context.return_value.get_node_id.return_value = (
+                "driver-node"
+            )
+            with self.assertLogs("flwr", level="WARNING") as logs:
+                with self.assertRaises(ValueError):
+                    pool_size_from_resources(client_resources)
+
+        mock_log_kfd_diagnostics.assert_not_called()
+        output = "\n".join(logs.output)
+        self.assertIn("connected to a remote cluster", output)
+        self.assertIn("remote-node", output)
+        self.assertIn("driver-node", output)
+
+    def test_single_local_node_runs_kfd_probe_when_colocated(self) -> None:
+        """Test that a single-node cluster co-located with the driver still runs the
+        local `/dev/kfd` probe."""
+        client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+        with (
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+                return_value=[{"Resources": {"CPU": 8}, "NodeID": "same-node"}],
+            ),
+            patch(
+                "flwr.simulation.ray_transport.ray_actor.ray.get_runtime_context"
+            ) as mock_get_runtime_context,
+            patch(
+                "flwr.simulation.ray_transport.ray_actor._log_kfd_diagnostics"
+            ) as mock_log_kfd_diagnostics,
+        ):
+            mock_get_runtime_context.return_value.get_node_id.return_value = "same-node"
+            with self.assertRaises(ValueError):
+                pool_size_from_resources(client_resources)
+
+        mock_log_kfd_diagnostics.assert_called_once()
+
     def test_case_with_no_usable_node(self) -> None:
         """Test that a cluster with no usable node raises ValueError.
 

@@ -230,6 +230,11 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # multi-node cluster, where the driver's own device state says nothing about which
     # worker node is missing access.
     active_node_count = 0
+    # The single active node's own ID, if there is exactly one. `init_args` can hand
+    # `ray.init()` an `address` that joins this driver to a single-node cluster running
+    # on another host entirely -- active_node_count==1 alone does not mean the driver
+    # shares a host with that node. Compared against the driver's own node ID below.
+    active_node_id: str | None = None
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -246,6 +251,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         if not node_resources:
             continue
         active_node_count += 1
+        active_node_id = node.get("NodeID")
 
         # Fallback to zero when resource quantity is not configured on the ray node
         # e.g.: node without GPU; head node set up not to run tasks (zero resources)
@@ -321,6 +327,24 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                     "and `/dev/dri/renderD*` access on each node individually, not "
                     "just here.",
                     active_node_count,
+                )
+            elif active_node_id is not None and active_node_id != (
+                driver_node_id := ray.get_runtime_context().get_node_id()
+            ):
+                # A single reporting node that is not this driver's own node means
+                # `init_args` connected this process to a remote single-node cluster
+                # (for example via `address="<ip>:<port>"`). Probing this host's
+                # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine.
+                log(
+                    WARNING,
+                    "The only node reporting resources (NodeID=%s) is not this "
+                    "driver's own node (NodeID=%s) -- `ray.init()` connected to a "
+                    "remote cluster. Checking `/dev/kfd` and `/dev/dri/renderD*` on "
+                    "this host cannot diagnose a device on a different machine; "
+                    "check device access on the node that reported zero GPUs "
+                    "instead.",
+                    active_node_id,
+                    driver_node_id,
                 )
             else:
                 _log_kfd_diagnostics()
