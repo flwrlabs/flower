@@ -38,8 +38,8 @@ erDiagram
 
   compacted_contexts {
     BIGINT id PK
+    BIGINT agent_id FK
     TIMESTAMP created_at
-    BIGINT series_id
     TEXT text
     BIGINT through_event_id
     BIGINT token_count
@@ -329,6 +329,7 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent ||--o{ compacted_contexts : agent_id
   space ||--o{ events : space_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
