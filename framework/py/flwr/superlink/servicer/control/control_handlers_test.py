@@ -1045,26 +1045,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
 
 @pytest.mark.parametrize(
-    ("after_seq", "last_event_id", "expected"),
-    [(None, None, 0), (None, "7", 7), (3, "invalid", 3), (0, "7", 0)],
-)
-def test_stream_cursor_precedence(
-    after_seq: int | None, last_event_id: str | None, expected: int
-) -> None:
-    """Prefer the protobuf cursor, then Last-Event-ID, then zero."""
-    state = Mock(spec=LinkState)
-    stream = stream_events(
-        StreamEventsRequest(after_seq=after_seq),
-        _ACCOUNT,
-        state,
-        lambda: True,
-        last_event_id,
-    )
-    state.get_user_events.assert_called_once_with("alice", after_seq=expected)
-    stream.close()
-
-
-@pytest.mark.parametrize(
     ("value", "expected"), [(None, 0.1), ("0.5", 0.5), ("0.01", 0.01), ("60", 60.0)]
 )
 def test_stream_replays_pages_polls_and_stops_on_disconnect(

@@ -222,7 +222,6 @@ def stream_events(
     account: AccountInfo,
     state: LinkState,
     is_active: Callable[[], bool],
-    last_event_id: str | None = None,
 ) -> Generator[StreamEventsResponse, None, None]:
     """Validate replay before starting the authenticated account's stream."""
     raw_interval = os.getenv(
@@ -240,10 +239,6 @@ def stream_events(
 
     after_seq = request.after_seq
     try:
-        if not request.HasField("after_seq") and last_event_id is not None:
-            if not last_event_id.isascii() or not last_event_id.isdecimal():
-                raise ValueError("Last-Event-ID must be a nonnegative integer.")
-            after_seq = int(last_event_id)
         initial = state.get_user_events(account.flwr_aid, after_seq=after_seq)
     except ValueError as exc:
         raise FlowerError(ApiErrorCode.INVALID_USER_EVENT_CURSOR, str(exc)) from exc

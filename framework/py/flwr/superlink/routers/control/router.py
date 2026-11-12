@@ -17,7 +17,7 @@
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends
 
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -182,11 +182,10 @@ def stream_events(
     linkstate: LinkStateDependency,
     account: AccountDependency,
     stream_context: ProtobufStreamContextDependency,
-    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
 ) -> Iterator[StreamEventsResponse]:
     """Replay and stream application events for the authenticated account."""
     return control_handlers.stream_events(
-        request, account, linkstate, stream_context.is_active, last_event_id
+        request, account, linkstate, stream_context.is_active
     )
 
 

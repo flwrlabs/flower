@@ -1375,39 +1375,31 @@ def test_user_event_stream_framing(accept: str) -> None:
     ) as stream:
         response = TestClient(app).post(
             "/v1/control/stream-events",
-            content=StreamEventsRequest().SerializeToString(),
+            content=StreamEventsRequest(after_seq=100).SerializeToString(),
             headers={
                 "authorization": "Bearer access-token",
                 "content-type": PROTOBUF_MEDIA_TYPE,
                 "accept": accept,
-                "Last-Event-ID": "100",
             },
         )
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
     assert response.content == b"".join(frame_message(entry) for entry in expected)
+    assert stream.call_args.args[0] == StreamEventsRequest(after_seq=100)
     assert stream.call_args.args[1] is _ACCOUNT
-    assert stream.call_args.args[-1] == "100"
 
 
-@pytest.mark.parametrize(
-    ("after_seq", "last_event_id"),
-    [(None, "invalid"), (None, "-1"), (None, str(2**64)), (1, None)],
-)
+@pytest.mark.parametrize("after_seq", [1, 2**64 - 1])
 def test_invalid_user_cursor_returns_error_before_streaming(
     space_client: tuple[TestClient, LinkState],
-    after_seq: int | None,
-    last_event_id: str | None,
+    after_seq: int,
 ) -> None:
     """Reject invalid cursors before opening the protobuf stream."""
     client, _ = space_client
-    headers = {"accept": PROTOBUF_STREAM_MEDIA_TYPE}
-    if last_event_id is not None:
-        headers["Last-Event-ID"] = last_event_id
     response = client.post(
         "/v1/control/stream-events",
         content=StreamEventsRequest(after_seq=after_seq).SerializeToString(),
-        headers=headers,
+        headers={"accept": PROTOBUF_STREAM_MEDIA_TYPE},
     )
     assert response.status_code == 400
     assert response.headers["content-type"] == "application/json"

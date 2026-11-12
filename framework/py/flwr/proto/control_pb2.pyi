@@ -588,7 +588,7 @@ class StreamEventsRequest(google.protobuf.message.Message):
 
     AFTER_SEQ_FIELD_NUMBER: builtins.int
     after_seq: builtins.int
-    """Exclusive user-feed cursor. Falls back to Last-Event-ID when absent."""
+    """Exclusive user-feed cursor. Defaults to zero when absent."""
     def __init__(
         self,
         *,
@@ -607,7 +607,7 @@ class StreamEventsResponse(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     EVENT_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """Position in the authenticated user's feed, also used as the SSE id."""
+    """Position in the authenticated user's feed."""
     @property
     def event(self) -> global___Event: ...
     def __init__(
