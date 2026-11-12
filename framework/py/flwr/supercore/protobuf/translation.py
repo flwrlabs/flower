@@ -30,6 +30,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
     BeginConnectorOAuthRequest,
+    BootstrapRequest,
     CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
     CreateAgentRequest,
@@ -64,6 +65,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamEventsRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
@@ -130,6 +132,8 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/control/bootstrap"): BootstrapRequest,
+    ("POST", "/v1/control/stream-events"): StreamEventsRequest,
     ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
     ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
     ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,

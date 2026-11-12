@@ -48,6 +48,7 @@ from flwr.common.constant import (
     LOG_STREAM_INTERVAL,
     REFRESH_TOKEN_KEY,
     RUN_EVENTS_STREAM_INTERVAL,
+    USER_EVENTS_STREAM_INTERVAL,
     Status,
 )
 from flwr.common.serde import (
@@ -68,6 +69,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
@@ -137,6 +139,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -207,6 +211,54 @@ from flwr.superlink.federation.typing import Federation as FederationInfo
 from flwr.superlink.run_source import RunSource
 
 from .conversation_title import start_title_generation
+
+
+def bootstrap(account: AccountInfo, state: LinkState) -> BootstrapResponse:
+    """Read the account's feed cursor followed by its visible Agents and Spaces."""
+    return state.get_bootstrap(account.flwr_aid)
+
+
+def stream_events(
+    request: StreamEventsRequest,
+    account: AccountInfo,
+    state: LinkState,
+    is_active: Callable[[], bool],
+) -> Generator[StreamEventsResponse, None, None]:
+    """Validate replay before starting the authenticated account's stream."""
+    raw_interval = os.getenv(
+        "FLWR_USER_EVENTS_STREAM_INTERVAL", str(USER_EVENTS_STREAM_INTERVAL)
+    )
+    try:
+        poll_interval = float(raw_interval)
+        if not 0.01 <= poll_interval <= 60:
+            raise ValueError
+    except ValueError as err:
+        raise ValueError(
+            "FLWR_USER_EVENTS_STREAM_INTERVAL must be a finite number of seconds "
+            f"between 0.01 and 60, got {raw_interval!r}."
+        ) from err
+
+    after_seq = request.after_seq
+    try:
+        initial = state.get_user_events(account.flwr_aid, after_seq=after_seq)
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_USER_EVENT_CURSOR, str(exc)) from exc
+
+    def generate() -> Generator[StreamEventsResponse, None, None]:
+        cursor = after_seq
+        batch = initial
+        while is_active():
+            for entry in batch:
+                if not is_active():
+                    return
+                cursor = entry.seq
+                yield entry
+            if not batch:
+                time.sleep(poll_interval)
+            if is_active():
+                batch = state.get_user_events(account.flwr_aid, after_seq=cursor)
+
+    return generate()
 
 
 class InvalidAgentRequestError(FlowerError):
