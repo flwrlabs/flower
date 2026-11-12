@@ -24,6 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
 from sqlalchemy import (
     MetaData,
     and_,
@@ -61,7 +62,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -89,6 +93,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -103,6 +108,7 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import Event as EventModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -140,6 +146,10 @@ from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventM
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
+from flwr.supercore.state.schema.corestate_models import UserEvent as UserEventModel
+from flwr.supercore.state.schema.corestate_models import (
+    UserEventFeed as UserEventFeedModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -151,6 +161,7 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
@@ -735,6 +746,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
+            self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
             self.create_space(
                 participants=[
                     SpaceParticipant(flwr_aid=flwr_aid),
@@ -754,6 +766,87 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             return [_agent_from_model(model) for model in session.scalars(stmt)]
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching visible state."""
+        with self.session() as session:
+            head = session.scalar(
+                select(UserEventFeedModel.last_seq).where(
+                    UserEventFeedModel.user_id == flwr_aid
+                )
+            )
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head or 0,
+        )
+
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
+        event_id = uuid4()
+        with self.session() as session:
+            session.execute(
+                insert(EventModel).values(
+                    event_id=event_id,
+                    type=event_type,
+                    space_id=space_id,
+                    payload=MessageToDict(payload, preserving_proto_field_name=True),
+                    created_at=now(),
+                )
+            )
+            for user_id in sorted(set(recipients)):
+                seq = session.execute(
+                    self.dialect_insert(UserEventFeedModel)
+                    .values(user_id=user_id, last_seq=1)
+                    .on_conflict_do_update(
+                        index_elements=[UserEventFeedModel.user_id],
+                        set_={"last_seq": UserEventFeedModel.last_seq + 1},
+                    )
+                    .returning(UserEventFeedModel.last_seq)
+                ).scalar_one()
+                session.execute(
+                    insert(UserEventModel).values(
+                        user_id=user_id, seq=seq, event_id=event_id
+                    )
+                )
+        return event_id
+
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read a non-consuming page with access filtering before pagination."""
+        accessible = exists().where(
+            SpaceParticipantTable.c.space_id == EventModel.space_id,
+            SpaceParticipantTable.c.flwr_aid == flwr_aid,
+        )
+        with self.session() as session:
+            feed = session.get(UserEventFeedModel, flwr_aid, populate_existing=True)
+            head = feed.last_seq if feed else 0
+            validate_event_cursor(after_seq, head, limit)
+            query = (
+                select(UserEventModel.seq, EventModel)
+                .join(EventModel, EventModel.event_id == UserEventModel.event_id)
+                .where(
+                    UserEventModel.user_id == flwr_aid,
+                    UserEventModel.seq > after_seq,
+                    or_(EventModel.space_id.is_(None), accessible),
+                )
+                .order_by(UserEventModel.seq)
+                .limit(limit)
+            )
+            results = [
+                StreamEventsResponse(seq=seq, event=_event_from_model(model))
+                for seq, model in session.execute(query)
+            ]
+            if not results and head > after_seq:
+                results.append(StreamEventsResponse(seq=head))
+            return results
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -1240,6 +1333,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 space = _space_from_model(model)
                 space.participants.extend(members)
+                self.store_event(
+                    EventType.SPACE_CREATED,
+                    space,
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                    space_id=model.id,
+                )
                 return space
         except IntegrityError as exc:
             raise ValueError("Invalid space participants") from exc
@@ -1309,26 +1408,48 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _space_message_from_model(model)
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            recipients = list(
+                session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                )
+            )
+            self.store_event(
+                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
+            )
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        forward = after_id is not None
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
+        if unread_only:
+            message_conditions.append(
+                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
+            )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             message_conditions.append(SpaceMessageModel.id < before_id)
@@ -1340,10 +1461,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .outerjoin(SpaceMessageModel, and_(*message_conditions))
             .where(
                 SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c.flwr_aid == flwr_aid,
+                SpaceParticipantTable.c[field] == identity,
             )
             .order_by(
-                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
+                SpaceMessageModel.id.asc()
+                if unread_only or after_id is not None
+                else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
@@ -1356,7 +1479,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for model in models
                 if model is not None
             ]
-            return messages if forward else list(reversed(messages))
+            if messages:
+                read_through = max(message.id for message in messages)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_message_id < read_through,
+                    )
+                    .values(read_through_message_id=read_through)
+                )
+            return (
+                messages
+                if unread_only or after_id is not None
+                else list(reversed(messages))
+            )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -2456,6 +2594,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .returning(NonceStoreModel.nonce)
             )
             return session.scalar(stmt) is not None
+
+
+def _event_from_model(model: EventModel) -> Event:
+    """Convert a journal row without losing protobuf JSON's integer strings."""
+    event = Event(
+        event_id=str(model.event_id),
+        type=model.type,
+        created_at=model.created_at.astimezone(UTC).isoformat(),
+    )
+    event.payload.update(model.payload)
+    event.payload.SetInParent()
+    if model.space_id is not None:
+        event.space_id = str(model.space_id)
+    return event
 
 
 def _agent_from_model(model: AgentModel) -> Agent:

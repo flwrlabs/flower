@@ -20,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from collections.abc import Callable, Generator, Sequence
@@ -164,6 +165,7 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    AGENT_RUN_BATCH_LIMIT,
     DEFAULT_FEDERATION_SIMULATION,
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
@@ -654,6 +656,18 @@ def _refresh_hub_app_in_thread(
     Thread(target=refresh, daemon=True).start()
 
 
+def _prepare_fab(content: bytes, verifications: dict[str, str]) -> Fab | None:
+    """Validate FAB size and calculate its content hash."""
+    if len(content) > FAB_MAX_SIZE:
+        log(
+            ERROR,
+            "FAB size exceeds maximum allowed size of %d bytes.",
+            FAB_MAX_SIZE,
+        )
+        return None
+    return Fab(hashlib.sha256(content).hexdigest(), content, verifications)
+
+
 def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: StartRunRequest,
     account: AccountInfo,
@@ -740,12 +754,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
     else:
         fab_file = request.fab.content
 
-    if len(fab_file) > FAB_MAX_SIZE:
-        log(
-            ERROR,
-            "FAB size exceeds maximum allowed size of %d bytes.",
-            FAB_MAX_SIZE,
-        )
+    fab = _prepare_fab(fab_file, verification_dict)
+    if fab is None:
         return StartRunResponse()
 
     override_config = user_config_from_proto(request.override_config)
@@ -760,7 +770,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
 
     try:
         # Validate user config overrides matches keys in run config in FAB
-        fab_config = get_fab_config(fab_file)
+        fab_config = get_fab_config(fab.content)
         run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
         fuse_dicts(run_config, override_config, check_keys=True)
 
@@ -794,11 +804,6 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
         )
 
         # Create run
-        fab = Fab(
-            hashlib.sha256(fab_file).hexdigest(),
-            fab_file,
-            verification_dict,
-        )
         fab_id, fab_version = get_metadata_from_config(fab_config)
         fab_app_id = f"@{fab_id}"
         if app_id is None:
@@ -1197,6 +1202,55 @@ def dispatch_automation(
     )
 
 
+def _process_pending_agent_runs(
+    state: LinkState, *, limit: int = AGENT_RUN_BATCH_LIMIT
+) -> None:
+    """Resolve eligible AgentApps and attempt to open execution windows."""
+    created = 0
+    # Scan eligible agents; limit successful admissions rather than candidates.
+    for space_id, agent in state.get_agent_run_candidates():
+        if created >= limit:
+            break
+        try:
+            # Resolve the configured FAB and validate its size and app type.
+            content, verifications, _ = _get_remote_fab(agent.config.app_spec)
+            fab = _prepare_fab(content, verifications)
+            if fab is None:
+                continue
+            config = get_fab_config(fab.content)
+            if _get_app_type(config) != TaskType.AGENT_APP:
+                raise ValueError("The agent must use an AgentApp bundle.")
+
+            # Store the resolved FAB before creating a Run that references it.
+            fab_id, version = get_metadata_from_config(config)
+            fab_hash = state.store_fab(fab)
+
+            # Enforce one open Run per agent and Space during creation.
+            run_id = state.create_run(
+                fab_id=fab_id,
+                fab_version=version,
+                fab_hash=fab_hash,
+                override_config={},
+                federation_id=None,
+                federation_config=None,
+                flwr_aid=None,
+                primary_task_type=TaskType.AGENT_APP,
+                space_id=space_id,
+                agent_id=agent.id,
+            )
+            if run_id:
+                created += 1
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            # A failed candidate must not prevent other eligible agents from starting.
+            log(
+                ERROR,
+                "Unable to start agent %d in Space %s: %s",
+                agent.id,
+                space_id,
+                exc,
+            )
+
+
 def process_due_automations(
     state: LinkState,
     *,
@@ -1273,12 +1327,16 @@ def list_runs(
     account_name = account.account_name
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
-        # If no `run_id` is specified and account auth is enabled,
-        # return run IDs for the authenticated account
+        federation_ids: list[str | None] = [
+            federation.id
+            for federation in state.federation_manager.get_federations(flwr_aid)
+        ]
+        federation_ids.append(None)  # Space runs have no federation.
         limit = request.limit if request.HasField("limit") else 20
         skip = request.skip if request.HasField("skip") else 0
         runs = state.get_run_info(
             flwr_aids=[flwr_aid],
+            federation_ids=federation_ids,
             order_by="pending_at",
             ascending=False,
             limit=limit,
@@ -1375,9 +1433,10 @@ def get_space_messages(
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
-            account.flwr_aid,
+            SpaceParticipant(flwr_aid=account.flwr_aid),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc
@@ -1646,7 +1705,10 @@ def pull_artifacts(
     state: LinkState,
     artifact_provider: ArtifactProvider | None,
 ) -> PullArtifactsResponse:
-    """Pull artifacts for a given run ID."""
+    """Pull artifacts for a given run ID.
+
+    Currently unused: the ``flwr pull`` client was never completed.
+    """
     # Check if artifact provider is configured
     if artifact_provider is None:
         raise FlowerError(
@@ -1674,9 +1736,11 @@ def pull_artifacts(
             f"status={run.status.status}, owner_aid={run.flwr_aid}.",
         )
 
-    # Check if `flwr_aid` matches the run's `flwr_aid`
+    # Require ownership and current membership for federation-scoped runs.
     flwr_aid = account.flwr_aid
     _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run)
+    if run.space_id is None:
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
     # Call artifact provider
     download_url = artifact_provider.get_url(run_id)
@@ -1982,10 +2046,20 @@ def create_federation(
             public_details=err_msg,
         )
 
-    # Construct federation ID
+    # Keep explicitly selected namespaces compatible with federation ID consumers.
+    handle = request.handle if request.HasField("handle") else account.account_name
+    if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
+        raise FlowerError(
+            ApiErrorCode.INVALID_FEDERATION_NAME,
+            "Invalid namespace handle in CreateFederation request.",
+            public_details="Namespace must contain only ASCII letters, digits, "
+            "hyphens, or underscores.",
+        )
+
+    # Preserve default initialization before delegating namespace policy and creation.
     flwr_aid = account.flwr_aid
     state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    federation_id = f"@{account.account_name}/{request.federation_name}"
+    federation_id = f"@{handle}/{request.federation_name}"
 
     runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
     state.federation_manager.can_execute(
@@ -1998,7 +2072,7 @@ def create_federation(
         ),
     )
 
-    # Create federation
+    # The manager authorizes the selected namespace for the authenticated actor.
     federation = state.federation_manager.create_federation(
         federation_id=federation_id,
         description=request.description,

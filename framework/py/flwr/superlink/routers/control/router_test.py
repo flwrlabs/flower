@@ -88,7 +88,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AccountInfo,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
@@ -184,6 +184,7 @@ def test_space_routes(
     assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
         message
     ]
+    assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
 
 
@@ -224,10 +225,11 @@ def test_create_space_rejects_other_users_agent(
     assert not state.get_spaces(_ACCOUNT.flwr_aid)
 
 
+@pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
 def test_space_history_pagination(
-    space_client: tuple[TestClient, LinkState],
+    space_client: tuple[TestClient, LinkState], unread_only: bool, expected_index: int
 ) -> None:
-    """Apply the HTTP request's exclusive cursor and page size."""
+    """Apply the HTTP request's cursor, page size, and unread filter."""
     client, state = space_client
     space = state.create_space(
         participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
@@ -240,12 +242,12 @@ def test_space_history_pagination(
     response = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(
-            space_id=space.id, before_id=last.id, limit=1
+            space_id=space.id, before_id=last.id, limit=1, unread_only=unread_only
         ).SerializeToString(),
     )
     assert response.status_code == 200
     assert list(GetSpaceMessagesResponse.FromString(response.content).messages) == [
-        messages[1]
+        messages[expected_index]
     ]
 
 
@@ -1030,6 +1032,7 @@ def test_list_runs_returns_runs_from_linkstate(
 ) -> None:
     """ListRuns applies the default and requested pagination."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.flwr_aid
     linkstate.get_run_info.return_value = [run]
@@ -1055,6 +1058,7 @@ def test_list_runs_returns_runs_from_linkstate(
     assert linkstate.get_run_info.call_args_list == [
         call(
             flwr_aids=[_ACCOUNT.flwr_aid],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=expected_limit,
@@ -1066,6 +1070,7 @@ def test_list_runs_returns_runs_from_linkstate(
 def test_list_runs_cleans_finished_runs_on_page() -> None:
     """ListRuns cleans up finished runs returned on the page."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     page_run = Run.create_empty(7)
     page_run.flwr_aid = _ACCOUNT.flwr_aid
     page_run.status.status = Status.FINISHED
@@ -1376,7 +1381,9 @@ def test_stream_logs_returns_missing_run_error_before_streaming() -> None:
 def test_pull_artifacts_returns_provider_url() -> None:
     """Return the configured provider's URL for a finished owned run."""
     linkstate = Mock(spec=LinkState)
+    linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
+    run.federation_id = NOOP_FEDERATION_ID
     run.flwr_aid = _ACCOUNT.flwr_aid
     run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
     linkstate.get_run_info.return_value = [run]

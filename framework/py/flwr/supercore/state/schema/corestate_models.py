@@ -43,7 +43,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from flwr.supercore.state.schema.types import UInt64, UTCDateTime
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONValue
 
 
 class FlwrBase(DeclarativeBase):
@@ -60,7 +60,7 @@ class Event(FlwrBase):
     event_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     type: Mapped[str] = mapped_column(Text, nullable=False)
     space_id: Mapped[UUID | None] = mapped_column(Uuid, ForeignKey("space.id"))
-    payload: Mapped[JSONObject] = mapped_column(
+    payload: Mapped[dict[str, JSONValue]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -271,7 +271,7 @@ SpaceParticipantTable = Table(
     Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
-    Column("seen_through_message_id", BigInteger, nullable=False, server_default="0"),
+    Column("read_through_message_id", BigInteger, nullable=False, server_default="0"),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
         "(flwr_aid IS NULL AND agent_id IS NOT NULL)",

@@ -256,7 +256,7 @@ erDiagram
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
-    BIGINT seen_through_message_id
+    BIGINT read_through_message_id
   }
 
   task {

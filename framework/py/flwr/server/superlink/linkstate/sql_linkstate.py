@@ -23,7 +23,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy import MetaData, bindparam, case, insert, or_, select, update
+from sqlalchemy import MetaData, Select, bindparam, case, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 
@@ -38,18 +38,23 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
-from flwr.supercore.corestate.sql_corestate import SqlCoreState
+from flwr.supercore.corestate.sql_corestate import SqlCoreState, _agent_from_model
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
+from flwr.supercore.state.schema.corestate_models import (
+    SpaceMessage as SpaceMessageModel,
+)
 from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
@@ -57,7 +62,11 @@ from flwr.supercore.state.schema.corestate_tables import create_corestate_metada
 from flwr.supercore.state.schema.linkstate_models import Node as NodeModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.utils import simulation_config_from_json, simulation_config_to_json
+from flwr.supercore.utils import (
+    parse_app_spec,
+    simulation_config_from_json,
+    simulation_config_to_json,
+)
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
@@ -425,14 +434,46 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                participant = session.scalar(
-                    select(SpaceParticipantTable.c.agent_id).where(
+                # Serialize admission before checking for an open Run.
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         SpaceParticipantTable.c.agent_id == agent_id,
                     )
+                    .values(agent_id=agent_id)
                 )
-                if participant is None:
+                open_run = (
+                    select(RunModel.run_id)
+                    .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                    .where(
+                        RunModel.space_id == space_id,
+                        RunModel.agent_id == agent_id,
+                        TaskModel.finished_at.is_(None),
+                    )
+                    .exists()
+                )
+                agent = session.scalar(
+                    select(AgentModel)
+                    .join(
+                        SpaceParticipantTable,
+                        SpaceParticipantTable.c.agent_id == AgentModel.agent_id,
+                    )
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        AgentModel.agent_id == agent_id,
+                        ~open_run,
+                    )
+                    .execution_options(populate_existing=True)
+                )
+                if agent is None:
                     return 0
+                app_id, version = parse_app_spec(agent.app_spec)
+                if app_id != f"@{fab_id}" or (version and version != fab_version):
+                    return 0
+                if not fab_hash or self.get_fab(fab_hash) is None:
+                    raise ValueError("The resolved AgentApp FAB must be stored first.")
+                flwr_aid = agent.flwr_aid
             existing_run_id = session.scalar(
                 select(RunModel.run_id).where(RunModel.run_id == run_id)
             )
@@ -515,13 +556,28 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread messages and no open Run."""
+        if limit is not None and limit <= 0:
+            return []
+        self._cleanup_expired_task_tokens()
+        with self.session() as session:
+            return [
+                (space_id, _agent_from_model(agent))
+                for space_id, agent in session.execute(
+                    _agent_run_candidates_query().limit(limit)
+                )
+            ]
+
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,
         *,
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -569,7 +625,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if federation_ids is not None:
             if not federation_ids:
                 return []
-            stmt = stmt.where(RunModel.federation_id.in_(federation_ids))
+            federation_conditions = [RunModel.federation_id.in_(federation_ids)]
+            # SQL IN does not match NULL; include Space runs explicitly.
+            if None in federation_ids:
+                federation_conditions.append(RunModel.federation_id.is_(None))
+            stmt = stmt.where(or_(*federation_conditions))
 
         if order_by is not None:
             order_column = TaskModel.pending_at
@@ -880,4 +940,43 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         series_id=run.series_id or 0,
         space_id=run.space_id,
         agent_id=run.agent_id,
+    )
+
+
+def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
+    """Select participating agents with unread messages and no open primary Task."""
+    unread = (
+        select(SpaceMessageModel.id)
+        .where(
+            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
+            SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
+        )
+        .exists()
+    )
+    open_run = (
+        select(RunModel.run_id)
+        .join(
+            TaskModel,
+            TaskModel.task_id == RunModel.primary_task_id,
+        )
+        .where(
+            RunModel.space_id == SpaceParticipantTable.c.space_id,
+            RunModel.agent_id == AgentModel.agent_id,
+            TaskModel.finished_at.is_(None),
+        )
+        .correlate(SpaceParticipantTable, AgentModel)
+        .exists()
+    )
+    return (
+        select(SpaceParticipantTable.c.space_id, AgentModel)
+        .join(
+            AgentModel,
+            AgentModel.agent_id == SpaceParticipantTable.c.agent_id,
+        )
+        .where(unread, ~open_run)
+        .order_by(
+            SpaceParticipantTable.c.space_id,
+            AgentModel.agent_id,
+        )
+        .execution_options(populate_existing=True)
     )
