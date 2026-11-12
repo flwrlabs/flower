@@ -187,6 +187,7 @@ def create_app(  # pylint: disable=too-many-statements
     fastapi_app = FastAPI(
         title="SuperLink API",
         version=package_version,
+        # Register /docs below with the protobuf Swagger UI plugin.
         docs_url=None,
         redoc_url=None,
         lifespan=lifespan,
