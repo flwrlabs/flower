@@ -49,6 +49,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
@@ -106,9 +107,9 @@ def _create_running_task(
 ) -> str:
     """Create and activate a primary task, returning its token."""
     run_id = state.create_run(
-        "",
-        "",
-        "",
+        "flwr/app",
+        "1.0",
+        state.store_fab(Fab("", b"fab", {})),
         {},
         NOOP_FEDERATION_ID if space_id is None else None,
         None,
@@ -117,6 +118,7 @@ def _create_running_task(
         space_id=space_id,
         agent_id=agent_id,
     )
+    assert run_id
     task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
