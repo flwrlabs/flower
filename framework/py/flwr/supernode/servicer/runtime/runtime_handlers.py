@@ -345,25 +345,35 @@ def send_space_message(
 def get_compacted_contexts(
     request: GetCompactedContextsRequest, state: NodeState, task: Task
 ) -> GetCompactedContextsResponse:
-    """Get summaries for the authenticated task's run series."""
+    """Get summaries for the agent."""
     run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
-    return core_runtime_handlers.get_compacted_contexts(request, state, run.series_id)
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Compacted contexts require a Run bound to an agent.",
+        )
+    return core_runtime_handlers.get_compacted_contexts(request, state, run.agent_id)
 
 
 def put_compacted_context(
     request: PutCompactedContextRequest, state: NodeState, task: Task
 ) -> PutCompactedContextResponse:
-    """Store a summary for the authenticated task's run series."""
+    """Store a summary for the agent."""
     run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
-    return core_runtime_handlers.put_compacted_context(request, state, run.series_id)
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Compacted contexts require a Run bound to an agent.",
+        )
+    return core_runtime_handlers.put_compacted_context(request, state, run.agent_id)
 
 
 def start_automation(
