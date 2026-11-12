@@ -626,6 +626,9 @@ def test_worker_uses_separate_input_paths(
     if space_run:
         pull.assert_not_called()
         assert agent.prompt == ""
+        assert agent.grid.tools() == []
+        with pytest.raises(NotImplementedError):
+            agent.grid.call({"name": "get_nodes"})
         assert {
             tool["name"]
             for tool in agent.connectors.tools(
@@ -645,6 +648,9 @@ def test_worker_uses_separate_input_paths(
         grid._runtime_client.GetCompactedContexts.assert_not_called()
         grid._runtime_client.PutCompactedContext.assert_not_called()
         grid._runtime_client.PushTaskEvents.assert_not_called()
+        grid._runtime_client.GetNodes.assert_not_called()
+        grid._runtime_client.PushMessages.assert_not_called()
+        grid._runtime_client.PullMessages.assert_not_called()
     else:
         publisher = run_agentapp_module.RuntimeAgentEvents.return_value
         assert agent.events is publisher

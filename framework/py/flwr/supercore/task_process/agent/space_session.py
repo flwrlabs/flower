@@ -17,6 +17,7 @@
 from collections.abc import Sequence
 from typing import cast
 
+from flwr.agentapp import AgentGrid
 from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
@@ -25,7 +26,6 @@ from flwr.supercore.task_process.connector.registry import (
 from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import HttpGrid
 
-from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
@@ -69,6 +69,20 @@ class _SpaceAgentConnectors(RuntimeAgentConnectors):
         return super().call(tool_call)
 
 
+class _SpaceAgentGrid(AgentGrid):
+    """Disable federation Grid tools for Space sessions."""
+
+    def tools(self) -> list[JSONObject]:
+        """Expose no federation Grid tool schemas."""
+        return []
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Reject Grid calls before making Runtime requests."""
+        raise NotImplementedError(
+            "Space sessions do not support federation Grid tools."
+        )
+
+
 def create_space_session(
     grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
@@ -81,12 +95,12 @@ def create_space_session(
     events : SpaceAgentEvents
         Task event publisher shared with the worker lifecycle.
     task_input : PullTaskInputResponse
-        Accepted Run, Task, and node identifiers.
+        Accepted Run and Task identifiers.
 
     Returns
     -------
     RuntimeAgentSession
-        Session with built-in connectors and no automations or compacted contexts.
+        Session with built-in connectors and federation Grid tools disabled.
     """
     runtime = AgentRuntime(
         stub=grid._runtime_client,  # pylint: disable=protected-access
@@ -98,5 +112,5 @@ def create_space_session(
         prompt="",
         connectors=_SpaceAgentConnectors(runtime),
         events=events,
-        grid=RuntimeAgentGrid(grid, events, task_input.context.node_id),
+        grid=_SpaceAgentGrid(),
     )
