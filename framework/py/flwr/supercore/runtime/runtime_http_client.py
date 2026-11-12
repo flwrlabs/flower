@@ -74,6 +74,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
@@ -243,6 +249,28 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetSpaceEvents",
             request=request,
             response_type=GetSpaceEventsResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Read messages from the authenticated task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-messages",
+            rpc_method="/flwr.proto.Runtime/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
+        )
+
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Publish a message as an agent participant in the task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/send-space-message",
+            rpc_method="/flwr.proto.Runtime/SendSpaceMessage",
+            request=request,
+            response_type=SendSpaceMessageResponse,
         )
 
     def GetCompactedContexts(

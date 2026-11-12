@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from google.protobuf.message import Message
 from httpx import Response
 
+from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetConnectorRequest,
     GetConnectorResponse,
@@ -30,6 +31,13 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
@@ -41,6 +49,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.dependencies.runtime import get_runtime_state
 from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import PROTOBUF_MEDIA_TYPE
 from flwr.supercore.protobuf.translation import ProtobufTranslationMiddleware
@@ -90,12 +99,26 @@ def _post(
 
 
 def _create_running_task(
-    state: LinkState, primary_task_type: str = TaskType.SERVER_APP
+    state: LinkState,
+    primary_task_type: str = TaskType.SERVER_APP,
+    *,
+    space_id: UUID | None = None,
+    agent_id: int | None = None,
 ) -> str:
     """Create and activate a primary task, returning its token."""
     run_id = state.create_run(
-        "", "", "", {}, NOOP_FEDERATION_ID, None, "", primary_task_type
+        "flwr/app",
+        "1.0",
+        state.store_fab(Fab("", b"fab", {})),
+        {},
+        NOOP_FEDERATION_ID if space_id is None else None,
+        None,
+        "",
+        primary_task_type,
+        space_id=space_id,
+        agent_id=agent_id,
     )
+    assert run_id
     task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
@@ -211,3 +234,44 @@ def test_get_space_events_reads_only_authenticated_space(
     events = GetSpaceEventsResponse.FromString(response.content).events
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
+
+
+def test_space_messages_use_authenticated_run(
+    client: TestClient, state: LinkState
+) -> None:
+    """Read and publish with the authenticated Run's Space and agent identity."""
+    agent = state.create_agent("alice", AgentConfig(name="agent", app_spec="@flwr/app"))
+    assert agent is not None
+    participant = SpaceParticipant(agent_id=agent.id)
+    space = state.create_space(participants=[participant])
+    token = _create_running_task(
+        state, TaskType.AGENT_APP, space_id=UUID(space.id), agent_id=agent.id
+    )
+    for path, request in (
+        ("get-space-messages", GetSpaceMessagesRequest()),
+        ("send-space-message", SendSpaceMessageRequest(content="Hello")),
+    ):
+        assert _post(client, path, request).status_code == 401
+
+    response = _post(
+        client,
+        "send-space-message",
+        SendSpaceMessageRequest(space_id="ignored", content="Hello"),
+        token=token,
+    )
+    assert response.status_code == 200
+    message = SendSpaceMessageResponse.FromString(response.content).message
+    assert message.author == participant
+    assert message.space_id == space.id and message.content == "Hello"
+
+    for expected in ([message], []):
+        response = _post(
+            client,
+            "get-space-messages",
+            GetSpaceMessagesRequest(space_id="ignored", unread_only=True),
+            token=token,
+        )
+        assert response.status_code == 200
+        assert (
+            GetSpaceMessagesResponse.FromString(response.content).messages == expected
+        )

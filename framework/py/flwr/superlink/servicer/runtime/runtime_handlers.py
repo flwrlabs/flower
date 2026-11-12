@@ -64,6 +64,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
@@ -72,6 +78,7 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
@@ -127,6 +134,34 @@ def get_space_events(
             "This endpoint is only available to Space tasks.",
         )
     return core_runtime_handlers.get_space_events(request, state, space_id)
+
+
+def _get_task_run(state: LinkState, task: Task) -> Run:
+    """Resolve the authenticated task's Run."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return runs[0]
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: LinkState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Read messages within the authenticated task's Space grant."""
+    return core_runtime_handlers.get_space_messages(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: LinkState, task: Task
+) -> SendSpaceMessageResponse:
+    """Publish with the primary AgentApp's server-bound agent identity."""
+    return core_runtime_handlers.send_space_message(
+        request, state, task, _get_task_run(state, task)
+    )
 
 
 def get_compacted_contexts(
