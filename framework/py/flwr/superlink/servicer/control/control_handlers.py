@@ -1254,7 +1254,7 @@ def dispatch_automation(
     )
 
 
-def _process_pending_agent_runs(
+def process_pending_agent_runs(
     state: LinkState, *, limit: int = AGENT_RUN_BATCH_LIMIT
 ) -> None:
     """Resolve eligible AgentApps and attempt to open execution windows."""
