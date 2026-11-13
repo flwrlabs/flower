@@ -433,7 +433,9 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.state.get_run.return_value = run
         event = TaskEvent(id=11, run_id=10, event="message", data="{}")
         self.state.get_task_events.return_value = [event]
-        request = GetSpaceEventsRequest(after_event_id=5, last_n=1)
+        request = GetSpaceEventsRequest(
+            after_event_id=5, last_n=1, event_types=["message"]
+        )
 
         response = runtime_handlers.get_space_events(
             request, self.state, Task(run_id=10)
@@ -443,6 +445,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.state.get_run.assert_called_once_with(10)
         self.state.get_task_events.assert_called_once_with(
             space_id=space_id,
+            event_types=["message"],
             after_task_event_id=5,
             before_task_event_id=None,
             last_n=1,
