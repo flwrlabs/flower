@@ -106,6 +106,23 @@ def _is_amd_render_node(node: str) -> bool:
         return True
 
 
+def _can_open_device(path: str) -> bool:
+    """Whether `path` can actually be opened for read/write.
+
+    `os.access()` only consults the device node's permission bits via `stat(2)`;
+    a container's devices cgroup can deny the `open(2)` itself with `EPERM`
+    independently of those bits, which `os.access()` does not detect, so it can
+    report a device as accessible when it is not. Attempting the real open
+    avoids that false positive.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except OSError:
+        return False
+    os.close(fd)
+    return True
+
+
 def _log_kfd_diagnostics() -> None:
     """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
 
@@ -115,7 +132,7 @@ def _log_kfd_diagnostics() -> None:
     if not os.path.exists("/dev/kfd"):
         return
 
-    if not os.access("/dev/kfd", os.R_OK | os.W_OK):
+    if not _can_open_device("/dev/kfd"):
         log(
             WARNING,
             "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
@@ -139,9 +156,7 @@ def _log_kfd_diagnostics() -> None:
     # `amdsmi`/ROCM_PATH -- the fix for the common case below -- would not help
     # at all.
     render_nodes = glob.glob("/dev/dri/renderD*")
-    accessible_render_nodes = [
-        node for node in render_nodes if os.access(node, os.R_OK | os.W_OK)
-    ]
+    accessible_render_nodes = [node for node in render_nodes if _can_open_device(node)]
     # A hybrid host or container can expose an accessible render node that ROCm
     # cannot use (e.g. an integrated Intel GPU's renderD128) while the AMD one is
     # missing or permission-denied; only an AMD-backed node rules out a device

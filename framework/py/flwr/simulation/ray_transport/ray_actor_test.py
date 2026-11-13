@@ -145,7 +145,7 @@ class TestPoolSizeFromResources(TestCase):
                 return_value=True,
             ),
             patch(
-                "flwr.simulation.ray_transport.ray_actor.os.access",
+                "flwr.simulation.ray_transport.ray_actor._can_open_device",
                 return_value=False,
             ),
         ):
@@ -172,7 +172,7 @@ class TestPoolSizeFromResources(TestCase):
                 return_value=True,
             ),
             patch(
-                "flwr.simulation.ray_transport.ray_actor.os.access",
+                "flwr.simulation.ray_transport.ray_actor._can_open_device",
                 return_value=True,
             ),
             patch(
@@ -215,7 +215,7 @@ class TestPoolSizeFromResources(TestCase):
                 return_value=True,
             ),
             patch(
-                "flwr.simulation.ray_transport.ray_actor.os.access",
+                "flwr.simulation.ray_transport.ray_actor._can_open_device",
                 return_value=True,
             ),
             patch(
@@ -250,7 +250,7 @@ class TestPoolSizeFromResources(TestCase):
                 return_value=True,
             ),
             patch(
-                "flwr.simulation.ray_transport.ray_actor.os.access",
+                "flwr.simulation.ray_transport.ray_actor._can_open_device",
                 return_value=True,
             ),
             patch(
@@ -294,7 +294,7 @@ class TestPoolSizeFromResources(TestCase):
                 return_value=True,
             ),
             patch(
-                "flwr.simulation.ray_transport.ray_actor.os.access",
+                "flwr.simulation.ray_transport.ray_actor._can_open_device",
                 return_value=True,
             ),
             patch(

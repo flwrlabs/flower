@@ -496,7 +496,7 @@ run actually uses, in which case this check validates the wrong cluster and a no
 .. code-block:: shell
 
     RAY_ADDRESS=<the address your run connects with> \
-        python -c "import ray; ray.init(address='auto'); print(ray.cluster_resources()); ray.shutdown()"
+        python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
 
 The output must contain a non-zero ``GPU`` entry:
 
