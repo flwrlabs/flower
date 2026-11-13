@@ -179,9 +179,10 @@ previous section without adding a GPU request. The SuperNode coordinates the wor
 does not execute the ClientApp, so it does not need access to the GPU.
 
 Request the GPU only in the SuperExec job. The ClientApp process then inherits the
-SuperExec environment, including ``CUDA_VISIBLE_DEVICES``. Configure both batch scripts
-with the same ``<partition>`` and ``<compute-node>`` values so that they run together on
-the GPU-capable node.
+SuperExec environment, including the GPU visibility variable that Slurm sets:
+``CUDA_VISIBLE_DEVICES`` on NVIDIA GPUs, ``ROCR_VISIBLE_DEVICES`` on AMD GPUs. Configure
+both batch scripts with the same ``<partition>`` and ``<compute-node>`` values so that
+they run together on the GPU-capable node.
 
 Create ``superexec-clientapp-gpu.sbatch``:
 
@@ -203,7 +204,24 @@ Create ``superexec-clientapp-gpu.sbatch``:
 
     export FLWR_HOME="${SLURM_TMPDIR:-/tmp}/flower-${SLURM_JOB_ID}"
 
-    if [[ -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+    # Slurm names the assigned devices per vendor: CUDA_VISIBLE_DEVICES on NVIDIA,
+    # ROCR_VISIBLE_DEVICES on AMD. Some Slurm AMD GRES setups express a no-device
+    # allocation as ROCR_VISIBLE_DEVICES=-1 rather than leaving it unset or empty, and
+    # Slurm's GPU GRES integration documents a "NoDevFiles" sentinel -- on either
+    # vendor -- for the case where an allocation has no bound GPU device files (see
+    # the AMD simulation guide's discussion of both sentinels), so check each variable
+    # on its own instead of concatenating them -- concatenation would let either
+    # nonempty sentinel masquerade as an assigned device and pass a plain emptiness
+    # check.
+    no_gpu=1
+    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" && "${CUDA_VISIBLE_DEVICES}" != "NoDevFiles" ]]; then
+        no_gpu=0
+    fi
+    if [[ -n "${ROCR_VISIBLE_DEVICES:-}" && "${ROCR_VISIBLE_DEVICES}" != "-1" \
+            && "${ROCR_VISIBLE_DEVICES}" != "NoDevFiles" ]]; then
+        no_gpu=0
+    fi
+    if [[ "$no_gpu" -eq 1 ]]; then
         echo "Slurm did not assign a GPU to this job." >&2
         exit 1
     fi
@@ -231,7 +249,8 @@ job:
 
 The ClientApp environment must include a GPU-enabled version of its machine learning
 framework and the required GPU libraries. For example, a PyTorch ClientApp can use the
-device that Slurm exposes through ``CUDA_VISIBLE_DEVICES``.
+device that Slurm exposes, through ``CUDA_VISIBLE_DEVICES`` on NVIDIA GPUs or
+``ROCR_VISIBLE_DEVICES`` on AMD GPUs.
 
 ************************************************
  Discover the SuperNode address from its job ID
