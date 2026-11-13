@@ -189,6 +189,22 @@ def put_compacted_context(
     )
 
 
+def _get_agent_id(state: LinkState, task: Task) -> int:
+    """Resolve the authenticated task's agent ID for file scoping."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    run = runs[0] if runs else None
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint requires a Run bound to an agent.",
+        )
+    return run.agent_id
+
+
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
     """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)

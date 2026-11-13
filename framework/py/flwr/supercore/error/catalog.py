@@ -393,4 +393,8 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         public_message="The file operation could not be completed because it "
         "already exists, is missing, or has a different revision than expected.",
     ),
+    ApiErrorCode.RUNTIME_INVALID_FILE_KEY: ApiErrorSpec(
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="File key must not be empty or whitespace-only.",
+    ),
 }
