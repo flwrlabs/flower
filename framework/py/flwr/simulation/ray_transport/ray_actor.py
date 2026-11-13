@@ -206,16 +206,18 @@ def _log_kfd_diagnostics() -> None:
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
-def _is_loopback_ray_client() -> bool:
-    """Whether a connected Ray Client server targets this same host.
+def _ray_client_conn_host() -> str | None:
+    """Return the host this process's Ray Client connection targets, if known.
 
-    `ray://127.0.0.1:10001`-style addresses put the Ray Client server in the same
-    host (and device) namespace as this process, unlike an address naming another
-    machine, so a local AMD permission/`amdsmi` failure is still the actionable
-    diagnosis here. No public Ray API exposes the connected host; the private
-    `client_worker._conn_str` is read best-effort, and any failure to read it is
-    treated as "not loopback" rather than raised, since this only gates whether an
-    extra local check is skipped.
+    No public Ray API exposes the connected host; the private
+    `client_worker._conn_str` is read best-effort, and any failure to read it
+    returns `None` rather than raising, since this only feeds a diagnostic
+    message. A `127.0.0.1`/`::1`/`localhost` endpoint does not by itself prove
+    the Ray Client server shares this process's device namespace: an SSH port
+    forward or a sidecar container that only shares this host's network
+    namespace presents the same loopback address while `/dev` belongs to a
+    different machine or container, so callers must treat a loopback result as
+    ambiguous rather than as confirmation of co-location.
     """
     try:
         client_worker = (
@@ -223,9 +225,8 @@ def _is_loopback_ray_client() -> bool:
         )
         conn_str: str = client_worker._conn_str  # pylint: disable=protected-access
     except AttributeError:
-        return False
-    host = conn_str.rsplit(":", 1)[0].strip("[]")
-    return host in _LOOPBACK_HOSTS
+        return None
+    return conn_str.rsplit(":", 1)[0].strip("[]")
 
 
 def _log_node_locality_diagnostics(
@@ -263,32 +264,52 @@ def _log_node_locality_diagnostics(
             "just here.",
             active_node_count,
         )
-    elif (
-        ray.util.client.ray.is_connected()  # type: ignore[no-untyped-call]
-        and not _is_loopback_ray_client()
-    ):
+    elif ray.util.client.ray.is_connected():  # type: ignore[no-untyped-call]
         # `ray.init("ray://host:port")` (Ray Client) proxies
         # `get_runtime_context()` into the remote cluster, so it returns the
         # *server's* node ID -- which then trivially equals the sole
         # `active_node_id` from `ray.nodes()` even though this process's own
-        # `/dev` is on the client host, not the cluster node. A NodeID
-        # comparison can therefore never detect this remote case; checking
-        # `ray.util.client.ray.is_connected()` instead. That alone would also
-        # catch a same-host `ray://127.0.0.1:10001` connection though, where
-        # this host's `/dev` *is* the cluster node's -- `_is_loopback_ray_client`
-        # excludes that case so it still falls through to the local KFD probe
-        # below (the NodeID comparison trivially passes there too, since Ray
-        # Client always proxies the server's own ID).
-        log(
-            WARNING,
-            "This process connected to the Ray cluster over Ray Client "
-            "(a `ray://` address), so it runs on a different host than the "
-            "cluster node (NodeID=%s) that reported zero GPUs. Checking "
-            "`/dev/kfd` and `/dev/dri/renderD*` on this host cannot "
-            "diagnose a device on the remote cluster node; check device "
-            "access there instead.",
-            active_node_id,
-        )
+        # `/dev` is not necessarily on the client host. A NodeID comparison can
+        # therefore never detect this case; checking
+        # `ray.util.client.ray.is_connected()` instead. A loopback connection
+        # endpoint (`ray://127.0.0.1:10001`) does not by itself prove this
+        # host's `/dev` is the cluster node's -- an SSH port forward or a
+        # sidecar sharing only the network namespace presents the same
+        # endpoint while the server's `/dev` is elsewhere -- so that case is
+        # flagged as ambiguous rather than excluded, and the local KFD probe
+        # still runs afterwards in case the loopback connection does turn out
+        # to be genuinely co-located.
+        conn_host = _ray_client_conn_host()
+        if conn_host is not None and conn_host in _LOOPBACK_HOSTS:
+            log(
+                WARNING,
+                "This process connected to the Ray cluster over Ray Client "
+                "at a loopback address (%s). That usually means the Ray "
+                "Client server runs on this same host, but an SSH port "
+                "forward or a sidecar container that only shares this "
+                "host's network namespace can present the same loopback "
+                "endpoint while the Ray Client server's `/dev` belongs to a "
+                "different machine or container. The `/dev/kfd` and "
+                "`/dev/dri/renderD*` check that follows assumes they are "
+                "shared with the cluster node (NodeID=%s) that reported "
+                "zero GPUs; if that assumption turns out to be wrong, check "
+                "device access on the actual Ray Client server host "
+                "instead.",
+                conn_host,
+                active_node_id,
+            )
+            _log_kfd_diagnostics()
+        else:
+            log(
+                WARNING,
+                "This process connected to the Ray cluster over Ray Client "
+                "(a `ray://` address), so it runs on a different host than "
+                "the cluster node (NodeID=%s) that reported zero GPUs. "
+                "Checking `/dev/kfd` and `/dev/dri/renderD*` on this host "
+                "cannot diagnose a device on the remote cluster node; check "
+                "device access there instead.",
+                active_node_id,
+            )
     elif active_node_id is not None and active_node_id != (
         driver_node_id := ray.get_runtime_context().get_node_id()
     ):

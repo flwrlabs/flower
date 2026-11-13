@@ -275,49 +275,63 @@ exported, silently leaving Ray's original import failure in place:
         else
             _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))
         fi
-        if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
+    fi
+    if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
+        # Only synthesize a value when ROCR_VISIBLE_DEVICES is set -- `_n` is
+        # otherwise unknown, and there is nothing to derive a mask from.
+        if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
             if [ "$_n" -gt 0 ]; then
                 export HIP_VISIBLE_DEVICES="$(seq -s, 0 $((_n - 1)))"
             else
                 export HIP_VISIBLE_DEVICES=""
             fi
-        else
-            _bad=0
-            if [[ "$HIP_VISIBLE_DEVICES" == *, ]]; then
-                # A trailing comma leaves `read -ra` one field short of what Ray
-                # gets from splitting the raw string itself, so check the raw
-                # string before trusting the parsed array's field count.
-                _bad=1
+        fi
+    else
+        # The syntax/duplicate checks below must run even when
+        # ROCR_VISIBLE_DEVICES is unset -- an existing HIP_VISIBLE_DEVICES can
+        # be malformed (e.g. `0,0` or `0,1,`) independently of ROCr, and Ray
+        # still sizes its advertised GPU resources from this mask either way.
+        # Only the ordinal-bounds check below needs `_n`, so it alone stays
+        # conditional on ROCR_VISIBLE_DEVICES being set.
+        _bad_syntax=0
+        _bad_range=0
+        if [[ "$HIP_VISIBLE_DEVICES" == *, ]]; then
+            # A trailing comma leaves `read -ra` one field short of what Ray
+            # gets from splitting the raw string itself, so check the raw
+            # string before trusting the parsed array's field count.
+            _bad_syntax=1
+        fi
+        _norm_ids=()
+        IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
+        for _id in "${_hip_ids[@]}"; do
+            if ! [[ "$_id" =~ ^[0-9]+$ ]]; then
+                _bad_syntax=1
+                continue
             fi
-            _norm_ids=()
-            IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
-            for _id in "${_hip_ids[@]}"; do
-                if ! [[ "$_id" =~ ^[0-9]+$ ]]; then
-                    _bad=1
-                    continue
-                fi
-                # Compare digit-string lengths rather than `[ "$_id" -ge "$_n"
-                # ]` directly: an all-digit ordinal outside Bash's integer
-                # range (e.g. a mistyped 30-digit value) makes that
-                # comparison fail with "integer expression expected" and a
-                # nonzero exit status -- which the original `||` chain
-                # treated as false, silently accepting an out-of-range
-                # ordinal. `_n` is always small, so a trimmed ordinal with
-                # more digits than `_n` is unambiguously too large without
-                # needing arithmetic on it, and one with the same digit
-                # count is bounded by `_n`'s own magnitude, so comparing it
-                # numerically is safe.
-                _trimmed_id="${_id#"${_id%%[!0]*}"}"
-                [ -z "$_trimmed_id" ] && _trimmed_id=0
-                if [ "${#_trimmed_id}" -gt "${#_n}" ] ||
-                    { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; then
-                    _bad=1
-                else
-                    _norm_ids+=("$((10#$_id))")
-                fi
-            done
-            _dup=$(printf '%s\n' "${_norm_ids[@]}" | sort -n | uniq -d | paste -sd ',')
-            if [ "$_bad" -eq 1 ]; then
+            # Compare digit-string lengths rather than `[ "$_id" -ge "$_n"
+            # ]` directly: an all-digit ordinal outside Bash's integer
+            # range (e.g. a mistyped 30-digit value) makes that
+            # comparison fail with "integer expression expected" and a
+            # nonzero exit status -- which the original `||` chain
+            # treated as false, silently accepting an out-of-range
+            # ordinal. `_n` is always small, so a trimmed ordinal with
+            # more digits than `_n` is unambiguously too large without
+            # needing arithmetic on it, and one with the same digit
+            # count is bounded by `_n`'s own magnitude, so comparing it
+            # numerically is safe.
+            _trimmed_id="${_id#"${_id%%[!0]*}"}"
+            [ -z "$_trimmed_id" ] && _trimmed_id=0
+            if [ -n "${ROCR_VISIBLE_DEVICES+x}" ] &&
+                { [ "${#_trimmed_id}" -gt "${#_n}" ] ||
+                    { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; }; then
+                _bad_range=1
+            else
+                _norm_ids+=("$((10#$_id))")
+            fi
+        done
+        _dup=$(printf '%s\n' "${_norm_ids[@]}" | sort -n | uniq -d | paste -sd ',')
+        if [ "$_bad_syntax" -eq 1 ] || [ "$_bad_range" -eq 1 ]; then
+            if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "valid selection of ordinals 0..$((_n - 1)) -- the only" \
                      "ordinals ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES exposes" \
@@ -328,19 +342,28 @@ exported, silently leaving Ray's original import failure in place:
                      "GPU. Unset HIP_VISIBLE_DEVICES and re-run this snippet, or" \
                      "correct it to ordinals in that range with no stray" \
                      "separators." >&2
-            elif [ -n "$_dup" ]; then
-                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
-                     "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
-                     "sizes its advertised GPU resources from the length of this" \
-                     "mask, so a repeated ordinal creates two schedulable slots" \
-                     "that both map to the same ROCr-visible device, letting" \
-                     "concurrent ClientApps collide on it. Left unchanged, so" \
-                     "remove the duplicate and re-run this snippet." >&2
+            else
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
+                     "well-formed comma-separated list of ordinals -- it has a" \
+                     "non-numeric value, or a stray leading, trailing, or" \
+                     "doubled comma. ROCR_VISIBLE_DEVICES is not set, so no" \
+                     "known bound exists to validate ordinals against; left" \
+                     "unchanged, so Ray may advertise the wrong number of GPU" \
+                     "slots or none at all. Correct it to a well-formed" \
+                     "comma-separated list of ordinals." >&2
             fi
-            unset _hip_ids _id _bad _dup _norm_ids _trimmed_id
+        elif [ -n "$_dup" ]; then
+            echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
+                 "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
+                 "sizes its advertised GPU resources from the length of this" \
+                 "mask, so a repeated ordinal creates two schedulable slots" \
+                 "that both map to the same ROCr-visible device, letting" \
+                 "concurrent ClientApps collide on it. Left unchanged, so" \
+                 "remove the duplicate and re-run this snippet." >&2
         fi
-        unset _n
+        unset _hip_ids _id _bad_syntax _bad_range _dup _norm_ids _trimmed_id
     fi
+    unset _n
 
 .. important::
 
@@ -451,11 +474,29 @@ First, the framework:
 
     python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"
 
+This check is local to whichever host you run it on. On a :ref:`multi-node cluster
+<multinodesimulations>`, running it only on the driver/head node is not representative of
+the whole cluster: a CPU-only head correctly reports ``False, 0`` here even though Ray
+can still place GPU ``ClientApp``\s on separate worker nodes. Run it on each node that is
+expected to have a GPU, not just the driver.
+
 Then Ray, which is what the Simulation Runtime actually schedules against:
 
 .. code-block:: shell
 
     python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
+
+If your run connects to an existing cluster through a specific ``address`` -- whether via
+``RAY_ADDRESS``, an ``--init-args-address`` passed to the Simulation Runtime, or a
+manually started multi-node cluster -- reuse that same address here. A bare ``ray.init()``
+with no address can start or attach to a *different* local cluster instead of the one your
+run actually uses, in which case this check validates the wrong cluster and a non-zero
+``GPU`` result tells you nothing about the one that matters:
+
+.. code-block:: shell
+
+    RAY_ADDRESS=<the address your run connects with> \
+        python -c "import ray; ray.init(address='auto'); print(ray.cluster_resources()); ray.shutdown()"
 
 The output must contain a non-zero ``GPU`` entry:
 
