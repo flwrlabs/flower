@@ -36,6 +36,7 @@ from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -171,6 +172,7 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
         assert not context_from_proto(response.context).state
         assert response.fab.hash_str == fab_hash
         assert not response.HasField("federation_config")
+        assert not response.HasField("agent")
         assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
         output = Context(
             run_id=run_id,
@@ -204,6 +206,51 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
     assert response.context.series_id == 0
     assert not context_from_proto(response.context).state
     assert state.get_run_series() == []
+
+
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> None:
+    """Resolve an accountless agent run to its owner and supply its identity."""
+    database = (
+        FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
+    )
+    state = LinkStateFactory(
+        database, NoOpFederationManager(), ObjectStoreFactory()
+    ).state()
+    agent = state.create_agent(
+        "alice",
+        AgentConfig(
+            name="Research", app_spec="@publisher/app", description="Cite sources."
+        ),
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+    fab_hash = state.store_fab(
+        Fab(hashlib.sha256(b"agentapp-fab").hexdigest(), b"agentapp-fab", {})
+    )
+    run_id = state.create_run(
+        "publisher/app",
+        "1.0",
+        fab_hash,
+        {},
+        None,
+        None,
+        None,
+        TaskType.AGENT_APP,
+        space_id=space_id,
+        agent_id=agent.id,
+    )
+    assert run_id
+    assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
+    )
+    assert acquired.task.run_id == run_id
+    response = runtime_handlers.pull_task_input(
+        PullTaskInputRequest(), state, acquired.task
+    )
+
+    assert response.agent == agent
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

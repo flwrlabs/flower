@@ -755,6 +755,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return agent
 
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an agent owned by the account."""
+        with self.session() as session:
+            model = session.scalar(
+                select(AgentModel).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
+            return _agent_from_model(model) if model is not None else None
+
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:

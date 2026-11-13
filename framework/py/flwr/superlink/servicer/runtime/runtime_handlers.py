@@ -387,6 +387,11 @@ def pull_task_input(
     runs = state.get_run_info(run_ids=[run_id])
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
+    agent = (
+        state.get_agent(run.flwr_aid, run.agent_id)
+        if run and run.agent_id is not None
+        else None
+    )
     context = None
     if run:
         if not run.federation_id:
@@ -403,6 +408,7 @@ def pull_task_input(
                 state.get_federation_config(run_id) if run.federation_id else None
             ),
             task_id=task.task_id,
+            agent=agent,
         )
 
     raise FlowerError(

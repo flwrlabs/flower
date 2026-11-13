@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/fab.proto";
+import "flwr/proto/control.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/file.proto";
 import "flwr/proto/message.proto";
@@ -130,6 +131,7 @@ message PullTaskInputResponse {
   Fab fab = 3;
   SimulationConfig federation_config = 4;
   uint64 task_id = 5;
+  Agent agent = 6;
 }
 
 // PushTaskOutput messages
