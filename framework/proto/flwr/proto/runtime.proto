@@ -85,6 +85,8 @@ message GetSpaceEventsRequest {
   // Select newest matching events; zero means no limit.
   // Response remains in ascending ID order.
   uint32 last_n = 3;
+  // Empty means all event types.
+  repeated string event_types = 4;
 }
 message GetSpaceEventsResponse { repeated TaskEvent events = 1; }
 

@@ -323,7 +323,12 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     state.get_run_info.return_value = [Mock(space_id=space_id)]
     expected_event = TaskEvent(id=11, run_id=123, event="message", data="{}")
     state.get_task_events.return_value = [expected_event]
-    request = GetSpaceEventsRequest(after_event_id=10, before_event_id=20, last_n=1)
+    request = GetSpaceEventsRequest(
+        after_event_id=10,
+        before_event_id=20,
+        last_n=1,
+        event_types=["message"],
+    )
 
     response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
 
@@ -331,6 +336,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     state.get_run_info.assert_called_once_with(run_ids=[123])
     state.get_task_events.assert_called_once_with(
         space_id=space_id,
+        event_types=["message"],
         after_task_event_id=10,
         before_task_event_id=20,
         last_n=1,
