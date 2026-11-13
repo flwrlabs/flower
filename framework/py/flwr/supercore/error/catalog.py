@@ -235,6 +235,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_404_NOT_FOUND,
         public_message="Space not found.",
     ),
+    ApiErrorCode.INVALID_USER_EVENT_CURSOR: ApiErrorSpec(
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="Invalid user event cursor.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",
@@ -382,7 +386,7 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ),
     ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS: ApiErrorSpec(
         http_status_code=status.HTTP_409_CONFLICT,
-        public_message="Compacted context already exists for this event in the series.",
+        public_message="Compacted context already exists for this agent and event.",
     ),
     ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT: ApiErrorSpec(
         http_status_code=status.HTTP_409_CONFLICT,

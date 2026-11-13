@@ -1226,16 +1226,16 @@ class InMemoryCoreState(
             return self.run_series_context_store.get(series_id)
 
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         with self.lock_compacted_context_store:
             contexts = [
                 context
                 for context in self.compacted_context_store.values()
-                if context.series_id == series_id
+                if context.agent_id == agent_id
                 and (before_context_id is None or context.id < before_context_id)
             ]
             return sorted(contexts, key=lambda context: context.id, reverse=True)[
@@ -1244,7 +1244,7 @@ class InMemoryCoreState(
 
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
@@ -1252,7 +1252,7 @@ class InMemoryCoreState(
         """Store a new summary."""
         with self.lock_compacted_context_store:
             if any(
-                context.series_id == series_id
+                context.agent_id == agent_id
                 and context.through_event_id == through_event_id
                 for context in self.compacted_context_store.values()
             ):
@@ -1260,7 +1260,7 @@ class InMemoryCoreState(
 
             context = CompactedContext(
                 id=self._next_compacted_context_id,
-                series_id=series_id,
+                agent_id=agent_id,
                 through_event_id=through_event_id,
                 text=text,
                 token_count=token_count,

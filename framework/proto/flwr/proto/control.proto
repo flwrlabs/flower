@@ -129,17 +129,16 @@ message Event {
   string created_at = 5;
 }
 
-// POST /v1/control/stream-events. Accept: text/event-stream selects standard
-// SSE with protobuf JSON data; otherwise use the binary protobuf stream
-// framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
-// use their existing separate stream. The event journal is append-only;
-// replay cursors do not expire.
+// POST /v1/control/stream-events uses binary protobuf stream framing.
+// Resume from Bootstrap.cursor or the last consumed seq. Task events use their
+// existing separate stream. The event journal is append-only; replay cursors
+// do not expire.
 message StreamEventsRequest {
-  // Exclusive user-feed cursor. Falls back to Last-Event-ID when absent.
+  // Exclusive user-feed cursor. Defaults to zero when absent.
   optional uint64 after_seq = 1;
 }
 message StreamEventsResponse {
-  // Position in the authenticated user's feed, also used as the SSE id.
+  // Position in the authenticated user's feed.
   uint64 seq = 1;
   Event event = 2;
 }

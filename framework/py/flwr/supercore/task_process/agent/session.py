@@ -31,7 +31,13 @@ from uuid import uuid4
 from google.protobuf.json_format import ParseDict
 from httpx import HTTPStatusError
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
+from flwr.agentapp import (
+    AgentConnectors,
+    AgentEvents,
+    AgentGrid,
+    AgentSession,
+    AgentSpace,
+)
 from flwr.app import Message
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
@@ -125,7 +131,7 @@ class RuntimeAgentEvents(AgentEvents):
     def get_compacted_contexts(
         self, *, limit: int = 1, before_context_id: int | None = None
     ) -> list[JSONObject]:
-        """Get summaries from the current run series."""
+        """Get summaries for the agent."""
         response = self._stub.GetCompactedContexts(
             GetCompactedContextsRequest(
                 limit=limit, before_context_id=before_context_id
@@ -134,7 +140,7 @@ class RuntimeAgentEvents(AgentEvents):
         return [
             {
                 "id": context.id,
-                "series_id": context.series_id,
+                "agent_id": context.agent_id,
                 "through_event_id": context.through_event_id,
                 "text": context.text,
                 "created_at": context.created_at,
@@ -146,7 +152,7 @@ class RuntimeAgentEvents(AgentEvents):
     def put_compacted_context(
         self, *, through_event_id: int, text: str, token_count: int
     ) -> None:
-        """Store a summary in the current run series."""
+        """Store a summary for the agent."""
         self._stub.PutCompactedContext(
             PutCompactedContextRequest(
                 context=CompactedContext(
@@ -230,17 +236,20 @@ class RuntimeAgentEvents(AgentEvents):
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         prompt: str,
         connectors: AgentConnectors,
         events: AgentEvents,
         grid: AgentGrid,
+        *,
+        space: AgentSpace | None = None,
     ) -> None:
         self._prompt = prompt
         self._connectors = connectors
         self._events = events
         self._grid = grid
+        self._space = space
 
     @property
     def prompt(self) -> str:
@@ -261,6 +270,11 @@ class RuntimeAgentSession(AgentSession):
     def grid(self) -> AgentGrid:
         """Model-facing federation Grid API."""
         return self._grid
+
+    @property
+    def space(self) -> AgentSpace | None:
+        """Space messaging API, or None when unavailable for this session."""
+        return self._space
 
 
 class RuntimeAgentConnectors(AgentConnectors):
@@ -309,7 +323,7 @@ class AgentRuntime:
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
-        start_run_request: StartRunRequest,
+        start_run_request: StartRunRequest | None = None,
         events: AgentEvents,
     ) -> None:
         self._stub = stub
@@ -490,6 +504,8 @@ class AgentRuntime:
         self, *, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Create an automation and emit/persist its activity events."""
+        if self._start_run_request is None:
+            raise NotImplementedError("Automations are unavailable in this session.")
         function_call: JSONObject = {
             "type": "function_call",
             "call_id": call_id,

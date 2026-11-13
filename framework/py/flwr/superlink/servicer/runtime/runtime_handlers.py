@@ -64,6 +64,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
@@ -72,11 +78,15 @@ from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    process_pending_agent_runs,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
@@ -129,37 +139,60 @@ def get_space_events(
     return core_runtime_handlers.get_space_events(request, state, space_id)
 
 
-def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: LinkState, task: Task
-) -> GetCompactedContextsResponse:
-    """Get summaries for the authenticated task's run series."""
+def _get_task_run(state: LinkState, task: Task) -> Run:
+    """Resolve the authenticated task's Run."""
     runs = state.get_run_info(run_ids=[task.run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
+    return runs[0]
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: LinkState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Read messages within the authenticated task's Space grant."""
+    return core_runtime_handlers.get_space_messages(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: LinkState, task: Task
+) -> SendSpaceMessageResponse:
+    """Publish with the primary AgentApp's server-bound agent identity."""
+    return core_runtime_handlers.send_space_message(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def get_compacted_contexts(
+    request: GetCompactedContextsRequest, state: LinkState, task: Task
+) -> GetCompactedContextsResponse:
+    """Get summaries for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.get_compacted_contexts(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
 def put_compacted_context(
     request: PutCompactedContextRequest, state: LinkState, task: Task
 ) -> PutCompactedContextResponse:
-    """Store a summary for the authenticated task's run series."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
+    """Store a summary for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.put_compacted_context(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
-    """Process due automations, then acquire an eligible pending task."""
+    """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    process_pending_agent_runs(state)
     return core_runtime_handlers.acquire_task(request, state)
 
 

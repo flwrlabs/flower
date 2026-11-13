@@ -54,6 +54,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -148,6 +154,16 @@ class RuntimeHandlers(Protocol[StateT_contra]):
         task: Task,
     ) -> GetSpaceEventsResponse:
         """Get events from the authenticated task's Space."""
+
+    def get_space_messages(
+        self, request: GetSpaceMessagesRequest, state: StateT_contra, task: Task
+    ) -> GetSpaceMessagesResponse:
+        """Read messages from the authenticated task's Space."""
+
+    def send_space_message(
+        self, request: SendSpaceMessageRequest, state: StateT_contra, task: Task
+    ) -> SendSpaceMessageResponse:
+        """Publish a message to the authenticated task's Space."""
 
     def get_compacted_contexts(
         self, request: GetCompactedContextsRequest, state: StateT_contra, task: Task

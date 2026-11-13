@@ -22,6 +22,7 @@ from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.protobuf.client import ProtobufClient
 
 _UNARY_UNARY_ENDPOINTS = (
+    "bootstrap",
     "create-agent",
     "list-agents",
     "start-run",
@@ -95,7 +96,9 @@ def test_unary_unary_method(endpoint: str) -> None:
     assert call.call_args.kwargs["response_type"].__name__ == f"{method_name}Response"
 
 
-@pytest.mark.parametrize("endpoint", ("stream-logs", "stream-run-events"))
+@pytest.mark.parametrize(
+    "endpoint", ("stream-logs", "stream-run-events", "stream-events")
+)
 def test_unary_stream_method(endpoint: str) -> None:
     """Delegate a Control unary-stream method to the shared HTTP client."""
     method_name = endpoint.title().replace("-", "")

@@ -578,18 +578,17 @@ global___Event = Event
 
 @typing.final
 class StreamEventsRequest(google.protobuf.message.Message):
-    """POST /v1/control/stream-events. Accept: text/event-stream selects standard
-    SSE with protobuf JSON data; otherwise use the binary protobuf stream
-    framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
-    use their existing separate stream. The event journal is append-only;
-    replay cursors do not expire.
+    """POST /v1/control/stream-events uses binary protobuf stream framing.
+    Resume from Bootstrap.cursor or the last consumed seq. Task events use their
+    existing separate stream. The event journal is append-only; replay cursors
+    do not expire.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     AFTER_SEQ_FIELD_NUMBER: builtins.int
     after_seq: builtins.int
-    """Exclusive user-feed cursor. Falls back to Last-Event-ID when absent."""
+    """Exclusive user-feed cursor. Defaults to zero when absent."""
     def __init__(
         self,
         *,
@@ -608,7 +607,7 @@ class StreamEventsResponse(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     EVENT_FIELD_NUMBER: builtins.int
     seq: builtins.int
-    """Position in the authenticated user's feed, also used as the SSE id."""
+    """Position in the authenticated user's feed."""
     @property
     def event(self) -> global___Event: ...
     def __init__(

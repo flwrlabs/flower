@@ -62,6 +62,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
@@ -316,28 +322,54 @@ def get_space_events(
     return core_runtime_handlers.get_space_events(request, state, run.space_id)
 
 
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: NodeState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Reject Space message reads on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space messages are only available on SuperLink.",
+    )
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: NodeState, task: Task
+) -> SendSpaceMessageResponse:
+    """Reject Space message publication on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space messages are only available on SuperLink.",
+    )
+
+
 def get_compacted_contexts(
     request: GetCompactedContextsRequest, state: NodeState, task: Task
 ) -> GetCompactedContextsResponse:
-    """Get summaries for the authenticated task's run series."""
+    """Get summaries for the agent."""
     run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
-    return core_runtime_handlers.get_compacted_contexts(request, state, run.series_id)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    return core_runtime_handlers.get_compacted_contexts(
+        request, state, participant.agent_id
+    )
 
 
 def put_compacted_context(
     request: PutCompactedContextRequest, state: NodeState, task: Task
 ) -> PutCompactedContextResponse:
-    """Store a summary for the authenticated task's run series."""
+    """Store a summary for the agent."""
     run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
-    return core_runtime_handlers.put_compacted_context(request, state, run.series_id)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    return core_runtime_handlers.put_compacted_context(
+        request, state, participant.agent_id
+    )
 
 
 def start_automation(

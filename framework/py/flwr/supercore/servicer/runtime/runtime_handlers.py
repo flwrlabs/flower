@@ -55,6 +55,13 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+    SpaceParticipant,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import (
@@ -66,6 +73,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
@@ -87,10 +95,65 @@ def get_space_events(
     return GetSpaceEventsResponse(events=events)
 
 
+def authenticate_space_agent(task: Task, run: Run) -> tuple[UUID, SpaceParticipant]:
+    """Require the primary AgentApp task of a Run bound to a Space and agent."""
+    if run.space_id is None or run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint requires a Run bound to a Space and an agent.",
+        )
+    if task.type != TaskType.AGENT_APP or task.task_id != run.primary_task_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "Only the primary AgentApp task can access this endpoint.",
+        )
+    return run.space_id, SpaceParticipant(agent_id=run.agent_id)
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: CoreState, task: Task, run: Run
+) -> GetSpaceMessagesResponse:
+    """Read messages within the authenticated task's Space grant."""
+    space_id, participant = authenticate_space_agent(task, run)
+    limit = request.limit if request.HasField("limit") else 100
+    if limit > 100:
+        raise FlowerError(
+            ApiErrorCode.INVALID_SPACE_REQUEST, "limit must be at most 100."
+        )
+    try:
+        messages = state.get_space_messages(
+            space_id,
+            participant,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+            after_id=request.after_id if request.HasField("after_id") else None,
+            unread_only=request.unread_only,
+        )
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if messages is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space not found.")
+    return GetSpaceMessagesResponse(messages=messages)
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: CoreState, task: Task, run: Run
+) -> SendSpaceMessageResponse:
+    """Publish with the primary AgentApp's server-bound agent identity."""
+    space_id, participant = authenticate_space_agent(task, run)
+    try:
+        message = state.create_space_message(space_id, participant, request.content)
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if message is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space participant not found.")
+    return SendSpaceMessageResponse(message=message)
+
+
 def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: CoreState, series_id: int
+    request: GetCompactedContextsRequest, state: CoreState, agent_id: int
 ) -> GetCompactedContextsResponse:
-    """Get compacted contexts for the authenticated task's series."""
+    """Get compacted contexts for the agent."""
     limit = request.limit if request.HasField("limit") else 1
     if limit == 0:
         raise FlowerError(
@@ -98,7 +161,7 @@ def get_compacted_contexts(
             "Limit must be positive.",
         )
     contexts = state.get_compacted_contexts(
-        series_id,
+        agent_id,
         limit=limit,
         before_context_id=(
             request.before_context_id if request.HasField("before_context_id") else None
@@ -108,23 +171,23 @@ def get_compacted_contexts(
 
 
 def put_compacted_context(
-    request: PutCompactedContextRequest, state: CoreState, series_id: int
+    request: PutCompactedContextRequest, state: CoreState, agent_id: int
 ) -> PutCompactedContextResponse:
-    """Store a compacted context in the authenticated task's series."""
+    """Store a compacted context for the agent."""
     if not request.HasField("context") or not request.context.text:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
             "Compacted context text is required.",
         )
     context = request.context
-    if context.series_id and context.series_id != series_id:
+    if context.agent_id and context.agent_id != agent_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
-            "Compacted context series does not match the authenticated task.",
+            "Compacted context agent does not match the authenticated task.",
         )
     try:
         state.store_compacted_context(
-            series_id,
+            agent_id,
             context.through_event_id,
             context.text,
             context.token_count,
@@ -132,7 +195,7 @@ def put_compacted_context(
     except ValueError as exc:
         raise FlowerError(
             ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS,
-            f"Compacted context already exists for series {series_id} "
+            f"Compacted context already exists for agent {agent_id} "
             f"and event {context.through_event_id}.",
         ) from exc
     return PutCompactedContextResponse()

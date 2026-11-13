@@ -42,6 +42,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     Connector,
@@ -49,6 +51,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
+    Event,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -65,6 +68,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RefreshAuthTokensResponse,
     StartRunRequest,
     StartRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -341,6 +346,7 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
     stream_paths = {
         "/v1/control/stream-logs",
         "/v1/control/stream-run-events",
+        "/v1/control/stream-events",
     }
 
     assert control_routes
@@ -1328,3 +1334,87 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
         "detail": "ControlServicer initialized without artifact provider.",
         "code": ApiErrorCode.NO_ARTIFACT_PROVIDER.value,
     }
+
+
+def test_bootstrap_uses_authenticated_account(
+    space_client: tuple[TestClient, LinkState],
+) -> None:
+    """Return the caller's Agents, Spaces, and cursor without message history."""
+    client, state = space_client
+    config = AgentConfig(name="Agent", app_spec="@test/app")
+    state.create_agent(_ACCOUNT.flwr_aid, config)
+    state.create_agent("other-account", config)
+    response = client.post(
+        "/v1/control/bootstrap",
+        content=BootstrapRequest().SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    snapshot = BootstrapResponse.FromString(response.content)
+    assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
+    assert len(snapshot.agents) == len(snapshot.spaces) == 1
+    assert snapshot.cursor == 2
+
+
+@pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
+def test_user_event_stream_framing(accept: str) -> None:
+    """Use binary protobuf framing regardless of the Accept header."""
+    state = Mock(spec=LinkState)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    event_id = str(uuid4())
+    expected = [
+        StreamEventsResponse(
+            seq=2**63 - 2, event=Event(event_id=event_id, type="agent.created")
+        ),
+        StreamEventsResponse(seq=2**63 - 1),
+    ]
+    with patch(
+        "flwr.superlink.routers.control.router.control_handlers.stream_events",
+        return_value=iter(expected),
+    ) as stream:
+        response = TestClient(app).post(
+            "/v1/control/stream-events",
+            content=StreamEventsRequest(after_seq=100).SerializeToString(),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": PROTOBUF_MEDIA_TYPE,
+                "accept": accept,
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_STREAM_MEDIA_TYPE
+    assert response.content == b"".join(frame_message(entry) for entry in expected)
+    assert stream.call_args.args[0] == StreamEventsRequest(after_seq=100)
+    assert stream.call_args.args[1] is _ACCOUNT
+
+
+@pytest.mark.parametrize("after_seq", [1, 2**64 - 1])
+def test_invalid_user_cursor_returns_error_before_streaming(
+    space_client: tuple[TestClient, LinkState],
+    after_seq: int,
+) -> None:
+    """Reject invalid cursors before opening the protobuf stream."""
+    client, _ = space_client
+    response = client.post(
+        "/v1/control/stream-events",
+        content=StreamEventsRequest(after_seq=after_seq).SerializeToString(),
+        headers={"accept": PROTOBUF_STREAM_MEDIA_TYPE},
+    )
+    assert response.status_code == 400
+    assert response.headers["content-type"] == "application/json"
+    assert response.json()["code"] == ApiErrorCode.INVALID_USER_EVENT_CURSOR.value
+
+
+@pytest.mark.parametrize("endpoint", ["bootstrap", "stream-events"])
+def test_user_event_routes_require_authentication(endpoint: str) -> None:
+    """Authenticate both routes before serving account state or starting a stream."""
+    authn_plugin = Mock()
+    app = _create_app(authn_plugin)
+    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
+    response = TestClient(app).post(
+        f"/v1/control/{endpoint}",
+        content=b"",
+        headers={"content-type": PROTOBUF_MEDIA_TYPE},
+    )
+    assert response.status_code == 401
