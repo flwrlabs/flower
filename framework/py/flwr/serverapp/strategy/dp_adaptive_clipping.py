@@ -106,8 +106,9 @@ class DifferentialPrivacyAdaptiveBase(Strategy, ABC):
         return float(np.random.normal(count, self.clipped_count_stddev)) / float(total)
 
     def _geometric_update(self, clipped_fraction: float) -> None:
+        # KEY_NORM_BIT is 1 when clipped; grow when clipped_fraction > target.
         self.clipping_norm *= math.exp(
-            -self.clip_norm_lr * (clipped_fraction - self.target_clipped_quantile)
+            self.clip_norm_lr * (clipped_fraction - self.target_clipped_quantile)
         )
 
     def configure_evaluate(

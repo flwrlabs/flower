@@ -210,9 +210,9 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
             np.random.normal(norm_bit_set_count, self.clipped_count_stddev)
         )
         noised_norm_bit_set_fraction = noised_norm_bit_set_count / len(results)
-        # Geometric update
+        # Grow clipping norm when clipped fraction exceeds target quantile.
         self.clipping_norm *= math.exp(
-            -self.clip_norm_lr
+            self.clip_norm_lr
             * (noised_norm_bit_set_fraction - self.target_clipped_quantile)
         )
 
@@ -442,9 +442,9 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
         )
 
         noised_norm_bit_set_fraction = noised_norm_bit_set_count / len(results)
-        # Geometric update
+        # Grow clipping norm when clipped fraction exceeds target quantile.
         self.clipping_norm *= math.exp(
-            -self.clip_norm_lr
+            self.clip_norm_lr
             * (noised_norm_bit_set_fraction - self.target_clipped_quantile)
         )
 
