@@ -484,10 +484,34 @@ accelerator -- see :doc:`how-to-run-simulations`:
 ``ActorPool is empty. Stopping Simulation.``
 ============================================
 
-This error is raised for two different reasons, and the warning immediately above it
+This error is raised for three different reasons, and the warning immediately above it
 tells you which one applies. Despite the error message, the process does not always
 exit: the run can appear to hang after the error is printed. If that happens, interrupt
 it and scroll back for the warning that precedes it.
+
+No active Ray node is available
+-------------------------------
+
+If the preceding warning reads ``No active Ray node reported resources: ray.nodes()
+returned either no entries, or only detached ones with empty Resources...``, this
+applies regardless of whether a GPU was requested -- it also fires for a CPU-only run
+configured with ``client-resources-num-gpus 0``:
+
+.. code-block:: text
+
+    WARNING : No active Ray node reported resources: `ray.nodes()` returned either
+    no entries, or only detached ones with empty `Resources`. This is not a
+    per-node GPU discovery problem to fix on this host -- check why the Ray
+    cluster has no usable node (for example, it failed to start or every node
+    has disconnected). Reconnect with the same `address` (or `RAY_ADDRESS`) this
+    run used before calling `ray.nodes()` -- a bare `ray.init()` can start or
+    attach to a different local cluster instead of the one that just failed.
+
+Ray never reported a usable node at all, so none of the GPU-discovery diagnostics below
+apply. Check why the cluster has no active node -- for example with ``ray status``, or
+by reconnecting with the same ``address``/``RAY_ADDRESS`` your run used and calling
+``ray.nodes()`` yourself. Common causes are the cluster failing to start, every node
+disconnecting, or ``init_args`` pointing at a cluster that was never brought up.
 
 No GPU reported while a GPU was requested
 -----------------------------------------

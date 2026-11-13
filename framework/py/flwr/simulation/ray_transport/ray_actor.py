@@ -203,6 +203,31 @@ def _log_kfd_diagnostics() -> None:
         )
 
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _is_loopback_ray_client() -> bool:
+    """Whether a connected Ray Client server targets this same host.
+
+    `ray://127.0.0.1:10001`-style addresses put the Ray Client server in the same
+    host (and device) namespace as this process, unlike an address naming another
+    machine, so a local AMD permission/`amdsmi` failure is still the actionable
+    diagnosis here. No public Ray API exposes the connected host; the private
+    `client_worker._conn_str` is read best-effort, and any failure to read it is
+    treated as "not loopback" rather than raised, since this only gates whether an
+    extra local check is skipped.
+    """
+    try:
+        client_worker = (
+            ray.util.client.ray.get_context().client_worker  # type: ignore[no-untyped-call]
+        )
+        conn_str: str = client_worker._conn_str  # pylint: disable=protected-access
+    except AttributeError:
+        return False
+    host = conn_str.rsplit(":", 1)[0].strip("[]")
+    return host in _LOOPBACK_HOSTS
+
+
 def _log_node_locality_diagnostics(
     active_node_count: int, active_node_id: str | None
 ) -> None:
@@ -238,14 +263,22 @@ def _log_node_locality_diagnostics(
             "just here.",
             active_node_count,
         )
-    elif ray.util.client.ray.is_connected():  # type: ignore[no-untyped-call]
+    elif (
+        ray.util.client.ray.is_connected()  # type: ignore[no-untyped-call]
+        and not _is_loopback_ray_client()
+    ):
         # `ray.init("ray://host:port")` (Ray Client) proxies
         # `get_runtime_context()` into the remote cluster, so it returns the
         # *server's* node ID -- which then trivially equals the sole
         # `active_node_id` from `ray.nodes()` even though this process's own
         # `/dev` is on the client host, not the cluster node. A NodeID
         # comparison can therefore never detect this remote case; checking
-        # `ray.util.client.ray.is_connected()` instead.
+        # `ray.util.client.ray.is_connected()` instead. That alone would also
+        # catch a same-host `ray://127.0.0.1:10001` connection though, where
+        # this host's `/dev` *is* the cluster node's -- `_is_loopback_ray_client`
+        # excludes that case so it still falls through to the local KFD probe
+        # below (the NodeID comparison trivially passes there too, since Ray
+        # Client always proxies the server's own ID).
         log(
             WARNING,
             "This process connected to the Ray cluster over Ray Client "
@@ -369,8 +402,10 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                 "`Resources`. This is not a per-node GPU discovery problem to "
                 "fix on this host -- check why the Ray cluster has no usable "
                 "node (for example, it failed to start or every node has "
-                "disconnected) with "
-                '`python -c "import ray; ray.init(); print(ray.nodes())"`.',
+                "disconnected). Reconnect with the same `address` (or "
+                "`RAY_ADDRESS`) this run used before calling `ray.nodes()` -- a "
+                "bare `ray.init()` can start or attach to a different local "
+                "cluster instead of the one that just failed.",
             )
         elif requested_gpus > 0 and not cluster_num_gpus:
             # No node in the cluster reported a GPU while each client asks for a
@@ -388,9 +423,12 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
                 "GPU discovery failed: the cluster may have no GPU, or Ray's GPU "
                 "resources may have been limited deliberately (for example "
                 "`--init-args-num-gpus 0`). Set `num_gpus=0` if no GPU is expected, "
-                "otherwise review that limit before suspecting discovery. Compare "
-                "what Ray actually detects with "
-                '`python -c "import ray; ray.init(); print(ray.cluster_resources())"`. '
+                "otherwise review that limit before suspecting discovery. Reconnect "
+                "with the same `address` (or `RAY_ADDRESS`) this run used before "
+                "calling `ray.cluster_resources()` to compare what Ray actually "
+                "detects -- a bare `ray.init()` can start or attach to a different "
+                "local cluster and report its GPUs instead of the one that just "
+                "failed. "
                 "Note that an ML framework reporting a usable GPU (for instance "
                 "`torch.cuda.is_available()` returning True) does not imply Ray found "
                 "one -- they discover devices independently.",
