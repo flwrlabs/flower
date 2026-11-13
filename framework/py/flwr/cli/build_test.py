@@ -389,6 +389,17 @@ def test_build_fab_from_files_fab_include_toml_does_not_raise_for_pyproject() ->
     assert "pyproject.toml" in entries
 
 
+def test_build_fab_from_files_raises_for_excluded_nested_pyproject() -> None:
+    """Test fab-include reports a nested pyproject removed by built-in rules."""
+    files = _make_files(
+        '\n[tool.flwr.app]\nfab-include = ["sub/pyproject.toml"]\n',
+        **{"client.py": _DUMMY_PY, "sub/pyproject.toml": b"[project]\n"},
+    )
+
+    with pytest.raises(ValueError, match="sub/pyproject.toml"):
+        build_fab_from_files(files)
+
+
 def test_build_fab_from_files_fab_exclude_only_removes_files() -> None:
     """Test fab-exclude removes files selected by other steps."""
     files = _make_files(
