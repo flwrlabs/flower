@@ -36,6 +36,7 @@ from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
 from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -127,32 +128,35 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
     )
     stores = ObjectStoreFactory()
     state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
-    space_id = UUID(state.create_space(participants=[]).id)
+    agent = state.create_agent(
+        "alice",
+        AgentConfig(
+            name="Research", app_spec="@publisher/app", description="Cite sources."
+        ),
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
     fab_hash = state.store_fab(
         Fab(hashlib.sha256(b"agentapp-fab").hexdigest(), b"agentapp-fab", {})
     )
-    run_ids = [
-        state.create_run(
-            "publisher/app",
-            "1.0",
-            fab_hash,
-            {},
-            None,
-            None,
-            "account",
-            TaskType.AGENT_APP,
-            space_id=space_id,
-            user_prompt="Hello",
-        )
-        for _ in range(2)
-    ]
+    run_id = state.create_run(
+        "publisher/app",
+        "1.0",
+        fab_hash,
+        {},
+        None,
+        None,
+        "alice",
+        TaskType.AGENT_APP,
+        space_id=space_id,
+        user_prompt="Hello",
+    )
     # The same FAB and TaskType are used by the existing warm executor.
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
         state,
     )
-    assert acquired.task.run_id in run_ids
-    run_id = acquired.task.run_id
+    assert acquired.task.run_id == run_id
     with (
         patch.object(state, "get_run_series_context", side_effect=AssertionError),
         patch.object(state, "set_run_series_context", side_effect=AssertionError),
@@ -171,6 +175,7 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
         assert not context_from_proto(response.context).state
         assert response.fab.hash_str == fab_hash
         assert not response.HasField("federation_config")
+        assert not response.HasField("agent")
         assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
         output = Context(
             run_id=run_id,
@@ -191,18 +196,32 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
     assert state.get_run_status({run_id})[run_id].sub_status == SubStatus.COMPLETED
     if backend == "sqlite":
         state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
-    # A subsequent run gets fresh context even after output supplied state.
+    # A subsequent agent run gets fresh context and its bound identity.
+    agent_run_id = state.create_run(
+        "publisher/app",
+        "1.0",
+        fab_hash,
+        {},
+        None,
+        None,
+        "alice",
+        TaskType.AGENT_APP,
+        space_id=space_id,
+        agent_id=agent.id,
+    )
+    assert agent_run_id
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
         state,
     )
-    assert acquired.task.run_id in run_ids and acquired.task.run_id != run_id
+    assert acquired.task.run_id == agent_run_id
     response = runtime_handlers.pull_task_input(
         PullTaskInputRequest(), state, acquired.task
     )
     assert response.context.run_id == acquired.task.run_id
     assert response.context.series_id == 0
     assert not context_from_proto(response.context).state
+    assert response.agent == agent
     assert state.get_run_series() == []
 
 
