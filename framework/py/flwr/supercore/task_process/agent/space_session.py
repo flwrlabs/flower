@@ -53,6 +53,7 @@ class SpaceEvents(RuntimeAgentEvents):
         """Get matching events from the authenticated task's Space."""
         response = self._stub.GetSpaceEvents(
             GetSpaceEventsRequest(
+                # An empty list means no filtering by event type.
                 event_types=event_types or [],
                 after_event_id=after_event_id,
                 before_event_id=before_event_id,
