@@ -19,6 +19,7 @@ import unittest
 from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import pytest
 from fastapi import status
@@ -48,11 +49,17 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    SendSpaceMessageRequest,
+)
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
@@ -167,6 +174,38 @@ def test_file_revision_conflict(operation: str) -> None:
     assert caught.value is error
 
 
+@pytest.mark.parametrize("read", [False, True])
+@pytest.mark.parametrize(
+    "task,agent_id",
+    [
+        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
+        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
+        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
+    ],
+)
+def test_space_messages_require_bound_primary_agent(
+    task: Task, agent_id: int | None, read: bool
+) -> None:
+    """Reading and publishing require the Run's bound primary AgentApp task."""
+    state = Mock(spec=CoreState)
+    run = Run.create_empty(123)
+    run.space_id = UUID("12345678-1234-5678-1234-567812345678")
+    run.agent_id = agent_id
+    run.primary_task_id = 1
+    with pytest.raises(FlowerError) as error:
+        if read:
+            runtime_handlers.get_space_messages(
+                GetSpaceMessagesRequest(), state, task, run
+            )
+        else:
+            runtime_handlers.send_space_message(
+                SendSpaceMessageRequest(content="No"), state, task, run
+            )
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_space_messages.assert_not_called()
+    state.create_space_message.assert_not_called()
+
+
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     """Tests for shared Runtime API handlers."""
 
@@ -178,7 +217,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_get_compacted_contexts(self) -> None:
         """Apply the default limit and reject zero."""
         context = CompactedContext(
-            id=1, series_id=42, through_event_id=9, text="Summary"
+            id=1, agent_id=42, through_event_id=9, text="Summary"
         )
         self.state.get_compacted_contexts.return_value = [context]
 
@@ -200,10 +239,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_put_compacted_context(self) -> None:
-        """Store only a valid summary for the authenticated series."""
+        """Store only a valid summary for the authenticated agent."""
         request = PutCompactedContextRequest(
             context=CompactedContext(
-                series_id=42, through_event_id=9, text="Summary", token_count=123
+                agent_id=42, through_event_id=9, text="Summary", token_count=123
             )
         )
 
@@ -214,7 +253,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             42, 9, "Summary", 123
         )
 
-        request.context.series_id = 43
+        request.context.agent_id = 43
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.put_compacted_context(request, self.state, 42)
         self.assertEqual(

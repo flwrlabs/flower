@@ -18,16 +18,20 @@
 import abc
 from collections.abc import Collection, Sequence
 from typing import Literal
+from uuid import UUID
 
-from flwr.app import Context, Message, RecordDict
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
+
+from .utils import create_run_context
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
@@ -64,6 +68,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_nodes: dict[str, set[int]] = {}
         for message in messages:
             if (run := runs.get(message.metadata.run_id)) is not None:
+                if not run.federation_id:
+                    continue
                 federation_nodes.setdefault(run.federation_id, set()).update(
                     (message.metadata.src_node_id, message.metadata.dst_node_id)
                 )
@@ -82,7 +88,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
                 results.append(False)
                 continue
             node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
-            results.append(node_ids <= federation_nodes[run.federation_id])
+            if not run.federation_id:
+                results.append(node_ids == {SUPERLINK_NODE_ID})
+            else:
+                results.append(node_ids <= federation_nodes[run.federation_id])
         return results
 
     def store_messages(self, messages: Sequence[Message]) -> list[bool]:
@@ -250,13 +259,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -265,6 +274,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -278,12 +289,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
-        federation_id : str
-            The federation ID this run belongs to.
+        federation_id : str | None
+            The federation ID for a legacy run. Must be None for a Space run.
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
-            Flower Account ID of the creator.
+            Flower Account ID of the creator. Agent-bound Space runs use the
+            executing agent's owner.
         primary_task_type : str
             The type of the primary task to create for the run.
         series_id : int | None (default: None)
@@ -301,16 +313,41 @@ class LinkState(CoreState):  # pylint: disable=R0904
         user_prompt : str | None (default: None)
             User prompt to store as a Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
+        space_id : UUID | None (default: None)
+            Space for an AgentApp run with a fresh context. Cannot be combined
+            with federation configuration, a series, or federation connectors.
+        agent_id : int | None (default: None)
+            Executing agent assigned by the server for a Space run. Creation
+            returns 0 unless the agent participates, has no open Run, and its
+            app matches the resolved FAB. The FAB must already be stored.
 
         Returns
         -------
         int
-            The run ID of the newly created run.
+            The new run ID, or 0 if creation fails or the agent is ineligible.
 
         Notes
         -----
         This method will not verify if the account has permission to create
-        a run in the federation.
+        a run in the federation or space. Invalid scope combinations or missing
+        FABs for agent-bound runs raise ValueError.
+        """
+
+    @abc.abstractmethod
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread messages and no open Run.
+
+        Parameters
+        ----------
+        limit : int | None (default: None)
+            Maximum number of Space/agent pairs to return; None returns all.
+
+        Returns
+        -------
+        Sequence[tuple[UUID, Agent]]
+            Eligible Space IDs and agents. This does not advance read cursors.
         """
 
     @abc.abstractmethod
@@ -320,7 +357,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -340,8 +377,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
             Sequence of Flower Account IDs to filter by.
-        federation_ids : Optional[Sequence[str]] (default: None)
-            Sequence of federation IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)
@@ -445,14 +483,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id: int,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-            series_id=series_id,
-        )
+        context = create_run_context(run_id, series_id)
         if existing_context := self.get_run_series_context(series_id):
             context.state = existing_context.state
         self.set_run_series_context(series_id=series_id, context=context)

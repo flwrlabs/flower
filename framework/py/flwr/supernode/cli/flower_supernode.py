@@ -34,6 +34,7 @@ from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
 from flwr.app.user_config import UserConfig
 from flwr.common.args import (
+    add_args_removed_health_server,
     add_args_runtime_dependency_install,
     try_obtain_root_certificates,
     try_obtain_server_certificates,
@@ -52,7 +53,6 @@ from flwr.supercore.constant import (
     UVICORN_DEFAULT_HOST,
 )
 from flwr.supercore.exit import ExitCode, add_exit_handler, flwr_exit
-from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.logger import console_handler
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.telemetry import EventType, event
@@ -78,7 +78,6 @@ class SuperNodeLifespanConfig:  # pylint: disable=too-many-instance-attributes
     isolation: str
     runtime_certificates: tuple[bytes, bytes, bytes] | None
     runtime_root_certificates_path: str | None
-    health_server_address: str | None
     trusted_entities: dict[str, str] | None
     superexec_auth_secret: bytes | None
     runtime_dependency_install: bool
@@ -146,7 +145,6 @@ def _parse_supernode_lifespan_config() -> SuperNodeLifespanConfig:
             if runtime_certificates is not None
             else None
         ),
-        health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
         runtime_dependency_install=args.runtime_dependency_install,
@@ -209,7 +207,6 @@ def flower_supernode() -> None:
         runtime_api_address=f"{runtime_host}:{config.port}",
         runtime_certificates=config.runtime_certificates,
         runtime_root_certificates_path=config.runtime_root_certificates_path,
-        health_server_address=config.health_server_address,
         trusted_entities=config.trusted_entities,
         superexec_auth_secret=config.superexec_auth_secret,
         runtime_dependency_install=config.runtime_dependency_install,
@@ -349,7 +346,7 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_runtime_dependency_install(parser)
-    add_args_health(parser)
+    add_args_removed_health_server(parser)
 
     return parser
 

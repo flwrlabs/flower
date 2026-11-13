@@ -27,6 +27,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
@@ -95,6 +97,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -104,6 +108,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    CreateSpaceResponse,
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    ListSpacesRequest,
+    ListSpacesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.supercore.protobuf.client import ProtobufClient
 
 
@@ -111,6 +125,26 @@ from flwr.supercore.protobuf.client import ProtobufClient
 # pylint: disable=invalid-name
 class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-methods
     """Protobuf-over-HTTP client for the Control API."""
+
+    def Bootstrap(self, request: BootstrapRequest) -> BootstrapResponse:
+        """Read the user feed cursor and visible Agents and Spaces."""
+        return self._unary_unary(
+            path="/v1/control/bootstrap",
+            rpc_method="/flwr.proto.Control/Bootstrap",
+            request=request,
+            response_type=BootstrapResponse,
+        )
+
+    def StreamEvents(
+        self, request: StreamEventsRequest
+    ) -> Generator[StreamEventsResponse, None, None]:
+        """Replay application events after a recipient-specific sequence."""
+        return self._unary_stream(
+            path="/v1/control/stream-events",
+            rpc_method="/flwr.proto.Control/StreamEvents",
+            request=request,
+            response_type=StreamEventsResponse,
+        )
 
     def CreateAgent(self, request: CreateAgentRequest) -> CreateAgentResponse:
         """Create an agent."""
@@ -197,6 +231,46 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListRuns",
             request=request,
             response_type=ListRunsResponse,
+        )
+
+    def CreateSpace(self, request: CreateSpaceRequest) -> CreateSpaceResponse:
+        """Create space."""
+        return self._unary_unary(
+            path="/v1/control/create-space",
+            rpc_method="/flwr.proto.Control/CreateSpace",
+            request=request,
+            response_type=CreateSpaceResponse,
+        )
+
+    def ListSpaces(self, request: ListSpacesRequest) -> ListSpacesResponse:
+        """List spaces."""
+        return self._unary_unary(
+            path="/v1/control/list-spaces",
+            rpc_method="/flwr.proto.Control/ListSpaces",
+            request=request,
+            response_type=ListSpacesResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Get space messages."""
+        return self._unary_unary(
+            path="/v1/control/get-space-messages",
+            rpc_method="/flwr.proto.Control/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
+        )
+
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Send space message."""
+        return self._unary_unary(
+            path="/v1/control/send-space-message",
+            rpc_method="/flwr.proto.Control/SendSpaceMessage",
+            request=request,
+            response_type=SendSpaceMessageResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:

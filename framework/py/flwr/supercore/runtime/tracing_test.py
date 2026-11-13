@@ -47,8 +47,10 @@ _CARRIER = "00-" + "1" * 32 + "-" + "2" * 16 + "-03"
 
 @pytest.fixture(name="app")
 def runtime_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
-    """Provide the real Runtime routes with stubbed business state and handlers."""
+    """Provide real Runtime routes with stubbed business state and tracing."""
     monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
+    backend = MagicMock()
+    monkeypatch.setattr("flwr.supercore.tracing._load_backend", lambda: backend)
     state = Mock()
     app = FastAPI()
     app.include_router(router)

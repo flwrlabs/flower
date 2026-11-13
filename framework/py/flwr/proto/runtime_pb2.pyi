@@ -294,6 +294,60 @@ class GetRunSeriesEventsResponse(google.protobuf.message.Message):
 global___GetRunSeriesEventsResponse = GetRunSeriesEventsResponse
 
 @typing.final
+class GetSpaceEventsRequest(google.protobuf.message.Message):
+    """GetSpaceEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_EVENT_ID_FIELD_NUMBER: builtins.int
+    BEFORE_EVENT_ID_FIELD_NUMBER: builtins.int
+    LAST_N_FIELD_NUMBER: builtins.int
+    EVENT_TYPES_FIELD_NUMBER: builtins.int
+    after_event_id: builtins.int
+    """ID bounds are exclusive."""
+    before_event_id: builtins.int
+    last_n: builtins.int
+    """Select newest matching events; zero means no limit.
+    Response remains in ascending ID order.
+    """
+    @property
+    def event_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Empty means all event types."""
+
+    def __init__(
+        self,
+        *,
+        after_event_id: builtins.int | None = ...,
+        before_event_id: builtins.int | None = ...,
+        last_n: builtins.int = ...,
+        event_types: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id", "event_types", b"event_types", "last_n", b"last_n"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_event_id", b"_after_event_id"]) -> typing.Literal["after_event_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_before_event_id", b"_before_event_id"]) -> typing.Literal["before_event_id"] | None: ...
+
+global___GetSpaceEventsRequest = GetSpaceEventsRequest
+
+@typing.final
+class GetSpaceEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___GetSpaceEventsResponse = GetSpaceEventsResponse
+
+@typing.final
 class GetCompactedContextsRequest(google.protobuf.message.Message):
     """GetCompactedContexts messages"""
 

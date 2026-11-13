@@ -14,8 +14,22 @@
 # ==============================================================================
 """Tests for CoreState declarative models."""
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
+from datetime import UTC, datetime
+from uuid import UUID
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from flwr.supercore.state.schema.corestate_models import (
+    Event,
+    FlwrBase,
+    Task,
+    TaskLogsTable,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.typing import JSONObject
 
 CORESTATE_TABLE_NAMES = {
     "nonce_store",
@@ -24,6 +38,12 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "space",
+    "space_participant",
+    "space_message",
+    "events",
+    "user_events",
+    "user_event_feeds",
     "run_series",
     "compacted_contexts",
     "series_context",
@@ -58,6 +78,32 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
+def test_event_payload_round_trips_nested_json() -> None:
+    """Map and persist recursive JSON values through the Event ORM model."""
+    payload: JSONObject = {
+        "nested": {"values": [None, True, 42, 1.5, "text", {"items": []}]},
+    }
+    engine = create_engine("sqlite:///:memory:")
+    FlwrBase.metadata.tables["events"].create(engine)
+    event_id = UUID(int=1)
+
+    with Session(engine) as session:
+        session.add(
+            Event(
+                event_id=event_id,
+                type="test",
+                payload=payload,
+                created_at=datetime.now(UTC),
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        event = session.get(Event, event_id)
+        assert event is not None
+        assert event.payload == payload
+
+
 def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() -> None:
     """Ensure connectors use an ID without provider-level uniqueness."""
     table = FlwrBase.metadata.tables["connector"]
@@ -74,3 +120,34 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     """Ensure keyless task_logs stays a table, not an ORM mapper."""
     assert "task_logs" in create_corestate_metadata().tables
     assert TaskLogsTable.primary_key.columns.values() == []
+
+
+@pytest.mark.parametrize("table_name", ["space_participant", "space_message"])
+@pytest.mark.parametrize(
+    ("flwr_aid", "agent_id", "valid"),
+    [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
+)
+def test_space_requires_exactly_one_identity(
+    table_name: str,
+    flwr_aid: str | None,
+    agent_id: int | None,
+    valid: bool,
+) -> None:
+    """Accept either identity and reject both or neither in both tables."""
+    table = FlwrBase.metadata.tables[table_name]
+    engine = create_engine("sqlite:///:memory:")
+    table.create(engine)
+    values: dict[str, object] = {
+        "space_id": UUID(int=1),
+        "flwr_aid": flwr_aid,
+        "agent_id": agent_id,
+    }
+    if table_name == "space_message":
+        values.update(content="Hello", created_at=datetime.now(UTC))
+
+    with engine.begin() as conn:
+        if valid:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
+                conn.execute(table.insert().values(**values))

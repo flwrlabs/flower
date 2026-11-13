@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Sequence
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from flwr.app import Context, Message
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -27,13 +28,20 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.fab import Fab
@@ -235,7 +243,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         flwr_aid: str,
         config: AgentConfig,
     ) -> Agent | None:
-        """Create an agent owned by a Flower account.
+        """Create an agent and its initial Space atomically.
+
+        The untitled Space contains the agent and its owning account.
 
         Parameters
         ----------
@@ -267,6 +277,41 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Sequence[Agent]
             Agents belonging to the account, or an empty sequence if none exist.
+        """
+
+    @abstractmethod
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching owned Agents and participating Spaces.
+
+        Concurrent changes may appear in both this response and subsequent replay.
+        """
+
+    @abstractmethod
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Store a shared event and its ordered deliveries, returning its UUID.
+
+        Each call creates a new event with a generated UUID and creation timestamp.
+        SQL callers can use an enclosing session to commit application changes
+        with the event.
+        """
+
+    @abstractmethod
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Replay accessible events after an exclusive cursor in user-feed order.
+
+        Raise ValueError for cursors outside [0, feed head] or nonpositive limits.
+        If all remaining entries are inaccessible, return a cursor-only response
+        with no event. Clients apply present events before saving seq; cursor-only
+        responses only advance the client's cursor.
+        Reading does not consume entries or advance a shared cursor.
         """
 
     @abstractmethod
@@ -663,6 +708,70 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def create_space(
+        self,
+        *,
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+
+    @abstractmethod
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """List spaces the user participates in."""
+
+    @abstractmethod
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
+        """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def get_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Read a page and advance the participant's read cursor.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the messages.
+        participant : SpaceParticipant
+            User or agent reading the messages.
+        limit : int (default: 50)
+            Maximum number of messages to return.
+        before_id : int | None (default: None)
+            Exclusive upper message ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower message ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceMessage] | None
+            Messages in ascending ID order, selecting the newest page by default.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or the supplied ID range is invalid.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
+        """
+
+    @abstractmethod
     def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
@@ -729,19 +838,19 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
 
     @abstractmethod
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
     ) -> None:
-        """Store a summary; raise ValueError for an existing series/event pair."""
+        """Store a summary; raise ValueError for an existing agent/event pair."""
 
     @abstractmethod
     def set_run_series_context(self, series_id: int, context: Context) -> None:
@@ -1286,6 +1395,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1299,6 +1409,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         run_ids : Optional[Sequence[int]] (default: None)
             If set, return only events for these runs. If set to `None`, return
             events for all runs.
+        space_id : Optional[UUID] (default: None)
+            If set, return only events from runs in this space.
         task_ids : Optional[Sequence[int]] (default: None)
             If set, return only events produced by these tasks.
         after_task_event_id : Optional[int] (default: None)
@@ -1317,6 +1429,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[TaskEvent]
             Task events ordered by ID.
         """
+
+    # pylint: disable=unused-argument
+    def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
+        """Return run IDs associated with a space, if this state stores runs."""
+        return []
 
     @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

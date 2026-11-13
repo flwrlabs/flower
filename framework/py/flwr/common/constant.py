@@ -19,13 +19,7 @@ from __future__ import annotations
 import os
 from typing import Final
 
-TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
-TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
 TRANSPORT_TYPE_VCE = "vce"
-TRANSPORT_TYPES = [
-    TRANSPORT_TYPE_GRPC_RERE,
-    TRANSPORT_TYPE_VCE,
-]
 
 # Addresses
 # Ports
@@ -33,9 +27,6 @@ CONTROL_API_PORT = "9093"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
-FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
-    "[::]:8080"  # IPv6 to keep start_server compatible
-)
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
 
 # Constants for heartbeat
@@ -117,14 +108,11 @@ FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION = (
     "FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION"
 )
 
-# Internal API toggles
-FLWR_INTERNAL_GRPC_CONTROL_API = "FLWR_INTERNAL_GRPC_CONTROL_API"
-
 # Log streaming configurations
-CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
-LOG_STREAM_INTERVAL = 0.5  # Log stream interval for `ControlServicer.StreamLogs`
+LOG_STREAM_INTERVAL = 0.5  # Control API log stream interval
 RUN_EVENTS_STREAM_INTERVAL = 0.5  # Event stream interval for `StreamRunEvents`
+USER_EVENTS_STREAM_INTERVAL = 0.1  # Event stream interval for `StreamEvents`
 LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 
 # Retry configurations
@@ -135,8 +123,6 @@ ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
 REFRESH_TOKEN_KEY = "flwr-oidc-refresh-token"
 
 # Constants for node authentication
-PUBLIC_KEY_HEADER = "flwr-public-key-bin"  # Must end with "-bin" for binary data
-SIGNATURE_HEADER = "flwr-signature-bin"  # Must end with "-bin" for binary data
 TIMESTAMP_HEADER = "flwr-timestamp"
 TIMESTAMP_TOLERANCE = 300  # General tolerance for timestamp verification
 SYSTEM_TIME_TOLERANCE = 5  # Allowance for system time drift

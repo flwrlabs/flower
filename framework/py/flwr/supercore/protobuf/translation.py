@@ -30,6 +30,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddNodeToFederationRequest,
     ArchiveFederationRequest,
     BeginConnectorOAuthRequest,
+    BootstrapRequest,
     CompleteConnectorOAuthRequest,
     ConfigureSimulationFederationRequest,
     CreateAgentRequest,
@@ -64,6 +65,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartRunRequest,
     StopAutomationRequest,
     StopRunRequest,
+    StreamEventsRequest,
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
@@ -95,6 +97,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetFileRequest,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
+    GetSpaceEventsRequest,
     ListFilesRequest,
     PullAppMessagesRequest,
     PullTaskInputRequest,
@@ -107,6 +110,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    CreateSpaceRequest,
+    GetSpaceMessagesRequest,
+    ListSpacesRequest,
+    SendSpaceMessageRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
@@ -123,6 +132,8 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/control/bootstrap"): BootstrapRequest,
+    ("POST", "/v1/control/stream-events"): StreamEventsRequest,
     ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,
     ("POST", "/v1/fleet/activate-node"): ActivateNodeRequest,
     ("POST", "/v1/fleet/deactivate-node"): DeactivateNodeRequest,
@@ -137,6 +148,10 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
     ("POST", "/v1/control/create-agent"): CreateAgentRequest,
     ("POST", "/v1/control/list-agents"): ListAgentsRequest,
+    ("POST", "/v1/control/create-space"): CreateSpaceRequest,
+    ("POST", "/v1/control/list-spaces"): ListSpacesRequest,
+    ("POST", "/v1/control/get-space-messages"): GetSpaceMessagesRequest,
+    ("POST", "/v1/control/send-space-message"): SendSpaceMessageRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
@@ -209,6 +224,9 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/push-task-message"): PushTaskMessageRequest,
     ("POST", "/v1/runtime/push-task-events"): PushTaskEventsRequest,
     ("POST", "/v1/runtime/get-run-series-events"): GetRunSeriesEventsRequest,
+    ("POST", "/v1/runtime/get-space-events"): GetSpaceEventsRequest,
+    ("POST", "/v1/runtime/get-space-messages"): GetSpaceMessagesRequest,
+    ("POST", "/v1/runtime/send-space-message"): SendSpaceMessageRequest,
     ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
     ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,

@@ -34,6 +34,8 @@ ROUTINE_ACCESS_PATHS = frozenset(
         "/v1/runtime/get-file",
         "/v1/runtime/get-nodes",
         "/v1/runtime/get-run-series-events",
+        "/v1/runtime/get-space-events",
+        "/v1/runtime/get-space-messages",
         "/v1/runtime/list-files",
         "/v1/runtime/acquire-task",
         "/v1/runtime/pull-task-message",

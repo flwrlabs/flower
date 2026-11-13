@@ -23,10 +23,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import (
-    FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION,
-    FLWR_INTERNAL_GRPC_CONTROL_API,
-)
+from flwr.common.constant import FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -34,7 +31,6 @@ from flwr.supercore.version import package_version
 from flwr.superlink.federation import NoOpFederationManager
 
 from .flower_superlink import (
-    SuperLinkLifespan,
     _obtain_superlink_certificates,
     _parse_args_run_superlink,
     _parse_superlink_lifespan_config,
@@ -42,33 +38,6 @@ from .flower_superlink import (
 
 app_module = importlib.import_module("flwr.superlink.cli.flower_superlink")
 config_loader_module = importlib.import_module("flwr.superlink.config_loader")
-
-
-@pytest.mark.parametrize(
-    ("env_value", "expected_call_count"),
-    [(None, 0), ("0", 0), ("1", 1)],
-)
-def test_superlink_lifespan_starts_grpc_control_api_only_when_enabled(
-    env_value: str | None,
-    expected_call_count: int,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SuperLink should require an explicit opt-in for the gRPC Control API."""
-    if env_value is None:
-        monkeypatch.delenv(FLWR_INTERNAL_GRPC_CONTROL_API, raising=False)
-    else:
-        monkeypatch.setenv(FLWR_INTERNAL_GRPC_CONTROL_API, env_value)
-
-    state_factory = Mock()
-    lifespan = SuperLinkLifespan(Mock(), state_factory)
-    start_control_api = Mock()
-    monkeypatch.setattr(lifespan, "_start_control_api", start_control_api)
-    monkeypatch.setattr(lifespan, "_start_superexec_if_needed", Mock())
-    monkeypatch.setattr(lifespan, "_start_health_server_if_needed", Mock())
-
-    lifespan.startup()
-
-    assert start_control_api.call_count == expected_call_count
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -90,9 +59,6 @@ def test_parse_superlink_lifespan_config_returns_final_defaults(
 
     config = _parse_superlink_lifespan_config()
 
-    assert config.control_address == app_module.CONTROL_API_DEFAULT_SERVER_ADDRESS
-    assert config.fleet_api_type == "http"
-    assert config.health_server_address is None
     assert config.certificates is None
     assert config.superexec_auth_secret is None
     assert config.host == app_module.UVICORN_DEFAULT_HOST

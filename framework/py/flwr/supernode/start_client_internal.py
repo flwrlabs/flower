@@ -46,7 +46,6 @@ from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import SUPERNODE_DEFAULT_SERVER_ADDRESS, TaskType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -94,7 +93,6 @@ def start_client_internal(
     runtime_api_address: str = SUPERNODE_DEFAULT_SERVER_ADDRESS,
     runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
     runtime_root_certificates_path: str | None = None,
-    health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
@@ -147,9 +145,6 @@ def start_client_internal(
     runtime_root_certificates_path : Optional[str] (default: None)
         Path to the CA certificate file passed to subprocess SuperExec instances so
         they can verify the Runtime API server certificate.
-    health_server_address : Optional[str] (default: None)
-        The address of the health server. If `None` is provided, the health server will
-        NOT be started.
     trusted_entities : Optional[dict[str, str]] (default: None)
         A dictionary mapping public key IDs to public keys.
         Only apps verified by at least one of these
@@ -186,19 +181,10 @@ def start_client_internal(
             )
         superexec_auth_secret = None
 
-    # Runtime API is served over HTTP by the SuperNode process.
-    grpc_servers = []
-
-    # Launch gRPC health server
-    if health_server_address is not None:
-        health_server = run_health_server_grpc_no_tls(health_server_address)
-        grpc_servers.append(health_server)
-
     # Register handlers for graceful shutdown
     register_signal_handlers(
         event_type=EventType.RUN_SUPERNODE_LEAVE,
         exit_message="SuperNode terminated gracefully.",
-        grpc_servers=grpc_servers,
     )
 
     # Initialize NodeState and ObjectStore

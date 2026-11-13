@@ -51,6 +51,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -75,6 +77,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
 )
 from flwr.supercore.dependencies.runtime import (
     RuntimeHandlersDependency,
@@ -253,6 +261,39 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get events from the authenticated task's run series."""
     return handlers.get_run_series_events(request, state, task)
+
+
+@router.post("/get-space-events")
+def get_space_events(
+    request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> GetSpaceEventsResponse:
+    """Get events from the authenticated task's Space."""
+    return handlers.get_space_events(request, state, task)
+
+
+@router.post("/get-space-messages")
+def runtime_get_space_messages(
+    request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> GetSpaceMessagesResponse:
+    """Read messages from the authenticated task's Space."""
+    return handlers.get_space_messages(request, state, task)
+
+
+@router.post("/send-space-message")
+def runtime_send_space_message(
+    request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> SendSpaceMessageResponse:
+    """Publish a message to the authenticated task's Space."""
+    return handlers.send_space_message(request, state, task)
 
 
 @router.post("/get-compacted-contexts")

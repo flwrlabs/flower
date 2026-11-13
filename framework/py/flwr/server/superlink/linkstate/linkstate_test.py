@@ -27,16 +27,17 @@ import unittest
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from threading import Barrier
 from typing import Any, cast
 from unittest.mock import Mock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
 from sqlalchemy import event, select, update
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Update
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
@@ -49,7 +50,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
+from flwr.proto.control_pb2 import AgentConfig, StartRunRequest  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -57,6 +58,7 @@ from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
@@ -85,6 +87,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -421,10 +424,149 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
+        assert run.space_id is None
+        assert run.agent_id is None
         stored_event = state.get_task_events(run_ids=[run_id])[0]
         assert stored_event.event == initial_event.event
         assert stored_event.data == initial_event.data
         assert stored_event.task_id == run.primary_task_id
+
+    def test_get_task_events_filters_by_space(self) -> None:
+        """Return events only from runs assigned to the requested space."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        other_space_id = UUID(state.create_space(participants=[]).id)
+        run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
+        for assigned_run_id, assigned_space_id in (
+            (run_id, space_id),
+            (other_run_id, other_space_id),
+        ):
+            if isinstance(state, InMemoryLinkState):
+                state.run_ids[assigned_run_id].space_id = assigned_space_id
+            else:
+                assert isinstance(state, SqlLinkState)
+                with state.session() as session:
+                    session.execute(
+                        update(RunModel)
+                        .where(RunModel.run_id == assigned_run_id)
+                        .values(space_id=assigned_space_id)
+                    )
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        other_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=other_run_id
+        )
+        assert task_id is not None and other_task_id is not None
+        assert state.store_task_events(
+            [
+                TaskEvent(run_id=run_id, task_id=task_id, event="message", data="{}"),
+                TaskEvent(
+                    run_id=other_run_id,
+                    task_id=other_task_id,
+                    event="message",
+                    data="{}",
+                ),
+                TaskEvent(run_id=run_id, task_id=task_id, event="message", data="{}"),
+            ]
+        )
+
+        events = state.get_task_events(space_id=space_id)
+        self.assertEqual([event.run_id for event in events], [run_id, run_id])
+        self.assertEqual(state.get_task_events(space_id=space_id, last_n=1), events[1:])
+        self.assertEqual(
+            state.get_task_events(space_id=space_id, run_ids=[other_run_id]), []
+        )
+        self.assertEqual(state.get_task_events(space_id=uuid4()), [])
+
+    def test_create_space_run(self) -> None:
+        """Create a Space AgentApp run without federation or series resources."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        with patch.object(state.federation_manager, "filter_nodes") as filter_nodes:
+            run_id = state.create_run(
+                "flwr/test",
+                "1.0",
+                "hash",
+                {},
+                None,
+                None,
+                "account",
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            run = state.get_run_info(run_ids=[run_id])[0]
+            assert run.space_id == space_id
+            assert run.agent_id is None
+            assert run.federation_id == "" and run.series_id == 0
+            assert state.get_run_series() == []
+            assert state.get_nodes(run_id) == set()
+            assert (
+                len(state.get_messages(dst_node_id=SUPERLINK_NODE_ID, run_id=run_id))
+                == 1
+            )
+            assert not state.store_messages(
+                [
+                    message_from_proto(
+                        create_ins_message(
+                            src_node_id=SUPERLINK_NODE_ID,
+                            dst_node_id=2,
+                            run_id=run_id,
+                        )
+                    )
+                ]
+            )[0]
+        filter_nodes.assert_not_called()
+
+    def test_create_run_rejects_invalid_scope(self) -> None:
+        """Reject missing/mixed scopes and non-AgentApp Space runs before writes."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        for federation_id, series_id, scope, task_type in (
+            (None, None, None, TaskType.AGENT_APP),
+            (NOOP_FEDERATION_ID, None, space_id, TaskType.AGENT_APP),
+            (None, 123, space_id, TaskType.AGENT_APP),
+            (None, None, space_id, TaskType.SERVER_APP),
+        ):
+            with self.assertRaises(ValueError):
+                state.create_run(
+                    "",
+                    "",
+                    "hash",
+                    {},
+                    federation_id,
+                    None,
+                    "account",
+                    task_type,
+                    series_id=series_id,
+                    space_id=scope,
+                )
+        assert state.get_run_info() == []
+        assert state.get_tasks() == [] and state.get_run_series() == []
+
+    def test_create_run_rejects_unknown_space(self) -> None:
+        """An unknown Space must not leave an orphan run or primary task."""
+        state = self.state_factory()
+        with (
+            self.assertRaises(IntegrityError)
+            if isinstance(state, SqlLinkState)
+            else nullcontext()
+        ):
+            assert (
+                state.create_run(
+                    "",
+                    "",
+                    "hash",
+                    {},
+                    None,
+                    None,
+                    "account",
+                    TaskType.AGENT_APP,
+                    space_id=uuid4(),
+                )
+                == 0
+            )
+        assert state.get_run_info() == [] and state.get_tasks() == []
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
@@ -689,6 +831,40 @@ class StateTest(CoreStateTest):
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
+
+    def test_get_run_info_filter_space_and_federation_runs(self) -> None:
+        """Distinguish unrestricted, empty, Space-only, and mixed filters."""
+        state = self.state_factory()
+        federation_run_id = create_dummy_run(state)
+        space_run_id = state.create_run(
+            "flwr/test",
+            "1.0",
+            "hash",
+            {},
+            None,
+            None,
+            "account",
+            TaskType.AGENT_APP,
+            space_id=UUID(state.create_space(participants=[]).id),
+            user_prompt="Hello",
+        )
+
+        cases: list[tuple[list[str | None] | None, set[int]]] = [
+            (None, {federation_run_id, space_run_id}),
+            ([], set()),
+            ([None], {space_run_id}),
+            ([NOOP_FEDERATION_ID], {federation_run_id}),
+            ([NOOP_FEDERATION_ID, None], {federation_run_id, space_run_id}),
+        ]
+        for federation_ids, expected in cases:
+            with self.subTest(federation_ids=federation_ids):
+                self.assertSetEqual(
+                    {
+                        run.run_id
+                        for run in state.get_run_info(federation_ids=federation_ids)
+                    },
+                    expected,
+                )
 
     def test_get_run_info_filter_logic(self) -> None:
         """Test get_run_info ORs within each filter and ANDs across filters."""
@@ -1777,16 +1953,14 @@ class InMemoryStateTest(StateTest):
         return InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
 
     def test_get_compacted_contexts(self) -> None:
-        """Read one series newest first with an exclusive cursor."""
+        """Read one agent newest first with an exclusive cursor."""
         state = self.state_factory()
         state.compacted_context_store = {
             context.id: context
             for context in (
-                CompactedContext(id=1, series_id=42, through_event_id=10, text="First"),
-                CompactedContext(
-                    id=2, series_id=42, through_event_id=20, text="Second"
-                ),
-                CompactedContext(id=3, series_id=43, through_event_id=30, text="Other"),
+                CompactedContext(id=1, agent_id=42, through_event_id=10, text="First"),
+                CompactedContext(id=2, agent_id=42, through_event_id=20, text="Second"),
+                CompactedContext(id=3, agent_id=43, through_event_id=30, text="Other"),
             )
         }
 
@@ -1838,21 +2012,28 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         return state
 
     def test_get_compacted_contexts(self) -> None:
-        """Read only one series in newest-first order with an exclusive cursor."""
+        """Read only one agent in newest-first order with an exclusive cursor."""
         state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
         with state.session() as session:
             rows = [
                 CompactedContextModel(
-                    series_id=series_id,
+                    agent_id=agent_id,
                     through_event_id=event_id,
                     text=text,
                     token_count=1,
                     created_at=now(),
                 )
-                for series_id, event_id, text in (
-                    (42, 10, "First"),
-                    (42, 20, "Second"),
-                    (43, 30, "Other"),
+                for agent_id, event_id, text in (
+                    (agent.id, 10, "First"),
+                    (agent.id, 20, "Second"),
+                    (other.id, 30, "Other"),
                 )
             ]
             session.add_all(rows)
@@ -1860,24 +2041,27 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             first_id, second_id = rows[0].id, rows[1].id
 
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(42, limit=2)],
+            [
+                context.text
+                for context in state.get_compacted_contexts(agent.id, limit=2)
+            ],
             ["Second", "First"],
         )
         self.assertEqual(
-            [context.id for context in state.get_compacted_contexts(42)],
+            [context.id for context in state.get_compacted_contexts(agent.id)],
             [second_id],
         )
         self.assertEqual(
             [
                 context.id
                 for context in state.get_compacted_contexts(
-                    42, before_context_id=second_id
+                    agent.id, before_context_id=second_id
                 )
             ],
             [first_id],
         )
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(43)],
+            [context.text for context in state.get_compacted_contexts(other.id)],
             ["Other"],
         )
 
@@ -2241,6 +2425,47 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             state.initialize()
             self.states.append(state)
         return self.states
+
+    def test_agent_run_admission_is_atomic(self) -> None:
+        """Two replicas admit one Run even after the triggering message is read."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
+            state = states[0]
+            agent = state.create_agent(
+                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+            )
+            assert agent is not None
+            space_id = UUID(state.get_spaces("alice")[0].id)
+            fab_hash = state.store_fab(Fab("", b"fab", {}))
+            assert not state.get_agent_run_candidates()
+            state.create_space_message(
+                space_id, SpaceParticipant(flwr_aid="alice"), "User message"
+            )
+            assert state.get_agent_run_candidates() == [(space_id, agent)]
+            state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
+            assert not state.get_agent_run_candidates()
+            barrier = Barrier(2)
+
+            def start(backend: LinkState) -> int:
+                barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
+                return backend.create_run(
+                    fab_id="publisher/app",
+                    fab_version="1.0",
+                    fab_hash=fab_hash,
+                    override_config={},
+                    federation_id=None,
+                    federation_config=None,
+                    flwr_aid=None,
+                    primary_task_type=TaskType.AGENT_APP,
+                    space_id=space_id,
+                    agent_id=agent.id,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                run_ids = list(pool.map(start, states))
+            assert sum(bool(run_id) for run_id in run_ids) == 1
+            assert len(state.get_run_info()) == 1
+            assert not state.get_agent_run_candidates()
 
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""

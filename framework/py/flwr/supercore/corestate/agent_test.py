@@ -14,9 +14,13 @@
 # ==============================================================================
 """Tests for account-owned agents across CoreState implementations."""
 
+from pathlib import Path
+from uuid import UUID
+
 import pytest
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -25,15 +29,17 @@ from flwr.superlink.federation import NoOpFederationManager
 from . import CoreState
 
 
-@pytest.fixture(name="state", params=["in-memory", "sqlite"])
-def corestate_fixture(request: pytest.FixtureRequest) -> CoreState:
+@pytest.fixture(name="state", params=["in-memory", ":memory:", "sqlite"])
+def corestate_fixture(request: pytest.FixtureRequest, tmp_path: Path) -> CoreState:
     """Provide in-memory and SQL state."""
     manager = NoOpFederationManager()
     object_store = ObjectStoreFactory().store()
     if request.param == "in-memory":
         return InMemoryLinkState(manager, object_store)
     state = SqlLinkState(
-        database_path=":memory:",
+        database_path=(
+            ":memory:" if request.param == ":memory:" else str(tmp_path / "state.db")
+        ),
         federation_manager=manager,
         object_store=object_store,
     )
@@ -66,6 +72,27 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert state.list_agents("") == []
 
 
+def test_create_agent_creates_space(state: CoreState) -> None:
+    """Each new agent gets an empty Space containing only itself and its creator."""
+    config = AgentConfig(name="Research", app_spec="@flower/research")
+    agents = [state.create_agent("alice", config) for _ in range(2)]
+    spaces = state.get_spaces("alice")
+    assert len(spaces) == 2 and spaces[0].id != spaces[1].id
+    for agent in agents:
+        assert agent is not None
+        member = SpaceParticipant(agent_id=agent.id)
+        space = next(space for space in spaces if member in space.participants)
+        assert len(space.participants) == 2
+        assert SpaceParticipant(flwr_aid="alice") in space.participants
+        assert space.title == ""
+        assert (
+            state.get_space_messages(UUID(space.id), SpaceParticipant(flwr_aid="alice"))
+            == []
+        )
+    assert state.get_spaces("bob") == []
+    assert not state.get_tasks()
+
+
 @pytest.mark.parametrize(
     "field", ["flwr_aid", "name", "app_spec", "title", "description"]
 )
@@ -84,3 +111,4 @@ def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None
     assert state.create_agent(flwr_aid=flwr_aid, config=AgentConfig(**values)) is None
     assert state.list_agents("alice") == []
     assert state.list_agents("") == []
+    assert state.get_spaces("alice") == []
