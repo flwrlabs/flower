@@ -42506,7 +42506,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:32:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentSpace <flwr.agentapp.AgentSpace>`\\ \\(\\)"
-msgstr ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:32:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace:1 of
@@ -43098,7 +43098,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`space <flwr.agentapp.AgentSession.space>`\\"
-msgstr ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.space:1 of
@@ -43112,7 +43112,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`call <flwr.agentapp.AgentSpace.call>`\\ \\(tool\\_call\\)"
-msgstr ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
@@ -43125,8 +43125,6 @@ msgid ""
 ":py:obj:`get_messages <flwr.agentapp.AgentSpace.get_messages>`\\ "
 "\\(\\*\\[\\, limit\\, before\\_id\\, ...\\]\\)"
 msgstr ""
-":py:obj:`create_message <flwr.serverapp.Grid.create_message>`\\ "
-"\\(content\\, message\\_type\\, ...\\[\\, ttl\\]\\)"
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace.get_messages:1 of
@@ -43136,7 +43134,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentSpace.tools>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace.tools:1 of

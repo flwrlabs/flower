@@ -32148,7 +32148,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentSpace.rst:2
 #, fuzzy
 msgid "AgentSpace"
-msgstr "O nome do repositório da imagem base."
+msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 msgid ":py:obj:`call <flwr.agentapp.AgentSpace.call>`\\ \\(tool\\_call\\)"
