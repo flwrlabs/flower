@@ -226,9 +226,24 @@ def test_get_space_events_reads_only_authenticated_space(
     token = state.claim_task(task_id)
     assert token is not None
     assert state.activate_task(task_id)
+    assert state.store_task_events(
+        [
+            TaskEvent(
+                run_id=run_ids[0],
+                task_id=task_id,
+                event="other",
+                data='{"type":"other"}',
+            )
+        ]
+    )
 
     assert _post(client, "get-space-events", GetSpaceEventsRequest()).status_code == 401
-    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
+    response = _post(
+        client,
+        "get-space-events",
+        GetSpaceEventsRequest(event_types=["message"], last_n=1),
+        token=token,
+    )
 
     assert response.status_code == 200
     events = GetSpaceEventsResponse.FromString(response.content).events
