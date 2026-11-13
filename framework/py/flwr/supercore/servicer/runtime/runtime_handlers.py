@@ -392,7 +392,11 @@ def get_file(
 def list_files(
     request: ListFilesRequest, state: CoreState, series_id: int
 ) -> ListFilesResponse:
-    """List file metadata in the authenticated task's run series."""
+    """List file metadata in the authenticated task's run series.
+    
+    When a limit is set, fetch one extra entry to check for another page.
+    Return the last included key as the cursor only if more files remain.
+    """
     log(DEBUG, "Runtime.ListFiles")
     limit = request.limit if request.HasField("limit") else None
     files = state.list_files(
