@@ -96,6 +96,18 @@ def get_space_events(
     return GetSpaceEventsResponse(events=events)
 
 
+def require_agent_id(run: Run | None, run_id: int) -> int:
+    """Return the agent ID of a Run, or reject a missing or unbound Run."""
+    if run is None:
+        raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {run_id} not found.")
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint requires a Run bound to an agent.",
+        )
+    return run.agent_id
+
+
 def authenticate_space_agent(task: Task, run: Run) -> tuple[UUID, SpaceParticipant]:
     """Require the primary AgentApp task of a Run bound to a Space and agent."""
     if run.space_id is None or run.agent_id is None:
