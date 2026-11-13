@@ -81,8 +81,8 @@ StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 class RuntimeHandlers(Protocol[StateT_contra]):
     """Component-specific handlers used by the shared Runtime API router."""
 
-    def _get_run_series_id(self, state: StateT_contra, task: Task) -> int:
-        """Resolve the authenticated task's series ID for temporary file scoping."""
+    def _get_agent_id(self, state: StateT_contra, task: Task) -> int:
+        """Resolve the authenticated task's agent ID for file scoping."""
 
     def acquire_task(
         self, request: AcquireTaskRequest, state: StateT_contra

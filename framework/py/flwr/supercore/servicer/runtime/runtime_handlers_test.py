@@ -67,7 +67,7 @@ from . import runtime_handlers
 
 @pytest.mark.parametrize("expected_revision", [None, 0, 7])
 def test_put_file(expected_revision: int | None) -> None:
-    """Preserve create-only and explicit revision preconditions in the series scope."""
+    """Preserve create-only and explicit revision preconditions in the agent scope."""
     state = Mock()
     state.put_file.return_value = 8
     response = runtime_handlers.put_file(
@@ -78,7 +78,7 @@ def test_put_file(expected_revision: int | None) -> None:
 
     assert response.revision == 8
     state.put_file.assert_called_once_with(
-        scope="run-series-456",
+        scope="agent-456",
         key="file",
         data=b"",
         expected_revision=expected_revision,
@@ -89,12 +89,12 @@ def test_put_file(expected_revision: int | None) -> None:
     "file", [None, File(metadata=FileMetadata(key="file", revision=7), data=b"data")]
 )
 def test_get_file(file: File | None) -> None:
-    """Return the series's current file, or leave the response field absent."""
+    """Return the agent's current file, or leave the response field absent."""
     state = Mock()
     state.get_file.return_value = file
     response = runtime_handlers.get_file(GetFileRequest(key="file"), state, 456)
 
-    state.get_file.assert_called_once_with(scope="run-series-456", key="file")
+    state.get_file.assert_called_once_with(scope="agent-456", key="file")
     assert response.HasField("file") == (file is not None)
     if file is not None:
         assert response.file == file
@@ -131,7 +131,7 @@ def test_list_files(
     )
 
     state.list_files.assert_called_once_with(
-        scope="run-series-456",
+        scope="agent-456",
         prefix="prefix/",
         start_after="previous",
         limit=limit + 1 if limit else limit,
@@ -142,7 +142,7 @@ def test_list_files(
 
 
 def test_delete_file() -> None:
-    """Delete the series's file using the supplied revision precondition."""
+    """Delete the agent's file using the supplied revision precondition."""
     state = Mock()
     response = runtime_handlers.delete_file(
         DeleteFileRequest(key="file", expected_revision=7),
@@ -151,7 +151,7 @@ def test_delete_file() -> None:
     )
 
     state.delete_file.assert_called_once_with(
-        scope="run-series-456", key="file", expected_revision=7
+        scope="agent-456", key="file", expected_revision=7
     )
     assert not response.ListFields()
 

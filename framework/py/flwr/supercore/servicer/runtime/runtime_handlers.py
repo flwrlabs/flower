@@ -364,12 +364,12 @@ def push_logs(
 
 
 def put_file(
-    request: PutFileRequest, state: CoreState, series_id: int
+    request: PutFileRequest, state: CoreState, agent_id: int
 ) -> PutFileResponse:
-    """Store a file in the authenticated task's run series."""
+    """Store a file in the authenticated task's agent scope."""
     log(DEBUG, "Runtime.PutFile")
     revision = state.put_file(
-        scope=_file_scope(series_id),
+        scope=_file_scope(agent_id),
         key=request.key,
         data=request.data,
         expected_revision=(
@@ -380,27 +380,27 @@ def put_file(
 
 
 def get_file(
-    request: GetFileRequest, state: CoreState, series_id: int
+    request: GetFileRequest, state: CoreState, agent_id: int
 ) -> GetFileResponse:
-    """Get a file from the authenticated task's run series."""
+    """Get a file from the authenticated task's agent scope."""
     log(DEBUG, "Runtime.GetFile")
     return GetFileResponse(
-        file=state.get_file(scope=_file_scope(series_id), key=request.key)
+        file=state.get_file(scope=_file_scope(agent_id), key=request.key)
     )
 
 
 def list_files(
-    request: ListFilesRequest, state: CoreState, series_id: int
+    request: ListFilesRequest, state: CoreState, agent_id: int
 ) -> ListFilesResponse:
-    """List file metadata in the authenticated task's run series.
-    
+    """List file metadata in the authenticated task's agent scope.
+
     When a limit is set, fetch one extra entry to check for another page.
     Return the last included key as the cursor only if more files remain.
     """
     log(DEBUG, "Runtime.ListFiles")
     limit = request.limit if request.HasField("limit") else None
     files = state.list_files(
-        scope=_file_scope(series_id),
+        scope=_file_scope(agent_id),
         prefix=request.prefix,
         start_after=request.start_after,
         limit=limit + 1 if limit else limit,
@@ -412,22 +412,21 @@ def list_files(
 
 
 def delete_file(
-    request: DeleteFileRequest, state: CoreState, series_id: int
+    request: DeleteFileRequest, state: CoreState, agent_id: int
 ) -> DeleteFileResponse:
-    """Delete a file in the authenticated task's run series."""
+    """Delete a file in the authenticated task's agent scope."""
     log(DEBUG, "Runtime.DeleteFile")
     state.delete_file(
-        scope=_file_scope(series_id),
+        scope=_file_scope(agent_id),
         key=request.key,
         expected_revision=request.expected_revision,
     )
     return DeleteFileResponse()
 
 
-def _file_scope(series_id: int) -> str:
-    """Return the temporary file namespace for a run series."""
-    # shortcut: scope to the run series for now; use agent ID when available.
-    return f"run-series-{series_id}"
+def _file_scope(agent_id: int) -> str:
+    """Return the file namespace for an agent."""
+    return f"agent-{agent_id}"
 
 
 def _validate_create_task_request(

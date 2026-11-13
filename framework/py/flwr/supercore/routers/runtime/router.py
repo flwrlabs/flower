@@ -401,7 +401,7 @@ def put_file(  # pylint: disable=protected-access
 ) -> PutFileResponse:
     """Store a file."""
     return core_runtime_handlers.put_file(
-        request, state, handlers._get_run_series_id(state, task)
+        request, state, handlers._get_agent_id(state, task)
     )
 
 
@@ -414,7 +414,7 @@ def get_file(  # pylint: disable=protected-access
 ) -> GetFileResponse:
     """Get a file."""
     return core_runtime_handlers.get_file(
-        request, state, handlers._get_run_series_id(state, task)
+        request, state, handlers._get_agent_id(state, task)
     )
 
 
@@ -427,7 +427,7 @@ def list_files(  # pylint: disable=protected-access
 ) -> ListFilesResponse:
     """List file metadata."""
     return core_runtime_handlers.list_files(
-        request, state, handlers._get_run_series_id(state, task)
+        request, state, handlers._get_agent_id(state, task)
     )
 
 
@@ -440,5 +440,5 @@ def delete_file(  # pylint: disable=protected-access
 ) -> DeleteFileResponse:
     """Delete a file."""
     return core_runtime_handlers.delete_file(
-        request, state, handlers._get_run_series_id(state, task)
+        request, state, handlers._get_agent_id(state, task)
     )
