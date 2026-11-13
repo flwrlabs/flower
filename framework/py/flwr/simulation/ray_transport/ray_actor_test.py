@@ -413,11 +413,12 @@ class TestIsAmdRenderNode(TestCase):
         with patch("builtins.open", mock_open(read_data="0x8086\n")):
             self.assertFalse(_is_amd_render_node("/dev/dri/renderD128"))
 
-    def test_missing_sysfs_vendor_file_assumes_amd(self) -> None:
-        """Test that an unreadable sysfs vendor file does not exclude the node.
+    def test_missing_sysfs_vendor_file_is_unknown(self) -> None:
+        """Test that an unreadable sysfs vendor file is reported as unknown.
 
-        Some restricted containers do not mount sysfs; falling back to "assume AMD"
-        there avoids regressing environments that previously worked.
+        Some restricted containers do not mount sysfs; an unreadable vendor file
+        says nothing about which GPU backs the node, so it must be neither
+        certified as AMD nor rejected as non-AMD.
         """
         with patch("builtins.open", side_effect=OSError):
-            self.assertTrue(_is_amd_render_node("/dev/dri/renderD128"))
+            self.assertIsNone(_is_amd_render_node("/dev/dri/renderD128"))

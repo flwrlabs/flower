@@ -147,12 +147,12 @@ discovers AMD GPUs through the ``amdsmi`` Python package, via
     A missing or unimportable ``amdsmi`` fails silently. Ray's AMD accelerator manager
     catches the resulting ``ImportError`` and simply reports zero GPUs -- there is no
     visible error anywhere in Ray's own logs. If Ray reports ``GPU=0`` while
-    ``/dev/kfd`` and an AMD-backed render node are both accessible (see
-    `Troubleshooting`_ below), this is almost always the cause.
+    ``/dev/kfd`` and an AMD-backed render node are both accessible (see Troubleshooting_
+    below), this is almost always the cause.
 
-Confirm ``amdsmi`` is importable in the **exact same Python environment Ray runs in**
--- a venv created with ``uv`` or ``python -m venv`` does not see packages installed
-into the system/apt Python by default, which is a common trap:
+Confirm ``amdsmi`` is importable in the **exact same Python environment Ray runs in** --
+a venv created with ``uv`` or ``python -m venv`` does not see packages installed into
+the system/apt Python by default, which is a common trap:
 
 .. code-block:: shell
 
@@ -160,18 +160,17 @@ into the system/apt Python by default, which is a common trap:
 
 If that fails, install ``amdsmi`` one of two ways:
 
-- **System package** (``apt install amd-smi-lib`` or your distribution's
-  equivalent): installs ``amdsmi`` into the **system** Python's site-packages via the
-  package's post-install script, together with its own bundled ``libamd_smi.so``.
-  This is invisible to an isolated virtual environment unless that environment has
+- **System package** (``apt install amd-smi-lib`` or your distribution's equivalent):
+  installs ``amdsmi`` into the **system** Python's site-packages via the package's
+  post-install script, together with its own bundled ``libamd_smi.so``. This is
+  invisible to an isolated virtual environment unless that environment has
   system-site-packages access.
-- **Pip wheel** (``pip install amdsmi``): installs a pure-Python wrapper with no
-  bundled ``.so``. It locates the native library itself, checking ``ROCM_HOME``
-  before ``ROCM_PATH`` (the opposite order from the rest of this guide), then
+- **Pip wheel** (``pip install amdsmi``): installs a pure-Python wrapper with no bundled
+  ``.so``. It locates the native library itself, checking ``ROCM_HOME`` before
+  ``ROCM_PATH`` (the opposite order from the rest of this guide), then
   ``lib/libamd_smi.so`` under whichever of those is set -- the same
-  unversioned-shared-library requirement as ``librocm_smi64.so`` above, just a
-  different filename. Use the same unset-vs-empty check, substituting
-  ``libamd_smi.so``:
+  unversioned-shared-library requirement as ``librocm_smi64.so`` above, just a different
+  filename. Use the same unset-vs-empty check, substituting ``libamd_smi.so``:
 
   .. code-block:: shell
 
@@ -241,15 +240,16 @@ verification steps later in this guide still report zero GPUs with no indication
 A value can also be in range and syntactically well-formed while still being wrong: a
 repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only looks at
 each value in isolation. Ray 2.56.0 sizes its advertised GPU resources from the length
-of this mask -- unaffected by the ``amdsmi`` switch above, since ``smi_get_device_count``
-still reports the node's total physical device count rather than anything already
-filtered by ``HIP_VISIBLE_DEVICES`` -- so a duplicate ordinal creates two schedulable
-slots that both map to the same ROCr-visible device, letting concurrent ClientApps
-collide on it instead of each getting a distinct GPU. A duplicate can also hide behind a leading-zero alias -- ``0``
-and ``00`` are the same ordinal to HIP, but two distinct strings to a naive comparison
--- so the snippet normalizes each value before comparing, rather than comparing the
-spellings it was given. It also rejects the mask in that case rather than accepting a
-syntactically-valid-looking duplicate.
+of this mask -- unaffected by the ``amdsmi`` switch above, since
+``smi_get_device_count`` still reports the node's total physical device count rather
+than anything already filtered by ``HIP_VISIBLE_DEVICES`` -- so a duplicate ordinal
+creates two schedulable slots that both map to the same ROCr-visible device, letting
+concurrent ClientApps collide on it instead of each getting a distinct GPU. A duplicate
+can also hide behind a leading-zero alias -- ``0`` and ``00`` are the same ordinal to
+HIP, but two distinct strings to a naive comparison -- so the snippet normalizes each
+value before comparing, rather than comparing the spellings it was given. It also
+rejects the mask in that case rather than accepting a syntactically-valid-looking
+duplicate.
 
 A trailing comma is a similar trap: Bash's ``read -ra`` silently drops a single empty
 field left by a trailing separator, so ``HIP_VISIBLE_DEVICES=0,1,`` parses to the same
@@ -295,6 +295,15 @@ exported, silently leaving Ray's original import failure in place:
         # conditional on ROCR_VISIBLE_DEVICES being set.
         _bad_syntax=0
         _bad_range=0
+        # Bash's arithmetic expansion (used below to normalize each ordinal)
+        # silently wraps a too-large all-digit value instead of erroring --
+        # `$((10#18446744073709551616))` evaluates to `0` with exit status 0,
+        # not a warning or failure. The ROCR_VISIBLE_DEVICES-bound check above
+        # already rejects such values via digit-length comparison without
+        # doing arithmetic, but that check is skipped entirely when
+        # ROCR_VISIBLE_DEVICES is unset, so this bound -- the largest value
+        # `$((...))` can represent -- is checked unconditionally instead.
+        _bash_int_max="9223372036854775807"
         if [[ "$HIP_VISIBLE_DEVICES" == *, ]]; then
             # A trailing comma leaves `read -ra` one field short of what Ray
             # gets from splitting the raw string itself, so check the raw
@@ -325,6 +334,14 @@ exported, silently leaving Ray's original import failure in place:
                 { [ "${#_trimmed_id}" -gt "${#_n}" ] ||
                     { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; }; then
                 _bad_range=1
+            elif [ "${#_trimmed_id}" -gt "${#_bash_int_max}" ] ||
+                { [ "${#_trimmed_id}" -eq "${#_bash_int_max}" ] &&
+                    [ "$_trimmed_id" -gt "$_bash_int_max" ]; }; then
+                # Same digit-length comparison as above, against Bash's own
+                # integer range rather than `_n` -- needed even when
+                # ROCR_VISIBLE_DEVICES is unset, since nothing else stops the
+                # `$((10#$_id))` below from silently wrapping this ordinal.
+                _bad_syntax=1
             else
                 _norm_ids+=("$((10#$_id))")
             fi
@@ -345,12 +362,13 @@ exported, silently leaving Ray's original import failure in place:
             else
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "well-formed comma-separated list of ordinals -- it has a" \
-                     "non-numeric value, or a stray leading, trailing, or" \
-                     "doubled comma. ROCR_VISIBLE_DEVICES is not set, so no" \
-                     "known bound exists to validate ordinals against; left" \
-                     "unchanged, so Ray may advertise the wrong number of GPU" \
-                     "slots or none at all. Correct it to a well-formed" \
-                     "comma-separated list of ordinals." >&2
+                     "non-numeric value, a value too large to represent, or a" \
+                     "stray leading, trailing, or doubled comma." \
+                     "ROCR_VISIBLE_DEVICES is not set, so no known bound exists" \
+                     "to validate ordinals against; left unchanged, so Ray may" \
+                     "advertise the wrong number of GPU slots or none at all." \
+                     "Correct it to a well-formed comma-separated list of" \
+                     "ordinals." >&2
             fi
         elif [ -n "$_dup" ]; then
             echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
@@ -362,6 +380,7 @@ exported, silently leaving Ray's original import failure in place:
                  "remove the duplicate and re-run this snippet." >&2
         fi
         unset _hip_ids _id _bad_syntax _bad_range _dup _norm_ids _trimmed_id
+        unset _bash_int_max
     fi
     unset _n
 
@@ -475,10 +494,10 @@ First, the framework:
     python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"
 
 This check is local to whichever host you run it on. On a :ref:`multi-node cluster
-<multinodesimulations>`, running it only on the driver/head node is not representative of
-the whole cluster: a CPU-only head correctly reports ``False, 0`` here even though Ray
-can still place GPU ``ClientApp``\s on separate worker nodes. Run it on each node that is
-expected to have a GPU, not just the driver.
+<multinodesimulations>`, running it only on the driver/head node is not representative
+of the whole cluster: a CPU-only head correctly reports ``False, 0`` here even though
+Ray can still place GPU ``ClientApp``\s on separate worker nodes. Run it on each node
+that is expected to have a GPU, not just the driver.
 
 Then Ray, which is what the Simulation Runtime actually schedules against:
 
@@ -486,12 +505,12 @@ Then Ray, which is what the Simulation Runtime actually schedules against:
 
     python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
 
-If your run connects to an existing cluster through a specific ``address`` -- whether via
-``RAY_ADDRESS``, an ``--init-args-address`` passed to the Simulation Runtime, or a
-manually started multi-node cluster -- reuse that same address here. A bare ``ray.init()``
-with no address can start or attach to a *different* local cluster instead of the one your
-run actually uses, in which case this check validates the wrong cluster and a non-zero
-``GPU`` result tells you nothing about the one that matters:
+If your run connects to an existing cluster through a specific ``address`` -- whether
+via ``RAY_ADDRESS``, an ``--init-args-address`` passed to the Simulation Runtime, or a
+manually started multi-node cluster -- reuse that same address here. A bare
+``ray.init()`` with no address can start or attach to a *different* local cluster
+instead of the one your run actually uses, in which case this check validates the wrong
+cluster and a non-zero ``GPU`` result tells you nothing about the one that matters:
 
 .. code-block:: shell
 
@@ -620,18 +639,28 @@ what else it can detect about device access:
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
 
-None of the four checks above run outside that single-node, driver-co-located case,
-since the driver's own ``/dev/kfd``/render-node state cannot diagnose a different
-machine:
+The four checks above assume this driver process shares the cluster node's device
+namespace; Flower qualifies or skips them whenever that assumption does not hold, since
+the driver's own ``/dev/kfd``/render-node state cannot diagnose a different machine:
 
 - On a **multi-node** cluster, AMD GPU discovery already ran independently on each node
   when ``ray start`` executed there, so Flower instead reports the node count and asks
-  you to check ``/dev/kfd`` and ``/dev/dri/renderD*`` on each node individually, not just
-  on the driver host.
-- On a **single-node** cluster where ``init_args`` joined the driver to a node on another
-  host (for example via ``address="<ip>:<port>"``), Flower instead names both the
-  reporting node's and the driver's own node ID, and points you at checking device
+  you to check ``/dev/kfd`` and ``/dev/dri/renderD*`` on each node individually, not
+  just on the driver host.
+- On a **single-node** cluster where ``init_args`` joined the driver to a node on
+  another host (for example via ``address="<ip>:<port>"``), Flower instead names both
+  the reporting node's and the driver's own node ID, and points you at checking device
   access on the node that actually reported zero GPUs, not on this host.
+- On a **single-node** cluster reached over **Ray Client**
+  (``ray.init("ray://host:port")``), Flower cannot tell whether the client and server
+  share a device namespace just from the endpoint address: a loopback literal
+  (``ray://127.0.0.1:10001``) or a hostname/LAN address that happens to resolve back to
+  this host can still be an SSH port forward or a sidecar sharing only the network
+  namespace, with the server's ``/dev`` elsewhere. In that ambiguous case Flower logs a
+  warning naming the endpoint and still runs the four checks above against this host, on
+  the chance the connection is genuinely co-located; only once the endpoint resolves to
+  an address confirmed *not* to be this host does Flower skip the checks outright and
+  point you at the remote node instead.
 
 CPU or GPU capacity is too small for even one client
 ----------------------------------------------------

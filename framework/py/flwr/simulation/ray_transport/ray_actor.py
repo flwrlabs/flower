@@ -17,6 +17,7 @@
 
 import glob
 import os
+import socket
 import threading
 from abc import ABC
 from collections.abc import Callable
@@ -88,22 +89,26 @@ class ClientAppActor(VirtualClientEngineActor):
 _AMD_PCI_VENDOR_ID = "0x1002"
 
 
-def _is_amd_render_node(node: str) -> bool:
+def _is_amd_render_node(node: str) -> bool | None:
     """Return whether a `/dev/dri/renderD*` node is backed by an AMD GPU.
 
     An accessible render node is not necessarily an AMD one: a hybrid host or
     container can expose an unrelated node (e.g. an integrated Intel GPU's
     `renderD128`) that ROCm cannot use. Disambiguate via the PCI vendor ID in
-    sysfs rather than assuming any accessible node is ROCm-capable. If the
-    vendor cannot be determined (sysfs missing, as in some restricted
-    containers), assume AMD rather than silently excluding the node.
+    sysfs rather than assuming any accessible node is ROCm-capable. Returns
+    `None` -- rather than guessing either way -- when the vendor cannot be
+    determined (sysfs missing, as in some restricted containers): an
+    unreadable vendor file says nothing about which GPU actually backs the
+    node, and certifying it as AMD on that basis can send a user chasing
+    `amdsmi`/`ROCM_PATH` when the real problem is that the only passed-through
+    node is not AMD's.
     """
     vendor_path = f"/sys/class/drm/{os.path.basename(node)}/device/vendor"
     try:
         with open(vendor_path, encoding="utf-8") as vendor_file:
             return vendor_file.read().strip().lower() == _AMD_PCI_VENDOR_ID
     except OSError:
-        return True
+        return None
 
 
 def _can_open_device(path: str) -> bool:
@@ -159,11 +164,23 @@ def _log_kfd_diagnostics() -> None:
     accessible_render_nodes = [node for node in render_nodes if _can_open_device(node)]
     # A hybrid host or container can expose an accessible render node that ROCm
     # cannot use (e.g. an integrated Intel GPU's renderD128) while the AMD one is
-    # missing or permission-denied; only an AMD-backed node rules out a device
-    # access problem.
-    amd_accessible_render_nodes = [
-        node for node in accessible_render_nodes if _is_amd_render_node(node)
-    ]
+    # missing or permission-denied; only a node confirmed AMD-backed rules out a
+    # device access problem. A node whose vendor cannot be determined (sysfs
+    # missing) is neither confirmed AMD nor confirmed otherwise, so it gets its
+    # own inconclusive branch below rather than being folded into either
+    # certainty.
+    amd_accessible_render_nodes = []
+    unknown_vendor_render_nodes = []
+    other_vendor_render_nodes = []
+    for node in accessible_render_nodes:
+        is_amd = _is_amd_render_node(node)
+        if is_amd is True:
+            amd_accessible_render_nodes.append(node)
+        elif is_amd is None:
+            unknown_vendor_render_nodes.append(node)
+        else:
+            other_vendor_render_nodes.append(node)
+
     if amd_accessible_render_nodes:
         log(
             WARNING,
@@ -183,7 +200,25 @@ def _log_kfd_diagnostics() -> None:
             "`libamd_smi.so` symlink, rather than only a versioned "
             "`libamd_smi.so.<N>`.",
         )
-    elif accessible_render_nodes:
+    elif unknown_vendor_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), and an accessible `/dev/dri/renderD*` node "
+            "exists (%s), but this host cannot determine its PCI "
+            "vendor ID (sysfs is missing or unreadable, as in some "
+            "restricted containers) -- it is therefore unclear "
+            "whether this node is AMD-backed or an unrelated GPU "
+            "(e.g. an integrated Intel GPU's renderD128) that ROCm "
+            "cannot use. Check the node's vendor manually if "
+            "possible (`cat /sys/class/drm/<node>/device/vendor`, "
+            "expecting `%s` for AMD) before assuming `amdsmi`/"
+            "ROCM_PATH is the issue -- it is not if this node turns "
+            "out not to be AMD's.",
+            ", ".join(unknown_vendor_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
+    elif other_vendor_render_nodes:
         log(
             WARNING,
             "The ROCm kernel driver is loaded and accessible "
@@ -195,7 +230,7 @@ def _log_kfd_diagnostics() -> None:
             "`amdsmi`/ROCM_PATH needs adjusting: check that `--device=/dev/dri "
             "--group-add render` passes through and grants access to "
             "the AMD device specifically, not just any render node.",
-            ", ".join(accessible_render_nodes),
+            ", ".join(other_vendor_render_nodes),
             _AMD_PCI_VENDOR_ID,
         )
     else:
@@ -244,6 +279,28 @@ def _ray_client_conn_host() -> str | None:
     return conn_str.rsplit(":", 1)[0].strip("[]")
 
 
+def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
+    """Return whether `conn_host` is confirmed to not be this machine.
+
+    Called only for a non-loopback `conn_host`: a DNS name or LAN address can
+    still resolve back to this host (e.g. `ray://gpu-box:10001` where
+    `gpu-box` is this machine's own hostname), in which case the Ray Client
+    server may share this process's device namespace despite not using a
+    loopback literal. Resolve both sides and compare; any resolution failure
+    is treated as "not confirmed remote" so the caller falls back to the
+    ambiguous, probe-running branch rather than asserting a remoteness it
+    cannot actually support.
+    """
+    try:
+        conn_ips = {info[4][0] for info in socket.getaddrinfo(conn_host, None)}
+        local_ips = {
+            info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None)
+        }
+    except OSError:
+        return False
+    return conn_ips.isdisjoint(local_ips)
+
+
 def _log_node_locality_diagnostics(
     active_node_count: int, active_node_id: str | None
 ) -> None:
@@ -290,26 +347,33 @@ def _log_node_locality_diagnostics(
         # endpoint (`ray://127.0.0.1:10001`) does not by itself prove this
         # host's `/dev` is the cluster node's -- an SSH port forward or a
         # sidecar sharing only the network namespace presents the same
-        # endpoint while the server's `/dev` is elsewhere -- so that case is
-        # flagged as ambiguous rather than excluded, and the local KFD probe
-        # still runs afterwards in case the loopback connection does turn out
-        # to be genuinely co-located.
+        # endpoint while the server's `/dev` is elsewhere -- and neither does
+        # a non-loopback hostname/LAN address, since it can still resolve
+        # back to this same host (`_ray_client_host_confirmed_remote`). Both
+        # cases are flagged as ambiguous rather than excluded, and the local
+        # KFD probe still runs afterwards in case the connection does turn
+        # out to be genuinely co-located.
         conn_host = _ray_client_conn_host()
-        if conn_host is not None and conn_host in _LOOPBACK_HOSTS:
+        if conn_host is not None and (
+            conn_host in _LOOPBACK_HOSTS
+            or not _ray_client_host_confirmed_remote(conn_host)
+        ):
             log(
                 WARNING,
                 "This process connected to the Ray cluster over Ray Client "
-                "at a loopback address (%s). That usually means the Ray "
-                "Client server runs on this same host, but an SSH port "
-                "forward or a sidecar container that only shares this "
-                "host's network namespace can present the same loopback "
-                "endpoint while the Ray Client server's `/dev` belongs to a "
-                "different machine or container. The `/dev/kfd` and "
-                "`/dev/dri/renderD*` check that follows assumes they are "
-                "shared with the cluster node (NodeID=%s) that reported "
-                "zero GPUs; if that assumption turns out to be wrong, check "
-                "device access on the actual Ray Client server host "
-                "instead.",
+                "at %s, which this host cannot confirm is a different "
+                "machine from its own (a loopback literal, or a hostname/"
+                "LAN address that resolves to one of this host's own "
+                "addresses). That usually means the Ray Client server runs "
+                "on this same host, but an SSH port forward or a sidecar "
+                "container that only shares this host's network namespace "
+                "can present the same endpoint while the Ray Client "
+                "server's `/dev` belongs to a different machine or "
+                "container. The `/dev/kfd` and `/dev/dri/renderD*` check "
+                "that follows assumes they are shared with the cluster "
+                "node (NodeID=%s) that reported zero GPUs; if that "
+                "assumption turns out to be wrong, check device access on "
+                "the actual Ray Client server host instead.",
                 conn_host,
                 active_node_id,
             )
@@ -318,11 +382,12 @@ def _log_node_locality_diagnostics(
             log(
                 WARNING,
                 "This process connected to the Ray cluster over Ray Client "
-                "(a `ray://` address), so it runs on a different host than "
-                "the cluster node (NodeID=%s) that reported zero GPUs. "
-                "Checking `/dev/kfd` and `/dev/dri/renderD*` on this host "
-                "cannot diagnose a device on the remote cluster node; check "
-                "device access there instead.",
+                "(a `ray://` address) at a host confirmed to not be this "
+                "one, so it runs on a different host than the cluster node "
+                "(NodeID=%s) that reported zero GPUs. Checking `/dev/kfd` "
+                "and `/dev/dri/renderD*` on this host cannot diagnose a "
+                "device on the remote cluster node; check device access "
+                "there instead.",
                 active_node_id,
             )
     elif active_node_id is not None and active_node_id != (
