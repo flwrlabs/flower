@@ -249,6 +249,7 @@ def test_get_space_events_reads_only_authenticated_space(
     events = GetSpaceEventsResponse.FromString(response.content).events
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
+    assert events[0].event == "message"
 
 
 def test_space_messages_use_authenticated_run(
