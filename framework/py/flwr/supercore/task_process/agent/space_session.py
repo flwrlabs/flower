@@ -35,7 +35,7 @@ from .session import (
 from .space import RuntimeAgentSpace
 
 
-class SpaceAgentEvents(RuntimeAgentEvents):
+class SpaceEvents(RuntimeAgentEvents):
     """Disable trace reads while retaining event publication and compaction."""
 
     def get_trace(
@@ -84,7 +84,7 @@ class _SpaceAgentGrid(AgentGrid):
 
 
 def create_space_session(
-    grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
+    grid: HttpGrid, events: SpaceEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -92,7 +92,7 @@ def create_space_session(
     ----------
     grid : HttpGrid
         Task-authenticated Runtime connection.
-    events : SpaceAgentEvents
+    events : SpaceEvents
         Task event publisher shared with the worker lifecycle.
     task_input : PullTaskInputResponse
         Accepted Run and Task identifiers.
