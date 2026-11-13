@@ -18,12 +18,16 @@ from collections.abc import Sequence
 from typing import cast
 
 from flwr.agentapp import AgentGrid
-from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetSpaceEventsRequest,
+    PullTaskInputResponse,
+)
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     has_builtin_connector,
 )
 from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
 from flwr.superlink.grid import HttpGrid
 
 from .session import (
@@ -36,7 +40,7 @@ from .space import RuntimeAgentSpace
 
 
 class SpaceEvents(RuntimeAgentEvents):
-    """Disable trace reads while retaining event publication and compaction."""
+    """Read Space events while retaining event publication and compaction."""
 
     def get_trace(
         self,
@@ -46,8 +50,28 @@ class SpaceEvents(RuntimeAgentEvents):
         before_event_id: int | None = None,
         last_n: int | None = None,
     ) -> list[JSONObject]:
-        """Reject trace reads before making Runtime requests."""
-        raise NotImplementedError("Space sessions do not support trace reads.")
+        """Get matching events from the authenticated task's Space."""
+        request = GetSpaceEventsRequest(
+            after_event_id=after_event_id,
+            before_event_id=before_event_id,
+            last_n=0 if last_n is None else last_n,
+        )
+        if event_types:
+            request.last_n = 0
+        response = self._stub.GetSpaceEvents(request)
+        trace: list[JSONObject] = [
+            {
+                "id": event.id,
+                "timestamp": event.timestamp,
+                "run_id": event.run_id,
+                "task_id": event.task_id,
+                "event": event.event,
+                "data": strict_json_loads(event.data),
+            }
+            for event in response.events
+            if not event_types or event.event in event_types
+        ]
+        return trace[-last_n:] if event_types and last_n else trace
 
 
 class _SpaceAgentConnectors(RuntimeAgentConnectors):

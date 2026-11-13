@@ -35,6 +35,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetCompactedContextsResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullTaskInputResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
@@ -67,7 +69,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
-from .space_session import create_space_session
+from .space_session import SpaceEvents, create_space_session
 
 
 @pytest.fixture(autouse=True)
@@ -267,6 +269,52 @@ def test_get_trace_without_filters_requests_all_events() -> None:
     events.close()
 
     stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
+
+
+def test_space_get_trace_filters_before_last_n() -> None:
+    """Return the newest matching Space event, even with newer other events."""
+    stub = Mock()
+    stub.GetSpaceEvents.return_value = GetSpaceEventsResponse(
+        events=[
+            TaskEvent(id=10, event="message", data='{"type":"message"}'),
+            TaskEvent(id=11, event="other", data='{"type":"other"}'),
+            TaskEvent(id=12, event="message", data='{"type":"message"}'),
+            TaskEvent(id=13, event="other", data='{"type":"other"}'),
+        ]
+    )
+    events = SpaceEvents(stub)
+
+    trace = events.get_trace(
+        event_types=["message"], after_event_id=9, before_event_id=14, last_n=1
+    )
+    events.close()
+
+    stub.GetSpaceEvents.assert_called_once_with(
+        GetSpaceEventsRequest(after_event_id=9, before_event_id=14)
+    )
+    stub.GetRunSeriesEvents.assert_not_called()
+    assert trace == [
+        {
+            "id": 12,
+            "timestamp": "",
+            "run_id": 0,
+            "task_id": 0,
+            "event": "message",
+            "data": {"type": "message"},
+        }
+    ]
+
+
+def test_space_get_trace_without_event_types_forwards_last_n() -> None:
+    """Let the endpoint select the newest events when no type filter is set."""
+    stub = Mock()
+    stub.GetSpaceEvents.return_value = GetSpaceEventsResponse()
+    events = SpaceEvents(stub)
+
+    assert events.get_trace(last_n=2) == []
+    events.close()
+
+    stub.GetSpaceEvents.assert_called_once_with(GetSpaceEventsRequest(last_n=2))
 
 
 def test_get_compacted_contexts_returns_without_emitting() -> None:
