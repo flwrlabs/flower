@@ -51,15 +51,15 @@ class SpaceEvents(RuntimeAgentEvents):
         last_n: int | None = None,
     ) -> list[JSONObject]:
         """Get matching events from the authenticated task's Space."""
-        request = GetSpaceEventsRequest(
-            after_event_id=after_event_id,
-            before_event_id=before_event_id,
-            last_n=0 if last_n is None else last_n,
+        response = self._stub.GetSpaceEvents(
+            GetSpaceEventsRequest(
+                event_types=event_types or [],
+                after_event_id=after_event_id,
+                before_event_id=before_event_id,
+                last_n=0 if last_n is None else last_n,
+            )
         )
-        if event_types:
-            request.last_n = 0
-        response = self._stub.GetSpaceEvents(request)
-        trace: list[JSONObject] = [
+        return [
             {
                 "id": event.id,
                 "timestamp": event.timestamp,
@@ -69,9 +69,7 @@ class SpaceEvents(RuntimeAgentEvents):
                 "data": strict_json_loads(event.data),
             }
             for event in response.events
-            if not event_types or event.event in event_types
         ]
-        return trace[-last_n:] if event_types and last_n else trace
 
 
 class _SpaceAgentConnectors(RuntimeAgentConnectors):

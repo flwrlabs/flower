@@ -271,15 +271,12 @@ def test_get_trace_without_filters_requests_all_events() -> None:
     stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
 
 
-def test_space_get_trace_filters_before_last_n() -> None:
-    """Return the newest matching Space event, even with newer other events."""
+def test_space_get_trace_forwards_filters_and_decodes_events() -> None:
+    """Let Runtime filter before limiting, then decode the returned events."""
     stub = Mock()
     stub.GetSpaceEvents.return_value = GetSpaceEventsResponse(
         events=[
-            TaskEvent(id=10, event="message", data='{"type":"message"}'),
-            TaskEvent(id=11, event="other", data='{"type":"other"}'),
             TaskEvent(id=12, event="message", data='{"type":"message"}'),
-            TaskEvent(id=13, event="other", data='{"type":"other"}'),
         ]
     )
     events = SpaceEvents(stub)
@@ -290,7 +287,9 @@ def test_space_get_trace_filters_before_last_n() -> None:
     events.close()
 
     stub.GetSpaceEvents.assert_called_once_with(
-        GetSpaceEventsRequest(after_event_id=9, before_event_id=14)
+        GetSpaceEventsRequest(
+            event_types=["message"], after_event_id=9, before_event_id=14, last_n=1
+        )
     )
     stub.GetRunSeriesEvents.assert_not_called()
     assert trace == [
