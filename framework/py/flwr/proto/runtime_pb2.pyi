@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.control_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.file_pb2
@@ -545,6 +546,7 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     FAB_FIELD_NUMBER: builtins.int
     FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
+    AGENT_FIELD_NUMBER: builtins.int
     task_id: builtins.int
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
@@ -554,6 +556,8 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
     def federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
+    @property
+    def agent(self) -> flwr.proto.control_pb2.Agent: ...
     def __init__(
         self,
         *,
@@ -562,9 +566,10 @@ class PullTaskInputResponse(google.protobuf.message.Message):
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         task_id: builtins.int = ...,
+        agent: flwr.proto.control_pb2.Agent | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["agent", b"agent", "context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent", b"agent", "context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
 global___PullTaskInputResponse = PullTaskInputResponse
 
