@@ -368,6 +368,11 @@ def put_file(
 ) -> PutFileResponse:
     """Store a file in the authenticated task's agent scope."""
     log(DEBUG, "Runtime.PutFile")
+    if not request.key.strip():
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_FILE_KEY,
+            "File key must not be empty or whitespace-only.",
+        )
     revision = state.put_file(
         scope=_file_scope(agent_id),
         key=request.key,

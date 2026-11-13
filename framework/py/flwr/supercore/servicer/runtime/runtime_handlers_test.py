@@ -66,20 +66,29 @@ from . import runtime_handlers
 
 
 @pytest.mark.parametrize("expected_revision", [None, 0, 7])
-def test_put_file(expected_revision: int | None) -> None:
-    """Preserve create-only and explicit revision preconditions in the agent scope."""
+@pytest.mark.parametrize("key", ["file", " file ", "", " \t\n"])
+def test_put_file(expected_revision: int | None, key: str) -> None:
+    """Reject blank keys and preserve valid keys and revision preconditions."""
     state = Mock()
     state.put_file.return_value = 8
-    response = runtime_handlers.put_file(
-        PutFileRequest(key="file", data=b"", expected_revision=expected_revision),
-        state,
-        456,
-    )
+    request = PutFileRequest(key=key, data=b"", expected_revision=expected_revision)
+    if key in ("", " \t\n"):
+        with pytest.raises(FlowerError) as caught:
+            runtime_handlers.put_file(request, state, 456)
+        assert caught.value.code == ApiErrorCode.RUNTIME_INVALID_FILE_KEY
+        assert (
+            API_ERROR_MAP[caught.value.code].http_status_code
+            == status.HTTP_400_BAD_REQUEST
+        )
+        state.put_file.assert_not_called()
+        return
+
+    response = runtime_handlers.put_file(request, state, 456)
 
     assert response.revision == 8
     state.put_file.assert_called_once_with(
         scope="agent-456",
-        key="file",
+        key=key,
         data=b"",
         expected_revision=expected_revision,
     )
