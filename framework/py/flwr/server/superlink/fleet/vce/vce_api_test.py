@@ -465,3 +465,25 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 content.config_records["getpropertiesres.properties"]["result"]
                 == expected_results[message_res.metadata.reply_to_message_id]
             )
+
+
+def test_register_nodes_uses_stable_ids_when_seeded() -> None:
+    """A run seed registers simulation nodes as 2, 3, ... in partition order."""
+    first = _seeded_node_mapping(num_nodes=3, random_seed=42)
+    second = _seeded_node_mapping(num_nodes=3, random_seed=7)
+    assert first == {2: 0, 3: 1, 4: 2}
+    assert second == first
+
+
+def _seeded_node_mapping(
+    num_nodes: int, random_seed: int | None
+) -> NodeToPartitionMapping:
+    """Register nodes in a fresh in-memory state."""
+    state_factory = LinkStateFactory(
+        FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
+    )
+    return _register_nodes(
+        num_nodes=num_nodes,
+        state_factory=state_factory,
+        random_seed=random_seed,
+    )

@@ -15,13 +15,18 @@
 """Tests for Flower ClientApp."""
 
 
+import random
 from collections.abc import Iterator
 from itertools import product
 from unittest.mock import Mock
 
 import pytest
 
+from flwr.app import ConfigRecord, RecordDict
 from flwr.app.message import Context, Message
+from flwr.common.constant import PARTITION_ID_KEY
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed
+from flwr.supercore.task_identity import TaskIdentity
 
 from .client_app import ClientApp
 from .typing import ClientAppCallable
@@ -259,3 +264,39 @@ def test_register_repeated_func(category: str, action: str | None) -> None:
         @decorator(*args)  # type: ignore
         def func2(_msg: Message, _cxt: Context) -> Message:
             raise AssertionError("This function should not be called")
+
+
+def test_client_app_applies_derived_seed_before_train(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ClientApp seeds user code from the run seed and the server round."""
+    monkeypatch.setattr(TaskIdentity, "_task_id", 1)
+    monkeypatch.setattr(TaskIdentity, "_run_id", 1)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 0)
+    app = ClientApp()
+    seen: list[float] = []
+
+    @app.train()
+    def train(_msg: Message, _cxt: Context) -> Message:
+        seen.append(random.random())
+        return Mock()
+
+    context = Context(
+        run_id=1,
+        node_id=4,
+        node_config={PARTITION_ID_KEY: 2},
+        state=RecordDict(),
+        run_config={RANDOM_SEED_KEY: 21},
+    )
+    message = Message(
+        RecordDict({"config": ConfigRecord({"server-round": 3})}),
+        dst_node_id=4,
+        message_type="train",
+    )
+    try:
+        app(message, context)
+        app(message, context)
+        assert len(seen) == 2
+        assert seen[0] == seen[1]
+    finally:
+        clear_run_seed()

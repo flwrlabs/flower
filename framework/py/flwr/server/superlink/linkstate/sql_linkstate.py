@@ -174,12 +174,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         *,
         location: str | None = None,
         name: str | None = None,
+        node_id: int | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
-        # Sample a random uint64 as node_id
-        node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
-        )
+        if node_id is None:
+            # Sample a random uint64 as node_id
+            node_id = generate_rand_int_from_bytes(
+                NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
+            )
+        elif node_id in {0, SUPERLINK_NODE_ID}:
+            raise ValueError(
+                "Explicit node_id must not be 0 or "
+                f"the SuperLink node id ({SUPERLINK_NODE_ID})."
+            )
 
         # Mark the node online until now().timestamp() + heartbeat_interval
         try:

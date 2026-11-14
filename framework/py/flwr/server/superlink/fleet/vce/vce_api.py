@@ -54,20 +54,37 @@ NodeToPartitionMapping = dict[int, int]
 
 
 def _register_nodes(
-    num_nodes: int, state_factory: LinkStateFactory
+    num_nodes: int,
+    state_factory: LinkStateFactory,
+    random_seed: int | None = None,
 ) -> NodeToPartitionMapping:
-    """Register nodes with the StateFactory and create node-id:partition-id mapping."""
+    """Register nodes with the StateFactory and create node-id:partition-id mapping.
+
+    Parameters
+    ----------
+    num_nodes : int
+        Number of virtual nodes to register.
+    state_factory : LinkStateFactory
+        State factory that stores the nodes.
+    random_seed : Optional[int] (default: None)
+        When set, node ids are ``2 .. num_nodes + 1`` so client sampling selects
+        the same partitions on every run. Id ``1`` is reserved for the SuperLink.
+        The seed value itself does not change the ids; it only enables stable ids.
+    """
     nodes_mapping: NodeToPartitionMapping = {}
     state = state_factory.state()
     for i in range(num_nodes):
+        # No node authentication in simulation;
+        # use NOOP_FLWR_AID as owner_aid and
+        # use random bytes as public key.
+        # Id 1 is the SuperLink, so seeded simulation nodes start at 2.
+        explicit_node_id = None if random_seed is None else i + 2
         node_id = state.create_node(
-            # No node authentication in simulation;
-            # use NOOP_FLWR_AID as owner_aid and
-            # use random bytes as public key
             NOOP_FLWR_AID,
             NOOP_ACCOUNT_NAME,
             secrets.token_bytes(32),
             heartbeat_interval=HEARTBEAT_INTERVAL_INF,
+            node_id=explicit_node_id,
         )
         state.acknowledge_node_heartbeat(
             node_id=node_id, heartbeat_interval=HEARTBEAT_INTERVAL_INF
@@ -291,6 +308,7 @@ def start_vce(
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     existing_nodes_mapping: NodeToPartitionMapping | None = None,
+    random_seed: int | None = None,
 ) -> None:
     """Start Fleet API with the Simulation Runtime."""
     nodes_mapping = {}
@@ -336,7 +354,9 @@ def start_vce(
     if num_supernodes:
         # Register SuperNodes
         nodes_mapping = _register_nodes(
-            num_nodes=num_supernodes, state_factory=state_factory
+            num_nodes=num_supernodes,
+            state_factory=state_factory,
+            random_seed=random_seed,
         )
 
     # Construct mapping of DeprecatedRunInfoStore

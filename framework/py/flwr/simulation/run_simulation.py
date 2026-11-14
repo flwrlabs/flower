@@ -38,6 +38,7 @@ from flwr.common.constant import (
     TASK_ID_NUM_BYTES,
     Status,
 )
+from flwr.common.seeding import read_random_seed
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
@@ -335,6 +336,7 @@ def _main_loop(
             f_stop=f_stop,
             run=run,
             metrics=metrics,
+            random_seed=read_random_seed(server_app_context.run_config),
         )
 
         updated_context = output_context_queue.get(timeout=3)

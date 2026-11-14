@@ -26,6 +26,7 @@ from flwr.client import ClientFnExt
 from flwr.client.message_handler.message_handler import (
     handle_legacy_message_from_msgtype,
 )
+from flwr.common.seeding import seed_client
 from flwr.compat.client.client import Client
 from flwr.supercore.logger import warn_deprecated_feature
 
@@ -138,6 +139,9 @@ class ClientApp:
 
     def __call__(self, message: Message, context: Context) -> Message:
         """Execute `ClientApp`."""
+        # Reseed before user code. Each client task is a fresh process in
+        # deployment, and simulation actors do not share the server process.
+        seed_client(context, message)
         with self._lifespan(context):
             # Execute message using `client_fn`
             if self._call:

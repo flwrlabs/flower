@@ -295,6 +295,37 @@ Access these values in your code using ``context.run_config``. For example:
     followed by key-value pairs when executing ``flwr run``. See the
     |flwr_run_cli_link|_ CLI documentation for more details.
 
+*******************
+ Reproducible runs
+*******************
+
+Set ``random-seed`` to a non-negative integer to make a run repeatable. Flower seeds the
+server process with that value before the ``ServerApp`` runs, and seeds each client
+invocation with a value derived from it. Client selection and aggregation noise that use
+Python's :mod:`random` or the global NumPy RNG then follow the seed. Local training
+follows it too when the app uses those RNGs, or PyTorch or TensorFlow and has already
+imported that library.
+
+.. code-block:: toml
+
+    [tool.flwr.app.config]
+    random-seed = 42
+
+Override it for one launch with ``flwr run . --run-config random-seed=42``.
+
+The derived client seed includes the ``partition-id`` when the node has one, otherwise
+the ``node_id``, plus the message type, ``group_id``, and ``server-round`` when a config
+record contains that key. The same inputs produce the same client stream. In simulation,
+a configured seed also registers virtual nodes as ids ``2, 3, ...`` so the sampled
+clients keep the same partitions on every run. In a deployment, selection is repeatable
+when the participating node ids stay the same.
+
+``random-seed`` does not seed ``numpy.random.default_rng()`` generators created without
+a seed, GPU kernels that are nondeterministic, or values drawn from operating-system
+entropy. Run ids, message ids, and node authentication keys still use that entropy. The
+deprecated ``start_simulation`` API does not assign stable simulation node ids from this
+key.
+
 **************************
  Federation Configuration
 **************************

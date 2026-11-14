@@ -15,12 +15,14 @@
 """Tests for ServerApp."""
 
 
+import random
 from collections.abc import Iterator
 from unittest.mock import MagicMock, Mock
 
 import pytest
 
 from flwr.app import Context, RecordDict
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed
 from flwr.server import ServerConfig
 from flwr.serverapp import Grid
 
@@ -168,3 +170,49 @@ def test_lifespan_multiple_yields() -> None:
     enter_code.assert_called_once()
     middle_code.assert_called_once()
     exit_code.assert_not_called()
+
+
+def test_server_app_applies_run_seed_before_main() -> None:
+    """ServerApp seeds the process RNG before user code runs."""
+    app = ServerApp()
+    grid = MagicMock()
+    context = Context(
+        run_id=1,
+        node_id=0,
+        node_config={},
+        state=RecordDict(),
+        run_config={RANDOM_SEED_KEY: 15},
+    )
+    seen: list[float] = []
+
+    @app.main()
+    def custom_main(grid: Grid, context: Context) -> None:
+        # Arguments are part of the ServerApp signature.
+        del grid, context
+        seen.append(random.random())
+
+    try:
+        app(grid, context)
+        random.seed(15)
+        assert seen == [random.random()]
+    finally:
+        clear_run_seed()
+
+
+def test_server_app_rejects_an_invalid_run_seed() -> None:
+    """ServerApp fails fast when random-seed is not a valid integer."""
+    app = ServerApp()
+    context = Context(
+        run_id=1,
+        node_id=0,
+        node_config={},
+        state=RecordDict(),
+        run_config={RANDOM_SEED_KEY: True},
+    )
+
+    @app.main()
+    def custom_main(grid: Grid, context: Context) -> None:
+        del grid, context
+
+    with pytest.raises(ValueError, match=RANDOM_SEED_KEY):
+        app(MagicMock(), context)
