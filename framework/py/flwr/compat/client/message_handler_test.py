@@ -17,9 +17,11 @@
 
 import uuid
 
+import pytest
+
 from flwr.app import DEFAULT_TTL, Context, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.client import Client, ClientFnExt
+from flwr.clientapp import ClientApp
 from flwr.common import (
     Code,
     EvaluateIns,
@@ -34,6 +36,8 @@ from flwr.common import (
     Status,
 )
 from flwr.common.constant import MessageTypeLegacy
+from flwr.compat.client.client import Client
+from flwr.compat.client.typing import ClientFnExt
 from flwr.compat.common import recorddict_compat as compat
 from flwr.supercore.date import now
 
@@ -181,7 +185,8 @@ def test_client_without_get_properties() -> None:
     assert actual_msg.metadata.created_at < expected_msg.metadata.created_at
 
 
-def test_client_with_get_properties() -> None:
+@pytest.mark.parametrize("use_client_app", [False, True])
+def test_client_with_get_properties(use_client_app: bool) -> None:
     """Test client not implementing get_properties."""
     # Prepare
     client = ClientWithProps()
@@ -202,13 +207,14 @@ def test_client_with_get_properties() -> None:
     )
 
     # Execute
-    actual_msg = handle_legacy_message_from_msgtype(
-        client_fn=_get_client_fn(client),
-        message=message,
-        context=Context(
-            run_id=2234, node_id=1123, node_config={}, state=RecordDict(), run_config={}
-        ),
+    client_fn = _get_client_fn(client)
+    context = Context(
+        run_id=2234, node_id=1123, node_config={}, state=RecordDict(), run_config={}
     )
+    if use_client_app:
+        actual_msg = ClientApp(client_fn=client_fn)(message, context)
+    else:
+        actual_msg = handle_legacy_message_from_msgtype(client_fn, message, context)
 
     # Assert
     expected_get_properties_res = GetPropertiesRes(
