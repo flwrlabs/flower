@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower client."""
+"""Compatibility exports for legacy Flower client APIs."""
 
 
 from importlib import import_module
