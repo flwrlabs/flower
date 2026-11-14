@@ -17,9 +17,8 @@
 
 from flwr.clientapp.mod import arrays_size_mod, message_size_mod
 from flwr.clientapp.mod.utils import make_ffn
+from flwr.compat.client.mod import LocalDpMod, adaptiveclipping_mod, fixedclipping_mod
 
-from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod
-from .localdp_mod import LocalDpMod
 from .secure_aggregation import secagg_mod, secaggplus_mod
 
 __all__ = [
