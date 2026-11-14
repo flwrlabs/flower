@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Built-in Mods."""
+"""Compatibility exports for legacy Flower client mods."""
 
 
 from flwr.clientapp.mod import arrays_size_mod, message_size_mod
 from flwr.clientapp.mod.utils import make_ffn
-from flwr.compat.client.mod import LocalDpMod, adaptiveclipping_mod, fixedclipping_mod
-
-from .secure_aggregation import secagg_mod, secaggplus_mod
+from flwr.compat.client.mod import (
+    LocalDpMod,
+    adaptiveclipping_mod,
+    fixedclipping_mod,
+    secagg_mod,
+    secaggplus_mod,
+)
 
 __all__ = [
     "LocalDpMod",
