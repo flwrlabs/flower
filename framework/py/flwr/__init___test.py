@@ -47,6 +47,13 @@ def test_version() -> None:
         "assert set(server.__all__).issubset(dict(inspect.getmembers(server)))\n"
         "from flwr import client",
         "import flwr.compat.server.grpc_bidi.grpc_server",
+        "from flwr.client.mod import make_ffn as legacy_make_ffn\n"
+        "from flwr.clientapp.mod.utils import make_ffn\n"
+        "assert legacy_make_ffn is make_ffn",
+        "from flwr.clientapp import ClientApp\n"
+        "from flwr.clientapp.mod.utils import make_ffn\n"
+        "from flwr.client.mod import make_ffn as legacy_make_ffn\n"
+        "assert legacy_make_ffn is make_ffn",
         "import flwr.supercore.agentapp_worker\n"
         "import flwr.supercore.connector_worker",
     ],
