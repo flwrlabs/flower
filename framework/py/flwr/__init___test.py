@@ -47,6 +47,16 @@ def test_version() -> None:
         "assert set(server.__all__).issubset(dict(inspect.getmembers(server)))\n"
         "from flwr import client",
         "import flwr.compat.server.grpc_bidi.grpc_server",
+        "from flwr.client import mod as legacy\n"
+        "from flwr.clientapp import mod as current\n"
+        "from flwr.compat.client import mod as compat\n"
+        "assert legacy.LocalDpMod is compat.LocalDpMod\n"
+        "assert legacy.fixedclipping_mod is compat.fixedclipping_mod\n"
+        "assert legacy.adaptiveclipping_mod is compat.adaptiveclipping_mod\n"
+        "assert legacy.LocalDpMod is not current.LocalDpMod\n"
+        "assert legacy.fixedclipping_mod is not current.fixedclipping_mod\n"
+        "assert legacy.adaptiveclipping_mod is not current.adaptiveclipping_mod",
+        "import flwr.compat.client.mod\nfrom flwr.client import mod",
         "from flwr.clientapp import ClientApp\n"
         "from flwr.compat.client.app import start_client, start_numpy_client\n"
         "from flwr import client\n"
