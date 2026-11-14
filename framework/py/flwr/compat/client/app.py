@@ -28,11 +28,11 @@ from flwr.app.error import Error
 from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
-from flwr.client.message_handler.message_handler import handle_control_message
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.compat.client.client import Client
 from flwr.compat.client.grpc_client.connection import grpc_connection
+from flwr.compat.client.message_handler import handle_control_message
 from flwr.compat.client.numpy_client import NumPyClient
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.client.typing import ClientFnExt
