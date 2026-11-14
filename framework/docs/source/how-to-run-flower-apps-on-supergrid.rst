@@ -86,10 +86,10 @@ Pull the app locally with ``flwr new``:
     $ cd demo
 
 Then, log in to SuperGrid with ``flwr login``. This opens a browser window where you can
-authenticate with your SuperGrid account. Finally, run the app with ``flwr run . supergrid``
-to select the SuperGrid connection, and use ``--federation`` to choose the target
-federation. If you omit ``supergrid``, the CLI uses your default SuperLink connection
-instead; ``--federation`` does not select the connection:
+authenticate with your SuperGrid account. Finally, run the app with ``flwr run .
+supergrid`` to select the SuperGrid connection, and use ``--federation`` to choose the
+target federation. If you omit ``supergrid``, the CLI uses your default SuperLink
+connection instead; ``--federation`` does not select the connection:
 
 .. note::
 
