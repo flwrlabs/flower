@@ -47,6 +47,15 @@ def test_version() -> None:
         "assert set(server.__all__).issubset(dict(inspect.getmembers(server)))\n"
         "from flwr import client",
         "import flwr.compat.server.grpc_bidi.grpc_server",
+        "from flwr import client\n"
+        "from flwr.clientapp import mod\n"
+        "from flwr.compat.client.mod import secagg_mod, secaggplus_mod\n"
+        "assert client.mod.secagg_mod is secagg_mod\n"
+        "assert client.mod.secaggplus_mod is secaggplus_mod\n"
+        "assert client.mod.arrays_size_mod is mod.arrays_size_mod\n"
+        "assert client.mod.message_size_mod is mod.message_size_mod\n"
+        "assert all(hasattr(client, name) for name in client.__all__)\n"
+        "assert all(hasattr(client.mod, name) for name in client.mod.__all__)",
         "from flwr.client import mod as legacy\n"
         "from flwr.clientapp import mod as current\n"
         "from flwr.compat.client import mod as compat\n"
