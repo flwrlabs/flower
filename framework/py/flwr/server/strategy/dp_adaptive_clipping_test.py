@@ -20,13 +20,7 @@ from unittest.mock import MagicMock, Mock
 import numpy as np
 import pytest
 
-from flwr.common import (
-    Code,
-    FitRes,
-    Parameters,
-    Status,
-    ndarrays_to_parameters,
-)
+from flwr.common import Code, FitRes, Parameters, Status, ndarrays_to_parameters
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.supercore.differential_privacy import KEY_CLIPPING_NORM, KEY_NORM_BIT
@@ -172,3 +166,62 @@ def test_legacy_adaptive_clipping_shrinks_when_all_unclipped(
     strategy.aggregate_fit(1, results, [])
 
     assert strategy.clipping_norm == pytest.approx(5.0 * math.exp(-0.5 * 0.4))
+
+
+@pytest.mark.parametrize(
+    "wrapper_cls",
+    [
+        DifferentialPrivacyServerSideAdaptiveClipping,
+        DifferentialPrivacyClientSideAdaptiveClipping,
+    ],
+)
+def test_legacy_adaptive_clipping_uses_pre_update_norm_for_noise(
+    wrapper_cls: (
+        type[DifferentialPrivacyServerSideAdaptiveClipping]
+        | type[DifferentialPrivacyClientSideAdaptiveClipping]
+    ),
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Noise added to aggregated parameters must be calibrated to current round's norm."""
+    num_clients = 4
+    strategy = wrapper_cls(
+        strategy=FedAvg(
+            min_fit_clients=num_clients,
+            min_available_clients=num_clients,
+        ),
+        noise_multiplier=0.5,
+        num_sampled_clients=num_clients,
+        initial_clipping_norm=5.0,
+        target_clipped_quantile=0.5,
+        clip_norm_lr=0.5,
+        clipped_count_stddev=1.0,
+    )
+    recorded_norms: list[float] = []
+
+    def mock_compute_stdv(
+        noise_multiplier: float, clipping_norm: float, num_sampled_clients: int
+    ) -> float:
+        recorded_norms.append(clipping_norm)
+        return 0.0
+
+    monkeypatch.setattr(
+        "flwr.server.strategy.dp_adaptive_clipping.compute_stdv",
+        mock_compute_stdv,
+    )
+
+    is_client_side = issubclass(
+        wrapper_cls, DifferentialPrivacyClientSideAdaptiveClipping
+    )
+    manager = _client_manager(num_clients)
+    base_params = ndarrays_to_parameters([np.array([0.0])])
+    instructions = strategy.configure_fit(1, base_params, manager)
+    results = [
+        (proxy, _fit_res(0.5, norm_bit=False if is_client_side else None))
+        for proxy, _ in instructions
+    ]
+    strategy.aggregate_fit(1, results, [])
+
+    # The norm must shrink after the round because no updates were clipped.
+    assert strategy.clipping_norm < 5.0
+    # But noising for this round must have used the pre-update norm (5.0).
+    assert recorded_norms == [5.0]

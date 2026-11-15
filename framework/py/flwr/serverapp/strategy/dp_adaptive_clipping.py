@@ -211,17 +211,17 @@ class DifferentialPrivacyServerSideAdaptiveClipping(DifferentialPrivacyAdaptiveB
                 self.clipping_norm,
             )
 
-        clipped_fraction = self._noisy_fraction(
-            clipped_indicator_count, len(replies_list)
-        )
-        self._geometric_update(clipped_fraction)
-
         aggregated_arrays, aggregated_metrics = self.strategy.aggregate_train(
             server_round, replies_list
         )
 
         if aggregated_arrays:
             aggregated_arrays = self._add_noise_to_aggregated_arrays(aggregated_arrays)
+
+        clipped_fraction = self._noisy_fraction(
+            clipped_indicator_count, len(replies_list)
+        )
+        self._geometric_update(clipped_fraction)
 
         return aggregated_arrays, aggregated_metrics
 
@@ -317,10 +317,10 @@ class DifferentialPrivacyClientSideAdaptiveClipping(DifferentialPrivacyAdaptiveB
             server_round, replies_list
         )
 
-        self._update_clip_norm_from_replies(replies_list)
-
         if aggregated_arrays:
             aggregated_arrays = self._add_noise_to_aggregated_arrays(aggregated_arrays)
+
+        self._update_clip_norm_from_replies(replies_list)
 
         return aggregated_arrays, aggregated_metrics
 

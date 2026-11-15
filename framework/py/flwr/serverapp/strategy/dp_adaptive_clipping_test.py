@@ -221,3 +221,61 @@ def test_adaptive_clipping_shrinks_when_no_updates_clipped(
     wrapper.aggregate_train(1, replies)
 
     assert wrapper.clipping_norm == pytest.approx(5.0 * math.exp(-0.5 * 0.4))
+
+
+@pytest.mark.parametrize(
+    "wrapper_cls",
+    [
+        DifferentialPrivacyServerSideAdaptiveClipping,
+        DifferentialPrivacyClientSideAdaptiveClipping,
+    ],
+)
+def test_adaptive_clipping_uses_pre_update_norm_for_noise(
+    wrapper_cls: type[DifferentialPrivacyAdaptiveBase],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Noise added to aggregated arrays must be calibrated to current round's norm."""
+    num_clients = 4
+    grid = _grid(num_clients)
+    wrapper = wrapper_cls(
+        strategy=FedAvg(
+            min_train_nodes=num_clients,
+            min_available_nodes=num_clients,
+        ),
+        noise_multiplier=0.5,
+        num_sampled_clients=num_clients,
+        initial_clipping_norm=5.0,
+        target_clipped_quantile=0.5,
+        clip_norm_lr=0.5,
+        clipped_count_stddev=1.0,
+    )
+
+    recorded_norms: list[float] = []
+
+    def mock_compute_stdv(
+        noise_multiplier: float, clipping_norm: float, num_sampled_clients: int
+    ) -> float:
+        recorded_norms.append(clipping_norm)
+        return 0.0
+
+    monkeypatch.setattr(
+        "flwr.serverapp.strategy.dp_adaptive_clipping.compute_stdv",
+        mock_compute_stdv,
+    )
+
+    is_client_side = issubclass(
+        wrapper_cls, DifferentialPrivacyClientSideAdaptiveClipping
+    )
+    list(
+        wrapper.configure_train(1, ArrayRecord([np.array([0.0])]), ConfigRecord(), grid)
+    )
+    replies = [
+        _reply(np.array([0.5]), norm_bit=0 if is_client_side else None)
+        for _ in range(num_clients)
+    ]
+    wrapper.aggregate_train(1, replies)
+
+    # The norm must shrink after the round because no updates were clipped.
+    assert wrapper.clipping_norm < 5.0
+    # But noising for this round must have used the pre-update norm (5.0).
+    assert recorded_norms == [5.0]

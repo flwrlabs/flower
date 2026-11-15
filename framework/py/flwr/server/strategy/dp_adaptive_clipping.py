@@ -210,11 +210,6 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
             np.random.normal(norm_bit_set_count, self.clipped_count_stddev)
         )
         noised_norm_bit_set_fraction = noised_norm_bit_set_count / len(results)
-        # Grow clipping norm when clipped fraction exceeds target quantile.
-        self.clipping_norm *= math.exp(
-            self.clip_norm_lr
-            * (noised_norm_bit_set_fraction - self.target_clipped_quantile)
-        )
 
         aggregated_params, metrics = self.strategy.aggregate_fit(
             server_round, results, failures
@@ -235,6 +230,12 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
                     self.noise_multiplier, self.clipping_norm, self.num_sampled_clients
                 ),
             )
+
+        # Grow clipping norm when clipped fraction exceeds target quantile.
+        self.clipping_norm *= math.exp(
+            self.clip_norm_lr
+            * (noised_norm_bit_set_fraction - self.target_clipped_quantile)
+        )
 
         return aggregated_params, metrics
 
@@ -406,7 +407,6 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
         aggregated_params, metrics = self.strategy.aggregate_fit(
             server_round, results, failures
         )
-        self._update_clip_norm(results)
 
         # Add Gaussian noise to the aggregated parameters
         if aggregated_params:
@@ -423,6 +423,8 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
                     self.noise_multiplier, self.clipping_norm, self.num_sampled_clients
                 ),
             )
+
+        self._update_clip_norm(results)
 
         return aggregated_params, metrics
 
