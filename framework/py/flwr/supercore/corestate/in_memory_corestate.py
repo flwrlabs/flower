@@ -909,10 +909,8 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if agent_id is not None:
-            with self.lock_agent_store:
-                if not any(agent_id in agents for agents in self.agent_store.values()):
-                    return None
+        if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+            return None
         with self.lock_connector_store:
             self.connector_id_counter += 1
             connector_id = self.connector_id_counter
@@ -1046,10 +1044,8 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if agent_id is not None:
-            with self.lock_agent_store:
-                if not any(agent_id in agents for agents in self.agent_store.values()):
-                    return None
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+            return None
         expires_at = expires_at.astimezone(UTC)
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,

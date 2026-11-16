@@ -1144,7 +1144,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            if agent_id is not None and session.get(AgentModel, agent_id) is None:
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
                 return None
             return session.scalar(stmt)
 
@@ -1305,10 +1305,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as db_session:
-                if (
-                    agent_id is not None
-                    and db_session.get(AgentModel, agent_id) is None
-                ):
+                if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
                     return None
                 db_session.add(model)
                 db_session.flush()

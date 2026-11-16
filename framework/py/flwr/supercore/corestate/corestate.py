@@ -438,13 +438,14 @@ class CoreState(ABC):  # pylint: disable=R0904
         created_by : str
             Account ID creating the connector.
         agent_id : int | None (default: None)
-            Existing agent owning the connector. Requires ``federation_id=None``.
+            Agent owning the connector. Must belong to ``created_by`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         int | None
-            The connector ID, or ``None`` if the owner is invalid, the agent does
-            not exist, or a required identifier is empty.
+            The connector ID, or ``None`` if the owner is invalid, the agent is not
+            owned by ``created_by``, or a required identifier is empty.
         """
 
     @abstractmethod
@@ -565,14 +566,15 @@ class CoreState(ABC):  # pylint: disable=R0904
         expires_at : datetime
             Timezone-aware expiration timestamp, normalized to UTC before storage.
         agent_id : int | None (default: None)
-            Existing agent receiving the connector. Requires ``federation_id=None``.
+            Agent receiving the connector. Must belong to ``flwr_aid`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         ConnectorOAuthSessionRecord | None
             The created session, or `None` if the session ID already exists, a
-            required identifier is empty, the owner is invalid, the agent does
-            not exist, or `expires_at` is timezone-naive.
+            required identifier is empty, the owner is invalid, the agent is not
+            owned by ``flwr_aid``, or `expires_at` is timezone-naive.
         """
 
     @abstractmethod
