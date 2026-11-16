@@ -43,7 +43,7 @@ from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.supercore import log
-from flwr.supercore.constant import NodeStatus, TaskType
+from flwr.supercore.constant import EventType, NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
@@ -55,6 +55,7 @@ from flwr.superlink.federation import FederationManager
 from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
+    run_activity_to_proto,
     validate_run_scope,
 )
 
@@ -127,6 +128,33 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if task is None:
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
+
+    def _store_run_event(self, event_type: str, task_id: int) -> None:
+        """Publish a bound Space run's primary transition with the task lock held."""
+        if not self._is_primary_task(task_id):
+            return
+        run = self._get_run(self.task_store[task_id].run_id)
+        if run.space_id is None or run.agent_id is None:
+            return
+        with self.lock_space_store:
+            self.store_event(
+                event_type,
+                run_activity_to_proto(run),
+                [
+                    member.flwr_aid
+                    for member in self.space_store[run.space_id].participants
+                    if member.flwr_aid
+                ],
+                space_id=run.space_id,
+            )
+
+    def activate_task(self, task_id: int) -> bool:
+        """Activate a task and publish a primary run transition atomically."""
+        with self.lock_task_store:
+            result = super().activate_task(task_id)
+            if result:
+                self._store_run_event(EventType.RUN_STARTED, task_id)
+            return result
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
@@ -491,6 +519,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 connector_ids=connector_ids,
             )
 
+            self._store_run_event(EventType.RUN_CREATED, task_id)
             return run_id
 
     def _agent_has_open_run(self, space_id: UUID, agent_id: int) -> bool:
@@ -660,9 +689,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
-        result = super().finish_task(task_id, sub_status, details)
-        if result and self._is_primary_task(task_id):
-            with self.lock_task_store:
+        with self.lock_task_store:
+            result = super().finish_task(task_id, sub_status, details)
+            if result and self._is_primary_task(task_id):
                 task = self.task_store.get(task_id)
                 if task is not None:
                     # Stop all tasks of the run when the run is stopped
@@ -678,9 +707,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         sub_status=finish_sub_status,
                         details=finish_details,
                     )
-            if self.run_ids[self.task_store[task_id].run_id].space_id is None:
-                self.federation_manager.report_run_usage()
-        return result
+                if self.run_ids[self.task_store[task_id].run_id].space_id is None:
+                    self.federation_manager.report_run_usage()
+            if result:
+                self._store_run_event(EventType.RUN_FINISHED, task_id)
+            return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
@@ -702,6 +733,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
+        for _, task_id in pairs:
+            self._store_run_event(EventType.RUN_FINISHED, task_id)
         if any(self.run_ids[run_id].space_id is None for run_id, _ in pairs):
             self.federation_manager.report_run_usage()
 

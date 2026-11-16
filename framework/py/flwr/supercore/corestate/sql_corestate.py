@@ -73,6 +73,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -786,16 +787,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     UserEventFeedModel.user_id == flwr_aid
                 )
             )
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
             cursor=head or 0,
         )
 
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
+        payload: Agent | Space | SpaceMessage | ProtoRun,
         recipients: Sequence[str],
         space_id: UUID | None = None,
     ) -> UUID:
@@ -2602,8 +2606,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
-        if expired_tasks:
-            self._on_task_tokens_expired(expired_tasks)
+            if expired_tasks:
+                self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""

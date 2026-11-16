@@ -512,7 +512,9 @@ global___ListRunsResponse = ListRunsResponse
 
 @typing.final
 class BootstrapRequest(google.protobuf.message.Message):
-    """Agents and Spaces only. Message history is fetched through GetSpaceMessages."""
+    """Agents, Spaces and active runs. Message history is fetched through
+    GetSpaceMessages.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -529,20 +531,26 @@ class BootstrapResponse(google.protobuf.message.Message):
     AGENTS_FIELD_NUMBER: builtins.int
     SPACES_FIELD_NUMBER: builtins.int
     CURSOR_FIELD_NUMBER: builtins.int
+    ACTIVE_RUNS_FIELD_NUMBER: builtins.int
     cursor: builtins.int
-    """Feed head from the same snapshot as agents and spaces."""
+    """Feed head read before the snapshot; replay may repeat snapshot updates."""
     @property
     def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Agent]: ...
     @property
     def spaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.space_pb2.Space]: ...
+    @property
+    def active_runs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.run_pb2.Run]:
+        """Minimal lifecycle projections for active Space-bound agent runs."""
+
     def __init__(
         self,
         *,
         agents: collections.abc.Iterable[global___Agent] | None = ...,
         spaces: collections.abc.Iterable[flwr.proto.space_pb2.Space] | None = ...,
         cursor: builtins.int = ...,
+        active_runs: collections.abc.Iterable[flwr.proto.run_pb2.Run] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agents", b"agents", "cursor", b"cursor", "spaces", b"spaces"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["active_runs", b"active_runs", "agents", b"agents", "cursor", b"cursor", "spaces", b"spaces"]) -> None: ...
 
 global___BootstrapResponse = BootstrapResponse
 
@@ -560,7 +568,14 @@ class Event(google.protobuf.message.Message):
     space_id: builtins.str
     created_at: builtins.str
     @property
-    def payload(self) -> google.protobuf.struct_pb2.Struct: ...
+    def payload(self) -> google.protobuf.struct_pb2.Struct:
+        """run.created (queued), run.started (primary task running), and run.finished
+        (completed, failed or stopped) carry a minimal Run: run_id, agent_id,
+        space_id, status/sub_status and lifecycle timestamps. Config and failure
+        details are omitted. As in protobuf JSON, uint64 identifiers in this Struct
+        are decimal strings.
+        """
+
     def __init__(
         self,
         *,

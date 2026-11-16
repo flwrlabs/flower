@@ -35,8 +35,9 @@ from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 from google.protobuf.message import DecodeError
+from google.protobuf.struct_pb2 import Struct  # pylint: disable=E0611
 from parameterized import parameterized
-from sqlalchemy import event, select, update
+from sqlalchemy import delete, event, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.sql.dml import Update
 
@@ -87,6 +88,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
@@ -477,6 +479,218 @@ class StateTest(CoreStateTest):
             state.get_task_events(space_id=space_id, run_ids=[other_run_id]), []
         )
         self.assertEqual(state.get_task_events(space_id=uuid4()), [])
+
+    def _create_activity_run(self) -> tuple[LinkState, int, int, UUID, int]:
+        """Create a bound Space run whose uint64 ID exceeds JavaScript precision."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        space_id = UUID(
+            state.create_space(
+                participants=[
+                    SpaceParticipant(flwr_aid="alice"),
+                    SpaceParticipant(flwr_aid="bob"),
+                    SpaceParticipant(agent_id=agent.id),
+                ]
+            ).id
+        )
+        fab_hash = state.store_fab(Fab("", b"fab", {}))
+        with (
+            patch(
+                "flwr.server.superlink.linkstate.in_memory_linkstate.generate_rand_int_from_bytes",
+                side_effect=[2**64 - 1, 2**64 - 2],
+            ),
+            patch(
+                "flwr.server.superlink.linkstate.sql_linkstate.generate_rand_int_from_bytes",
+                side_effect=[2**64 - 1, 2**64 - 2],
+            ),
+        ):
+            run_id = state.create_run(
+                "publisher/app",
+                "1.0",
+                fab_hash,
+                {"private": "secret"},
+                None,
+                None,
+                None,
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                agent_id=agent.id,
+            )
+        assert run_id == 2**64 - 1
+        return state, run_id, get_primary_task_id(state, run_id), space_id, agent.id
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [SubStatus.COMPLETED, SubStatus.FAILED, SubStatus.STOPPED]
+    )
+    def test_run_activity_lifecycle(self, sub_status: str) -> None:
+        """Publish each primary transition once with a minimal, scoped payload."""
+        state, run_id, task_id, space_id, agent_id = self._create_activity_run()
+        assert state.get_bootstrap("charlie").active_runs == []
+        assert state.get_user_events("charlie") == []
+        queued = state.get_bootstrap("bob")
+        assert len(queued.active_runs) == 1
+        assert queued.active_runs[0].run_id == run_id
+        assert queued.active_runs[0].status.status == Status.PENDING
+        assert state.claim_task(task_id) is not None
+        assert (
+            state.get_bootstrap("bob").active_runs[0].status.status == Status.STARTING
+        )
+        assert state.activate_task(task_id)
+        assert not state.activate_task(task_id)
+        active = state.get_bootstrap("bob")
+        assert active.active_runs[0].status.status == Status.RUNNING
+        assert (
+            state.get_user_events("bob", queued.cursor)[0].event.type == "run.started"
+        )
+        if sub_status == SubStatus.STOPPED:
+            assert state.stop_run(run_id)
+        else:
+            assert state.finish_task(task_id, sub_status, "private failure details")
+        assert not state.finish_task(task_id, sub_status, "private failure details")
+        assert state.get_bootstrap("bob").active_runs == []
+        events = [
+            entry.event
+            for entry in state.get_user_events("bob")
+            if entry.event.type.startswith("run.")
+        ]
+        assert [event.type for event in events] == [
+            "run.created",
+            "run.started",
+            "run.finished",
+        ]
+        for run_event in events:
+            payload = run_event.payload
+            assert run_event.space_id == str(space_id)
+            assert payload["run_id"] == str(run_id)
+            assert payload["agent_id"] == str(agent_id)
+            assert payload["space_id"] == str(space_id)
+            assert set(payload) <= {
+                "run_id",
+                "agent_id",
+                "space_id",
+                "status",
+                "pending_at",
+                "starting_at",
+                "running_at",
+                "finished_at",
+            }
+            assert isinstance(payload["status"], Struct)
+            assert "details" not in payload["status"]
+        assert events[0].payload["pending_at"]
+        assert events[1].payload["running_at"]
+        assert events[2].payload["finished_at"]
+        assert cast(Struct, events[2].payload["status"])["sub_status"] == sub_status
+        assert [
+            entry.event
+            for entry in state.get_user_events("alice")
+            if entry.event.type.startswith("run.")
+        ] == events
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [SubStatus.FAILED, SubStatus.STOPPED]
+    )
+    def test_run_activity_finished_before_activation(self, sub_status: str) -> None:
+        """A rejected or stopped queued run emits a terminal event without started."""
+        state, _, task_id, _, _ = self._create_activity_run()
+        assert state.finish_task(task_id, sub_status, "private launch failure")
+        assert state.get_bootstrap("bob").active_runs == []
+        events = [
+            entry.event
+            for entry in state.get_user_events("bob")
+            if entry.event.type.startswith("run.")
+        ]
+        assert [run_event.type for run_event in events] == [
+            "run.created",
+            "run.finished",
+        ]
+
+    def test_run_activity_excludes_child_and_federation_tasks(self) -> None:
+        """Child tasks and federation runs do not produce Space activity events."""
+        state, run_id, _, _, _ = self._create_activity_run()
+        cursor = state.get_bootstrap("alice").cursor
+        child_id = state.create_task(task_type="model", run_id=run_id)
+        assert child_id is not None
+        assert state.claim_task(child_id) is not None
+        assert state.activate_task(child_id)
+        assert state.finish_task(child_id, SubStatus.COMPLETED, "")
+        legacy = create_dummy_run(state)
+        legacy_task = get_primary_task_id(state, legacy)
+        assert state.claim_task(legacy_task) is not None
+        assert state.activate_task(legacy_task)
+        assert state.finish_task(legacy_task, SubStatus.COMPLETED, "")
+        assert state.get_user_events("alice", cursor) == []
+        assert [run.run_id for run in state.get_bootstrap("alice").active_runs] == [
+            run_id
+        ]
+
+    def test_run_activity_claim_retry_and_heartbeat_expiry(self) -> None:
+        """Retryable STARTING expiry stays active and RUNNING expiry finishes once."""
+        state, run_id, task_id, _, _ = self._create_activity_run()
+        cursor = state.get_bootstrap("alice").cursor
+        assert state.claim_task(task_id) is not None
+        future = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future
+            snapshot = state.get_bootstrap("alice")
+        assert snapshot.active_runs[0].status.status == Status.PENDING
+        assert state.get_user_events("alice", cursor) == []
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future
+            assert state.get_bootstrap("alice").active_runs == []
+            assert state.get_run_status({run_id})[run_id].status == Status.FINISHED
+        events = [entry.event for entry in state.get_user_events("alice", cursor)]
+        assert [event.type for event in events] == ["run.started", "run.finished"]
+        assert (
+            cast(Struct, events[-1].payload["status"])["sub_status"] == SubStatus.FAILED
+        )
+
+    def test_run_activity_bootstrap_cursor_precedes_snapshot(self) -> None:
+        """A transition during bootstrap is represented in the snapshot and replay."""
+        state, _, task_id, _, _ = self._create_activity_run()
+        assert state.claim_task(task_id) is not None
+        get_spaces = state.get_spaces
+
+        def activate_and_get_spaces(flwr_aid: str) -> Sequence[Any]:
+            assert state.activate_task(task_id)
+            return get_spaces(flwr_aid)
+
+        with patch.object(state, "get_spaces", side_effect=activate_and_get_spaces):
+            snapshot = state.get_bootstrap("bob")
+        assert snapshot.active_runs[0].status.status == Status.RUNNING
+        assert (
+            state.get_user_events("bob", snapshot.cursor)[0].event.type == "run.started"
+        )
+
+    def test_run_activity_revoked_space_access(self) -> None:
+        """Revoked members receive no active snapshot or replayed run payload."""
+        state, _, task_id, space_id, _ = self._create_activity_run()
+        if isinstance(state, InMemoryLinkState):
+            with state.lock_space_store:
+                state.space_store[space_id].participants.remove(
+                    SpaceParticipant(flwr_aid="bob")
+                )
+        else:
+            assert isinstance(state, SqlLinkState)
+            with state.session() as session:
+                session.execute(
+                    delete(SpaceParticipantTable).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid == "bob",
+                    )
+                )
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.get_bootstrap("bob").active_runs == []
+        assert all(
+            not entry.HasField("event") for entry in state.get_user_events("bob")
+        )
 
     def test_create_space_run(self) -> None:
         """Create a Space AgentApp run without federation or series resources."""
@@ -2010,6 +2224,60 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        ["created", "started", "finished", "expired"]
+    )
+    def test_run_activity_journal_failure_rolls_back(self, transition: str) -> None:
+        """Journal failure rolls back the SQL task transition and feed deliveries."""
+        state, run_id, task_id, space_id, agent_id = self._create_activity_run()
+        assert isinstance(state, SqlLinkState)
+        if transition in ("finished", "expired"):
+            assert state.claim_task(task_id) is not None
+            assert state.activate_task(task_id)
+        elif transition == "started":
+            assert state.claim_task(task_id) is not None
+        else:
+            assert state.finish_task(task_id, SubStatus.STOPPED, "")
+        before = state.get_bootstrap("alice")
+        before_status = state.get_run_status({run_id})[run_id]
+        store_event = state.store_event
+
+        def fail_journal(*args: Any, **kwargs: Any) -> UUID:
+            store_event(*args, **kwargs)
+            raise RuntimeError("Journal failure")
+
+        with patch.object(state, "store_event", side_effect=fail_journal):
+            with self.assertRaisesRegex(RuntimeError, "Journal failure"):
+                if transition == "created":
+                    run = state.get_run_info(run_ids=[run_id])[0]
+                    state.create_run(
+                        "publisher/app",
+                        "1.0",
+                        run.fab_hash,
+                        {},
+                        None,
+                        None,
+                        None,
+                        TaskType.AGENT_APP,
+                        space_id=space_id,
+                        agent_id=agent_id,
+                    )
+                elif transition == "started":
+                    state.activate_task(task_id)
+                elif transition == "finished":
+                    state.finish_task(task_id, SubStatus.FAILED, "failure")
+                else:
+                    future = now() + timedelta(
+                        seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+                    )
+                    with patch("datetime.datetime") as mock_dt:
+                        mock_dt.now.return_value = future
+                        state.get_run_status({run_id})
+        assert state.get_run_status({run_id})[run_id] == before_status
+        assert state.get_bootstrap("alice") == before
+        assert state.get_user_events("alice", before.cursor) == []
+        assert len(state.get_run_info()) == 1
 
     def test_get_compacted_contexts(self) -> None:
         """Read only one agent in newest-first order with an exclusive cursor."""

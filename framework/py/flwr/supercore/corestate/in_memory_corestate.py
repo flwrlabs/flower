@@ -52,6 +52,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -650,16 +651,19 @@ class InMemoryCoreState(
         """Read the feed cursor before fetching visible state."""
         with self.lock_space_store:
             head = len(self.user_event_store.get(flwr_aid, []))
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
             cursor=head,
         )
 
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
+        payload: Agent | Space | SpaceMessage | ProtoRun,
         recipients: Sequence[str],
         space_id: UUID | None = None,
     ) -> UUID:

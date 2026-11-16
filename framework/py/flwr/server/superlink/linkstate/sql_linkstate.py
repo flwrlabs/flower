@@ -42,9 +42,10 @@ from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
-from flwr.supercore.constant import NodeStatus, TaskType
+from flwr.supercore.constant import EventType, NodeStatus, TaskType
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, _agent_from_model
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
@@ -73,6 +74,7 @@ from .linkstate import LinkState
 from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
+    run_activity_to_proto,
     validate_run_scope,
 )
 
@@ -89,6 +91,63 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_active_runs(self, space_ids: set[UUID]) -> Sequence[ProtoRun]:
+        """Read active agent runs scoped to the snapshot's visible Spaces."""
+        if not space_ids:
+            return []
+        with self.session() as session:
+            self._cleanup_expired_task_tokens()
+            rows = session.execute(
+                select(RunModel, TaskModel)
+                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                .where(
+                    RunModel.space_id.in_(space_ids),
+                    RunModel.agent_id.is_not(None),
+                    TaskModel.finished_at.is_(None),
+                )
+                .execution_options(populate_existing=True)
+            )
+            return [run_activity_to_proto(_run_from_models(*row)) for row in rows]
+
+    def _store_run_event(self, event_type: str, task_id: int) -> None:
+        """Publish a bound Space run's primary transition in the current session."""
+        with self.session() as session:
+            row = session.execute(
+                select(RunModel, TaskModel)
+                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
+                .where(
+                    RunModel.primary_task_id == task_id,
+                    RunModel.space_id.is_not(None),
+                    RunModel.agent_id.is_not(None),
+                )
+                .execution_options(populate_existing=True)
+            ).first()
+            if row is None:
+                return
+            run = _run_from_models(*row)
+            recipients = list(
+                session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == run.space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                )
+            )
+            self.store_event(
+                event_type,
+                run_activity_to_proto(run),
+                recipients,
+                space_id=run.space_id,
+            )
+
+    def activate_task(self, task_id: int) -> bool:
+        """Activate a task and publish a primary run transition atomically."""
+        with self.session():
+            result = super().activate_task(task_id)
+            if result:
+                self._store_run_event(EventType.RUN_STARTED, task_id)
+            return result
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
@@ -551,6 +610,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     connector_ids=connector_ids,
                 )
+                self._store_run_event(EventType.RUN_CREATED, task_id)
                 return run_id
 
         log(ERROR, "Unexpected run creation failure.")
@@ -724,33 +784,36 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
-        result = super().finish_task(task_id, sub_status, details)
-        if result:
-            # Check whether this task is referenced as a run's primary task
-            with self.session() as session:
-                run = session.execute(
-                    select(RunModel.run_id, RunModel.space_id).where(
-                        RunModel.primary_task_id == task_id
+        with self.session():
+            result = super().finish_task(task_id, sub_status, details)
+            if result:
+                # Check whether this task is referenced as a run's primary task
+                with self.session() as session:
+                    run = session.execute(
+                        select(RunModel.run_id, RunModel.space_id).where(
+                            RunModel.primary_task_id == task_id
+                        )
+                    ).first()
+                if run is not None:
+                    run_id, space_id = run
+                    # Stop all tasks of the run when the run is stopped
+                    if sub_status == SubStatus.STOPPED:
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
+                    # Otherwise, fail all tasks of the run
+                    else:
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
+                        [(run_id, task_id)],
+                        sub_status=finish_sub_status,
+                        details=finish_details,
                     )
-                ).first()
-            if run is not None:
-                run_id, space_id = run
-                # Stop all tasks of the run when the run is stopped
-                if sub_status == SubStatus.STOPPED:
-                    finish_sub_status = SubStatus.STOPPED
-                    finish_details = "Task stopped because the run was stopped"
-                # Otherwise, fail all tasks of the run
-                else:
-                    finish_sub_status = SubStatus.FAILED
-                    finish_details = "Task failed because the run finished"
-                self._finish_run_tasks(
-                    [(run_id, task_id)],
-                    sub_status=finish_sub_status,
-                    details=finish_details,
-                )
-                if space_id is None:
-                    self.federation_manager.report_run_usage()
-        return result
+                    if space_id is None:
+                        self.federation_manager.report_run_usage()
+            if result:
+                self._store_run_event(EventType.RUN_FINISHED, task_id)
+            return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
@@ -782,6 +845,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
+
+        for _, task_id, _ in rows:
+            self._store_run_event(EventType.RUN_FINISHED, task_id)
 
         # Report usage for the run
         if any(space_id is None for _, _, space_id in rows):
