@@ -258,6 +258,18 @@ def test_adaptive_clipping_uses_pre_update_norm_for_noise(
         recorded_norms.append(clipping_norm)
         return 0.0
 
+    orig_normal = np.random.normal
+
+    def mock_normal(
+        loc: float = 0.0,
+        scale: float = 1.0,
+        size: int | tuple[int, ...] | None = None,
+    ) -> float | np.ndarray:
+        if size is None:
+            return float(loc)
+        return orig_normal(loc, scale, size)
+
+    monkeypatch.setattr("numpy.random.normal", mock_normal)
     monkeypatch.setattr(
         "flwr.serverapp.strategy.dp_adaptive_clipping.compute_stdv",
         mock_compute_stdv,
@@ -276,6 +288,6 @@ def test_adaptive_clipping_uses_pre_update_norm_for_noise(
     wrapper.aggregate_train(1, replies)
 
     # The norm must shrink after the round because no updates were clipped.
-    assert wrapper.clipping_norm < 5.0
+    assert wrapper.clipping_norm == pytest.approx(5.0 * math.exp(-0.5 * 0.5))
     # But noising for this round must have used the pre-update norm (5.0).
     assert recorded_norms == [5.0]
