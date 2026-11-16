@@ -16,18 +16,22 @@
 
 
 import abc
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Literal
+from uuid import UUID
 
-from flwr.app import Context, Message, RecordDict
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
+
+from .utils import create_run_context
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
@@ -42,131 +46,93 @@ class LinkState(CoreState):  # pylint: disable=R0904
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
 
-    @abc.abstractmethod
-    def store_message_ins(self, message: Message) -> str | None:
-        """Store one Message.
+    def _check_message_policy(self, messages: Sequence[Message]) -> list[bool]:
+        """Check run and federation policy in input order without changing state.
 
-        Usually, the Runtime API calls this to schedule instructions.
-
-        Stores the value of the `message` in the link state and, if successful,
-        returns the `message_id` (str) of the `message`. If, for any reason,
-        storing the `message` fails, `None` is returned.
-
-        Constraints
-        -----------
-        `message.metadata.dst_node_id` MUST be set.
-
-        If `message.metadata.run_id` is invalid, then
-        storing the `message` MUST fail.
+        Run and federation lookup errors propagate to the caller.
+        All run and membership lookups are scoped to this batch.
         """
+        # Avoid lookups when there are no messages to check.
+        if not messages:
+            return []
 
-    @abc.abstractmethod
-    def get_message_ins(
+        # Fetch distinct runs once and retain only those that can exchange messages.
+        run_ids = sorted({message.metadata.run_id for message in messages})
+        runs = {
+            run.run_id: run
+            for run in self.get_run_info(run_ids=run_ids)
+            if run.status.status in (Status.PENDING, Status.STARTING, Status.RUNNING)
+        }
+
+        # Merge node IDs by federation to share membership checks across runs.
+        federation_nodes: dict[str, set[int]] = {}
+        for message in messages:
+            if (run := runs.get(message.metadata.run_id)) is not None:
+                if not run.federation_id:
+                    continue
+                federation_nodes.setdefault(run.federation_id, set()).update(
+                    (message.metadata.src_node_id, message.metadata.dst_node_id)
+                )
+
+        # Filter node IDs once per federation, delegating SuperLink address rules.
+        for federation_id, node_ids in federation_nodes.items():
+            federation_nodes[federation_id] = self.federation_manager.filter_nodes(
+                node_ids, federation_id
+            )
+
+        # Preserve input order and require both nodes to belong to the federation.
+        results: list[bool] = []
+        for message in messages:
+            run = runs.get(message.metadata.run_id)
+            if run is None:
+                results.append(False)
+                continue
+            node_ids = {message.metadata.src_node_id, message.metadata.dst_node_id}
+            if not run.federation_id:
+                results.append(node_ids == {SUPERLINK_NODE_ID})
+            else:
+                results.append(node_ids <= federation_nodes[run.federation_id])
+        return results
+
+    def store_messages(self, messages: Sequence[Message]) -> list[bool]:
+        """Store messages allowed by run and federation policy in input order."""
+        # Concrete LinkStates put their CoreState implementation next in the MRO.
+        allowed = self._check_message_policy(messages)
+        results = iter(
+            super().store_messages(  # type: ignore[safe-super]
+                [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
+            )
+        )
+        return [next(results) if ok else False for ok in allowed]
+
+    def get_messages(
         self,
-        node_id: int,
-        limit: int | None,
         *,
+        dst_node_id: int,
         run_id: int | None = None,
+        reply_to_message_ids: Collection[str] | None = None,
+        limit: int | None = None,
     ) -> list[Message]:
-        """Get zero or more `Message` objects for the provided `node_id`.
-
-        Usually, the Fleet API calls this for Nodes planning to work on one or more
-        Message.
-
-        Parameters
-        ----------
-        node_id : int
-            The destination node ID to filter Messages by.
-        limit : Optional[int]
-            Maximum number of Messages to return. If None, no limit is applied.
-        run_id : Optional[int] (default: None)
-            The run ID to filter by.
-
-        Returns
-        -------
-        list[Message]
-            A list of Messages matching the specified filters.
-
-        Constraints
-        -----------
-        Retrieve all Message where the `message.metadata.dst_node_id` equals `node_id`.
-
-        If `limit` is not `None`, return, at most, `limit` number of `message`. If
-        `limit` is set, it has to be greater zero.
-        """
-
-    @abc.abstractmethod
-    def store_message_res(self, message: Message) -> str | None:
-        """Store one Message.
-
-        Usually, the Fleet API calls this for Nodes returning results.
-
-        Stores the Message and, if successful, returns the `message_id` (str) of
-        the `message`. If storing the `message` fails, `None` is returned.
-
-        Constraints
-        -----------
-        `message.metadata.dst_node_id` MUST be set (not constant.SUPERLINK_NODE_ID)
-
-        If `message.metadata.run_id` is invalid, then
-        storing the `message` MUST fail.
-        """
-
-    @abc.abstractmethod
-    def get_message_res(self, message_ids: set[str], run_id: int) -> list[Message]:
-        """Get reply Messages for the given Message IDs.
-
-        This method is typically called by the Runtime API to obtain
-        results (type Message) for previously scheduled instructions (type Message).
-        For each message_id passed, this method returns one of the following responses:
-
-        - An error Message if there was no message registered with such message IDs
-        or has expired.
-        - An error Message if the reply Message exists but has expired.
-        - The reply Message.
-        - Nothing if the Message with the passed message_id is still valid and waiting
-        for a reply Message.
-
-        Parameters
-        ----------
-        message_ids : set[str]
-            A set of Message IDs used to retrieve reply Messages responding to them.
-        run_id : int
-            The run ID the Messages must belong to.
-
-        Returns
-        -------
-        list[Message]
-            A list of reply Message responding to the given message IDs or Messages
-            carrying an Error.
-        """
-
-    @abc.abstractmethod
-    def num_message_ins(self) -> int:
-        """Calculate the number of Messages awaiting a reply."""
-
-    @abc.abstractmethod
-    def num_message_res(self) -> int:
-        """Calculate the number of reply Messages in store."""
-
-    @abc.abstractmethod
-    def delete_messages(self, message_ins_ids: set[str]) -> None:
-        """Delete a Message and its reply based on provided Message IDs.
-
-        Parameters
-        ----------
-        message_ins_ids : set[str]
-            A set of Message IDs. For each ID in the set, the corresponding
-            Message and its associated reply Message will be deleted.
-        """
-
-    @abc.abstractmethod
-    def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
-        """Get all instruction Message IDs for the given run_id."""
+        """Get candidates, cancelling policy rejections without refilling the batch."""
+        messages = super().get_messages(  # type: ignore[safe-super]
+            dst_node_id=dst_node_id,
+            run_id=run_id,
+            reply_to_message_ids=reply_to_message_ids,
+            limit=limit,
+        )
+        allowed = self._check_message_policy(messages)
+        rejected_ids = [
+            msg.metadata.message_id
+            for msg, ok in zip(messages, allowed, strict=True)
+            if not ok
+        ]
+        if rejected_ids:
+            self.cancel_messages(message_ids=rejected_ids)
+        return [msg for msg, ok in zip(messages, allowed, strict=True) if ok]
 
     def cleanup_run(self, run_id: int) -> None:
         """Clean up run-scoped messages and objects."""
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.cancel_messages(run_id=run_id)
         self.object_store.delete_objects_in_run(run_id)
         self.delete_sessions_in_run(run_id)
 
@@ -293,13 +259,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
-        federation_id: str,
+        federation_id: str | None,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         primary_task_type: str,
@@ -308,6 +274,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         connector_ids: Sequence[int] = (),
         initial_task_event: TaskEvent | None = None,
         user_prompt: str | None = None,
+        space_id: UUID | None = None,
+        agent_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -321,12 +289,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
-        federation_id : str
-            The federation ID this run belongs to.
+        federation_id : str | None
+            The federation ID for a legacy run. Must be None for a Space run.
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
-            Flower Account ID of the creator.
+            Flower Account ID of the creator. Agent-bound Space runs use the
+            executing agent's owner.
         primary_task_type : str
             The type of the primary task to create for the run.
         series_id : int | None (default: None)
@@ -342,18 +311,43 @@ class LinkState(CoreState):  # pylint: disable=R0904
         initial_task_event : TaskEvent | None (default: None)
             Event to store atomically before the pending primary task is visible.
         user_prompt : str | None (default: None)
-            User prompt to store as an instruction Message for an AgentApp run.
+            User prompt to store as a Message for an AgentApp run.
             Ignored for other primary task types and when `None`.
+        space_id : UUID | None (default: None)
+            Space for an AgentApp run with a fresh context. Cannot be combined
+            with federation configuration, a series, or federation connectors.
+        agent_id : int | None (default: None)
+            Executing agent assigned by the server for a Space run. Creation
+            returns 0 unless the agent participates, has no open Run, and its
+            app matches the resolved FAB. The FAB must already be stored.
 
         Returns
         -------
         int
-            The run ID of the newly created run.
+            The new run ID, or 0 if creation fails or the agent is ineligible.
 
         Notes
         -----
         This method will not verify if the account has permission to create
-        a run in the federation.
+        a run in the federation or space. Invalid scope combinations or missing
+        FABs for agent-bound runs raise ValueError.
+        """
+
+    @abc.abstractmethod
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread messages and no open Run.
+
+        Parameters
+        ----------
+        limit : int | None (default: None)
+            Maximum number of Space/agent pairs to return; None returns all.
+
+        Returns
+        -------
+        Sequence[tuple[UUID, Agent]]
+            Eligible Space IDs and agents. This does not advance read cursors.
         """
 
     @abc.abstractmethod
@@ -363,7 +357,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
         limit: int | None = None,
@@ -383,8 +377,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
             Sequence of Flower Account IDs to filter by.
-        federation_ids : Optional[Sequence[str]] (default: None)
-            Sequence of federation IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
         order_by : Optional[Literal["pending_at"]] (default: None)
             Field used to order the result.
         ascending : bool (default: True)
@@ -488,14 +483,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id: int,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-            series_id=series_id,
-        )
+        context = create_run_context(run_id, series_id)
         if existing_context := self.get_run_series_context(series_id):
             context.state = existing_context.state
         self.set_run_series_context(series_id=series_id, context=context)

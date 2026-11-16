@@ -44,9 +44,10 @@ ENV PATH=/python/venv/bin:$PATH
 # Install specific version of pip, setuptools and flwr
 ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
-RUN pip install -U --no-cache-dir \
-    pip==${PIP_VERSION} \
-    setuptools==${SETUPTOOLS_VERSION}
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION}
 
 ARG FLWR_VERSION
 ARG FLWR_VERSION_REF
@@ -64,8 +65,12 @@ FROM python:${PYTHON_VERSION}-${DISTRO}${DISTRO_VERSION} AS base
 
 # Keep system setuptools aligned with the virtualenv, then remove system pip
 # and the bundled wheel that could reinstall it.
+ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
-RUN pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION} \
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION} \
     && python -m pip uninstall --yes pip \
     && rm -rf /usr/local/lib/python*/ensurepip
 

@@ -32,6 +32,7 @@ from .retry_invoker import RetryInvoker, RetryState, exponential
 
 _RETRYABLE_STATUS_CODES = frozenset(
     {
+        httpx.codes.BAD_GATEWAY,
         httpx.codes.SERVICE_UNAVAILABLE,
         httpx.codes.GATEWAY_TIMEOUT,
     }

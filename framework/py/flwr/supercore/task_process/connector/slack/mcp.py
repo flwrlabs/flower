@@ -69,10 +69,25 @@ async def _session(context: ConnectorExecutionContext) -> AsyncIterator[ClientSe
             ) as session:
                 await session.initialize()
                 yield session
-    except SlackApiError:
-        raise
-    except Exception:  # pylint: disable=broad-exception-caught
-        raise SlackApiError("mcp_error") from None
+        return
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        while isinstance(ex, ExceptionGroup):
+            ex = ex.exceptions[0]  # pylint: disable=no-member
+        if isinstance(ex, SlackApiError):
+            code, status, message = ex.code, ex.status_code, ex.message
+        else:
+            code = "request_failed"
+            status = (
+                ex.response.status_code
+                if isinstance(ex, httpx.HTTPStatusError)
+                else None
+            )
+            message = str(ex)
+        error = SlackApiError(
+            code, status, (message or "").replace(token, "[REDACTED]")
+        )
+    # Suppress the original exception so tracebacks cannot expose the token.
+    raise error from None
 
 
 def discover_tools(context: ConnectorExecutionContext) -> list[ActionDefinition]:

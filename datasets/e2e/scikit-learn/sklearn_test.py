@@ -13,8 +13,8 @@ from flwr_datasets import FederatedDataset
 # 2. With standard scaling.
 @parameterized_class(
     [
-        {"dataset_name": "mnist", "preprocessing": None},
-        {"dataset_name": "mnist", "preprocessing": StandardScaler()},
+        {"dataset_name": "ylecun/mnist", "preprocessing": None},
+        {"dataset_name": "ylecun/mnist", "preprocessing": StandardScaler()},
     ]
 )
 class FdsWithSKLearn(unittest.TestCase):

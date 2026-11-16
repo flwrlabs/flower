@@ -128,7 +128,7 @@ def http_request_response(  # pylint: disable=R0913,R0917,R0914,R0912,R0915
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code == httpx.codes.UNAUTHORIZED:
                     os.kill(os.getpid(), signal.SIGINT)
-                if exc.response.status_code in (503, 504):
+                if exc.response.status_code in (502, 503, 504):
                     return False
                 raise
             if not response.success:

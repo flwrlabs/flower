@@ -19,7 +19,9 @@ import unittest
 from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
+import pytest
 from fastapi import status
 
 from flwr.common.constant import SUPERLINK_NODE_ID
@@ -42,14 +44,52 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    SendSpaceMessageRequest,
+)
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
+
+
+@pytest.mark.parametrize("read", [False, True])
+@pytest.mark.parametrize(
+    "task,agent_id",
+    [
+        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
+        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
+        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
+    ],
+)
+def test_space_messages_require_bound_primary_agent(
+    task: Task, agent_id: int | None, read: bool
+) -> None:
+    """Reading and publishing require the Run's bound primary AgentApp task."""
+    state = Mock(spec=CoreState)
+    run = Run.create_empty(123)
+    run.space_id = UUID("12345678-1234-5678-1234-567812345678")
+    run.agent_id = agent_id
+    run.primary_task_id = 1
+    with pytest.raises(FlowerError) as error:
+        if read:
+            runtime_handlers.get_space_messages(
+                GetSpaceMessagesRequest(), state, task, run
+            )
+        else:
+            runtime_handlers.send_space_message(
+                SendSpaceMessageRequest(content="No"), state, task, run
+            )
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_space_messages.assert_not_called()
+    state.create_space_message.assert_not_called()
 
 
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
@@ -63,7 +103,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_get_compacted_contexts(self) -> None:
         """Apply the default limit and reject zero."""
         context = CompactedContext(
-            id=1, series_id=42, through_event_id=9, text="Summary"
+            id=1, agent_id=42, through_event_id=9, text="Summary"
         )
         self.state.get_compacted_contexts.return_value = [context]
 
@@ -85,17 +125,21 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_put_compacted_context(self) -> None:
-        """Store only a valid summary for the authenticated series."""
+        """Store only a valid summary for the authenticated agent."""
         request = PutCompactedContextRequest(
-            context=CompactedContext(series_id=42, through_event_id=9, text="Summary")
+            context=CompactedContext(
+                agent_id=42, through_event_id=9, text="Summary", token_count=123
+            )
         )
 
         response = runtime_handlers.put_compacted_context(request, self.state, 42)
 
         self.assertFalse(response.ListFields())
-        self.state.store_compacted_context.assert_called_once_with(42, 9, "Summary")
+        self.state.store_compacted_context.assert_called_once_with(
+            42, 9, "Summary", 123
+        )
 
-        request.context.series_id = 43
+        request.context.agent_id = 43
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.put_compacted_context(request, self.state, 42)
         self.assertEqual(
@@ -143,7 +187,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
         """An empty queue must not claim a task."""
         response = runtime_handlers.acquire_task(
-            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]),
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]),
             self.state,
         )
 
@@ -154,15 +198,15 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_acquire_task_retries_after_lost_claim_race(self) -> None:
         """A contender should try the next eligible task after losing a claim."""
         tasks = [
-            Task(task_id=1, type=TaskType.MODEL),
+            Task(task_id=1, type=TaskType.CONNECTOR),
             Task(task_id=2, type=TaskType.CLIENT_APP),
-            Task(task_id=3, type=TaskType.MODEL),
+            Task(task_id=3, type=TaskType.CONNECTOR),
         ]
         self.state.get_tasks.return_value = tasks
         self.state.claim_task.side_effect = [None, "task-token"]
 
         response = runtime_handlers.acquire_task(
-            AcquireTaskRequest(supported_task_types=[TaskType.MODEL]), self.state
+            AcquireTaskRequest(supported_task_types=[TaskType.CONNECTOR]), self.state
         )
 
         self.assertEqual(response.task, tasks[2])
@@ -176,7 +220,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """A FAB-specific warm slot must not claim an unrelated AgentApp."""
         tasks = [
             Task(task_id=1, type=TaskType.AGENT_APP, fab_hash="other"),
-            Task(task_id=2, type=TaskType.MODEL),
+            Task(task_id=2, type=TaskType.CONNECTOR),
             Task(task_id=3, type=TaskType.AGENT_APP, fab_hash="ready"),
         ]
         self.state.get_tasks.return_value = tasks
@@ -211,8 +255,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         self.state.create_task.return_value = 456
         request = CreateTaskRequest(
-            type=TaskType.MODEL,
-            model_ref="models/abc",
+            type=TaskType.SIMULATION,
+            fab_hash="fab-hash",
         )
 
         # Execute
@@ -224,10 +268,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         # Assert
         self.state.create_task.assert_called_once_with(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.SIMULATION,
             run_id=123,
-            fab_hash=None,
-            model_ref="models/abc",
+            fab_hash="fab-hash",
+            model_ref=None,
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
@@ -238,7 +282,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """CreateTask should allow app tasks to request task creation."""
         # Prepare
         self.state.create_task.return_value = 456
-        request = CreateTaskRequest(type=TaskType.MODEL, model_ref="model")
+        request = CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash")
 
         for requesting_task_type in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
             self.state.create_task.reset_mock()
@@ -253,10 +297,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
 
                 # Assert
                 self.state.create_task.assert_called_once_with(
-                    task_type=TaskType.MODEL,
+                    task_type=TaskType.SIMULATION,
                     run_id=123,
-                    fab_hash=None,
-                    model_ref="model",
+                    fab_hash="fab-hash",
+                    model_ref=None,
                     connector_ref=None,
                     connector_id=None,
                     requesting_task_id=789,
@@ -337,7 +381,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with self.assertRaises(RuntimeError) as err:
             runtime_handlers.create_task(
-                CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
+                CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
                 self.state,
                 Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             )
@@ -348,10 +392,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             "Run 123 not found. create_task requires an existing run.",
         )
         self.state.create_task.assert_called_once_with(
-            task_type=TaskType.MODEL,
+            task_type=TaskType.SIMULATION,
             run_id=123,
-            fab_hash=None,
-            model_ref="model",
+            fab_hash="fab-hash",
+            model_ref=None,
             connector_ref=None,
             connector_id=None,
             requesting_task_id=789,
@@ -364,10 +408,6 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             (
                 CreateTaskRequest(type=TaskType.SERVER_APP),
                 "Task type 'flwr-serverapp' requires fab_hash.",
-            ),
-            (
-                CreateTaskRequest(type=TaskType.MODEL),
-                "Task type 'flwr-model' requires model_ref.",
             ),
             (
                 CreateTaskRequest(type=TaskType.CONNECTOR),
@@ -396,8 +436,8 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         self.state.create_task.return_value = None
         request = CreateTaskRequest(
-            type=TaskType.MODEL,
-            model_ref="models/abc",
+            type=TaskType.SIMULATION,
+            fab_hash="fab-hash",
         )
 
         # Execute
@@ -536,7 +576,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def test_record_task_usage_stores_usage_for_authenticated_metered_task(
         self,
     ) -> None:
-        """RecordTaskUsage should store usage for model and connector tasks."""
+        """RecordTaskUsage should store usage for the authenticated AgentApp."""
         usage = TaskUsage(
             usage_type="model_inference",
             provider="openai/gpt-test",
@@ -549,7 +589,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         response = runtime_handlers.record_task_usage(
             request,
             self.state,
-            Task(task_id=123, run_id=789, type=TaskType.MODEL),
+            Task(task_id=123, run_id=789, type=TaskType.AGENT_APP),
         )
 
         self.state.add_task_usage.assert_called_once_with(123, usage)
@@ -619,7 +659,9 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 # Execute
                 with self.assertRaises(FlowerError) as error:
                     runtime_handlers.create_task(
-                        CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
+                        CreateTaskRequest(
+                            type=TaskType.SIMULATION, fab_hash="fab-hash"
+                        ),
                         self.state,
                         Mock(run_id=123, type=requesting_task_type),
                     )

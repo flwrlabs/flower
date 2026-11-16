@@ -69,6 +69,8 @@ class Run(google.protobuf.message.Message):
     PRIMARY_TASK_ID_FIELD_NUMBER: builtins.int
     SERIES_ID_FIELD_NUMBER: builtins.int
     ACCOUNT_NAME_FIELD_NUMBER: builtins.int
+    SPACE_ID_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     fab_id: builtins.str
     fab_version: builtins.str
@@ -86,6 +88,10 @@ class Run(google.protobuf.message.Message):
     primary_task_id: builtins.int
     series_id: builtins.int
     account_name: builtins.str
+    space_id: builtins.str
+    """Present when the run belongs to a Space."""
+    agent_id: builtins.int
+    """Present when the server binds the run to an executing agent."""
     @property
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
@@ -112,10 +118,17 @@ class Run(google.protobuf.message.Message):
         primary_task_id: builtins.int | None = ...,
         series_id: builtins.int = ...,
         account_name: builtins.str = ...,
+        space_id: builtins.str | None = ...,
+        agent_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_primary_task_id", b"_primary_task_id", "primary_task_id", b"primary_task_id", "status", b"status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_primary_task_id", b"_primary_task_id", "account_name", b"account_name", "bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "primary_task_id", b"primary_task_id", "primary_task_type", b"primary_task_type", "run_id", b"run_id", "running_at", b"running_at", "series_id", b"series_id", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_agent_id", b"_agent_id", "_primary_task_id", b"_primary_task_id", "_space_id", b"_space_id", "agent_id", b"agent_id", "primary_task_id", b"primary_task_id", "space_id", b"space_id", "status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_agent_id", b"_agent_id", "_primary_task_id", b"_primary_task_id", "_space_id", b"_space_id", "account_name", b"account_name", "agent_id", b"agent_id", "bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "primary_task_id", b"primary_task_id", "primary_task_type", b"primary_task_type", "run_id", b"run_id", "running_at", b"running_at", "series_id", b"series_id", "space_id", b"space_id", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_agent_id", b"_agent_id"]) -> typing.Literal["agent_id"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_primary_task_id", b"_primary_task_id"]) -> typing.Literal["primary_task_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_space_id", b"_space_id"]) -> typing.Literal["space_id"] | None: ...
 
 global___Run = Run
 

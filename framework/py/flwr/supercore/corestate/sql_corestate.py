@@ -22,10 +22,12 @@ from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
 from sqlalchemy import (
     MetaData,
+    and_,
     case,
     delete,
     exists,
@@ -56,11 +58,17 @@ from flwr.common.constant import (
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
@@ -68,6 +76,11 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
@@ -80,10 +93,13 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -92,9 +108,14 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import Event as EventModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
+)
+from flwr.supercore.state.schema.corestate_models import File as FileModel
+from flwr.supercore.state.schema.corestate_models import (
+    FileRevision as FileRevisionModel,
 )
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import NonceStore as NonceStoreModel
@@ -115,19 +136,23 @@ from flwr.supercore.state.schema.corestate_models import (
     SeriesContext as SeriesContextModel,
 )
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
+from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
+from flwr.supercore.state.schema.corestate_models import (
+    SpaceMessage as SpaceMessageModel,
+)
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
-from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
-from flwr.supercore.tracing import (
-    current_traceparent,
-    load_task_context,
-    store_task_context,
+from flwr.supercore.state.schema.corestate_models import UserEvent as UserEventModel
+from flwr.supercore.state.schema.corestate_models import (
+    UserEventFeed as UserEventFeedModel,
 )
+from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -136,6 +161,7 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
@@ -348,7 +374,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expires_at = now() + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS)
         stmt = self.dialect_insert(ObjectPushSessionModel).values(
             session_id=session_id,
-            run_id=uint64_to_int64(run_id),
+            run_id=run_id,
             expires_at=expires_at,
             pending_count=0,
         )
@@ -361,7 +387,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             session.execute(
                 delete(ObjectPushSessionModel).where(
-                    ObjectPushSessionModel.run_id == uint64_to_int64(run_id)
+                    ObjectPushSessionModel.run_id == run_id
                 )
             )
 
@@ -376,7 +402,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             if push_session is None:
                 raise ValueError(f"Unknown object push session: {session_id}")
-            run_id = int64_to_uint64(push_session.run_id)
+            run_id = push_session.run_id
 
             # Preregister the tree and collect its currently missing objects.
             missing_objects = self.object_store.preregister(run_id, object_tree)
@@ -439,7 +465,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     select(ObjectPushSessionModel.session_id)
                     .where(
                         ObjectPushSessionModel.session_id == session_id,
-                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.run_id == run_id,
                     )
                     .exists(),
                 )
@@ -532,7 +558,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .where(
                         ObjectPushSessionPendingModel.object_id == object_id,
-                        ObjectPushSessionModel.run_id == uint64_to_int64(run_id),
+                        ObjectPushSessionModel.run_id == run_id,
                         ObjectPushSessionModel.expires_at <= now(),
                     )
                 )
@@ -566,11 +592,272 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
 
-            # Delete expired object trees and their message metadata.
+            # Delete expired object trees and cancel their pending messages.
             if message_object_ids:
                 for message_object_id in message_object_ids:
                     self.object_store.delete(message_object_id)
-                self._on_push_session_expired(message_object_ids)
+                self.cancel_messages(message_ids=message_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        with self.session() as session:
+            if expected_revision is None:
+                stmt = self.dialect_insert(FileModel).values(
+                    scope=scope,
+                    key=key,
+                    latest_revision=1,
+                    is_deleted=False,
+                    size_bytes=len(data),
+                )
+                revision = session.scalar(
+                    stmt.on_conflict_do_update(
+                        index_elements=[FileModel.scope, FileModel.key],
+                        set_={
+                            "latest_revision": FileModel.latest_revision + 1,
+                            "is_deleted": False,
+                            "size_bytes": len(data),
+                        },
+                        where=FileModel.is_deleted.is_(True),
+                    ).returning(FileModel.latest_revision)
+                )
+            else:
+                revision = session.scalar(
+                    update(FileModel)
+                    .where(
+                        FileModel.scope == scope,
+                        FileModel.key == key,
+                        FileModel.is_deleted.is_(False),
+                        FileModel.latest_revision == expected_revision,
+                    )
+                    .values(
+                        latest_revision=FileModel.latest_revision + 1,
+                        size_bytes=len(data),
+                    )
+                    .returning(FileModel.latest_revision)
+                )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            session.execute(
+                insert(FileRevisionModel).values(
+                    scope=scope, key=key, revision=revision, data=data, created_at=now()
+                )
+            )
+            return revision
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        with self.session() as session:
+            row = session.execute(
+                select(
+                    FileModel.latest_revision,
+                    FileModel.size_bytes,
+                    FileRevisionModel.data,
+                )
+                .join(
+                    FileRevisionModel,
+                    (FileRevisionModel.scope == FileModel.scope)
+                    & (FileRevisionModel.key == FileModel.key)
+                    & (FileRevisionModel.revision == FileModel.latest_revision),
+                )
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=row.latest_revision, size_bytes=row.size_bytes
+                ),
+                data=row.data,
+            )
+
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        stmt = select(
+            FileModel.key, FileModel.latest_revision, FileModel.size_bytes
+        ).where(FileModel.scope == scope, FileModel.is_deleted.is_(False))
+        if prefix:
+            # LIKE is case-insensitive on SQLite and interprets wildcard characters.
+            stmt = stmt.where(func.substr(FileModel.key, 1, len(prefix)) == prefix)
+        if start_after:
+            stmt = stmt.where(FileModel.key > start_after)
+        stmt = stmt.order_by(FileModel.key).limit(limit)
+        with self.session() as session:
+            return [
+                FileMetadata(
+                    key=row.key, revision=row.latest_revision, size_bytes=row.size_bytes
+                )
+                for row in session.execute(stmt)
+            ]
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        with self.session() as session:
+            revision = session.scalar(
+                update(FileModel)
+                .where(
+                    FileModel.scope == scope,
+                    FileModel.key == key,
+                    FileModel.is_deleted.is_(False),
+                    FileModel.latest_revision == expected_revision,
+                )
+                .values(is_deleted=True)
+                .returning(FileModel.latest_revision)
+            )
+            if revision is None:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create an agent and its initial Space in the same transaction."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        created_at = now()
+        model = AgentModel(
+            name=config.name,
+            title=config.title if config.HasField("title") else None,
+            description=config.description if config.HasField("description") else None,
+            app_spec=config.app_spec,
+            flwr_aid=flwr_aid,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        with self.session() as session:
+            session.add(model)
+            session.flush()
+            agent = _agent_from_model(model)
+            self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
+            self.create_space(
+                participants=[
+                    SpaceParticipant(flwr_aid=flwr_aid),
+                    SpaceParticipant(agent_id=agent.id),
+                ]
+            )
+            return agent
+
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an agent owned by the account."""
+        with self.session() as session:
+            model = session.scalar(
+                select(AgentModel).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
+            return _agent_from_model(model) if model is not None else None
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        stmt = (
+            select(AgentModel)
+            .where(AgentModel.flwr_aid == flwr_aid)
+            .order_by(AgentModel.agent_id)
+        )
+        with self.session() as session:
+            return [_agent_from_model(model) for model in session.scalars(stmt)]
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching visible state."""
+        with self.session() as session:
+            head = session.scalar(
+                select(UserEventFeedModel.last_seq).where(
+                    UserEventFeedModel.user_id == flwr_aid
+                )
+            )
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head or 0,
+        )
+
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
+        event_id = uuid4()
+        with self.session() as session:
+            session.execute(
+                insert(EventModel).values(
+                    event_id=event_id,
+                    type=event_type,
+                    space_id=space_id,
+                    payload=MessageToDict(payload, preserving_proto_field_name=True),
+                    created_at=now(),
+                )
+            )
+            for user_id in sorted(set(recipients)):
+                seq = session.execute(
+                    self.dialect_insert(UserEventFeedModel)
+                    .values(user_id=user_id, last_seq=1)
+                    .on_conflict_do_update(
+                        index_elements=[UserEventFeedModel.user_id],
+                        set_={"last_seq": UserEventFeedModel.last_seq + 1},
+                    )
+                    .returning(UserEventFeedModel.last_seq)
+                ).scalar_one()
+                session.execute(
+                    insert(UserEventModel).values(
+                        user_id=user_id, seq=seq, event_id=event_id
+                    )
+                )
+        return event_id
+
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read a non-consuming page with access filtering before pagination."""
+        accessible = exists().where(
+            SpaceParticipantTable.c.space_id == EventModel.space_id,
+            SpaceParticipantTable.c.flwr_aid == flwr_aid,
+        )
+        with self.session() as session:
+            feed = session.get(UserEventFeedModel, flwr_aid, populate_existing=True)
+            head = feed.last_seq if feed else 0
+            validate_event_cursor(after_seq, head, limit)
+            query = (
+                select(UserEventModel.seq, EventModel)
+                .join(EventModel, EventModel.event_id == UserEventModel.event_id)
+                .where(
+                    UserEventModel.user_id == flwr_aid,
+                    UserEventModel.seq > after_seq,
+                    or_(EventModel.space_id.is_(None), accessible),
+                )
+                .order_by(UserEventModel.seq)
+                .limit(limit)
+            )
+            results = [
+                StreamEventsResponse(seq=seq, event=_event_from_model(model))
+                for seq, model in session.execute(query)
+            ]
+            if not results and head > after_seq:
+                results.append(StreamEventsResponse(seq=head))
+            return results
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -922,10 +1209,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Associate connector IDs with a run."""
         if isinstance(connector_ids, (str, bytes)):
             return False
-        stored_run_id = uint64_to_int64(run_id)
         bound_ids = set(self.get_run_connector_ids(run_id))
         run_connectors = [
-            RunConnectorModel(run_id=stored_run_id, connector_id=connector_id)
+            RunConnectorModel(run_id=run_id, connector_id=connector_id)
             for connector_id in dict.fromkeys(connector_ids)
             if connector_id not in bound_ids
         ]
@@ -940,7 +1226,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return list(
                 session.scalars(
                     select(RunConnectorModel.connector_id)
-                    .where(RunConnectorModel.run_id == uint64_to_int64(run_id))
+                    .where(RunConnectorModel.run_id == run_id)
                     .order_by(RunConnectorModel.connector_id)
                 )
             )
@@ -1025,6 +1311,202 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return updated_oauth_session_id is not None
 
+    def create_space(
+        self,
+        *,
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+        members: list[SpaceParticipant] = []
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError("Space participants must have a nonempty identity")
+            if participant not in members:
+                members.append(participant)
+        try:
+            with self.session() as session:
+                model = session.scalars(
+                    insert(SpaceModel)
+                    .values(id=uuid4(), title="", created_at=now())
+                    .returning(SpaceModel)
+                ).one()
+                if members:
+                    session.execute(
+                        insert(SpaceParticipantTable),
+                        [
+                            {
+                                "space_id": model.id,
+                                "flwr_aid": member.flwr_aid or None,
+                                "agent_id": member.agent_id or None,
+                            }
+                            for member in members
+                        ],
+                    )
+                space = _space_from_model(model)
+                space.participants.extend(members)
+                self.store_event(
+                    EventType.SPACE_CREATED,
+                    space,
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                    space_id=model.id,
+                )
+                return space
+        except IntegrityError as exc:
+            raise ValueError("Invalid space participants") from exc
+
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """Return participating spaces, newest first."""
+        viewer = SpaceParticipantTable.alias("viewer")
+        query = (
+            select(
+                SpaceModel,
+                SpaceParticipantTable.c.flwr_aid,
+                SpaceParticipantTable.c.agent_id,
+            )
+            .join(viewer, viewer.c.space_id == SpaceModel.id)
+            .join(
+                SpaceParticipantTable,
+                SpaceParticipantTable.c.space_id == SpaceModel.id,
+            )
+            .where(viewer.c.flwr_aid == flwr_aid)
+            .order_by(SpaceModel.created_at.desc())
+            .execution_options(populate_existing=True)
+        )
+        with self.session() as session:
+            spaces: dict[UUID, Space] = {}
+            for model, member_flwr_aid, member_agent_id in session.execute(query):
+                if model.id not in spaces:
+                    spaces[model.id] = _space_from_model(model)
+                space = spaces[model.id]
+                if member_flwr_aid is not None:
+                    space.participants.add(flwr_aid=member_flwr_aid)
+                else:
+                    space.participants.add(agent_id=member_agent_id)
+            return list(spaces.values())
+
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
+        """Authorize membership in the message insert itself."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        if not (author.flwr_aid or author.agent_id):
+            return None
+        field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+        identity = author.flwr_aid or author.agent_id
+        source = select(
+            SpaceParticipantTable.c.space_id,
+            SpaceParticipantTable.c.flwr_aid,
+            SpaceParticipantTable.c.agent_id,
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(
+            SpaceParticipantTable.c.space_id == space_id,
+            SpaceParticipantTable.c[field] == identity,
+        )
+        with self.session() as session:
+            model = session.scalars(
+                insert(SpaceMessageModel)
+                .from_select(
+                    [
+                        "space_id",
+                        "flwr_aid",
+                        "agent_id",
+                        "created_at",
+                        "content",
+                    ],
+                    source,
+                )
+                .returning(SpaceMessageModel)
+            ).one_or_none()
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            recipients = list(
+                session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                )
+            )
+            self.store_event(
+                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
+            )
+            return message
+
+    def get_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Read messages and advance the participant's read cursor."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
+        message_conditions = [
+            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
+        ]
+        if unread_only:
+            message_conditions.append(
+                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
+            )
+        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
+        if before_id is not None and before_id <= 2**63 - 1:
+            message_conditions.append(SpaceMessageModel.id < before_id)
+        if after_id is not None:
+            message_conditions.append(SpaceMessageModel.id > min(after_id, 2**63 - 1))
+        query = (
+            select(SpaceMessageModel)
+            .select_from(SpaceParticipantTable)
+            .outerjoin(SpaceMessageModel, and_(*message_conditions))
+            .where(
+                SpaceParticipantTable.c.space_id == space_id,
+                SpaceParticipantTable.c[field] == identity,
+            )
+            .order_by(
+                SpaceMessageModel.id.asc()
+                if unread_only or after_id is not None
+                else SpaceMessageModel.id.desc()
+            )
+            .limit(limit)
+        )
+        with self.session() as session:
+            models = list(session.scalars(query))
+            if not models:
+                return None
+            messages = [
+                _space_message_from_model(model)
+                for model in models
+                if model is not None
+            ]
+            if messages:
+                read_through = max(message.id for message in messages)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_message_id < read_through,
+                    )
+                    .values(read_through_message_id=read_through)
+                )
+            return (
+                messages
+                if unread_only or after_id is not None
+                else list(reversed(messages))
+            )
+
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
         *,
@@ -1047,10 +1529,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         page_query = select(RunSeriesModel.series_id)
         if series_ids is not None:
-            sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
-            page_query = page_query.where(
-                RunSeriesModel.series_id.in_(sint64_series_ids)
-            )
+            page_query = page_query.where(RunSeriesModel.series_id.in_(series_ids))
         if federation_ids is not None:
             page_query = page_query.where(
                 RunSeriesModel.federation_id.in_(federation_ids)
@@ -1084,14 +1563,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         # Fold the joined rows back into one RunSeries per series.
         series_by_id: dict[int, RunSeries] = {}
         with self.session() as session:
-            for series_model, stored_run_id in session.execute(query):
+            for series_model, run_id in session.execute(query):
                 series_id = series_model.series_id
                 if series_id not in series_by_id:
                     series_by_id[series_id] = _run_series_from_model(series_model)
-                if stored_run_id is not None:
-                    series_by_id[series_id].run_ids.append(
-                        int64_to_uint64(stored_run_id)
-                    )
+                if run_id is not None:
+                    series_by_id[series_id].run_ids.append(run_id)
         return list(series_by_id.values())
 
     def set_run_series_description(self, series_id: int, description: str) -> None:
@@ -1101,7 +1578,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return
         stmt = (
             update(RunSeriesModel)
-            .where(RunSeriesModel.series_id == uint64_to_int64(series_id))
+            .where(RunSeriesModel.series_id == series_id)
             .values(description=normalized)
         )
         with self.session() as session:
@@ -1112,7 +1589,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             row = session.get(
                 SeriesContextModel,
-                uint64_to_int64(series_id),
+                series_id,
                 populate_existing=True,
             )
             if row is None or row.context is None:
@@ -1120,13 +1597,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return context_from_bytes(row.context)
 
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         query = select(CompactedContextModel).where(
-            CompactedContextModel.series_id == uint64_to_int64(series_id)
+            CompactedContextModel.agent_id == agent_id
         )
         # Autoincremented context IDs cannot exceed the signed BIGINT range.
         if before_context_id is not None:
@@ -1138,20 +1615,25 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ]
 
     def store_compacted_context(
-        self, series_id: int, through_event_id: int, text: str
+        self,
+        agent_id: int,
+        through_event_id: int,
+        text: str,
+        token_count: int,
     ) -> None:
         """Store a new summary."""
         stmt = (
             self.dialect_insert(CompactedContextModel)
             .values(
-                series_id=uint64_to_int64(series_id),
-                through_event_id=uint64_to_int64(through_event_id),
+                agent_id=agent_id,
+                through_event_id=through_event_id,
                 text=text,
+                token_count=token_count,
                 created_at=now(),
             )
             .on_conflict_do_nothing(
                 index_elements=[
-                    CompactedContextModel.series_id,
+                    CompactedContextModel.agent_id,
                     CompactedContextModel.through_event_id,
                 ]
             )
@@ -1163,10 +1645,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
-        sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
         stmt = self.dialect_insert(SeriesContextModel).values(
-            series_id=sint_series_id,
+            series_id=series_id,
             context=context_bytes,
         )
         stmt = stmt.on_conflict_do_update(
@@ -1194,7 +1675,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     stmt = (
                         self.dialect_insert(RunSeriesModel)
                         .values(
-                            series_id=uint64_to_int64(candidate),
+                            series_id=candidate,
                             federation_id=federation_id,
                             is_agent=is_agent,
                             description=description,
@@ -1216,7 +1697,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     updated_series_id = session.scalar(
                         update(RunSeriesModel)
                         .where(
-                            RunSeriesModel.series_id == uint64_to_int64(series_id),
+                            RunSeriesModel.series_id == series_id,
                             RunSeriesModel.federation_id == federation_id,
                         )
                         .values(updated_at=now())
@@ -1235,8 +1716,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 # Store the membership last so callers only receive linked series IDs.
                 session.add(
                     SeriesRunsModel(
-                        series_id=uint64_to_int64(resolved_series_id),
-                        run_id=uint64_to_int64(run_id),
+                        series_id=resolved_series_id,
+                        run_id=run_id,
                     )
                 )
                 session.flush()
@@ -1262,7 +1743,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .values(
                 federation_id=federation_id,
                 status=AutomationStatus.ACTIVE,
-                series_id=uint64_to_int64(series_id),
+                series_id=series_id,
                 flwr_aid=flwr_aid,
                 start_run_request=start_run_request.SerializeToString(),
                 created_at=current,
@@ -1289,12 +1770,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str | None,
     ) -> tuple[StartRunRequest, str] | None:
         """Claim an automation occurrence and return its unresolved run request."""
-        stored_automation_id = uint64_to_int64(automation_id)
         query = select(
             AutomationModel.start_run_request,
             AutomationModel.flwr_aid,
         ).where(
-            AutomationModel.automation_id == stored_automation_id,
+            AutomationModel.automation_id == automation_id,
             AutomationModel.status == AutomationStatus.ACTIVE,
             AutomationModel.start_run_request.is_not(None),
             AutomationModel.next_run_at == datetime.fromisoformat(previous_next_run_at),
@@ -1343,11 +1823,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         query = select(AutomationModel)
         if automation_ids is not None:
-            query = query.where(
-                AutomationModel.automation_id.in_(
-                    [uint64_to_int64(automation_id) for automation_id in automation_ids]
-                )
-            )
+            query = query.where(AutomationModel.automation_id.in_(automation_ids))
         if federations is not None:
             query = query.where(AutomationModel.federation_id.in_(federations))
         if statuses is not None:
@@ -1384,7 +1860,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
             )
             .values(
@@ -1412,7 +1888,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
                 AutomationModel.next_run_at
                 == datetime.fromisoformat(previous_next_run_at),
@@ -1460,7 +1936,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             update(AutomationModel)
             .where(
-                AutomationModel.automation_id == uint64_to_int64(automation_id),
+                AutomationModel.automation_id == automation_id,
                 AutomationModel.status == AutomationStatus.ACTIVE,
             )
             .values(status=status, updated_at=now())
@@ -1474,14 +1950,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
-        sint64_task_id = uint64_to_int64(task_id)
-
         try:
             with self.session() as session:
                 session.execute(
                     insert(TaskLogsTable).values(
                         timestamp=now().timestamp(),
-                        task_id=sint64_task_id,
+                        task_id=task_id,
                         log=log_message,
                     )
                 )
@@ -1492,8 +1966,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self, task_id: int, after_timestamp: float | None
     ) -> tuple[str, float]:
         """Get task logs for the specified `task_id`."""
-        sint64_task_id = uint64_to_int64(task_id)
-
         # We don't check if the task exists before querying logs because the Control API
         # handler validates access to the associated run before reading logs.
 
@@ -1507,7 +1979,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 session.execute(
                     select(TaskLogsTable.c.log, TaskLogsTable.c.timestamp)
                     .where(
-                        TaskLogsTable.c.task_id == sint64_task_id,
+                        TaskLogsTable.c.task_id == task_id,
                         TaskLogsTable.c.timestamp > after_timestamp,
                     )
                     .order_by(TaskLogsTable.c.timestamp)
@@ -1530,12 +2002,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        sint64_task_id = uint64_to_int64(task_id)
 
         task_values = select(
-            literal(sint64_task_id, type_=TaskModel.task_id.type),
+            literal(task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
-            literal(uint64_to_int64(run_id), type_=TaskModel.run_id.type),
+            literal(run_id, type_=TaskModel.run_id.type),
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
@@ -1543,11 +2014,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(now(), type_=TaskModel.pending_at.type),
         )
         if requesting_task_id is not None:
-            sint64_requesting_task_id = uint64_to_int64(requesting_task_id)
             task_values = task_values.where(
                 select(TaskModel.task_id)
                 .where(
-                    TaskModel.task_id == sint64_requesting_task_id,
+                    TaskModel.task_id == requesting_task_id,
                     TaskModel.finished_at.is_(None),
                 )
                 .exists()
@@ -1575,10 +2045,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             try:
                 if session.scalar(insert_stmt) is None:
                     return None
-                carrier = current_traceparent()
-                if not carrier and requesting_task_id is not None:
-                    carrier = load_task_context(self, requesting_task_id)
-                store_task_context(self, task_id, carrier)
                 return task_id
             except IntegrityError:
                 return None
@@ -1608,16 +2074,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskModel.task_id.in_(task_ids))
 
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [
-                uint64_to_int64(series_run_id) for series_run_id in run_ids
-            ]
-            query = query.where(TaskModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskModel.run_id.in_(run_ids))
 
         if statuses is not None:
             if not statuses:
@@ -1651,7 +2113,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def add_task_usage(self, task_id: int, usage: TaskUsage) -> None:
         """Record usage for the specified task."""
-        sint64_task_id = uint64_to_int64(task_id)
         usage_values = select(
             TaskModel.run_id,
             TaskModel.task_id,
@@ -1661,7 +2122,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(usage.usage_type, type_=TaskUsageModel.usage_type.type),
             literal(usage.provider, type_=TaskUsageModel.provider.type),
             literal(now(), type_=TaskUsageModel.created_at.type),
-        ).where(TaskModel.task_id == sint64_task_id)
+        ).where(TaskModel.task_id == task_id)
         stmt = insert(TaskUsageModel).from_select(
             [
                 TaskUsageModel.run_id,
@@ -1691,14 +2152,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            query = query.where(TaskUsageModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskUsageModel.run_id.in_(run_ids))
 
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskUsageModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskUsageModel.task_id.in_(task_ids))
 
         with self.session() as session:
             rows = session.scalars(query).all()
@@ -1709,7 +2168,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
         active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
-        sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
@@ -1717,7 +2175,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 claimed_task_id = session.scalar(
                     update(TaskModel)
                     .where(
-                        TaskModel.task_id == sint64_task_id,
+                        TaskModel.task_id == task_id,
                         TaskModel.token.is_(None),
                         _task_status_filter(Status.PENDING),
                     )
@@ -1751,7 +2209,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             activated_task_id = session.scalar(
                 update(TaskModel)
                 .where(
-                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.task_id == task_id,
                     _task_status_filter(Status.STARTING),
                 )
                 .values(running_at=activated_at, active_until=active_until)
@@ -1766,11 +2224,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             log(ERROR, err)
             return False
 
-        sint64_task_id = uint64_to_int64(task_id)
         with self.session() as session:
             self._cleanup_expired_task_tokens()
             query = update(TaskModel).where(
-                TaskModel.task_id == sint64_task_id,
+                TaskModel.task_id == task_id,
                 TaskModel.finished_at.is_(None),
             )
             # FINISHED:COMPLETED is only valid from RUNNING.
@@ -1798,7 +2255,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             acknowledged_task_id = session.scalar(
                 update(TaskModel)
                 .where(
-                    TaskModel.task_id == uint64_to_int64(task_id),
+                    TaskModel.task_id == task_id,
                     TaskModel.active_until >= current,
                     TaskModel.finished_at.is_(None),
                 )
@@ -1831,9 +2288,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         with self.session() as session:
             self._cleanup_expired_task_tokens()
             metadata = message.metadata
-            stored_run_id = uint64_to_int64(metadata.run_id)
-            stored_src_task_id = uint64_to_int64(cast(int, metadata.src_task_id))
-            stored_dst_task_id = uint64_to_int64(cast(int, metadata.dst_task_id))
+            run_id = metadata.run_id
+            src_task_id = cast(int, metadata.src_task_id)
+            dst_task_id = cast(int, metadata.dst_task_id)
             serialized_content = (
                 recorddict_to_proto(message.content).SerializeToString()
                 if message.has_content()
@@ -1845,19 +2302,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 else None
             )
             src_task_exists = exists().where(
-                TaskModel.task_id == stored_src_task_id,
-                TaskModel.run_id == stored_run_id,
+                TaskModel.task_id == src_task_id,
+                TaskModel.run_id == run_id,
             )
             dst_task_exists = exists().where(
-                TaskModel.task_id == stored_dst_task_id,
-                TaskModel.run_id == stored_run_id,
+                TaskModel.task_id == dst_task_id,
+                TaskModel.run_id == run_id,
                 TaskModel.finished_at.is_(None),
             )
             task_message_values = select(
                 literal(metadata.message_id, type_=TaskMessageModel.message_id.type),
-                literal(stored_run_id, type_=TaskMessageModel.run_id.type),
-                literal(stored_src_task_id, type_=TaskMessageModel.src_task_id.type),
-                literal(stored_dst_task_id, type_=TaskMessageModel.dst_task_id.type),
+                literal(run_id, type_=TaskMessageModel.run_id.type),
+                literal(src_task_id, type_=TaskMessageModel.src_task_id.type),
+                literal(dst_task_id, type_=TaskMessageModel.dst_task_id.type),
                 literal(
                     metadata.reply_to_message_id,
                     type_=TaskMessageModel.reply_to_message_id.type,
@@ -1943,8 +2400,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         event_rows = [
             {
                 "timestamp": current,
-                "run_id": uint64_to_int64(event.run_id),
-                "task_id": uint64_to_int64(event.task_id),
+                "run_id": event.run_id,
+                "task_id": event.task_id,
                 "event": event.event,
                 "data": event.data,
             }
@@ -1960,6 +2417,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1969,6 +2427,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return task-produced run events matching the filters."""
         if last_n is not None and last_n < 0:
             raise ValueError("last_n must be non-negative")
+        if space_id is not None:
+            space_run_ids = set(self._get_run_ids_for_space(space_id))
+            run_ids = list(
+                space_run_ids
+                if run_ids is None
+                else space_run_ids.intersection(run_ids)
+            )
         cursor = after_task_event_id if after_task_event_id is not None else 0
         query = select(TaskEventModel).where(TaskEventModel.id > cursor)
         if before_task_event_id is not None:
@@ -1978,13 +2443,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if run_ids is not None:
             if not run_ids:
                 return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            query = query.where(TaskEventModel.run_id.in_(sint64_run_ids))
+            query = query.where(TaskEventModel.run_id.in_(run_ids))
         if task_ids is not None:
             if not task_ids:
                 return []
-            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
-            query = query.where(TaskEventModel.task_id.in_(sint64_task_ids))
+            query = query.where(TaskEventModel.task_id.in_(task_ids))
         query = query.order_by(
             TaskEventModel.id.desc() if last_n else TaskEventModel.id.asc()
         )
@@ -2008,11 +2471,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
         # Filter by destination task IDs
         if dst_task_ids is not None:
-            sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
-            query = query.where(TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids))
+            query = query.where(TaskMessageModel.dst_task_id.in_(dst_task_ids))
         if src_task_ids is not None:
-            sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
-            query = query.where(TaskMessageModel.src_task_id.in_(sint64_src_task_ids))
+            query = query.where(TaskMessageModel.src_task_id.in_(src_task_ids))
         if order_by is not None:
             query = query.order_by(TaskMessageModel.created_at.asc())
         if limit is not None:
@@ -2035,14 +2496,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         else:
             delete_query = delete(TaskMessageModel)
             if dst_task_ids is not None:
-                sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
                 delete_query = delete_query.where(
-                    TaskMessageModel.dst_task_id.in_(sint64_dst_task_ids)
+                    TaskMessageModel.dst_task_id.in_(dst_task_ids)
                 )
             if src_task_ids is not None:
-                sint64_src_task_ids = [uint64_to_int64(t) for t in src_task_ids]
                 delete_query = delete_query.where(
-                    TaskMessageModel.src_task_id.in_(sint64_src_task_ids)
+                    TaskMessageModel.src_task_id.in_(src_task_ids)
                 )
 
         returning_query = delete_query.returning(TaskMessageModel)
@@ -2148,6 +2607,35 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return session.scalar(stmt) is not None
 
 
+def _event_from_model(model: EventModel) -> Event:
+    """Convert a journal row without losing protobuf JSON's integer strings."""
+    event = Event(
+        event_id=str(model.event_id),
+        type=model.type,
+        created_at=model.created_at.astimezone(UTC).isoformat(),
+    )
+    event.payload.update(model.payload)
+    event.payload.SetInParent()
+    if model.space_id is not None:
+        event.space_id = str(model.space_id)
+    return event
+
+
+def _agent_from_model(model: AgentModel) -> Agent:
+    """Convert an agent ORM model to its protobuf message."""
+    return Agent(
+        id=model.agent_id,
+        config=AgentConfig(
+            name=model.name,
+            title=model.title,
+            description=model.description,
+            app_spec=model.app_spec,
+        ),
+        created_at=_timestamp_to_iso_assuming_utc(model.created_at),
+        updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+    )
+
+
 def _connector_oauth_session_from_model(
     model: ConnectorOAuthSessionModel,
 ) -> ConnectorOAuthSessionRecord:
@@ -2163,6 +2651,7 @@ def _connector_oauth_session_from_model(
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
         completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
+        agent_id=model.agent_id,
     )
 
 
@@ -2174,6 +2663,7 @@ def _connector_from_model(model: ConnectorModel) -> ConnectorRecord:
         connector_ref=model.connector_ref,
         credentials_json=model.credentials_json,
         config_json=model.config_json,
+        agent_id=model.agent_id,
     )
 
 
@@ -2182,24 +2672,6 @@ def _timestamp_to_iso_assuming_utc(value: datetime | str | None) -> str:
     if isinstance(value, datetime) and value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return timestamp_to_iso(value)
-
-
-def determine_task_status(row: dict[str, Any]) -> TaskStatus:
-    """Determine the status of the task based on timestamp fields."""
-    if row["pending_at"]:
-        if row["finished_at"]:
-            return TaskStatus(
-                status=Status.FINISHED,
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-        if row["starting_at"]:
-            if row["running_at"]:
-                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
-            return TaskStatus(status=Status.STARTING, sub_status="", details="")
-        return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(row["task_id"])
-    raise ValueError(f"The task {task_id} does not have a valid status.")
 
 
 def _determine_task_model_status(model: TaskModel) -> TaskStatus:
@@ -2216,8 +2688,7 @@ def _determine_task_model_status(model: TaskModel) -> TaskStatus:
                 return TaskStatus(status=Status.RUNNING, sub_status="", details="")
             return TaskStatus(status=Status.STARTING, sub_status="", details="")
         return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    task_id = int64_to_uint64(model.task_id)
-    raise ValueError(f"The task {task_id} does not have a valid status.")
+    raise ValueError(f"The task {model.task_id} does not have a valid status.")
 
 
 def _task_status_filter(status: str) -> Any:
@@ -2237,30 +2708,12 @@ def _task_status_filter(status: str) -> Any:
     raise ValueError(f"Unsupported task status {status!r}.")
 
 
-def task_from_row(row: dict[str, Any]) -> Task:
-    """Convert a database row to a Task object."""
-    return Task(
-        task_id=int64_to_uint64(row["task_id"]),
-        type=row["type"],
-        run_id=int64_to_uint64(row["run_id"]),
-        pending_at=timestamp_to_iso(row["pending_at"]),
-        starting_at=timestamp_to_iso(row["starting_at"]),
-        running_at=timestamp_to_iso(row["running_at"]),
-        finished_at=timestamp_to_iso(row["finished_at"]),
-        status=determine_task_status(row),
-        fab_hash=row["fab_hash"],
-        model_ref=row["model_ref"],
-        connector_ref=row["connector_ref"],
-        connector_id=row["connector_id"],
-    )
-
-
 def task_from_model(model: TaskModel) -> Task:
     """Convert a task ORM model to a Task object."""
     return Task(
-        task_id=int64_to_uint64(model.task_id),
+        task_id=model.task_id,
         type=model.type,
-        run_id=int64_to_uint64(model.run_id),
+        run_id=model.run_id,
         pending_at=timestamp_to_iso(model.pending_at),
         starting_at=timestamp_to_iso(model.starting_at),
         running_at=timestamp_to_iso(model.running_at),
@@ -2273,21 +2726,37 @@ def task_from_model(model: TaskModel) -> Task:
     )
 
 
-def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
-    """Convert a database row to a RunSeries object."""
-    return RunSeries(
-        series_id=int64_to_uint64(row["series_id"]),
-        federation=row["federation_id"],
-        description=row["description"],
-        created_at=timestamp_to_iso(row["created_at"]),
-        updated_at=timestamp_to_iso(row["updated_at"]),
+def _space_from_model(model: SpaceModel) -> Space:
+    """Convert space metadata to its API representation."""
+    return Space(
+        id=str(model.id),
+        title=model.title,
+        created_at=model.created_at.isoformat(),
+    )
+
+
+def _space_message_from_model(
+    model: SpaceMessageModel,
+) -> SpaceMessage:
+    """Convert a persisted user or agent message to its API representation."""
+    author = SpaceParticipant()
+    if model.flwr_aid is not None:
+        author.flwr_aid = model.flwr_aid
+    else:
+        author.agent_id = cast(int, model.agent_id)
+    return SpaceMessage(
+        id=model.id,
+        space_id=str(model.space_id),
+        author=author,
+        created_at=model.created_at.isoformat(),
+        content=model.content,
     )
 
 
 def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
     """Convert a run series ORM model to a RunSeries object."""
     return RunSeries(
-        series_id=int64_to_uint64(model.series_id),
+        series_id=model.series_id,
         federation=model.federation_id,
         description=model.description or "",
         created_at=timestamp_to_iso(model.created_at),
@@ -2299,9 +2768,10 @@ def _compacted_context_from_model(model: CompactedContextModel) -> CompactedCont
     """Convert a compacted context model to its proto representation."""
     return CompactedContext(
         id=model.id,
-        series_id=int64_to_uint64(model.series_id),
-        through_event_id=int64_to_uint64(model.through_event_id),
+        agent_id=model.agent_id,
+        through_event_id=model.through_event_id,
         text=model.text,
+        token_count=model.token_count,
         created_at=timestamp_to_iso(model.created_at),
     )
 
@@ -2322,8 +2792,8 @@ def _task_event_from_model(model: TaskEventModel) -> TaskEvent:
     return TaskEvent(
         id=model.id,
         timestamp=timestamp_to_iso(model.timestamp),
-        run_id=int64_to_uint64(model.run_id),
-        task_id=int64_to_uint64(model.task_id),
+        run_id=model.run_id,
+        task_id=model.task_id,
         event=model.event,
         data=model.data,
     )
@@ -2335,7 +2805,7 @@ def _automation_from_model(model: AutomationModel) -> Automation:
         automation_id=model.automation_id,
         status=model.status,
         federation=model.federation_id,
-        series_id=int64_to_uint64(model.series_id),
+        series_id=model.series_id,
         flwr_aid=model.flwr_aid,
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
@@ -2371,7 +2841,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         error = error_from_proto(ProtoError.FromString(row["error"]))
 
     metadata = Metadata(
-        run_id=int64_to_uint64(row["run_id"]),
+        run_id=row["run_id"],
         message_id=row["message_id"],
         src_node_id=node_id,
         dst_node_id=node_id,
@@ -2380,7 +2850,7 @@ def _task_message_from_snapshot(row: dict[str, Any], node_id: int) -> Message:
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
-        src_task_id=int64_to_uint64(row["src_task_id"]),
-        dst_task_id=int64_to_uint64(row["dst_task_id"]),
+        src_task_id=row["src_task_id"],
+        dst_task_id=row["dst_task_id"],
     )
     return make_message(metadata=metadata, content=content, error=error)

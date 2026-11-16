@@ -35,14 +35,22 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -59,10 +67,18 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
 
@@ -226,6 +242,37 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=GetRunSeriesEventsResponse,
         )
 
+    def GetSpaceEvents(self, request: GetSpaceEventsRequest) -> GetSpaceEventsResponse:
+        """Get events from the authenticated AgentApp task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-events",
+            rpc_method="/flwr.proto.Runtime/GetSpaceEvents",
+            request=request,
+            response_type=GetSpaceEventsResponse,
+        )
+
+    def GetSpaceMessages(
+        self, request: GetSpaceMessagesRequest
+    ) -> GetSpaceMessagesResponse:
+        """Read messages from the authenticated task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-messages",
+            rpc_method="/flwr.proto.Runtime/GetSpaceMessages",
+            request=request,
+            response_type=GetSpaceMessagesResponse,
+        )
+
+    def SendSpaceMessage(
+        self, request: SendSpaceMessageRequest
+    ) -> SendSpaceMessageResponse:
+        """Publish a message as an agent participant in the task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/send-space-message",
+            rpc_method="/flwr.proto.Runtime/SendSpaceMessage",
+            request=request,
+            response_type=SendSpaceMessageResponse,
+        )
+
     def GetCompactedContexts(
         self, request: GetCompactedContextsRequest
     ) -> GetCompactedContextsResponse:
@@ -277,4 +324,40 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/GetConnector",
             request=request,
             response_type=GetConnectorResponse,
+        )
+
+    def PutFile(self, request: PutFileRequest) -> PutFileResponse:
+        """Store a file."""
+        return self._unary_unary(
+            path="/v1/runtime/put-file",
+            rpc_method="/flwr.proto.Runtime/PutFile",
+            request=request,
+            response_type=PutFileResponse,
+        )
+
+    def GetFile(self, request: GetFileRequest) -> GetFileResponse:
+        """Get a file."""
+        return self._unary_unary(
+            path="/v1/runtime/get-file",
+            rpc_method="/flwr.proto.Runtime/GetFile",
+            request=request,
+            response_type=GetFileResponse,
+        )
+
+    def ListFiles(self, request: ListFilesRequest) -> ListFilesResponse:
+        """List file metadata."""
+        return self._unary_unary(
+            path="/v1/runtime/list-files",
+            rpc_method="/flwr.proto.Runtime/ListFiles",
+            request=request,
+            response_type=ListFilesResponse,
+        )
+
+    def DeleteFile(self, request: DeleteFileRequest) -> DeleteFileResponse:
+        """Delete a file."""
+        return self._unary_unary(
+            path="/v1/runtime/delete-file",
+            rpc_method="/flwr.proto.Runtime/DeleteFile",
+            request=request,
+            response_type=DeleteFileResponse,
         )

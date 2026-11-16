@@ -22,3 +22,19 @@ p {
     max-width: 180px;
     width: 100%;
 }
+
+.community-buttons a {
+    white-space: nowrap !important;
+}
+
+article a.sd-btn.sd-btn-primary {
+    background-color: #ffc502 !important;
+    border-color: #ffc502 !important;
+    color: #222222 !important;
+}
+
+article a.sd-btn.sd-btn-primary:hover {
+    background-color: #ffda27 !important;
+    border-color: #ffda27 !important;
+    color: #222222 !important;
+}

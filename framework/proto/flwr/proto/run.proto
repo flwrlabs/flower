@@ -40,6 +40,10 @@ message Run {
   optional uint64 primary_task_id = 17;
   uint64 series_id = 18;
   string account_name = 19;
+  // Present when the run belongs to a Space.
+  optional string space_id = 20;
+  // Present when the server binds the run to an executing agent.
+  optional uint64 agent_id = 21;
 }
 
 message RunStatus {

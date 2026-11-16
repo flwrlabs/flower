@@ -16,10 +16,11 @@
 
 import unittest
 from unittest.mock import Mock
+from uuid import UUID
 
 from parameterized import parameterized
 
-from flwr.app import Context
+from flwr.app import Context, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, message_to_proto
@@ -37,6 +38,8 @@ from flwr.proto.runtime_pb2 import (  # pylint:disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -63,32 +66,72 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.maker = RecordMaker()
         self.state = Mock()
 
-    def test_get_compacted_contexts_uses_authenticated_series(self) -> None:
-        """Summary requests derive the series from the authenticated run."""
+    def test_get_compacted_contexts_uses_authenticated_agent(self) -> None:
+        """Summary requests derive the agent from the authenticated run."""
         self.state.get_run.return_value = Run.create_empty(run_id=123)
         self.state.get_run.return_value.series_id = 456
+        self.state.get_run.return_value.space_id = UUID(int=1)
+        self.state.get_run.return_value.agent_id = 789
+        self.state.get_run.return_value.primary_task_id = 1
         self.state.get_compacted_contexts.return_value = []
-        task = Task(run_id=123)
+        task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         runtime_handlers.get_compacted_contexts(
             GetCompactedContextsRequest(), self.state, task
         )
 
         self.state.get_compacted_contexts.assert_called_once_with(
-            456, limit=1, before_context_id=None
+            789, limit=1, before_context_id=None
         )
 
-    def test_put_compacted_context_uses_authenticated_series(self) -> None:
-        """Summary writes derive the series from the authenticated run."""
+    def test_put_compacted_context_uses_authenticated_agent(self) -> None:
+        """Summary writes derive the agent from the authenticated run."""
         self.state.get_run.return_value = Run.create_empty(run_id=123)
         self.state.get_run.return_value.series_id = 456
+        self.state.get_run.return_value.space_id = UUID(int=1)
+        self.state.get_run.return_value.agent_id = 789
+        self.state.get_run.return_value.primary_task_id = 1
         request = PutCompactedContextRequest(
-            context=CompactedContext(through_event_id=9, text="Summary")
+            context=CompactedContext(
+                through_event_id=9, text="Summary", token_count=123
+            )
         )
 
-        runtime_handlers.put_compacted_context(request, self.state, Task(run_id=123))
+        runtime_handlers.put_compacted_context(
+            request,
+            self.state,
+            Task(task_id=1, run_id=123, type=TaskType.AGENT_APP),
+        )
 
-        self.state.store_compacted_context.assert_called_once_with(456, 9, "Summary")
+        self.state.store_compacted_context.assert_called_once_with(
+            789, 9, "Summary", 123
+        )
+
+    def test_compacted_contexts_require_agent_id(self) -> None:
+        """A run without an agent cannot access compacted contexts."""
+        self.state.get_run.return_value = Run.create_empty(run_id=123)
+        self.state.get_run.return_value.space_id = UUID(int=1)
+        self.state.get_run.return_value.primary_task_id = 1
+        task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_compacted_contexts(
+                GetCompactedContextsRequest(), self.state, task
+            )
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+        )
+
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.put_compacted_context(
+                PutCompactedContextRequest(), self.state, task
+            )
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+        )
+
+        self.state.get_compacted_contexts.assert_not_called()
+        self.state.store_compacted_context.assert_not_called()
 
     def test_pull_task_input_activates_task(self) -> None:
         """PullTaskInput should activate the authenticated task."""
@@ -204,7 +247,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_pull_messages_returns_empty_response(self) -> None:
         """PullMessages should return an empty response when none is available."""
-        self.state.get_messages_legacy.return_value = []
+        self.state.get_messages.return_value = []
         task = Task(run_id=61016)
 
         response = runtime_handlers.pull_messages(
@@ -244,6 +287,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         message = make_message(
             metadata=self.maker.metadata(), content=self.maker.recorddict(1, 1, 1)
         )
+        self.state.get_node_id.return_value = message.metadata.src_node_id
         object_tree = get_object_tree(message)
         request = PushAppMessagesRequest(
             messages_list=[message_to_proto(message)],
@@ -271,6 +315,21 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.assertEqual(list(response.message_ids), [message.metadata.message_id])
         self.assertEqual(list(response.objects_to_push), ["object-id"])
         self.assertEqual(response.session_id, "session-id")
+
+    def test_push_messages_rejects_mismatched_source(self) -> None:
+        """The authenticated task cannot submit messages from another node."""
+        message = make_message(metadata=self.maker.metadata(), content=RecordDict())
+        self.state.get_node_id.return_value = message.metadata.src_node_id + 1
+        request = PushAppMessagesRequest(
+            messages_list=[message_to_proto(message)],
+            message_object_trees=[get_object_tree(message)],
+        )
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.push_messages(
+                request, self.state, Task(run_id=message.metadata.run_id)
+            )
+        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        self.state.start_session.assert_not_called()
 
     def test_push_messages_rejects_mismatched_run_id(self) -> None:
         """PushMessages should reject messages from another run."""
@@ -303,7 +362,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         tasks = [
             Task(task_id=100, run_id=10, type=TaskType.AGENT_APP),
             Task(task_id=101, run_id=11, type=TaskType.AGENT_APP),
-            Task(task_id=102, run_id=10, type=TaskType.MODEL),
+            Task(task_id=102, run_id=10, type=TaskType.CONNECTOR),
             Task(task_id=103, run_id=12, type=TaskType.AGENT_APP),
         ]
         expected_events = [
@@ -364,6 +423,56 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
         self.assertEqual(error.exception.code, ApiErrorCode.RUN_ID_NOT_FOUND)
         self.state.get_tasks.assert_not_called()
+        self.state.get_task_events.assert_not_called()
+
+    def test_get_space_events_uses_authenticated_run_space(self) -> None:
+        """Read only local events from the authenticated run's Space."""
+        space_id = UUID("12345678-1234-5678-1234-567812345678")
+        run = Run.create_empty(run_id=10)
+        run.space_id = space_id
+        self.state.get_run.return_value = run
+        event = TaskEvent(id=11, run_id=10, event="message", data="{}")
+        self.state.get_task_events.return_value = [event]
+        request = GetSpaceEventsRequest(
+            after_event_id=5, last_n=1, event_types=["message"]
+        )
+
+        response = runtime_handlers.get_space_events(
+            request, self.state, Task(run_id=10)
+        )
+
+        self.assertEqual(response, GetSpaceEventsResponse(events=[event]))
+        self.state.get_run.assert_called_once_with(10)
+        self.state.get_task_events.assert_called_once_with(
+            space_id=space_id,
+            event_types=["message"],
+            after_task_event_id=5,
+            before_task_event_id=None,
+            last_n=1,
+        )
+
+    def test_get_space_events_rejects_non_space_run(self) -> None:
+        """A federation task cannot read Space events."""
+        self.state.get_run.return_value = Run.create_empty(run_id=10)
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_space_events(
+                GetSpaceEventsRequest(), self.state, Task(run_id=10)
+            )
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+        )
+        self.state.get_task_events.assert_not_called()
+
+    def test_get_space_events_rejects_unknown_run(self) -> None:
+        """An unknown authenticated run cannot read Space events."""
+        self.state.get_run.return_value = None
+        with self.assertRaises(FlowerError) as error:
+            runtime_handlers.get_space_events(
+                GetSpaceEventsRequest(), self.state, Task(run_id=10)
+            )
+
+        self.assertEqual(error.exception.code, ApiErrorCode.RUN_ID_NOT_FOUND)
         self.state.get_task_events.assert_not_called()
 
     def test_push_object_uses_state(self) -> None:

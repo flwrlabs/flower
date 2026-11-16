@@ -26,7 +26,7 @@ import requests
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
 from flwr.supercore.constant import RUN_SERIES_DESCRIPTION_MAX_LENGTH
-from flwr.supercore.task_process.model.provider import DEFAULT_MODEL_API_ENDPOINT
+from flwr.supercore.model_provider import DEFAULT_MODEL_API_ENDPOINT
 from flwr.supercore.typing import JSONObject
 
 _MODEL = "openai/gpt-5-nano"

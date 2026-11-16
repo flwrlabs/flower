@@ -25,8 +25,8 @@ def SimpleCNN():
 
 @parameterized_class(
     [
-        {"dataset_name": "cifar10", "test_split": "test"},
-        {"dataset_name": "cifar10", "test_split": "test"},
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test"},
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test"},
     ]
 )
 class FdsToTensorFlow(unittest.TestCase):

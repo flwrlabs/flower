@@ -25,7 +25,9 @@ from datetime import UTC, datetime, timedelta
 from logging import ERROR
 from threading import Lock, RLock
 from typing import Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
+
+from google.protobuf.json_format import MessageToDict
 
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
@@ -39,14 +41,25 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    Space,
+    SpaceMessage,
+    SpaceParticipant,
 )
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
     Task,
@@ -59,8 +72,10 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
@@ -68,10 +83,14 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
+    validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
 )
+
+FileKey = tuple[str, str]
+FileRevisionKey = tuple[str, str, int]
 
 
 @dataclass
@@ -137,16 +156,42 @@ class MessageRecord:
     message: Message | None
 
 
+@dataclass
+class FileRecord:
+    """Retain the file head when its contents are deleted."""
+
+    latest_revision: int
+    is_deleted: bool
+    size_bytes: int
+
+
+@dataclass(frozen=True)
+class FileRevisionRecord:
+    """Retain immutable file contents and their creation time."""
+
+    data: bytes
+    created_at: datetime
+
+
 class InMemoryCoreState(
     CoreState
 ):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
+    # pylint: disable-next=too-many-statements
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
+        self.file_store: dict[FileKey, FileRecord] = {}
+        self.file_revision_store: dict[FileRevisionKey, FileRevisionRecord] = {}
+        self.lock_file_store = Lock()
         self.message_store: dict[str, MessageRecord] = {}
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
-        self.lock_message_store = Lock()
+        self.lock_message_store = RLock()
+        self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.agent_id_counter = 0
+        self.lock_agent_store = RLock()
+        self.event_store: dict[UUID, Event] = {}
+        self.user_event_store: dict[str, list[UUID]] = {}
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
         self.federation_app_store: dict[tuple[str, str], FederationAppRecord] = {}
@@ -163,6 +208,11 @@ class InMemoryCoreState(
         self.run_series_store: dict[int, RunSeries] = {}
         self.agent_run_series_ids: set[int] = set()
         self.lock_run_series_store = Lock()
+        self.space_store: dict[UUID, Space] = {}
+        self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
+        self.space_message_id_counter = 0
+        self.lock_space_store = RLock()
+        self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -181,7 +231,7 @@ class InMemoryCoreState(
         self.task_usage_store: dict[int, TaskUsageRecord] = {}
         self.lock_task_usage_store = Lock()
         self._next_task_usage_id = 1
-        self.lock_task_store = Lock()
+        self.lock_task_store = RLock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
         self.task_event_store: dict[int, list[TaskEvent]] = {}
@@ -471,11 +521,187 @@ class InMemoryCoreState(
                 if self._object_push_session_by_root.get(object_id) == session_id:
                     del self._object_push_session_by_root[object_id]
 
-        # Delete expired object trees and their message metadata
+        # Delete expired object trees and cancel their pending messages
         if cleanup_messages and session.root_object_ids:
             for object_id in session.root_object_ids:
                 self.object_store.delete(object_id)
-            self._on_push_session_expired(session.root_object_ids)
+            self.cancel_messages(message_ids=session.root_object_ids)
+
+    def put_file(
+        self, scope: str, key: str, data: bytes, expected_revision: int | None
+    ) -> int:
+        """Create or update a file with a revision precondition."""
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            live_revision = (
+                head.latest_revision
+                if head is not None and not head.is_deleted
+                else None
+            )
+            if live_revision != expected_revision:
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            revision = head.latest_revision + 1 if head is not None else 1
+            self.file_revision_store[scope, key, revision] = FileRevisionRecord(
+                data=data, created_at=now()
+            )
+            self.file_store[scope, key] = FileRecord(revision, False, len(data))
+            return revision
+
+    def get_file(self, scope: str, key: str) -> File | None:
+        """Return the current file, or None if absent or deleted."""
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            if head is None or head.is_deleted:
+                return None
+            return File(
+                metadata=FileMetadata(
+                    key=key, revision=head.latest_revision, size_bytes=head.size_bytes
+                ),
+                data=self.file_revision_store[scope, key, head.latest_revision].data,
+            )
+
+    def list_files(
+        self, scope: str, prefix: str, start_after: str, limit: int | None
+    ) -> Sequence[FileMetadata]:
+        """List live file metadata in lexicographic key order."""
+        with self.lock_file_store:
+            return [
+                FileMetadata(
+                    key=key, revision=head.latest_revision, size_bytes=head.size_bytes
+                )
+                for (file_scope, key), head in sorted(self.file_store.items())
+                if file_scope == scope
+                and not head.is_deleted
+                and key.startswith(prefix)
+                and (not start_after or key > start_after)
+            ][:limit]
+
+    def delete_file(self, scope: str, key: str, expected_revision: int) -> None:
+        """Delete a file with a matching revision, preserving revision history."""
+        with self.lock_file_store:
+            head = self.file_store.get((scope, key))
+            if (
+                head is None
+                or head.is_deleted
+                or head.latest_revision != expected_revision
+            ):
+                raise FlowerError(
+                    ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT,
+                    "File revision precondition failed.",
+                )
+            head.is_deleted = True
+
+    def create_agent(
+        self,
+        flwr_aid: str,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Create an agent and its initial Space together."""
+        if not flwr_aid or not config.name or not config.app_spec:
+            return None
+        if (config.HasField("title") and not config.title) or (
+            config.HasField("description") and not config.description
+        ):
+            return None
+        with self.lock_space_store, self.lock_agent_store:
+            created_at = now().isoformat()
+            agent = Agent(
+                id=self.agent_id_counter + 1,
+                config=config,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+            event_id = self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
+            self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
+            try:
+                self.create_space(
+                    participants=[
+                        SpaceParticipant(flwr_aid=flwr_aid),
+                        SpaceParticipant(agent_id=agent.id),
+                    ]
+                )
+            except Exception:
+                del self.agent_store[flwr_aid][agent.id]
+                self.user_event_store[flwr_aid].remove(event_id)
+                del self.event_store[event_id]
+                raise
+            self.agent_id_counter = agent.id
+            return agent
+
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an agent owned by the account."""
+        with self.lock_agent_store:
+            return self.agent_store.get(flwr_aid, {}).get(agent_id)
+
+    def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
+        """List an account's agents in ascending agent ID order."""
+        if not flwr_aid:
+            return []
+        with self.lock_agent_store:
+            return sorted(
+                self.agent_store.get(flwr_aid, {}).values(),
+                key=lambda agent: agent.id,
+            )
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching visible state."""
+        with self.lock_space_store:
+            head = len(self.user_event_store.get(flwr_aid, []))
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head,
+        )
+
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
+        event_id = uuid4()
+        event = Event(
+            event_id=str(event_id), type=event_type, created_at=now().isoformat()
+        )
+        event.payload.update(MessageToDict(payload, preserving_proto_field_name=True))
+        event.payload.SetInParent()
+        if space_id is not None:
+            event.space_id = str(space_id)
+        with self.lock_space_store:
+            if space_id is not None and space_id not in self.space_store:
+                raise ValueError("Event Space does not exist")
+            self.event_store[event_id] = event
+            for user_id in sorted(set(recipients)):
+                self.user_event_store.setdefault(user_id, []).append(event_id)
+        return event_id
+
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Return a non-consuming page, filtering current Space access."""
+        with self.lock_space_store:
+            feed = self.user_event_store.get(flwr_aid, [])
+            head = len(feed)
+            validate_event_cursor(after_seq, head, limit)
+            viewer = SpaceParticipant(flwr_aid=flwr_aid)
+            results = []
+            for seq in range(after_seq + 1, head + 1):
+                event = self.event_store[feed[seq - 1]]
+                if event.HasField("space_id"):
+                    space = self.space_store.get(UUID(event.space_id))
+                    if space is None or viewer not in space.participants:
+                        continue
+                results.append(StreamEventsResponse(seq=seq, event=event))
+                if len(results) == limit:
+                    break
+            if not results and head > after_seq:
+                results.append(StreamEventsResponse(seq=head))
+            return results
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -826,6 +1052,123 @@ class InMemoryCoreState(
             )
         return True
 
+    def create_space(
+        self,
+        *,
+        participants: Sequence[SpaceParticipant],
+    ) -> Space:
+        """Create a space and its initial membership atomically."""
+        members: list[SpaceParticipant] = []
+        for participant in participants:
+            if not (participant.flwr_aid or participant.agent_id):
+                raise ValueError("Space participants must have a nonempty identity")
+            if participant not in members:
+                members.append(participant)
+        with self.lock_space_store, self.lock_agent_store:
+            known_agent_ids = {
+                agent_id for agents in self.agent_store.values() for agent_id in agents
+            }
+            if any(
+                member.agent_id and member.agent_id not in known_agent_ids
+                for member in members
+            ):
+                raise ValueError("Agent participant does not exist")
+            space_id = uuid4()
+            if space_id in self.space_store:
+                raise ValueError("Space ID already exists")
+            space = Space(
+                id=str(space_id),
+                created_at=now().isoformat(),
+                participants=members,
+            )
+            self.space_store[space_id] = space
+            self.space_message_store[space_id] = []
+            try:
+                self.store_event(
+                    EventType.SPACE_CREATED,
+                    space,
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                    space_id=space_id,
+                )
+            except Exception:
+                del self.space_store[space_id]
+                del self.space_message_store[space_id]
+                raise
+            return space
+
+    def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
+        """Return participating spaces, newest first."""
+        viewer = SpaceParticipant(flwr_aid=flwr_aid)
+        with self.lock_space_store:
+            spaces = [
+                space
+                for space in self.space_store.values()
+                if viewer in space.participants
+            ]
+            spaces.sort(key=lambda item: item.created_at, reverse=True)
+            return spaces
+
+    def create_space_message(
+        self, space_id: UUID, author: SpaceParticipant, content: str
+    ) -> SpaceMessage | None:
+        """Store a participant's message atomically with its membership check."""
+        if not content.strip():
+            raise ValueError("Message content must be nonempty")
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or author not in space.participants:
+                return None
+            message = SpaceMessage(
+                id=self.space_message_id_counter + 1,
+                space_id=str(space_id),
+                author=author,
+                created_at=now().isoformat(),
+                content=content,
+            )
+            self.store_event(
+                EventType.MESSAGE_CREATED,
+                message,
+                [p.flwr_aid for p in space.participants if p.flwr_aid],
+                space_id=space_id,
+            )
+            self.space_message_id_counter = message.id
+            self.space_message_store[space_id].append(message)
+            return message
+
+    def get_space_messages(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceMessage] | None:
+        """Read messages and advance the participant's read cursor."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or participant not in space.participants:
+                return None
+            key = (space_id, participant.flwr_aid or participant.agent_id)
+            cursor = self.space_participant_cursors.get(key, 0)
+            if unread_only:
+                after_id = max(cursor, after_id or 0)
+            messages = [
+                message
+                for message in self.space_message_store[space_id]
+                if (before_id is None or message.id < before_id)
+                and (after_id is None or message.id > after_id)
+            ]
+            page = messages[:limit] if after_id is not None else messages[-limit:]
+            if page:
+                self.space_participant_cursors[key] = max(cursor, page[-1].id)
+            return page
+
     def get_run_series(  # pylint: disable=too-many-arguments
         self,
         *,
@@ -888,16 +1231,16 @@ class InMemoryCoreState(
             return self.run_series_context_store.get(series_id)
 
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         with self.lock_compacted_context_store:
             contexts = [
                 context
                 for context in self.compacted_context_store.values()
-                if context.series_id == series_id
+                if context.agent_id == agent_id
                 and (before_context_id is None or context.id < before_context_id)
             ]
             return sorted(contexts, key=lambda context: context.id, reverse=True)[
@@ -905,12 +1248,16 @@ class InMemoryCoreState(
             ]
 
     def store_compacted_context(
-        self, series_id: int, through_event_id: int, text: str
+        self,
+        agent_id: int,
+        through_event_id: int,
+        text: str,
+        token_count: int,
     ) -> None:
         """Store a new summary."""
         with self.lock_compacted_context_store:
             if any(
-                context.series_id == series_id
+                context.agent_id == agent_id
                 and context.through_event_id == through_event_id
                 for context in self.compacted_context_store.values()
             ):
@@ -918,9 +1265,10 @@ class InMemoryCoreState(
 
             context = CompactedContext(
                 id=self._next_compacted_context_id,
-                series_id=series_id,
+                agent_id=agent_id,
                 through_event_id=through_event_id,
                 text=text,
+                token_count=token_count,
                 created_at=now().isoformat(),
             )
             self.compacted_context_store[context.id] = context
@@ -1601,6 +1949,7 @@ class InMemoryCoreState(
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_id: UUID | None = None,
         task_ids: Sequence[int] | None = None,
         after_task_event_id: int | None = None,
         before_task_event_id: int | None = None,
@@ -1610,6 +1959,13 @@ class InMemoryCoreState(
         """Return task-produced run events matching the filters."""
         if last_n is not None and last_n < 0:
             raise ValueError("last_n must be non-negative")
+        if space_id is not None:
+            space_run_ids = set(self._get_run_ids_for_space(space_id))
+            run_ids = list(
+                space_run_ids
+                if run_ids is None
+                else space_run_ids.intersection(run_ids)
+            )
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
             if run_ids is not None and not run_ids:

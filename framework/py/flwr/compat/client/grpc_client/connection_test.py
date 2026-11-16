@@ -26,12 +26,12 @@ from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common import Code, GetPropertiesRes, Status
 from flwr.common.constant import MessageTypeLegacy
 from flwr.compat.common import recorddict_compat as compat
+from flwr.compat.server.grpc_bidi.grpc_server import start_grpc_server
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     ServerMessage,
 )
 from flwr.server.client_manager import SimpleClientManager
-from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
 from flwr.supercore.retry import RetryInvoker, exponential
 from flwr.supercore.task_identity import TaskIdentity
 
@@ -77,7 +77,7 @@ def mock_join(  # type: ignore # pylint: disable=invalid-name
 
 @patch(
     # pylint: disable=line-too-long
-    "flwr.server.superlink.fleet.grpc_bidi.flower_service_servicer.FlowerServiceServicer.Join",  # noqa: E501
+    "flwr.compat.server.grpc_bidi.flower_service_servicer.FlowerServiceServicer.Join",  # noqa: E501
     # pylint: enable=line-too-long
     mock_join,
 )

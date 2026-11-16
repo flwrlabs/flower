@@ -19,20 +19,12 @@ from typing import Any
 import pytest
 from sqlalchemy import Column, Table, UniqueConstraint
 
-from flwr.supercore.state.schema.linkstate_models import (
-    LinkStateBase,
-    MessageIns,
-    MessageRes,
-    Node,
-    Run,
-)
+from flwr.supercore.state.schema.linkstate_models import LinkStateBase, Node, Run
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 
 LINKSTATE_TABLE_NAMES = {
     "node",
     "run",
-    "message_ins",
-    "message_res",
 }
 
 
@@ -55,8 +47,7 @@ def _column_signature(column: Column[Any]) -> tuple[object, ...]:
         tuple(
             sorted(
                 (
-                    foreign_key.column.table.name,
-                    foreign_key.column.name,
+                    foreign_key.target_fullname,
                     foreign_key.ondelete,
                 )
                 for foreign_key in column.foreign_keys
@@ -112,8 +103,6 @@ def test_declarative_metadata_covers_all_linkstate_tables() -> None:
     [
         (Node, "node_id"),
         (Run, "run_id"),
-        (MessageIns, "message_id"),
-        (MessageRes, "message_id"),
     ],
 )
 def test_mapper_uses_existing_unique_identity(

@@ -39,14 +39,22 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
+    DeleteFileResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -63,10 +71,18 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
     PutCompactedContextResponse,
+    PutFileRequest,
+    PutFileResponse,
     RecordTaskUsageRequest,
     RecordTaskUsageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+)
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
 )
 from flwr.supercore.dependencies.runtime import (
     RuntimeHandlersDependency,
@@ -247,6 +263,39 @@ def get_run_series_events(
     return handlers.get_run_series_events(request, state, task)
 
 
+@router.post("/get-space-events")
+def get_space_events(
+    request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> GetSpaceEventsResponse:
+    """Get events from the authenticated task's Space."""
+    return handlers.get_space_events(request, state, task)
+
+
+@router.post("/get-space-messages")
+def runtime_get_space_messages(
+    request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> GetSpaceMessagesResponse:
+    """Read messages from the authenticated task's Space."""
+    return handlers.get_space_messages(request, state, task)
+
+
+@router.post("/send-space-message")
+def runtime_send_space_message(
+    request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> SendSpaceMessageResponse:
+    """Publish a message to the authenticated task's Space."""
+    return handlers.send_space_message(request, state, task)
+
+
 @router.post("/get-compacted-contexts")
 def get_compacted_contexts(
     request: Annotated[GetCompactedContextsRequest, PROTOBUF_REQUEST_DEPENDENCY],
@@ -341,3 +390,43 @@ def get_nodes(
 ) -> GetNodesResponse:
     """Get available nodes."""
     return handlers.get_nodes(request, state, task)
+
+
+@router.post("/put-file")
+def put_file(
+    request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> PutFileResponse:
+    """Store a file."""
+    return core_runtime_handlers.put_file(request, state, task)
+
+
+@router.post("/get-file")
+def get_file(
+    request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> GetFileResponse:
+    """Get a file."""
+    return core_runtime_handlers.get_file(request, state, task)
+
+
+@router.post("/list-files")
+def list_files(
+    request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> ListFilesResponse:
+    """List file metadata."""
+    return core_runtime_handlers.list_files(request, state, task)
+
+
+@router.post("/delete-file")
+def delete_file(
+    request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> DeleteFileResponse:
+    """Delete a file."""
+    return core_runtime_handlers.delete_file(request, state, task)

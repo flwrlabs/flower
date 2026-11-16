@@ -22,7 +22,10 @@ from typing import Any
 
 import yaml
 
-from flwr.common.args import add_args_runtime_dependency_install
+from flwr.common.args import (
+    add_args_removed_health_server,
+    add_args_runtime_dependency_install,
+)
 from flwr.common.constant import ExecPluginType
 from flwr.supercore import log
 from flwr.supercore.auth import (
@@ -31,7 +34,6 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit
-from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.superexec.executor.config import (
     ExecutorConfig,
     ExecutorConfigError,
@@ -110,7 +112,6 @@ def flower_superexec() -> None:
         superexec_auth_secret=superexec_auth_secret,
         plugin_config=plugin_config,
         parent_pid=args.parent_pid,
-        health_server_address=args.health_server_address,
         runtime_dependency_install=args.runtime_dependency_install,
         executor_type=args.executor,
         executor_config=executor_config,
@@ -183,7 +184,7 @@ def _parse_args() -> argparse.ArgumentParser:
         help="Path to a YAML config file for the selected executor.",
     )
     add_superexec_auth_secret_args(parser)
-    add_args_health(parser)
+    add_args_removed_health_server(parser)
     add_args_runtime_dependency_install(parser)
     return parser
 

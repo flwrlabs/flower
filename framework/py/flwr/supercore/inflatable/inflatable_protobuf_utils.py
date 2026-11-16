@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""InflatableObject gRPC utils."""
+"""InflatableObject protobuf utils."""
 
 
 from collections.abc import Callable
@@ -39,13 +39,12 @@ def make_pull_object_fn_protobuf(
     node: Node,
     run_id: int,
 ) -> Callable[[str], bytes]:
-    """Create a pull object function that uses gRPC to pull objects.
+    """Create a pull object function that uses protobuf to pull objects.
 
     Parameters
     ----------
     pull_object_protobuf : Callable[[PullObjectRequest], PullObjectResponse]
         A callable that takes a `PullObjectRequest` and returns a `PullObjectResponse`.
-        This function is typically backed by a gRPC client stub.
     node : Node
         The node making the request.
     run_id : int
@@ -77,13 +76,12 @@ def make_push_object_fn_protobuf(
     run_id: int,
     session_id: str,
 ) -> Callable[[str, bytes], None]:
-    """Create a push object function that uses gRPC to push objects.
+    """Create a push object function that uses protobuf to push objects.
 
     Parameters
     ----------
     push_object_protobuf : Callable[[PushObjectRequest], PushObjectResponse]
         A callable that takes a `PushObjectRequest` and returns a `PushObjectResponse`.
-        This function is typically backed by a gRPC client stub.
     node : Node
         The node making the request.
     run_id : int
@@ -126,7 +124,6 @@ def make_confirm_message_received_fn_protobuf(
     confirm_message_received_protobuf : ConfirmMessageReceivedProtobuf
         A callable that takes a `ConfirmMessageReceivedRequest` and returns a
         `ConfirmMessageReceivedResponse`, confirming message receipt.
-        This function is typically backed by a gRPC client stub.
     node : Node
         The node making the request.
     run_id : int

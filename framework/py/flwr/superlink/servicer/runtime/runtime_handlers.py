@@ -19,7 +19,6 @@
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
-from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import (
     context_from_proto,
@@ -52,6 +51,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -63,19 +64,29 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextRequest,
     PutCompactedContextResponse,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    GetSpaceMessagesResponse,
+    SendSpaceMessageRequest,
+    SendSpaceMessageResponse,
+)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.server.utils.validator import validate_message
+from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
+from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
-from flwr.superlink.servicer.control.control_handlers import process_due_automations
+from flwr.superlink.servicer.control.control_handlers import (
+    process_due_automations,
+    process_pending_agent_runs,
+)
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
@@ -108,37 +119,80 @@ def get_run_series_events(
     return GetRunSeriesEventsResponse(events=events)
 
 
-def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: LinkState, task: Task
-) -> GetCompactedContextsResponse:
-    """Get summaries for the authenticated task's run series."""
+def get_space_events(
+    request: GetSpaceEventsRequest,
+    state: LinkState,
+    task: Task,
+) -> GetSpaceEventsResponse:
+    """Get events from the authenticated task's Space."""
     runs = state.get_run_info(run_ids=[task.run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
+    space_id = runs[0].space_id
+    if space_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint is only available to Space tasks.",
+        )
+    return core_runtime_handlers.get_space_events(request, state, space_id)
+
+
+def _get_task_run(state: LinkState, task: Task) -> Run:
+    """Resolve the authenticated task's Run."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return runs[0]
+
+
+def get_space_messages(
+    request: GetSpaceMessagesRequest, state: LinkState, task: Task
+) -> GetSpaceMessagesResponse:
+    """Read messages within the authenticated task's Space grant."""
+    return core_runtime_handlers.get_space_messages(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def send_space_message(
+    request: SendSpaceMessageRequest, state: LinkState, task: Task
+) -> SendSpaceMessageResponse:
+    """Publish with the primary AgentApp's server-bound agent identity."""
+    return core_runtime_handlers.send_space_message(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def get_compacted_contexts(
+    request: GetCompactedContextsRequest, state: LinkState, task: Task
+) -> GetCompactedContextsResponse:
+    """Get summaries for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.get_compacted_contexts(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
 def put_compacted_context(
     request: PutCompactedContextRequest, state: LinkState, task: Task
 ) -> PutCompactedContextResponse:
-    """Store a summary for the authenticated task's run series."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
+    """Store a summary for the agent."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
     return core_runtime_handlers.put_compacted_context(
-        request, state, runs[0].series_id
+        request, state, participant.agent_id
     )
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
-    """Process due automations, then acquire an eligible pending task."""
+    """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
+    process_pending_agent_runs(state)
     return core_runtime_handlers.acquire_task(request, state)
 
 
@@ -163,11 +217,13 @@ def push_messages(
     log(DEBUG, "Runtime.PushMessages")
     run_id = task.run_id
 
-    _raise_if(
-        validation_error=len(request.messages_list) == 0,
-        request_name="PushMessages",
-        detail="`messages_list` must not be empty",
-    )
+    if not request.messages_list:
+        return PushAppMessagesResponse()
+    if len(request.messages_list) != len(request.message_object_trees):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT,
+            "Expected one object tree per message.",
+        )
     session_id = state.start_session(run_id)
     message_ids: list[str] = []
     missing_objects_lists: list[list[str]] = []
@@ -175,17 +231,17 @@ def push_messages(
         request.messages_list, request.message_object_trees, strict=True
     ):
         message = message_from_proto(message_proto=message_proto)
-        validation_errors = validate_message(message, is_reply_message=False)
-        _raise_if(
-            validation_error=bool(validation_errors),
-            request_name="PushMessages",
-            detail=", ".join(validation_errors),
-        )
-        _raise_if(
-            validation_error=run_id != message.metadata.run_id,
-            request_name="PushMessages",
-            detail="`Message.metadata` has mismatched `run_id`",
-        )
+        if message.metadata.src_node_id != SUPERLINK_NODE_ID:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PushMessages: `Message.metadata.src_node_id` must be the SuperLink "
+                "node ID",
+            )
+        if run_id != message.metadata.run_id:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PushMessages: `Message.metadata` has mismatched `run_id`",
+            )
         stored, missing_objects = state.store_message_and_object_tree(
             message, object_tree, session_id
         )
@@ -211,31 +267,26 @@ def pull_messages(  # pylint: disable=R0914
     """Pull a set of Messages."""
     log(DEBUG, "Runtime.PullMessages")
     run_id = task.run_id
-    message_ids = set(request.message_ids)
-    messages: list[Message] = state.get_message_res(
-        message_ids=message_ids, run_id=run_id
-    )
-    # Allow pulling instruction message for `flwr-agentapp`
-    messages += state.get_message_ins(
-        node_id=SUPERLINK_NODE_ID, limit=None, run_id=run_id
+    messages = state.get_messages(
+        dst_node_id=SUPERLINK_NODE_ID,
+        run_id=run_id,
+        reply_to_message_ids=(
+            request.reply_to_message_ids.vals
+            if request.HasField("reply_to_message_ids")
+            else None
+        ),
     )
 
     store = state.object_store
-    # Gather all the instruction message IDs to delete
-    message_ins_ids_to_delete = {
-        msg.metadata.reply_to_message_id or msg.metadata.message_id for msg in messages
-    }
-    state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
-
     messages_list = []
     trees = []
     while messages:
         msg = messages.pop(0)
-        _raise_if(
-            validation_error=run_id != msg.metadata.run_id,
-            request_name="PullMessages",
-            detail="`message.metadata` has mismatched `run_id`",
-        )
+        if run_id != msg.metadata.run_id:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+                "PullMessages: `message.metadata` has mismatched `run_id`",
+            )
 
         try:
             msg_object_id = msg.metadata.message_id
@@ -244,7 +295,7 @@ def pull_messages(  # pylint: disable=R0914
             trees.append(obj_tree)
         except NoObjectInStoreError as err:
             log(ERROR, err.message)
-            state.delete_messages(message_ins_ids={msg_object_id})
+            state.cancel_messages(message_ids=[msg_object_id])
 
     return PullAppMessagesResponse(
         messages_list=messages_list, message_object_trees=trees
@@ -320,17 +371,28 @@ def pull_task_input(
     runs = state.get_run_info(run_ids=[run_id])
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
-    series_context = None
-    if run and run.series_id:
-        series_context = state.get_run_series_context(run.series_id)
-    if run and fab and series_context and state.activate_task(task.task_id):
+    agent = (
+        state.get_agent(run.flwr_aid, run.agent_id)
+        if run and run.agent_id is not None
+        else None
+    )
+    context = None
+    if run:
+        if not run.federation_id:
+            context = create_run_context(run_id)
+        elif run.series_id:
+            context = state.get_run_series_context(run.series_id)
+    if run and fab and context and state.activate_task(task.task_id):
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
-            context=context_to_proto(series_context),
+            context=context_to_proto(context),
             run=run_to_proto(run),
             fab=fab_to_proto(fab),
-            federation_config=state.get_federation_config(run_id),
+            federation_config=(
+                state.get_federation_config(run_id) if run.federation_id else None
+            ),
             task_id=task.task_id,
+            agent=agent,
         )
 
     raise FlowerError(
@@ -360,8 +422,7 @@ def push_task_output(
             run = runs[0] if runs else None
             if run and run.series_id and run.primary_task_id == task.task_id:
                 state.set_run_series_context(
-                    run.series_id,
-                    context_from_proto(request.context),
+                    run.series_id, context_from_proto(request.context)
                 )
     else:
         log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
@@ -381,6 +442,11 @@ def start_automation(
         )
 
     run = state.get_run_info(run_ids=[task.run_id])[0]
+    if not run.federation_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
+            "Space runs do not support federation automations.",
+        )
     del request.start_run_request.connector_refs[:]
     del request.start_run_request.connector_ids[:]
     request.start_run_request.connector_ids.extend(
@@ -406,7 +472,7 @@ def push_object(
     run_id = task.run_id
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
-            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, "Unexpected node ID."
         )
     stored = state.store_object(
         run_id,
@@ -427,7 +493,7 @@ def pull_object(
     run_id = task.run_id
     if request.node.node_id != SUPERLINK_NODE_ID:
         raise FlowerError(
-            ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID, "Unexpected node ID."
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED, "Unexpected node ID."
         )
 
     content = state.get_object(run_id, request.object_id)
@@ -447,11 +513,10 @@ def confirm_message_received(
 ) -> ConfirmMessageReceivedResponse:
     """Confirm message received."""
     log(DEBUG, "Runtime.ConfirmMessageReceived")
-    state.object_store.delete(request.message_object_id)
+    if request.run_id != task.run_id:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED,
+            "ConfirmMessageReceived: Run ID does not match authenticated task's run ID",
+        )
+    state.acknowledge_messages([request.message_object_id])
     return ConfirmMessageReceivedResponse()
-
-
-def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
-    """Raise a `ValueError` with a detailed message if a validation error occurs."""
-    if validation_error:
-        raise ValueError(f"Malformed {request_name}: {detail}")

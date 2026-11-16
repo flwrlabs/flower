@@ -29,7 +29,10 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from flwr.common.constant import FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+from flwr.common.constant import (
+    FLWR_TASK_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT,
+)
 
 from . import task_worker, task_worker_protocol
 
@@ -114,6 +117,12 @@ def test_protocol_rejects_invalid_messages() -> None:
         def write(self, data: Any, /) -> int:
             return super().write(data[:3])
 
+    assert task_worker_protocol.FLWR_TASK_TOKEN_LENGTH == FLWR_TASK_TOKEN_LENGTH
+    assert (
+        task_worker_protocol.FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+        == FLWR_TASK_TOKEN_STDIN_ACKNOWLEDGEMENT
+    )
+
     channel = ShortWriteChannel()
     task_worker_protocol.send_message(channel, {"value": "\ud800"})
     assert channel.getvalue() == b'{"value":"\\ud800"}\n'
@@ -141,8 +150,13 @@ def test_worker_cleans_up_socket_and_markers(
     connection = MagicMock()
     server = MagicMock()
     server.__enter__.return_value = server
-    server.bind.side_effect = lambda _: socket_path.touch()
+    initialize = Mock()
     unlink = Path.unlink
+
+    def bind(_: str) -> None:
+        initialize.assert_called_once_with("test")
+        assert not ready_file.exists()
+        socket_path.touch()
 
     def unlink_after_busy(path: Path, missing_ok: bool = False) -> None:
         if path == ready_file and path.exists():
@@ -158,10 +172,12 @@ def test_worker_cleans_up_socket_and_markers(
         assert not ready_file.exists()
         return 0
 
+    server.bind.side_effect = bind
     server.accept.side_effect = accept
     register_signals = Mock()
     monkeypatch.setattr(socket, "socket", Mock(return_value=server))
     monkeypatch.setattr(task_worker, "_register_idle_signal_handlers", register_signals)
+    monkeypatch.setattr(task_worker, "initialize_tracing", initialize)
     monkeypatch.setattr(task_worker, "_serve_connection", serve_connection)
     monkeypatch.setattr(Path, "unlink", unlink_after_busy)
 

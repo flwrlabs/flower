@@ -19,7 +19,6 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from ..compat.server import ServerAppComponents as ServerAppComponents
-from ..compat.server.app import start_server as start_server  # Deprecated
 from ..compat.server.grid import Driver as Driver
 from ..serverapp import Grid as Grid
 from . import strategy
@@ -34,8 +33,11 @@ from .server_config import ServerConfig as ServerConfig
 if TYPE_CHECKING:
     from flwr.serverapp import ServerApp as ServerApp
 
+    from ..compat.server.app import start_server as start_server  # Deprecated
+
 _LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
     "ServerApp": ("flwr.serverapp", "ServerApp"),
+    "start_server": ("flwr.compat.server.app", "start_server"),
 }
 
 
@@ -48,6 +50,11 @@ def __getattr__(name: str) -> Any:
         globals()[name] = value
         return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Keep lazy exports visible to package introspection."""
+    return sorted(set(globals()) | _LAZY_EXPORTS.keys())
 
 
 __all__ = [

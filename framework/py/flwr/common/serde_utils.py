@@ -17,7 +17,7 @@
 from collections.abc import MutableMapping
 from typing import Any, TypeVar, cast
 
-from google.protobuf.message import Message as GrpcMessage
+from google.protobuf.message import Message as ProtoMessage
 
 from flwr.app.message.typeddict import TypedDict
 
@@ -46,7 +46,7 @@ _type_to_field: dict[type, str] = {
     str: "string",
     bytes: "bytes",
 }
-_list_type_to_class_and_field: dict[type, tuple[type[GrpcMessage], str]] = {
+_list_type_to_class_and_field: dict[type, tuple[type[ProtoMessage], str]] = {
     float: (DoubleList, "double_list"),
     int: (SintList, "sint_list"),
     bool: (BoolList, "bool_list"),
@@ -93,7 +93,7 @@ def _record_value_to_proto(
     )
 
 
-def _record_value_from_proto(value_proto: GrpcMessage) -> Any:
+def _record_value_from_proto(value_proto: ProtoMessage) -> Any:
     """Deserialize `*RecordValue` from ProtoBuf."""
     value_field = cast(str, value_proto.WhichOneof("value"))
     if value_field.endswith("list"):

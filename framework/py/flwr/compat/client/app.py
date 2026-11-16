@@ -36,12 +36,15 @@ from flwr.compat.client.grpc_client.connection import grpc_connection
 from flwr.compat.client.numpy_client import NumPyClient
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.compat.client.typing import ClientFnExt
-from flwr.compat.common.constant import TRANSPORT_TYPE_GRPC_BIDI, TRANSPORT_TYPES_COMPAT
+from flwr.compat.common.constant import (
+    GRPC_MAX_MESSAGE_LENGTH,
+    TRANSPORT_TYPE_GRPC_BIDI,
+    TRANSPORT_TYPES_COMPAT,
+)
 from flwr.supercore import log
 from flwr.supercore.address import parse_address
 from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.fab import Fab
-from flwr.supercore.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.logger import warn_deprecated_feature
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.retry import RetryInvoker, RetryState, exponential

@@ -28,7 +28,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskResponse,
 )
 from flwr.supercore.constant import MAX_PROTOBUF_STREAM_MESSAGE_LENGTH
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.interceptors import (
+    FlowerErrorHttpInterceptor,
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
@@ -169,7 +171,8 @@ def test_unary_unary_raises_for_http_error() -> None:
         _call(ProtobufClient("http://api.example"))
 
 
-def test_unary_unary_uses_retry_invoker() -> None:
+@pytest.mark.parametrize("translate_errors", [False, True])
+def test_unary_unary_uses_retry_invoker(translate_errors: bool) -> None:
     """Retry a transient HTTP response before parsing the protobuf response."""
     retry_invoker = make_simple_http_retry_invoker()
     retry_invoker.max_tries = 2
@@ -183,6 +186,7 @@ def test_unary_unary_uses_retry_invoker() -> None:
         result = _call(
             ProtobufClient(
                 "http://api.example",
+                interceptors=[FlowerErrorHttpInterceptor()] if translate_errors else [],
                 retry_invoker=retry_invoker,
             )
         )
@@ -244,6 +248,33 @@ def _stream_response(status_code: int, chunks: list[bytes]) -> httpx.Response:
         stream=_ChunkedByteStream(chunks),
         request=httpx.Request("POST", "http://api.example"),
     )
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_flower_error_interceptor(stream: bool) -> None:
+    """Restore structured errors through unary and streaming client calls."""
+    response = _stream_response(
+        409,
+        [b'{"code": 3017, "detail": "File revision conflict."}'],
+    )
+    with (
+        ProtobufClient(
+            "http://api.example", interceptors=[FlowerErrorHttpInterceptor()]
+        ) as client,
+        patch(
+            "flwr.supercore.protobuf.client.httpx.Client.send", return_value=response
+        ),
+        pytest.raises(FlowerError) as caught,
+    ):
+        if stream:
+            list(_stream_call(client))
+        else:
+            response.read()
+            _call(client)
+
+    assert caught.value.code == ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+    assert caught.value.message == "File revision conflict."
+    assert response.is_closed
 
 
 def test_unary_stream_sends_and_receives_framed_protobuf() -> None:

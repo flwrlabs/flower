@@ -5,14 +5,14 @@ inputs:
     description: "Version range or exact version of Python to use, using SemVer's version range syntax."
     default: 3.11.14
   pip-version:
-    description: "Version of pip to be installed using pip"
-    default: 26.2.1
+    description: "Version of pip to be installed using uv"
+    default: 26.2.2
   setuptools-version:
-    description: "Version of setuptools to be installed using pip"
+    description: "Version of setuptools to be installed using uv"
     default: 83.0.0
   uv-version:
     description: "Version of uv to install"
-    default: "0.12.20"
+    default: "0.13.5"
 outputs:
   python-version:
     description: "Version range or exact version of Python"
@@ -38,9 +38,13 @@ runs:
       with:
         version: ${{ inputs.uv-version }}
     - name: Install build tools
+      env:
+        PIP_VERSION: ${{ inputs.pip-version }}
+        SETUPTOOLS_VERSION: ${{ inputs.setuptools-version }}
       run: |
-        python -m pip install -U pip==${{ inputs.pip-version }}
-        python -m pip install -U setuptools==${{ inputs.setuptools-version }}
+        set -euo pipefail
+        uv pip install --system --no-cache \
+          "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}"
       shell: bash
     - id: versions
       shell: bash

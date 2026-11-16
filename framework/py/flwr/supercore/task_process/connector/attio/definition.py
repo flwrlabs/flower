@@ -14,46 +14,41 @@
 # ===============================================================================
 """Attio connector definition."""
 
-from flwr.supercore.typing import JSONObject
-
-from ..definition import ConnectorDefinition, OAuth2Definition, ProviderDefinition
+from ..definition import (
+    ConnectorDefinition,
+    ConnectorToolSource,
+    OAuth2Definition,
+    ProviderDefinition,
+)
 from ..oauth import load_oauth_flow
-from .actions import ACTIONS
-from .executors import EXECUTORS
+from .mcp import discover_tools, execute_tool
 
 ATTIO_CONNECTOR_REF = "attio"
-
-
-def _attio_display_name(payload: JSONObject) -> str:
-    """Prefer workspace names, falling back to the token's workspace ID."""
-    data = payload.get("data")
-    workspace = data.get("workspace") if isinstance(data, dict) else None
-    if isinstance(workspace, dict):
-        name = workspace.get("name") or workspace.get("id")
-    else:
-        name = payload.get("workspace_name") or payload.get("sub")
-    return name.strip() if isinstance(name, str) else ""
 
 
 PROVIDER = ProviderDefinition(
     ref=ATTIO_CONNECTOR_REF,
     display_name="Attio",
-    description="Identify workspace members, search records, and read meetings.",
-    actions=ACTIONS,
+    description="Use Attio tools available to the connected account.",
+    actions=(),
     oauth=OAuth2Definition(
-        authorization_url="https://app.attio.com/authorize",
-        token_url="https://app.attio.com/oauth/token",
+        authorization_url="https://app.attio.com/oidc/authorize",
+        token_url="https://app.attio.com/oidc/token",
         client_id_env="FLWR_ATTIO_CLIENT_ID",
         client_secret_env="FLWR_ATTIO_CLIENT_SECRET",
         redirect_uri_env="FLWR_ATTIO_REDIRECT_URI",
+        scopes=("mcp", "offline_access"),
         token_auth_method="client_secret_post",
-        display_name_url="https://api.attio.com/v2/self",
-        display_name_resolver=_attio_display_name,
+        use_pkce=True,
+        authorization_params={"resource": "https://mcp.attio.com/mcp"},
+        token_params={"resource": "https://mcp.attio.com/mcp"},
+        expected_token_type="bearer",
     ),
 )
 
 CONNECTOR = ConnectorDefinition.from_provider(
     provider=PROVIDER,
-    executors=EXECUTORS,
+    executors={},
     oauth_flow=load_oauth_flow(PROVIDER),
+    tool_source=ConnectorToolSource(discover=discover_tools, execute=execute_tool),
 )

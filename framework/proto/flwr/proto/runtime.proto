@@ -18,9 +18,12 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/fab.proto";
+import "flwr/proto/control.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/file.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/recorddict.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/runseries.proto";
 import "flwr/proto/task.proto";
@@ -41,7 +44,10 @@ message PushAppMessagesResponse {
 }
 
 // PullAppMessages messages
-message PullAppMessagesRequest { repeated string message_ids = 2; }
+message PullAppMessagesRequest {
+  // Absent means no correlation filter; present with no IDs matches nothing.
+  optional StringList reply_to_message_ids = 3;
+}
 message PullAppMessagesResponse {
   repeated Message messages_list = 1;
   repeated ObjectTree message_object_trees = 2;
@@ -71,6 +77,19 @@ message GetRunSeriesEventsRequest {
   uint32 last_n = 4;
 }
 message GetRunSeriesEventsResponse { repeated TaskEvent events = 1; }
+
+// GetSpaceEvents messages
+message GetSpaceEventsRequest {
+  // ID bounds are exclusive.
+  optional uint64 after_event_id = 1;
+  optional uint64 before_event_id = 2;
+  // Select newest matching events; zero means no limit.
+  // Response remains in ascending ID order.
+  uint32 last_n = 3;
+  // Empty means all event types.
+  repeated string event_types = 4;
+}
+message GetSpaceEventsResponse { repeated TaskEvent events = 1; }
 
 // GetCompactedContexts messages
 message GetCompactedContextsRequest {
@@ -112,6 +131,7 @@ message PullTaskInputResponse {
   Fab fab = 3;
   SimulationConfig federation_config = 4;
   uint64 task_id = 5;
+  Agent agent = 6;
 }
 
 // PushTaskOutput messages
@@ -145,3 +165,37 @@ message AcquireTaskResponse {
   Task task = 1;
   string token = 2;
 }
+
+// PutFile messages
+message PutFileRequest {
+  string key = 1;
+  bytes data = 2;
+  // Absent means create-only
+  optional uint64 expected_revision = 3;
+}
+message PutFileResponse { uint64 revision = 1; }
+
+// GetFile messages
+message GetFileRequest { string key = 1; }
+message GetFileResponse { File file = 1; }
+
+// ListFiles messages
+message ListFilesRequest {
+  string prefix = 1;
+  // Empty means start from beginning.
+  string start_after = 2;
+  optional uint32 limit = 3;
+}
+message ListFilesResponse {
+  repeated FileMetadata files = 1;
+  // Last returned key if more results exist; empty otherwise.
+  string next_start_after = 2;
+}
+
+// DeleteFile messages
+message DeleteFileRequest {
+  string key = 1;
+  // Must match the current revision.
+  uint64 expected_revision = 2;
+}
+message DeleteFileResponse {}

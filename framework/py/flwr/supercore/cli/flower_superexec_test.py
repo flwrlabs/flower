@@ -152,7 +152,6 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         superexec_auth_secret_file=None,
         runtime_api_address="127.0.0.1:9091",
         parent_pid=None,
-        health_server_address=None,
         runtime_dependency_install=False,
         executor=ExecutorType.SUBPROCESS,
     )

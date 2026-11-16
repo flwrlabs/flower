@@ -116,7 +116,7 @@ class Executor(Protocol):
         """Start the TaskExecutor process described by the execution spec."""
 
     def reconcile(self) -> None:
-        """Maintain executor-owned resources between task polls."""
+        """Start executor-owned maintenance before task polling."""
 
     def close(self) -> None:
         """Release executor-owned resources during SuperExec shutdown."""

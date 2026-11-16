@@ -161,13 +161,13 @@ class EventType(str, Enum):
     FLWR_AGENTAPP_RUN_ENTER = auto()
     FLWR_AGENTAPP_RUN_LEAVE = auto()
 
-    # CLI: flwr-model
-    FLWR_MODEL_RUN_ENTER = auto()
-    FLWR_MODEL_RUN_LEAVE = auto()
-
     # CLI: flwr-connector
     FLWR_CONNECTOR_RUN_ENTER = auto()
     FLWR_CONNECTOR_RUN_LEAVE = auto()
+
+    # Deprecated compatibility values for the removed flwr-model CLI.
+    FLWR_MODEL_RUN_ENTER = auto()
+    FLWR_MODEL_RUN_LEAVE = auto()
 
     # --- Simulation Runtime -----------------------------------------------------------
 

@@ -43,18 +43,17 @@ def test_disabled_or_unavailable_backend_is_inert(
     monkeypatch.setenv("FLWR_TRACING_ENABLED", enabled)
     discover = Mock(side_effect=RuntimeError("private import detail"))
     monkeypatch.setattr(tracing, "import_module", discover)
+    tracing.initialize_tracing("model")
     with tracing.trace_span("test", traceparent=_CARRIER) as span:
         span.set_attribute("flwr.task_id", "1")
         span.add_event("provider.first_text")
         assert tracing.current_traceparent() == ""
     tracing.flush_traces()
-    tracing.store_task_context(object(), 1, _CARRIER)
-    assert tracing.load_task_context(object(), 1) == ""
     assert discover.call_count == int(enabled == "1")
 
 
 @pytest.mark.parametrize(
-    "failure", ["enter", "exit", "attribute", "event", "carrier", "flush"]
+    "failure", ["enter", "exit", "attribute", "event", "carrier", "flush", "initialize"]
 )
 def test_backend_failures_preserve_application_exception(
     monkeypatch: pytest.MonkeyPatch, failure: str
@@ -74,9 +73,12 @@ def test_backend_failures_preserve_application_exception(
         "event": raw_span.add_event,
         "carrier": backend.current_traceparent,
         "flush": backend.flush_traces,
+        "initialize": backend.initialize_tracing,
     }[failure]
     method.side_effect = RuntimeError("backend-secret")
     monkeypatch.setattr(tracing, "_load_backend", lambda: backend)
+    tracing.initialize_tracing("model")
+    backend.initialize_tracing.assert_called_once_with("model")
     error = ValueError("application-secret")
     with pytest.raises(ValueError) as caught:
         with tracing.trace_span("test", traceparent="invalid") as span:
@@ -121,15 +123,28 @@ def test_valid_traceparent(flags: str) -> None:
     assert tracing.validate_traceparent(carrier) == carrier
 
 
-def test_context_storage_failure_is_inert(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Optional storage cannot affect task execution or return invalid metadata."""
-    monkeypatch.setenv("FLWR_TRACING_ENABLED", "1")
+@pytest.mark.parametrize("enabled", ["", "1"])
+def test_phase_timings_are_deferred_and_best_effort(
+    monkeypatch: pytest.MonkeyPatch, enabled: str
+) -> None:
+    """Keep original elapsed times and export once without failing work."""
+    monkeypatch.setenv("FLWR_TRACING_ENABLED", enabled)
+    monkeypatch.setattr(tracing, "time_ns", lambda: 1000)
+    monkeypatch.setattr(tracing, "monotonic_ns", Mock(side_effect=[10, 20, 40]))
     backend = Mock()
-    backend.store_task_context.side_effect = RuntimeError("private database detail")
-    backend.load_task_context.side_effect = RuntimeError("private database detail")
-    monkeypatch.setattr(tracing, "_load_backend", lambda: backend)
-    state = object()
-    tracing.store_task_context(state, 1, _CARRIER)
-    assert tracing.load_task_context(state, 1) == ""
-    tracing.store_task_context(state, 1, "invalid")
-    backend.store_task_context.assert_called_once_with(state, 1, _CARRIER)
+    backend.record_phase_spans.side_effect = RuntimeError("export failed")
+    discover = Mock(return_value=backend)
+    monkeypatch.setattr(tracing, "import_module", discover)
+    timings = tracing.PhaseTimings()
+    with pytest.raises(ValueError, match="application"):
+        with timings.measure("executor.claim"):
+            raise ValueError("application")
+    discover.assert_not_called()
+    timings.publish("executor.acquire", {"flwr.task_id": "7"})
+    timings.publish("executor.acquire", {"flwr.task_id": "7"})
+    if enabled:
+        backend.record_phase_spans.assert_called_once_with(
+            "executor.acquire", [("executor.claim", 1010, 1030)], {"flwr.task_id": "7"}
+        )
+    else:
+        discover.assert_not_called()

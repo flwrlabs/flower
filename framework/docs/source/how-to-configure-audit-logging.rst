@@ -66,8 +66,8 @@ where,
     - - ``actor.ip_address``
       - IPv4 or IPv6 address of the actor
     - - ``event.action``
-      - Name of the servicer method, e.g.
-        ``ControlServicer.StartRun``/``FleetServicer.PullMessages``
+      - Name of the API method, e.g.
+        ``ControlServicer.StartRun``/``/v1/fleet/pull-messages``
     - - ``event.run_id``
       - The run ID of the Flower workflow
     - - ``event.fab_hash``
@@ -114,5 +114,5 @@ And here is an example when a SuperNode pulls a message from the SuperLink:
 
 .. code-block:: shell
 
-    INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "FleetServicer.PullMessages", "run_id": null, "fab_hash": null}, "status": "started"}
-    INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "FleetServicer.PullMessages", "run_id": null, "fab_hash": null}, "status": "completed"}
+    INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "/v1/fleet/pull-messages", "run_id": null, "fab_hash": null}, "status": "started"}
+    INFO :      [AUDIT] {"timestamp": "2025-07-14T10:27:02Z", "actor": {"actor_id": "...", "description": "SuperNode", "ip_address": "..."}, "event": {"action": "/v1/fleet/pull-messages", "run_id": null, "fab_hash": null}, "status": "completed"}

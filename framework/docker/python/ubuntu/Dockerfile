@@ -28,7 +28,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python from uv's managed, prebuilt CPython distributions.
-COPY --from=ghcr.io/astral-sh/uv:0.12.20@sha256:100047e74f30778ab704942321a09750d6158739573ff58bf3924085cc6cd2d8 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff /uv /uvx /bin/
 
 ARG PYTHON_VERSION=3.13
 ENV UV_PYTHON_INSTALL_DIR=/usr/local/bin/python \
@@ -43,10 +43,14 @@ ARG SETUPTOOLS_VERSION
 # whether the subsequent image build runs as root or app.
 # Update the bundled installer too, since the managed Python tree is copied
 # into the runtime image alongside the virtual environment.
-RUN python -m pip install -U --no-cache-dir --break-system-packages \
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir --break-system-packages "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir --break-system-packages \
     pip==${PIP_VERSION} \
     setuptools==${SETUPTOOLS_VERSION} \
     && python -m venv /python/venv \
+    && /python/venv/bin/python -m pip install -U --no-cache-dir "${pip_wheel}" \
     && /python/venv/bin/python -m pip install -U --no-cache-dir \
     pip==${PIP_VERSION} \
     setuptools==${SETUPTOOLS_VERSION}

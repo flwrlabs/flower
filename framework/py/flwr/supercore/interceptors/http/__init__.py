@@ -14,11 +14,13 @@
 # ==============================================================================
 """Reusable protobuf-over-HTTP client interceptors."""
 
+from .flower_error import FlowerErrorHttpInterceptor
 from .runtime_token import RuntimeTokenHttpInterceptor
 from .runtime_version import RuntimeVersionHttpInterceptor
 from .superexec_auth import SuperExecAuthHttpInterceptor
 
 __all__ = [
+    "FlowerErrorHttpInterceptor",
     "RuntimeTokenHttpInterceptor",
     "RuntimeVersionHttpInterceptor",
     "SuperExecAuthHttpInterceptor",

@@ -25,14 +25,18 @@ import threading
 import unittest
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import Mock, patch
+from uuid import UUID
 
+import pytest
 from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
-from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.common.serde import context_from_proto, context_to_proto, message_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -45,6 +49,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectRequest,
 )
 from flwr.proto.node_pb2 import Node, NodeInfo  # pylint: disable=E0611
+from flwr.proto.recorddict_pb2 import StringList  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
@@ -56,6 +61,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -113,48 +120,192 @@ def test_get_nodes_returns_metadata() -> None:
     )
 
 
-def test_raise_if_false() -> None:
-    """."""
-    # Prepare
-    validation_error = False
-    detail = "test"
-
-    try:
-        # Execute
-        runtime_handlers._raise_if(  # pylint: disable=protected-access
-            validation_error=validation_error,
-            request_name="DummyRequest",
-            detail=detail,
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
+    """Give Space tasks fresh contexts and discard their output contexts."""
+    database = (
+        FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
+    )
+    stores = ObjectStoreFactory()
+    state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
+    space_id = UUID(state.create_space(participants=[]).id)
+    fab_hash = state.store_fab(
+        Fab(hashlib.sha256(b"agentapp-fab").hexdigest(), b"agentapp-fab", {})
+    )
+    run_ids = [
+        state.create_run(
+            "publisher/app",
+            "1.0",
+            fab_hash,
+            {},
+            None,
+            None,
+            "account",
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            user_prompt="Hello",
         )
-
-        # Assert
-        assert True
-    except ValueError as err:
-        raise AssertionError() from err
-    except Exception as err:
-        raise AssertionError() from err
-
-
-def test_raise_if_true() -> None:
-    """."""
-    # Prepare
-    validation_error = True
-    detail = "test"
-
-    try:
-        # Execute
-        runtime_handlers._raise_if(  # pylint: disable=protected-access
-            validation_error=validation_error,
-            request_name="DummyRequest",
-            detail=detail,
+        for _ in range(2)
+    ]
+    # The same FAB and TaskType are used by the existing warm executor.
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
+        state,
+    )
+    assert acquired.task.run_id in run_ids
+    run_id = acquired.task.run_id
+    with (
+        patch.object(state, "get_run_series_context", side_effect=AssertionError),
+        patch.object(state, "set_run_series_context", side_effect=AssertionError),
+        patch.object(state, "get_federation_config", side_effect=AssertionError),
+        patch.object(
+            state.federation_manager, "report_run_usage", side_effect=AssertionError
+        ),
+    ):
+        response = runtime_handlers.pull_task_input(
+            PullTaskInputRequest(),
+            state,
+            acquired.task,
         )
+        assert response.run.run_id == run_id
+        assert response.context.run_id == run_id and response.context.series_id == 0
+        assert not context_from_proto(response.context).state
+        assert response.fab.hash_str == fab_hash
+        assert not response.HasField("federation_config")
+        assert not response.HasField("agent")
+        assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
+        output = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            run_config={},
+            series_id=123,
+            state=RecordDict({"result": ConfigRecord({"answer": "Done"})}),
+        )
+        runtime_handlers.push_task_output(
+            PushTaskOutputRequest(
+                context=context_to_proto(output),
+                sub_status=SubStatus.COMPLETED,
+            ),
+            state,
+            acquired.task,
+        )
+    assert state.get_run_status({run_id})[run_id].sub_status == SubStatus.COMPLETED
+    if backend == "sqlite":
+        state = LinkStateFactory(database, NoOpFederationManager(), stores).state()
+    # A subsequent run gets fresh context even after output supplied state.
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]),
+        state,
+    )
+    assert acquired.task.run_id in run_ids and acquired.task.run_id != run_id
+    response = runtime_handlers.pull_task_input(
+        PullTaskInputRequest(), state, acquired.task
+    )
+    assert response.context.run_id == acquired.task.run_id
+    assert response.context.series_id == 0
+    assert not context_from_proto(response.context).state
+    assert state.get_run_series() == []
 
-        # Assert
-        raise AssertionError()
-    except ValueError as err:
-        assert str(err) == "Malformed DummyRequest: test"
-    except Exception as err:
-        raise AssertionError() from err
+
+@pytest.mark.parametrize("backend", ["memory", "sqlite"])
+def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> None:
+    """Resolve an accountless agent run to its owner and supply its identity."""
+    database = (
+        FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
+    )
+    state = LinkStateFactory(
+        database, NoOpFederationManager(), ObjectStoreFactory()
+    ).state()
+    agent = state.create_agent(
+        "alice",
+        AgentConfig(
+            name="Research", app_spec="@publisher/app", description="Cite sources."
+        ),
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+    fab_hash = state.store_fab(
+        Fab(hashlib.sha256(b"agentapp-fab").hexdigest(), b"agentapp-fab", {})
+    )
+    run_id = state.create_run(
+        "publisher/app",
+        "1.0",
+        fab_hash,
+        {},
+        None,
+        None,
+        None,
+        TaskType.AGENT_APP,
+        space_id=space_id,
+        agent_id=agent.id,
+    )
+    assert run_id
+    assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
+    )
+    assert acquired.task.run_id == run_id
+    response = runtime_handlers.pull_task_input(
+        PullTaskInputRequest(), state, acquired.task
+    )
+
+    assert response.agent == agent
+
+
+def test_push_empty_messages_returns_empty_response() -> None:
+    """An empty push is a no-op and does not open an upload session."""
+    state = Mock(spec=LinkState)
+    response = runtime_handlers.push_messages(
+        PushAppMessagesRequest(), state, Task(run_id=1)
+    )
+    assert response == PushAppMessagesResponse()
+    state.start_session.assert_not_called()
+    state.store_message_and_object_tree.assert_not_called()
+
+
+@pytest.mark.parametrize("tree_count", [0, 2])
+def test_push_messages_rejects_mismatched_tree_count(tree_count: int) -> None:
+    """Message/tree count mismatches are parameter errors, not auth failures."""
+    message = create_ins_message(src_node_id=SUPERLINK_NODE_ID, dst_node_id=2, run_id=1)
+    state = Mock(spec=LinkState)
+    request = PushAppMessagesRequest(
+        messages_list=[message], message_object_trees=[ObjectTree()] * tree_count
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.push_messages(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_INVALID_MESSAGE_COUNT
+    state.start_session.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "source,run_id", [(SUPERLINK_NODE_ID + 1, 1), (SUPERLINK_NODE_ID, 2)]
+)
+def test_push_messages_rejects_identity_mismatch(source: int, run_id: int) -> None:
+    """Source and run mismatches use the same generic authentication error."""
+    message = create_ins_message(src_node_id=source, dst_node_id=2, run_id=run_id)
+    state = Mock(spec=LinkState)
+    request = PushAppMessagesRequest(
+        messages_list=[message], message_object_trees=[ObjectTree()]
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.push_messages(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert error.value.public_details is None
+    state.store_message_and_object_tree.assert_not_called()
+
+
+def test_ack_rejects_run_id_mismatch() -> None:
+    """An ACK for another run cannot release message bodies."""
+    state = Mock(spec=LinkState)
+    request = ConfirmMessageReceivedRequest(
+        node=Node(node_id=SUPERLINK_NODE_ID), run_id=2
+    )
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.confirm_message_received(request, state, Task(run_id=1))
+    assert error.value.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
+    assert error.value.public_details is None
+    state.acknowledge_messages.assert_not_called()
 
 
 def test_get_run_series_events_uses_authenticated_task_series() -> None:
@@ -182,7 +333,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     response = runtime_handlers.get_run_series_events(
         request,
         state,
-        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        Task(task_id=790, run_id=123, type=TaskType.CONNECTOR),
     )
 
     assert isinstance(response, GetRunSeriesEventsResponse)
@@ -201,7 +352,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     runtime_handlers.get_run_series_events(
         GetRunSeriesEventsRequest(after_event_id=10, last_n=0),
         state,
-        Task(task_id=790, run_id=123, type=TaskType.MODEL),
+        Task(task_id=790, run_id=123, type=TaskType.CONNECTOR),
     )
     state.get_task_events.assert_called_once_with(
         task_ids=[780, 789],
@@ -212,31 +363,119 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     )
 
 
-def test_get_compacted_contexts_uses_authenticated_series() -> None:
-    """Summary requests use the authenticated task's series."""
+def test_get_space_events_uses_authenticated_task_space() -> None:
+    """Read only events from the authenticated task's Space."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [Mock(series_id=456)]
+    space_id = UUID("12345678-1234-5678-1234-567812345678")
+    state.get_run_info.return_value = [Mock(space_id=space_id)]
+    expected_event = TaskEvent(id=11, run_id=123, event="message", data="{}")
+    state.get_task_events.return_value = [expected_event]
+    request = GetSpaceEventsRequest(
+        after_event_id=10,
+        before_event_id=20,
+        last_n=1,
+        event_types=["message"],
+    )
+
+    response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
+
+    assert response == GetSpaceEventsResponse(events=[expected_event])
+    state.get_run_info.assert_called_once_with(run_ids=[123])
+    state.get_task_events.assert_called_once_with(
+        space_id=space_id,
+        event_types=["message"],
+        after_task_event_id=10,
+        before_task_event_id=20,
+        last_n=1,
+    )
+
+
+def test_get_space_events_rejects_non_space_run() -> None:
+    """A federation task cannot use the Space event endpoint."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [Mock(space_id=None)]
+
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.get_space_events(
+            GetSpaceEventsRequest(), state, Task(run_id=123)
+        )
+
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_task_events.assert_not_called()
+
+
+def test_get_space_events_rejects_unknown_run() -> None:
+    """Reject requests whose authenticated run no longer exists."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = []
+
+    with pytest.raises(FlowerError) as error:
+        runtime_handlers.get_space_events(
+            GetSpaceEventsRequest(), state, Task(run_id=123)
+        )
+
+    assert error.value.code == ApiErrorCode.RUN_ID_NOT_FOUND
+    state.get_task_events.assert_not_called()
+
+
+def test_get_compacted_contexts_uses_authenticated_agent() -> None:
+    """Summary requests use the authenticated task's agent."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     state.get_compacted_contexts.return_value = []
-    task = Task(run_id=123)
+    task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
     runtime_handlers.get_compacted_contexts(GetCompactedContextsRequest(), state, task)
 
     state.get_compacted_contexts.assert_called_once_with(
-        456, limit=1, before_context_id=None
+        789, limit=1, before_context_id=None
     )
 
 
-def test_put_compacted_context_uses_authenticated_series() -> None:
-    """Summary writes use the authenticated task's series."""
+def test_put_compacted_context_uses_authenticated_agent() -> None:
+    """Summary writes use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [Mock(series_id=456)]
+    state.get_run_info.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     request = PutCompactedContextRequest(
-        context=CompactedContext(through_event_id=9, text="Summary")
+        context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
     )
 
-    runtime_handlers.put_compacted_context(request, state, Task(run_id=123))
+    runtime_handlers.put_compacted_context(
+        request, state, Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
+    )
 
-    state.store_compacted_context.assert_called_once_with(456, 9, "Summary")
+    state.store_compacted_context.assert_called_once_with(789, 9, "Summary", 123)
+
+
+@pytest.mark.parametrize("operation", ["get", "put"])
+@pytest.mark.parametrize("agent_id,task_id", [(None, 1), (789, 2)])
+def test_compacted_contexts_require_primary_agent(
+    operation: str, agent_id: int | None, task_id: int
+) -> None:
+    """Only the bound primary AgentApp task can access compacted contexts."""
+    state = Mock(spec=LinkState)
+    state.get_run_info.return_value = [
+        Mock(agent_id=agent_id, space_id=UUID(int=1), primary_task_id=1)
+    ]
+    task = Task(task_id=task_id, run_id=123, type=TaskType.AGENT_APP)
+
+    with pytest.raises(FlowerError) as error:
+        if operation == "get":
+            runtime_handlers.get_compacted_contexts(
+                GetCompactedContextsRequest(), state, task
+            )
+        else:
+            runtime_handlers.put_compacted_context(
+                PutCompactedContextRequest(), state, task
+            )
+
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_compacted_contexts.assert_not_called()
+    state.store_compacted_context.assert_not_called()
 
 
 def _create_shared_runtime(
@@ -562,7 +801,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
         response = core_runtime_handlers.create_task(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc"),
+            CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
             self.state,
             self._auth_task,
         )
@@ -570,8 +809,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert response.HasField("task_id")
         task = self.state.get_tasks(task_ids=[response.task_id])[0]
         assert task.run_id == self._auth_run_id
-        assert task.type == TaskType.MODEL
-        assert task.model_ref == "models/abc"
+        assert task.type == TaskType.SIMULATION
+        assert task.fab_hash == "fab-hash"
 
     def test_start_automation_enriches_connector_ids(self) -> None:
         """Enrich connector IDs and delegate automation creation."""
@@ -702,23 +941,25 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             messages_list=[message_1, message_2],
             message_object_trees=[object_tree_1, object_tree_2],
         )
-        original_store_message_ins = self.state.store_message_ins
+        original_store_message = self.state.store_message_and_object_tree
         primary_task_id = self._primary_task_id(run_id)
         call_count = 0
 
-        def store_message_ins_and_finish_run(message: Message) -> str | None:
+        def store_message_and_finish_run(
+            message: Message, tree: ObjectTree, session_id: str
+        ) -> tuple[bool, list[str]]:
             nonlocal call_count
             call_count += 1
-            message_id = original_store_message_ins(message)
+            results = original_store_message(message, tree, session_id)
             if call_count == 1:
                 assert self.state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
-            return message_id
+            return results
 
         # Execute
         with patch.object(
             self.state,
-            "store_message_ins",
-            side_effect=store_message_ins_and_finish_run,
+            "store_message_and_object_tree",
+            side_effect=store_message_and_finish_run,
         ):
             response = runtime_handlers.push_messages(
                 request, self.state, self._auth_task
@@ -754,15 +995,14 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
-        # pylint: disable-next=W0212
-        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
-        msg_id = self.state.store_message_ins(message=message_ins)
-        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+        message_ins.metadata.__dict__["_message_id"] = message_ins.object_id
+        assert self.state.store_messages([message_ins]) == [True]
+        msg_id = message_ins.metadata.message_id
+        msg_ = self.state.get_messages(dst_node_id=self.node_id, limit=1)[0]
 
         reply_msg = Message(RecordDict(), reply_to=msg_)
-        # pylint: disable-next=W0212
-        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
-        self.state.store_message_res(message=reply_msg)
+        reply_msg.metadata.__dict__["_message_id"] = reply_msg.object_id
+        self.state.store_messages([reply_msg])
 
         # Register response in ObjectStore (so pulling message request can be completed)
         obj_ids_registered: list[str] = []
@@ -771,7 +1011,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 run_id, get_object_tree(reply_msg)
             )
 
-        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[str(msg_id)])
+        )
 
         # Execute
         response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
@@ -791,11 +1033,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         else:
             assert len(response.messages_list) == 0
             assert len(response.message_object_trees) == 0
-            # Ins message was deleted
-            assert self.state.num_message_ins() == 0
 
-    def test_pull_messages_rejects_message_from_another_run(self) -> None:
-        """Reject message IDs not owned by the authenticated run."""
+    def test_pull_messages_filters_message_from_another_run(self) -> None:
+        """Correlation filters cannot leak messages from another run."""
         other_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
         )
@@ -807,14 +1047,18 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 run_id=other_run_id,
             )
         )
-        message_id = self.state.store_message_ins(message)
-        assert message_id
+        assert self.state.store_messages([message]) == [True]
+        message_id = message.metadata.message_id
 
-        request = PullAppMessagesRequest(message_ids=[message_id])
-        with self.assertRaisesRegex(ValueError, "contains invalid IDs"):
-            runtime_handlers.pull_messages(request, self.state, self._auth_task)
-
-        assert self.state.num_message_ins() == 1
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[message_id])
+        )
+        response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
+        assert not response.messages_list
+        assert (
+            len(self.state.get_messages(dst_node_id=self.node_id, run_id=other_run_id))
+            == 1
+        )
 
     @parameterized.expand(
         [
@@ -824,10 +1068,10 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             (None, Error(code=0)),
         ]
     )  # type: ignore
-    def test_successful_pull_messages_deletes_messages_in_linkstate(
+    def test_successful_pull_messages_keeps_pending_until_ack(
         self, content: RecordDict | None, error: Error | None
     ) -> None:
-        """Test `PullMessages` deletes messages from LinkState."""
+        """A pull keeps deliveries pending until receipt is acknowledged."""
         # Prepare
         run_id = self._auth_run_id
 
@@ -837,11 +1081,11 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
-        # pylint: disable-next=W0212
-        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
+        message_ins.metadata.__dict__["_message_id"] = message_ins.object_id
 
-        msg_id = self.state.store_message_ins(message=message_ins)
-        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
+        assert self.state.store_messages([message_ins]) == [True]
+        msg_id = message_ins.metadata.message_id
+        msg_ = self.state.get_messages(dst_node_id=self.node_id, limit=1)[0]
 
         if content is not None:
             reply_msg = Message(content, reply_to=msg_)
@@ -849,21 +1093,24 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             assert error is not None
             reply_msg = Message(error, reply_to=msg_)
 
-        # pylint: disable-next=W0212
-        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
+        reply_msg.metadata.__dict__["_message_id"] = reply_msg.object_id
 
-        self.state.store_message_res(message=reply_msg)
+        self.state.store_messages([reply_msg])
         # Register response in ObjectStore (so pulling message request can be completed)
         self.store.preregister(run_id, get_object_tree(reply_msg))
-        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+        request = PullAppMessagesRequest(
+            reply_to_message_ids=StringList(vals=[str(msg_id)])
+        )
 
         # Execute
         response = runtime_handlers.pull_messages(request, self.state, self._auth_task)
 
-        # Assert
-        assert isinstance(response, PullAppMessagesResponse)
-        assert self.state.num_message_ins() == 0
-        assert self.state.num_message_res() == 0
+        assert len(response.messages_list) == 1
+        assert len(self.state.get_messages(dst_node_id=SUPERLINK_NODE_ID)) == 1
+        assert len(self.state.get_messages(dst_node_id=self.node_id)) == 1
+        self.state.acknowledge_messages([reply_msg.metadata.message_id])
+        assert self.state.get_messages(dst_node_id=SUPERLINK_NODE_ID) == []
+        assert self.store.get(reply_msg.metadata.message_id) is None
 
     def test_push_object_successful(self) -> None:
         """Test `PushObject`."""
@@ -897,7 +1144,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.push_object(req, self.state, self._auth_task)
-        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        assert error.exception.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
         # Prepare
         obj = ConfigRecord({"a": 123, "b": [4, 5, 6]})
@@ -979,7 +1226,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.pull_object(req, self.state, self._auth_task)
-        assert error.exception.code == ApiErrorCode.RUNTIME_UNEXPECTED_NODE_ID
+        assert error.exception.code == ApiErrorCode.RUNTIME_AUTHENTICATION_FAILED
 
         # Attempt pulling object that doesn't exist
         req = PullObjectRequest(
@@ -992,7 +1239,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
     def test_confirm_message_received_successful(self) -> None:
         """Test `ConfirmMessageReceived` success."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
         proto = create_ins_message(
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
         )
@@ -1000,6 +1247,9 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         message_res = Message(
             RecordDict({"cfg": ConfigRecord({"key": "value"})}), reply_to=message_ins
         )
+
+        message_res.metadata.__dict__["_message_id"] = message_res.object_id
+        assert self.state.store_messages([message_ins, message_res]) == [True, True]
 
         # Prepare: Save reply message in ObjectStore
         all_objects = get_all_nested_objects(message_res)
@@ -1012,7 +1262,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Execute: Confirm message received
         request = ConfirmMessageReceivedRequest(
-            node=Node(node_id=self.node_id),
+            node=Node(node_id=SUPERLINK_NODE_ID),
             run_id=run_id,
             message_object_id=message_res.object_id,
         )

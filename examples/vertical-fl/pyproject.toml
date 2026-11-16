@@ -29,7 +29,8 @@ clientapp = "vertical_fl.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 250
 learning-rate = 0.01
+reply-timeout = 120.0 # Seconds to wait for each embedding or gradient exchange
 out-feature-dim-clientapp = 64 # Output feature dimension for client app
 # ['Age', 'Sex', 'Fare','Siblings/Spouses Aboard', 'Name', 'Parents/Children Aboard', 'Pclass']
 feature-splits = "2,3,2" # Comma-separated number of features per client (they must add up to 7)
-                         # And there must be as many entries as num-supernode in the simulation
+# And there must be as many entries as num-supernode in the simulation

@@ -18,9 +18,18 @@ import traceback
 from typing import cast
 from unittest.mock import Mock, call, create_autospec, patch
 
+import httpx
 import pytest
 from mcp import ClientSession
-from mcp.types import CallToolResult, ImageContent, ListToolsResult, TextContent, Tool
+from mcp.shared.exceptions import McpError
+from mcp.types import (
+    CallToolResult,
+    ErrorData,
+    ImageContent,
+    ListToolsResult,
+    TextContent,
+    Tool,
+)
 
 from flwr.supercore.typing import JSONObject
 
@@ -107,4 +116,42 @@ def test_mcp_tool_error_preserves_redacted_diagnostics(
             )
     assert error.value.code == "mcp_tool_error"
     assert error.value.message == message
+    assert "xoxp-secret" not in "".join(traceback.format_exception(error.value))
+
+
+@pytest.mark.parametrize("failure", ["http", "protocol", "connector"])
+def test_mcp_session_error_preserves_redacted_diagnostics(failure: str) -> None:
+    """Preserve nested session failures without exposing the bound token."""
+    message = "Denied xoxp-secret"
+    credentials: JSONObject = {"access_token": "xoxp-secret"}
+    session = create_autospec(ClientSession, instance=True)
+    session.__aenter__.return_value = session
+    cause: Exception
+    if failure == "http":
+        cause = httpx.HTTPStatusError(
+            message,
+            request=httpx.Request("POST", "https://mcp.slack.com/mcp"),
+            response=httpx.Response(401),
+        )
+    elif failure == "protocol":
+        cause = McpError(ErrorData(code=-32602, message=message))
+    else:
+        cause = slack_mcp.SlackApiError("invalid_tools", message=message)
+    session.list_tools.side_effect = ExceptionGroup(
+        "MCP failed", [ExceptionGroup("Transport failed", [cause])]
+    )
+    with (
+        patch("mcp.ClientSession", return_value=session),
+        patch("mcp.client.streamable_http.streamable_http_client") as transport,
+    ):
+        transport.return_value.__aenter__.return_value = (Mock(), Mock(), Mock())
+        with pytest.raises(slack_mcp.SlackApiError) as error:
+            registry.invoke_connector(
+                "slack__discover_tools", {}, Mock(), credentials, {}
+            )
+    assert error.value.code == (
+        "invalid_tools" if failure == "connector" else "request_failed"
+    )
+    assert error.value.status_code == (401 if failure == "http" else None)
+    assert error.value.message == "Denied [REDACTED]"
     assert "xoxp-secret" not in "".join(traceback.format_exception(error.value))

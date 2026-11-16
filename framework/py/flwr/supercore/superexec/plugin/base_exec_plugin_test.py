@@ -59,6 +59,8 @@ def test_default_plugin_uses_task_type() -> None:
         task=_get_task(task_type=TaskType.AGENT_APP, fab_hash="fab-hash"),
     )
 
+    executor.launch.assert_called_once()
+
     spec = _execution_spec_from_executor(executor)
     assert spec.task_type == TaskType.AGENT_APP
     assert spec.fab_hash == "fab-hash"

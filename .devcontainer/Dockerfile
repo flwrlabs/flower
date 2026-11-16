@@ -28,10 +28,12 @@ RUN apt-get update
 RUN apt-get install -y curl wget gnupg python3 python-is-python3 python3-pip git \
     build-essential tmux vim
 
+RUN python -m pip install --upgrade --no-cache-dir \
+    'pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70'
+
 RUN python -m pip install \
-    pip==26.2.1 \
     setuptools==83.0.0 \
-    uv==0.12.20 \
+    uv==0.13.5 \
     maturin==1.8.6
 # Install taplo from the main branch on GitHub so that maturin can build the wheel
 RUN python -m pip install \

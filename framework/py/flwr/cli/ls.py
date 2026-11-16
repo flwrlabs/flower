@@ -367,7 +367,7 @@ def _display_one_run(stub: ControlHttpClient, run_id: int) -> list[RunRow]:
     with flwr_cli_exc_handler():
         res: ListRunsResponse = stub.ListRuns(ListRunsRequest(run_id=run_id))
     if not res.run_dict:
-        # This won't be reached as an gRPC error is raised if run_id is invalid
+        # The server raises an API error if run_id is invalid
         raise ValueError(f"Run ID {run_id} not found")
 
     runs = [run_from_proto(proto) for proto in res.run_dict.values()]

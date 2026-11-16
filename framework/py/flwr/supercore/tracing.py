@@ -18,8 +18,8 @@ Set ``FLWR_TRACING_ENABLED=1`` in services and workers to use the installed
 ``flwr.ee.supercore.tracing`` backend. Backend failures do not affect execution.
 Application exceptions retain their type, without exporting messages or bodies.
 
-Validated version-00 task carriers correlate creation, acquisition, dispatch
-and execution. These spans can be siblings, not an exact nested run lifetime.
+Validated version-00 HTTP carriers preserve direct request context. Independent
+task traces correlate through run/task metadata, not persisted parent context.
 The first output-text delta records ``provider.first_text``, excluding reasoning
 and non-streamed responses. Span end and ERROR status record completion/failure.
 Export is best effort with bounded flushing and metadata-only attributes.
@@ -33,6 +33,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from functools import lru_cache
 from importlib import import_module
+from time import monotonic_ns, time_ns
 from types import ModuleType
 from typing import Any
 
@@ -62,6 +63,16 @@ def _backend() -> ModuleType | None:
     return _load_backend() if os.getenv("FLWR_TRACING_ENABLED") == "1" else None
 
 
+def initialize_tracing(component: str) -> None:
+    """Prepare optional tracing before worker readiness, without creating a span."""
+    backend = _backend()
+    if backend is not None:
+        try:
+            backend.initialize_tracing(component)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
+
 class TraceSpan:
     """Isolate optional tracing failures from application work."""
 
@@ -81,6 +92,41 @@ class TraceSpan:
         if self._span is not None:
             try:
                 self._span.add_event(name)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+
+
+class PhaseTimings:
+    """Retain measured phases until their run/task identity is available."""
+
+    def __init__(self) -> None:
+        self._enabled = os.getenv("FLWR_TRACING_ENABLED") == "1"
+        self._wall = time_ns() if self._enabled else 0
+        self._clock = monotonic_ns() if self._enabled else 0
+        self._phases: list[tuple[str, int, int]] = []
+
+    @contextmanager
+    def measure(self, name: str) -> Iterator[None]:
+        """Measure elapsed time without importing or invoking a tracing SDK."""
+        if not self._enabled:
+            yield
+            return
+        start = self._wall + monotonic_ns() - self._clock
+        try:
+            yield
+        finally:
+            end = self._wall + monotonic_ns() - self._clock
+            self._phases.append((name, start, end))
+
+    def publish(self, name: str, attributes: Mapping[str, TraceScalar]) -> None:
+        """Export the completed group once, with original measured timestamps."""
+        phases, self._phases = self._phases, []
+        if not phases:
+            return
+        backend = _backend()
+        if backend is not None:
+            try:
+                backend.record_phase_spans(name, phases, dict(attributes))
             except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
@@ -143,25 +189,3 @@ def flush_traces() -> None:
             backend.flush_traces()
         except Exception:  # pylint: disable=broad-exception-caught
             pass
-
-
-def store_task_context(state: object, task_id: int, traceparent: str) -> None:
-    """Persist a task carrier through the optional extension, best effort."""
-    carrier = validate_traceparent(traceparent)
-    backend = _backend()
-    if backend is not None and carrier:
-        try:
-            backend.store_task_context(state, task_id, carrier)
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-
-
-def load_task_context(state: object, task_id: int) -> str:
-    """Load a queued task carrier without putting it in application data."""
-    backend = _backend()
-    if backend is not None:
-        try:
-            return validate_traceparent(backend.load_task_context(state, task_id))
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
-    return ""

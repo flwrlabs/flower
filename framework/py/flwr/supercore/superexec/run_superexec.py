@@ -28,7 +28,6 @@ from flwr.supercore import log
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionHttpInterceptor,
     SuperExecAuthHttpInterceptor,
@@ -39,7 +38,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.runtime.tracing import RuntimeTracingInterceptor
 from flwr.supercore.telemetry import EventType
 from flwr.supercore.tls import validate_and_resolve_root_certificates
-from flwr.supercore.tracing import flush_traces, trace_span
+from flwr.supercore.tracing import PhaseTimings, flush_traces, trace_span
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .executor.config import ExecutorConfig
@@ -134,7 +133,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
-    health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
     executor_type: ExecutorType = ExecutorType.SUBPROCESS,
     executor_config: ExecutorConfig | None = None,
@@ -158,9 +156,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     parent_pid : Optional[int] (default: None)
         The PID of the parent process. If provided, the SuperExec will terminate
         when the parent process exits.
-    health_server_address : Optional[str] (default: None)
-        The address of the health server. If `None` is provided, the health server will
-        NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
@@ -197,13 +192,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
-    # Launch gRPC health server
-    grpc_servers = []
     try:
-        if health_server_address is not None:
-            health_server = run_health_server_grpc_no_tls(health_server_address)
-            grpc_servers.append(health_server)
-
         client = RuntimeHttpClient.from_server_address(
             server_address=runtime_api_address,
             insecure=insecure,
@@ -221,7 +210,6 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     register_signal_handlers(
         event_type=EventType.RUN_SUPEREXEC_LEAVE,
         exit_message="SuperExec terminated gracefully.",
-        grpc_servers=grpc_servers,
         exit_handlers=[client.close, executor.close],
     )
 
@@ -244,27 +232,38 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
             message=f"Invalid plugin config: {e!r}",
         )
 
-    # Start the main loop
+    # Start executor maintenance once, independently of task polling.
     try:
+        executor.reconcile()
         while True:
-            executor.reconcile()
-            supported_task_types, agentapp_fab_hashes = executor.get_eligible_capacity(
-                set(plugin.supported_task_types),
-                insecure=insecure,
-                root_certificates_path=root_certificates_path,
-            )
-            combined_res = client.AcquireTask(
-                AcquireTaskRequest(
-                    supported_task_types=supported_task_types,
-                    agentapp_fab_hashes=agentapp_fab_hashes,
+            timings = PhaseTimings()
+            with timings.measure("executor.capacity"):
+                supported_task_types, agentapp_fab_hashes = (
+                    executor.get_eligible_capacity(
+                        set(plugin.supported_task_types),
+                        insecure=insecure,
+                        root_certificates_path=root_certificates_path,
+                    )
                 )
-            )
+            with timings.measure("executor.claim"):
+                combined_res = client.AcquireTask(
+                    AcquireTaskRequest(
+                        supported_task_types=supported_task_types,
+                        agentapp_fab_hashes=agentapp_fab_hashes,
+                    )
+                )
             if combined_res.HasField("task") and combined_res.token:
+                # Idle polling must not generate an unbounded stream of spans.
+                timings.publish(
+                    "executor.acquire",
+                    {
+                        "flwr.component": "superexec",
+                        "flwr.task_id": str(combined_res.task.task_id),
+                        "flwr.run_id": str(combined_res.task.run_id),
+                    },
+                )
                 with trace_span(
                     "task.dispatch",
-                    traceparent=tracing.take_task_traceparent(
-                        combined_res.task.task_id
-                    ),
                     attributes={
                         "flwr.component": "superexec",
                         "flwr.task_id": str(combined_res.task.task_id),

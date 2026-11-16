@@ -135,7 +135,7 @@ def test_pull_prompt_requires_instruction() -> None:
 
     with pytest.raises(RuntimeError, match="exactly one"):
         pull_prompt(grid)
-    grid.pull_messages.assert_called_once_with([])
+    grid.pull_messages.assert_called_once_with()
 
 
 def test_pull_prompt_serializes_instruction() -> None:
@@ -422,6 +422,7 @@ def test_resident_accepts_before_task_input_and_output_capture(
     """Accept authority after Runtime setup and signals, before task work."""
     calls: list[str] = []
     lifecycle = Mock()
+    lifecycle.timings = run_agentapp_module.PhaseTimings()
 
     def run() -> int:
         calls.append("run")

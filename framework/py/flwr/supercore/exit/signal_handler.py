@@ -20,8 +20,6 @@ from collections.abc import Callable
 from threading import Lock, Thread
 from types import FrameType
 
-from grpc import Server
-
 from flwr.supercore.telemetry import EventType
 
 from .exit import flwr_exit
@@ -41,7 +39,6 @@ if hasattr(signal, "SIGQUIT"):
 def register_signal_handlers(
     event_type: EventType,
     exit_message: str | None = None,
-    grpc_servers: list[Server] | None = None,
     bckg_threads: list[Thread] | None = None,
     exit_handlers: list[Callable[[], None]] | None = None,
 ) -> None:
@@ -53,9 +50,6 @@ def register_signal_handlers(
         The telemetry event that should be logged before exit.
     exit_message : Optional[str] (default: None)
         The message to be logged before exiting.
-    grpc_servers: Optional[List[Server]] (default: None)
-        An otpional list of gRPC servers that need to be gracefully
-        terminated before exiting.
     bckg_threads: Optional[List[Thread]] (default: None)
         An optional list of threads that need to be gracefully
         terminated before exiting.
@@ -68,10 +62,6 @@ def register_signal_handlers(
     lock = Lock()
 
     def _wait_to_stop() -> None:
-        if grpc_servers is not None:
-            for grpc_server in grpc_servers:
-                grpc_server.stop(grace=1)
-
         if bckg_threads is not None:
             for bckg_thread in bckg_threads:
                 bckg_thread.join()
