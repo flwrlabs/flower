@@ -114,6 +114,10 @@ message PullTaskMessageResponse { repeated Message messages = 1; }
 message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
 message RecordTaskUsageResponse {}
 
+// ListAgentConnectors messages
+message ListAgentConnectorsRequest {}
+message ListAgentConnectorsResponse { repeated Connector connectors = 1; }
+
 // GetConnector messages
 message GetConnectorRequest {}
 message GetConnectorResponse {
