@@ -23,7 +23,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from flwr.supercore.state.schema.corestate_models import (
-    Agent,
     Event,
     FlwrBase,
     Task,
@@ -136,6 +135,7 @@ def test_connector_requires_exactly_one_existing_owner(
 ) -> None:
     """Accept one owner and require agent owners to reference an existing agent."""
     table = FlwrBase.metadata.tables[table_name]
+    agent_table = FlwrBase.metadata.tables["agent"]
     timestamp = datetime.now(UTC)
     values: dict[str, object] = {
         "federation_id": federation_id,
@@ -157,10 +157,10 @@ def test_connector_requires_exactly_one_existing_owner(
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
-        Agent.__table__.create(conn)
+        agent_table.create(conn)
         table.create(conn)
         conn.execute(
-            Agent.__table__.insert().values(
+            agent_table.insert().values(
                 agent_id=1,
                 name="Agent",
                 app_spec="@user/app",
