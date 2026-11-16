@@ -15,7 +15,9 @@
 """Ray-based Flower Actor and ActorPool implementation."""
 
 
+import errno
 import glob
+import ipaddress
 import os
 import socket
 import threading
@@ -111,7 +113,7 @@ def _is_amd_render_node(node: str) -> bool | None:
         return None
 
 
-def _can_open_device(path: str) -> bool:
+def _can_open_device(path: str) -> bool | None:
     """Whether `path` can actually be opened for read/write.
 
     `os.access()` only consults the device node's permission bits via `stat(2)`;
@@ -119,11 +121,18 @@ def _can_open_device(path: str) -> bool:
     independently of those bits, which `os.access()` does not detect, so it can
     report a device as accessible when it is not. Attempting the real open
     avoids that false positive.
+
+    Returns `None`, not `False`, when `open(2)` fails for a reason other than
+    `EACCES`/`EPERM` (e.g. `ENODEV`/`EIO` from the driver, or `EMFILE` in this
+    process): those are not a permissions problem, and the caller must not
+    prescribe a permissions fix for them.
     """
     try:
         fd = os.open(path, os.O_RDWR)
-    except OSError:
-        return False
+    except OSError as exc:
+        if exc.errno in (errno.EACCES, errno.EPERM):
+            return False
+        return None
     os.close(fd)
     return True
 
@@ -137,7 +146,8 @@ def _log_kfd_diagnostics() -> None:
     if not os.path.exists("/dev/kfd"):
         return
 
-    if not _can_open_device("/dev/kfd"):
+    kfd_openable = _can_open_device("/dev/kfd")
+    if kfd_openable is False:
         log(
             WARNING,
             "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
@@ -152,6 +162,20 @@ def _log_kfd_diagnostics() -> None:
             "Both Ray and the ML framework will report zero GPUs until "
             "device access is fixed; fixing `amdsmi`/ROCM_PATH "
             "configuration will not help.",
+        )
+        return
+    if kfd_openable is None:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), but "
+            "opening it failed for a reason other than a permissions "
+            "problem (e.g. a driver-level `ENODEV`/`EIO`, or this process "
+            "running out of file descriptors). This is inconclusive: it is "
+            "not the common group-membership/container `--device` issue, "
+            "so adding `--device=/dev/kfd --group-add render` or adjusting "
+            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
+            "process's open-file limit and the kernel/dmesg log for "
+            "driver errors on `/dev/kfd`.",
         )
         return
 
@@ -318,13 +342,26 @@ def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
     (`_local_ips`, not just the hostname's own resolution); any resolution
     failure is treated as "not confirmed remote" so the caller falls back to
     the ambiguous, probe-running branch rather than asserting a remoteness it
-    cannot actually support.
+    cannot actually support. Separately, any resolved address anywhere in the
+    IPv4 (`127.0.0.0/8`) or IPv6 (`::1`) loopback range is treated as local
+    even if it is not an exact match against `_local_ips`'s enumerated
+    addresses, since the whole range -- not just `127.0.0.1` -- always refers
+    back to this same host (e.g. `ray://127.0.0.2:10001`).
     """
     try:
         conn_ips = {info[4][0] for info in socket.getaddrinfo(conn_host, None)}
     except OSError:
         return False
-    return conn_ips.isdisjoint(_local_ips())
+    local_ips = _local_ips()
+    for conn_ip in conn_ips:
+        if conn_ip in local_ips:
+            return False
+        try:
+            if ipaddress.ip_address(conn_ip).is_loopback:
+                return False
+        except ValueError:
+            pass
+    return True
 
 
 def _log_node_locality_diagnostics(
