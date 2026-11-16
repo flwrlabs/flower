@@ -23,6 +23,8 @@ import pytest
 from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -114,7 +116,24 @@ def test_runtime_agent_session_exposes_prompt() -> None:
     )
 
     assert session.prompt == "Initial prompt"
+    assert session.identity is None
     assert session.space is None
+
+
+def test_space_session_exposes_agent_identity() -> None:
+    """Expose the full agent identity supplied with the task input."""
+    identity = Agent(
+        id=42,
+        config=AgentConfig(
+            name="Research", app_spec="@flower/research", description="Cite sources."
+        ),
+    )
+    task_input = PullTaskInputResponse(agent=identity)
+    agent = create_space_session(Mock(_runtime_client=Mock()), Mock(), task_input)
+
+    assert agent.identity == identity
+    assert agent.identity is not None
+    assert agent.identity.config.description == "Cite sources."
 
 
 def test_space_session_reads_messages() -> None:

@@ -138,4 +138,5 @@ def create_space_session(
         events=events,
         grid=_SpaceAgentGrid(),
         space=RuntimeAgentSpace(stub, events),
+        identity=task_input.agent if task_input.HasField("agent") else None,
     )

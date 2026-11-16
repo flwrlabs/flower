@@ -68,6 +68,9 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert first.created_at and first.updated_at == first.created_at
     assert state.list_agents("alice") == [first, second]
     assert state.list_agents("bob") == [other]
+    assert state.get_agent("alice", first.id) == first
+    assert state.get_agent("bob", first.id) is None
+    assert state.get_agent("alice", other.id) is None
     assert state.list_agents("unknown") == []
     assert state.list_agents("") == []
 
