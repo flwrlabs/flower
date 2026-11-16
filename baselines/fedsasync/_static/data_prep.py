@@ -176,10 +176,10 @@ def aggregate_and_save_config(
                                     len(loss_values) > 0
                                     and cumulative_time[-1] > 0
                                 ):
-                                    final_loss = float(loss_values[-1])
+                                    delta_loss = float(loss_values[-1]) - float(loss_values[0])
                                     total_time = float(cumulative_time[-1])
                                     loss_per_sec_runs.append(
-                                        final_loss / total_time
+                                        delta_loss / total_time
                                     )
 
                         # ======================================================

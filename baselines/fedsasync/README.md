@@ -195,6 +195,6 @@ Results for 100 clients experiment:
 ![FedSaSync_100 model efficiency for CIFAR10 IID](_static/cifar10_iid/efficiency_table_100_cifar10_iid.md)
 ![FedSaSync_100 scheduler efficiency for CIFAR10 IID](_static/cifar10_iid/scheduler_table_100_cifar10_iid.md)
 
-![FedSaSync_100 general comparison for CIFAR10 non-IID](_static/cifar10_dirichlet/metrics_grid_cifar10_iid.pdf)
-![FedSaSync_100 model efficiency for CIFAR10 non-IID](_static/cifar10_dirichlet/efficiency_table_100_cifar10_iid.md)
-![FedSaSync_100 scheduler efficiency for CIFAR10 IID](_static/cifar10_iid/scheduler_table_100_cifar10_iid.md)
+![FedSaSync_100 general comparison for CIFAR10 non-IID](_static/cifar10_dirichlet/metrics_grid_cifar10_dirichlet.pdf)
+![FedSaSync_100 model efficiency for CIFAR10 non-IID](_static/cifar10_dirichlet/efficiency_table_100_cifar10_dirichlet.md)
+![FedSaSync_100 scheduler efficiency for CIFAR10 IID](_static/cifar10_dirichlet/scheduler_table_100_cifar10_dirichlet.md)

@@ -908,8 +908,8 @@
         "acc_at_25s_std": 0.5759050847723661
     },
     "loss_per_sec_metrics": {
-        "loss_per_sec_mean": 0.003606060655416559,
-        "loss_per_sec_std": 0.00016364886884240198
+        "loss_per_sec_mean": -0.0026475934011012015,
+        "loss_per_sec_std": 0.00010525925479748352
     },
     "scheduler_metrics": {
         "polling_calls_count_mean": 5994.666666666667,
