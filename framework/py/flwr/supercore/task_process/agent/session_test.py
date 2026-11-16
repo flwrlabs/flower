@@ -23,6 +23,8 @@ import pytest
 from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
     StartAutomationRequest,
     StartAutomationResponse,
     StartRunRequest,
@@ -35,6 +37,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetCompactedContextsResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
+    GetSpaceEventsRequest,
+    GetSpaceEventsResponse,
     PullTaskInputResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
@@ -67,7 +71,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
-from .space_session import create_space_session
+from .space_session import SpaceEvents, create_space_session
 
 
 @pytest.fixture(autouse=True)
@@ -112,7 +116,24 @@ def test_runtime_agent_session_exposes_prompt() -> None:
     )
 
     assert session.prompt == "Initial prompt"
+    assert session.identity is None
     assert session.space is None
+
+
+def test_space_session_exposes_agent_identity() -> None:
+    """Expose the full agent identity supplied with the task input."""
+    identity = Agent(
+        id=42,
+        config=AgentConfig(
+            name="Research", app_spec="@flower/research", description="Cite sources."
+        ),
+    )
+    task_input = PullTaskInputResponse(agent=identity)
+    agent = create_space_session(Mock(_runtime_client=Mock()), Mock(), task_input)
+
+    assert agent.identity == identity
+    assert agent.identity is not None
+    assert agent.identity.config.description == "Cite sources."
 
 
 def test_space_session_reads_messages() -> None:
@@ -267,6 +288,51 @@ def test_get_trace_without_filters_requests_all_events() -> None:
     events.close()
 
     stub.GetRunSeriesEvents.assert_called_once_with(GetRunSeriesEventsRequest())
+
+
+def test_space_get_trace_forwards_filters_and_decodes_events() -> None:
+    """Let Runtime filter before limiting, then decode the returned events."""
+    stub = Mock()
+    stub.GetSpaceEvents.return_value = GetSpaceEventsResponse(
+        events=[
+            TaskEvent(id=12, event="message", data='{"type":"message"}'),
+        ]
+    )
+    events = SpaceEvents(stub)
+
+    trace = events.get_trace(
+        event_types=["message"], after_event_id=9, before_event_id=14, last_n=1
+    )
+    events.close()
+
+    stub.GetSpaceEvents.assert_called_once_with(
+        GetSpaceEventsRequest(
+            event_types=["message"], after_event_id=9, before_event_id=14, last_n=1
+        )
+    )
+    stub.GetRunSeriesEvents.assert_not_called()
+    assert trace == [
+        {
+            "id": 12,
+            "timestamp": "",
+            "run_id": 0,
+            "task_id": 0,
+            "event": "message",
+            "data": {"type": "message"},
+        }
+    ]
+
+
+def test_space_get_trace_without_event_types_forwards_last_n() -> None:
+    """Let the endpoint select the newest events when no type filter is set."""
+    stub = Mock()
+    stub.GetSpaceEvents.return_value = GetSpaceEventsResponse()
+    events = SpaceEvents(stub)
+
+    assert events.get_trace(last_n=2) == []
+    events.close()
+
+    stub.GetSpaceEvents.assert_called_once_with(GetSpaceEventsRequest(last_n=2))
 
 
 def test_get_compacted_contexts_returns_without_emitting() -> None:

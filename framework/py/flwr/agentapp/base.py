@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 
 from flwr.app import Context
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
 # OpenResponses item types and streaming events used for run summaries.
@@ -171,6 +172,11 @@ class AgentSpace(ABC):
 
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
+
+    @property
+    def identity(self) -> Agent | None:
+        """Return this agent's stored identity, or None when unavailable."""
+        return None
 
     @property
     @abstractmethod

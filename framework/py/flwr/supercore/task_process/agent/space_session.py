@@ -18,12 +18,16 @@ from collections.abc import Sequence
 from typing import cast
 
 from flwr.agentapp import AgentGrid
-from flwr.proto.runtime_pb2 import PullTaskInputResponse  # pylint: disable=E0611
+from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    GetSpaceEventsRequest,
+    PullTaskInputResponse,
+)
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     has_builtin_connector,
 )
 from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_loads
 from flwr.superlink.grid import HttpGrid
 
 from .session import (
@@ -35,8 +39,8 @@ from .session import (
 from .space import RuntimeAgentSpace
 
 
-class SpaceAgentEvents(RuntimeAgentEvents):
-    """Disable trace reads while retaining event publication and compaction."""
+class SpaceEvents(RuntimeAgentEvents):
+    """Read Space events while retaining event publication and compaction."""
 
     def get_trace(
         self,
@@ -46,8 +50,27 @@ class SpaceAgentEvents(RuntimeAgentEvents):
         before_event_id: int | None = None,
         last_n: int | None = None,
     ) -> list[JSONObject]:
-        """Reject trace reads before making Runtime requests."""
-        raise NotImplementedError("Space sessions do not support trace reads.")
+        """Get matching events from the authenticated task's Space."""
+        response = self._stub.GetSpaceEvents(
+            GetSpaceEventsRequest(
+                # An empty list means no filtering by event type.
+                event_types=event_types or [],
+                after_event_id=after_event_id,
+                before_event_id=before_event_id,
+                last_n=0 if last_n is None else last_n,
+            )
+        )
+        return [
+            {
+                "id": event.id,
+                "timestamp": event.timestamp,
+                "run_id": event.run_id,
+                "task_id": event.task_id,
+                "event": event.event,
+                "data": strict_json_loads(event.data),
+            }
+            for event in response.events
+        ]
 
 
 class _SpaceAgentConnectors(RuntimeAgentConnectors):
@@ -84,7 +107,7 @@ class _SpaceAgentGrid(AgentGrid):
 
 
 def create_space_session(
-    grid: HttpGrid, events: SpaceAgentEvents, task_input: PullTaskInputResponse
+    grid: HttpGrid, events: SpaceEvents, task_input: PullTaskInputResponse
 ) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
@@ -92,7 +115,7 @@ def create_space_session(
     ----------
     grid : HttpGrid
         Task-authenticated Runtime connection.
-    events : SpaceAgentEvents
+    events : SpaceEvents
         Task event publisher shared with the worker lifecycle.
     task_input : PullTaskInputResponse
         Accepted Run and Task identifiers.
@@ -115,4 +138,5 @@ def create_space_session(
         events=events,
         grid=_SpaceAgentGrid(),
         space=RuntimeAgentSpace(stub, events),
+        identity=task_input.agent if task_input.HasField("agent") else None,
     )

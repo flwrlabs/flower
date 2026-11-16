@@ -43,7 +43,7 @@ from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
 
 # pylint: disable=E0611
-from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.control_pb2 import Agent, StartAutomationRequest, StartRunRequest
 from flwr.proto.runseries_pb2 import CompactedContext
 from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
@@ -244,12 +244,19 @@ class RuntimeAgentSession(AgentSession):
         grid: AgentGrid,
         *,
         space: AgentSpace | None = None,
+        identity: Agent | None = None,
     ) -> None:
         self._prompt = prompt
         self._connectors = connectors
         self._events = events
         self._grid = grid
         self._space = space
+        self._identity = identity
+
+    @property
+    def identity(self) -> Agent | None:
+        """Return the stored identity of this agent, when available."""
+        return self._identity
 
     @property
     def prompt(self) -> str:

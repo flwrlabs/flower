@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.control_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.file_pb2
@@ -302,6 +303,7 @@ class GetSpaceEventsRequest(google.protobuf.message.Message):
     AFTER_EVENT_ID_FIELD_NUMBER: builtins.int
     BEFORE_EVENT_ID_FIELD_NUMBER: builtins.int
     LAST_N_FIELD_NUMBER: builtins.int
+    EVENT_TYPES_FIELD_NUMBER: builtins.int
     after_event_id: builtins.int
     """ID bounds are exclusive."""
     before_event_id: builtins.int
@@ -309,15 +311,20 @@ class GetSpaceEventsRequest(google.protobuf.message.Message):
     """Select newest matching events; zero means no limit.
     Response remains in ascending ID order.
     """
+    @property
+    def event_types(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Empty means all event types."""
+
     def __init__(
         self,
         *,
         after_event_id: builtins.int | None = ...,
         before_event_id: builtins.int | None = ...,
         last_n: builtins.int = ...,
+        event_types: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id", "last_n", b"last_n"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_after_event_id", b"_after_event_id", "_before_event_id", b"_before_event_id", "after_event_id", b"after_event_id", "before_event_id", b"before_event_id", "event_types", b"event_types", "last_n", b"last_n"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_after_event_id", b"_after_event_id"]) -> typing.Literal["after_event_id"] | None: ...
     @typing.overload
@@ -539,6 +546,7 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     FAB_FIELD_NUMBER: builtins.int
     FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
+    AGENT_FIELD_NUMBER: builtins.int
     task_id: builtins.int
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
@@ -548,6 +556,8 @@ class PullTaskInputResponse(google.protobuf.message.Message):
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
     def federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
+    @property
+    def agent(self) -> flwr.proto.control_pb2.Agent: ...
     def __init__(
         self,
         *,
@@ -556,9 +566,10 @@ class PullTaskInputResponse(google.protobuf.message.Message):
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         task_id: builtins.int = ...,
+        agent: flwr.proto.control_pb2.Agent | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["agent", b"agent", "context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent", b"agent", "context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
 global___PullTaskInputResponse = PullTaskInputResponse
 

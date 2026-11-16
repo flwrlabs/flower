@@ -103,7 +103,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
-from .space_session import SpaceAgentEvents, create_space_session
+from .space_session import SpaceEvents, create_space_session
 
 _RUNTIME_API_KEY_ENV = "FLWR_RUNTIME_API_KEY"
 _RUNTIME_BASE_URL_ENV = "FLWR_RUNTIME_BASE_URL"
@@ -299,7 +299,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 # Initialize the AgentApp session
                 with trace_span("agentapp.session"):
                     if run.agent_id is not None:
-                        self._agent_events = SpaceAgentEvents(grid._runtime_client)
+                        self._agent_events = SpaceEvents(grid._runtime_client)
                         agent = create_space_session(grid, self._agent_events, res)
                     else:
                         agent = self._create_legacy_session(res, run, fab)

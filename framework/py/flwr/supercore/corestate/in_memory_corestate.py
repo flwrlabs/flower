@@ -631,6 +631,11 @@ class InMemoryCoreState(
             self.agent_id_counter = agent.id
             return agent
 
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an agent owned by the account."""
+        with self.lock_agent_store:
+            return self.agent_store.get(flwr_aid, {}).get(agent_id)
+
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:

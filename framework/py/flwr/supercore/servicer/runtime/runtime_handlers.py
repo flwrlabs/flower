@@ -84,6 +84,7 @@ def get_space_events(
     log(DEBUG, "Runtime.GetSpaceEvents")
     events = state.get_task_events(
         space_id=space_id,
+        event_types=request.event_types or None,
         after_task_event_id=(
             request.after_event_id if request.HasField("after_event_id") else None
         ),
