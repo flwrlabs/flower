@@ -490,8 +490,40 @@ class RecordTaskUsageResponse(google.protobuf.message.Message):
 global___RecordTaskUsageResponse = RecordTaskUsageResponse
 
 @typing.final
+class ListAgentConnectorsRequest(google.protobuf.message.Message):
+    """ListAgentConnectors messages
+    Agent identity comes from the authenticated task's Run.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ListAgentConnectorsRequest = ListAgentConnectorsRequest
+
+@typing.final
+class ListAgentConnectorsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def connectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.control_pb2.Connector]: ...
+    def __init__(
+        self,
+        *,
+        connectors: collections.abc.Iterable[flwr.proto.control_pb2.Connector] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connectors", b"connectors"]) -> None: ...
+
+global___ListAgentConnectorsResponse = ListAgentConnectorsResponse
+
+@typing.final
 class GetConnectorRequest(google.protobuf.message.Message):
-    """GetConnector messages"""
+    """GetConnector messages
+    Credentials are available only to the authenticated connector task.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -629,6 +661,9 @@ class CreateTaskRequest(google.protobuf.message.Message):
     model_ref: builtins.str
     connector_ref: builtins.str
     connector_id: builtins.int
+    """Select a connection owned by the authenticated Run's agent. Its provider
+    must match connector_ref when both are supplied.
+    """
     def __init__(
         self,
         *,
