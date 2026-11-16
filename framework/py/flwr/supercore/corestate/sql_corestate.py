@@ -2651,6 +2651,7 @@ def _connector_oauth_session_from_model(
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
         completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
+        agent_id=model.agent_id,
     )
 
 
@@ -2662,6 +2663,7 @@ def _connector_from_model(model: ConnectorModel) -> ConnectorRecord:
         connector_ref=model.connector_ref,
         credentials_json=model.credentials_json,
         config_json=model.config_json,
+        agent_id=model.agent_id,
     )
 
 

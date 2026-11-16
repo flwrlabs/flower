@@ -422,15 +422,28 @@ class FederationApp(FlwrBase):
 
 
 class Connector(FlwrBase):
-    """Represent connector configuration for a federation."""
+    """Represent connector configuration owned by a federation or an agent."""
 
     __tablename__ = "connector"
-    __table_args__ = ({"sqlite_autoincrement": True},)
+    __table_args__ = (
+        CheckConstraint(
+            "(federation_id IS NOT NULL AND agent_id IS NULL) OR "
+            "(federation_id IS NULL AND agent_id IS NOT NULL)",
+            name="ck_connector_owner",
+        ),
+        Index("idx_connector_agent_id", "agent_id"),
+        {"sqlite_autoincrement": True},
+    )
 
     connector_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True, nullable=False
     )
-    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("agent.agent_id", name="fk_connector_agent_id"),
+        nullable=True,
+    )
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     credentials_json: Mapped[str] = mapped_column(String, nullable=False)
     config_json: Mapped[str] = mapped_column(String, nullable=False)
@@ -444,12 +457,25 @@ class ConnectorOAuthSession(FlwrBase):
     """Represent an OAuth authorization session for a connector."""
 
     __tablename__ = "connector_oauth_session"
+    __table_args__ = (
+        CheckConstraint(
+            "(federation_id IS NOT NULL AND agent_id IS NULL) OR "
+            "(federation_id IS NULL AND agent_id IS NOT NULL)",
+            name="ck_connector_oauth_session_owner",
+        ),
+        Index("idx_connector_oauth_session_agent_id", "agent_id"),
+    )
 
     oauth_session_id: Mapped[str] = mapped_column(
         String, primary_key=True, nullable=False
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
-    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("agent.agent_id", name="fk_connector_oauth_session_agent_id"),
+        nullable=True,
+    )
     connector_ref: Mapped[str] = mapped_column(String, nullable=False)
     state: Mapped[str] = mapped_column(String, nullable=False)
     redirect_uri: Mapped[str] = mapped_column(String, nullable=False)

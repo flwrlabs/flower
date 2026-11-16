@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from flwr.supercore.state.schema.corestate_models import (
+    Agent,
     Event,
     FlwrBase,
     Task,
@@ -110,10 +111,69 @@ def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() 
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
-    for column_name in ("federation_id", "created_at", "created_by"):
+    for column_name in ("created_at", "created_by"):
         assert table.c[column_name].nullable is False
-    for column_name in ("deleted_at", "deleted_by"):
+    for column_name in ("federation_id", "agent_id", "deleted_at", "deleted_by"):
         assert table.c[column_name].nullable is True
+
+
+@pytest.mark.parametrize("table_name", ["connector", "connector_oauth_session"])
+@pytest.mark.parametrize(
+    ("federation_id", "agent_id", "error"),
+    [
+        ("@user/fed", None, None),
+        (None, 1, None),
+        (None, None, "CHECK constraint failed"),
+        ("@user/fed", 1, "CHECK constraint failed"),
+        (None, 2, "FOREIGN KEY constraint failed"),
+    ],
+)
+def test_connector_requires_exactly_one_existing_owner(
+    table_name: str,
+    federation_id: str | None,
+    agent_id: int | None,
+    error: str | None,
+) -> None:
+    """Accept one owner and require agent owners to reference an existing agent."""
+    table = FlwrBase.metadata.tables[table_name]
+    timestamp = datetime.now(UTC)
+    values: dict[str, object] = {
+        "federation_id": federation_id,
+        "agent_id": agent_id,
+        "connector_ref": "slack",
+        "created_at": timestamp,
+    }
+    if table_name == "connector":
+        values.update(credentials_json="{}", config_json="{}", created_by="user")
+    else:
+        values.update(
+            oauth_session_id="session",
+            flwr_aid="user",
+            state="state",
+            redirect_uri="http://localhost/callback",
+            expires_at=timestamp,
+        )
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        Agent.__table__.create(conn)
+        table.create(conn)
+        conn.execute(
+            Agent.__table__.insert().values(
+                agent_id=1,
+                name="Agent",
+                app_spec="@user/app",
+                flwr_aid="user",
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+        )
+        if error is None:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match=error):
+                conn.execute(table.insert().values(**values))
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
