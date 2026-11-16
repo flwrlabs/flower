@@ -1,6 +1,12 @@
 name: Release nightly
 
 on:
+  workflow_dispatch:
+    inputs:
+      scan-only:
+        description: "Scan existing nightly base images without publishing a release"
+        type: boolean
+        default: true
   schedule:
     - cron: "0 23 * * *"
 
@@ -8,10 +14,15 @@ env:
   FLWR_TELEMETRY_ENABLED: 0
 
 jobs:
+  authorize-manual-trigger:
+    name: Authorize manual trigger
+    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
+
   release-nightly:
-    runs-on: ubuntu-22.04
-    name: Relase nightly on PyPI
+    runs-on: ubuntu-24.04
+    name: Prepare nightly release or scan
     if: github.repository == 'flwrlabs/flower'
+    needs: authorize-manual-trigger
     outputs:
       skip: ${{ steps.release.outputs.skip }}
       pip-version: ${{ steps.release.outputs.pip-version }}
@@ -22,10 +33,28 @@ jobs:
       - name: Bootstrap
         id: bootstrap
         uses: ./.github/actions/bootstrap
-      - name: Release nightly
-        id: release
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY_USER }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_NAMESPACE }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
+      - name: Publish nightly on PyPI
+        id: publish
+        if: ${{ !inputs.scan-only }}
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
+          PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
+          PYPI_REPOSITORY_NAME: ${{ vars.PYPI_REPOSITORY_NAME }}
+          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         working-directory: framework
         run: |
           RESULT=$(./dev/publish-nightly.sh)
@@ -33,12 +62,30 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
           fi
 
-          echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
-          echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
+      - name: Prepare Docker image matrix
+        id: release
+        env:
+          SKIP_BUILD: ${{ inputs.scan-only || steps.publish.outputs.skip == 'true' }}
+        working-directory: framework
+        run: |
+          {
+            echo "skip=${SKIP_BUILD}"
+            echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}"
+            echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}"
+          } >> "$GITHUB_OUTPUT"
 
-          NAME=$(poetry version | awk {'print $1'})
-          VERSION=$(poetry version -s)
-          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.json
+          NAME=$(uv version | awk '{ print $1 }')
+          VERSION=$(uv version --short)
+          python dev/build-docker-image-matrix.py \
+            --flwr-version "${VERSION}" \
+            --flwr-package "${NAME}" \
+            --image-tag "${VERSION}" \
+            --image-tag nightly \
+            > matrix.raw.json
+          python dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${{ vars.DOCKER_IMAGE_NAMESPACE }}"
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-docker-base-images:
@@ -50,16 +97,81 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).base }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      # Keep base image repository aligned with BASE_REPOSITORY for nightly builds.
+      image-repository: ${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
       file-dir: ${{ matrix.images.file_dir }}
       build-args: |
         PIP_VERSION=${{ needs.release-nightly.outputs.pip-version }}
         SETUPTOOLS_VERSION=${{ needs.release-nightly.outputs.setuptools-version }}
         ${{ matrix.images.build_args_encoded }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+  scan-docker-base-images:
+    name: Scan nightly base (${{ matrix.images.tags[1] }}, ${{ matrix.platform }})
+    # Rescan existing nightly images even when there are no commits to publish.
+    if: >-
+      ${{ !cancelled() && github.repository == 'flwrlabs/flower' &&
+          needs.release-nightly.result == 'success' &&
+          (needs.build-docker-base-images.result == 'success' ||
+           needs.build-docker-base-images.result == 'skipped') }}
+    needs: [release-nightly, build-docker-base-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Neither findings nor scanner errors should fail the nightly release.
+    continue-on-error: true
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        images: ${{ fromJson(needs.release-nightly.outputs.matrix).base.images }}
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Login to Docker registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+          username: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
+          password: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+      - name: Resolve nightly image digest
+        id: image
+        env:
+          IMAGE_REPOSITORY: ${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
+          IMAGE_TAGS: ${{ toJson(matrix.images.tags) }}
+        run: |
+          tag=$(jq --exit-status --raw-output \
+            '[.[] | select(startswith("nightly-"))][0]' <<< "${IMAGE_TAGS}")
+          # Buildx exposes the registry descriptor digest through this template field.
+          digest=$(docker buildx imagetools inspect "${IMAGE_REPOSITORY}:${tag}" \
+            --format '{{.Manifest.Digest}}')
+          [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+          echo "ref=registry://${IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Report all high and critical vulnerabilities
+        uses: docker/scout-action@221e7f4860634eeb1579e3bd7ca232e577bd1864 # v1.26.0
+        with:
+          command: cves
+          image: ${{ steps.image.outputs.ref }}
+          platform: ${{ matrix.platform }}
+          only-severities: critical,high
+          only-fixed: false
+          exit-code: false
+          summary: true
+          write-comment: false
+
+      - name: Report scan failure
+        if: ${{ failure() }}
+        run: |
+          echo "::warning::Docker Scout scan failed. See this job's logs. Nightly publishing is unaffected."
+          echo "Docker Scout scan failed. No complete vulnerability report is available. See this job's logs." >> "$GITHUB_STEP_SUMMARY"
 
   build-docker-binary-images:
     name: Build nightly binary images
@@ -70,10 +182,15 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).binary }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      # Compose a fully qualified repository from host + namespace/repository for binary images.
+      image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
-      build-args: BASE_IMAGE=${{ matrix.images.base_image }}
+      # Keep BASE_REPOSITORY fully qualified so binary builds pull from the same registry.
+      build-args: |
+        BASE_REPOSITORY=${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
+        BASE_IMAGE=${{ matrix.images.base_image }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}

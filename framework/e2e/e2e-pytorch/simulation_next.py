@@ -4,7 +4,7 @@ import flwr as fl
 
 # Define ServerAppp
 server_app = fl.serverapp.ServerApp(
-    config=fl.server.ServerConfig(num_rounds=3),
+    config=fl.server.ServerConfig(num_rounds=2),
 )
 
 

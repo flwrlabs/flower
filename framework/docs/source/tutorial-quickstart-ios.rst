@@ -39,11 +39,11 @@ server environment. We first need to install Flower. You can do this by using pi
 
     $ pip install flwr[simulation]
 
-Or Poetry:
+Or uv:
 
 .. code-block:: shell
 
-    $ poetry add flwr
+    $ uv add flwr
 
 ***************
  Flower Client

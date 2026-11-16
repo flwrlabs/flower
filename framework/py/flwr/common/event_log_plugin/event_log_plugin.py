@@ -17,14 +17,15 @@
 
 from abc import ABC, abstractmethod
 
-import grpc
-from google.protobuf.message import Message as GrpcMessage
+from fastapi import Request
+from google.protobuf.message import Message as ProtoMessage
 
-from flwr.common.typing import AccountInfo, LogEntry
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import LogEntry
 
 
 class EventLogWriterPlugin(ABC):
-    """Abstract Flower Event Log Writer Plugin class for ControlServicer."""
+    """Abstract Flower Event Log Writer Plugin for Control and Fleet APIs."""
 
     @abstractmethod
     def __init__(self) -> None:
@@ -33,8 +34,8 @@ class EventLogWriterPlugin(ABC):
     @abstractmethod
     def compose_log_before_event(  # pylint: disable=too-many-arguments
         self,
-        request: GrpcMessage,
-        context: grpc.ServicerContext,
+        request: ProtoMessage,
+        context: Request,
         account_info: AccountInfo | None,
         method_name: str,
     ) -> LogEntry:
@@ -43,11 +44,11 @@ class EventLogWriterPlugin(ABC):
     @abstractmethod
     def compose_log_after_event(  # pylint: disable=too-many-arguments,R0917
         self,
-        request: GrpcMessage,
-        context: grpc.ServicerContext,
+        request: ProtoMessage,
+        context: Request,
         account_info: AccountInfo | None,
         method_name: str,
-        response: GrpcMessage | BaseException | None,
+        response: ProtoMessage | BaseException | None,
     ) -> LogEntry:
         """Compose post-event log entry from the provided response and context."""
 

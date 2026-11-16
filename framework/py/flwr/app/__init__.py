@@ -15,31 +15,46 @@
 """Public Flower App APIs."""
 
 
-from flwr.common.context import Context
-from flwr.common.message import Message
-from flwr.common.record import (
+from .constants import DEFAULT_TTL
+from .error import Error
+from .message import (
     Array,
     ArrayRecord,
     ConfigRecord,
+    Context,
+    Message,
     MetricRecord,
     RecordDict,
 )
-
-from .error import Error
 from .message_type import MessageType
 from .metadata import Metadata
+from .typing import (
+    ConfigRecordValues,
+    ConfigScalar,
+    ConfigScalarList,
+    MetricRecordValues,
+    MetricScalar,
+    MetricScalarList,
+)
 from .user_config import UserConfig, UserConfigValue
 
 __all__ = [
     "Array",
     "ArrayRecord",
     "ConfigRecord",
+    "ConfigRecordValues",
+    "ConfigScalar",
+    "ConfigScalarList",
     "Context",
+    "DEFAULT_TTL",
     "Error",
     "Message",
     "MessageType",
     "Metadata",
     "MetricRecord",
+    "MetricRecordValues",
+    "MetricScalar",
+    "MetricScalarList",
     "RecordDict",
     "UserConfig",
     "UserConfigValue",

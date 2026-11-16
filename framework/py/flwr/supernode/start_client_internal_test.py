@@ -16,17 +16,45 @@
 
 
 import unittest
+from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
-from flwr.common import ConfigRecord, Context, Message, RecordDict
-from flwr.common.message import remove_content_from_message
-from flwr.common.typing import Fab
+import numpy as np
+import pytest
+from parameterized import parameterized
+
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app.message import make_message, remove_content_from_message
+from flwr.common.constant import SubStatus
+from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
+    iterate_object_tree,
 )
 
-from .start_client_internal import FAB_VERIFICATION_ERROR, _pull_and_store_message
+from .start_client_internal import (
+    FAB_VERIFICATION_ERROR,
+    _init_connection,
+    _pull_and_store_message,
+    _push_messages,
+    start_client_internal,
+)
+
+
+def test_init_connection_uses_http() -> None:
+    """The HTTP transport uses the Fleet HTTP connection."""
+    callbacks = Mock()
+    with patch(
+        "flwr.supernode.start_client_internal.http_request_response",
+        return_value=nullcontext(callbacks),
+    ) as connection:
+        with _init_connection("127.0.0.1:8000", True) as result:
+            assert result is callbacks
+
+    connection.assert_called_once_with("127.0.0.1:8000", True, None, None, None, None)
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -35,9 +63,14 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def setUp(self) -> None:
         """Set up the test case."""
         self.mock_state = Mock()
+        self.mock_state.store_messages.side_effect = lambda messages: [True] * len(
+            messages
+        )
         self.node_id = 111
         self.run_id = 110
+        self.series_id = 112
         self.mock_state.get_node_id.return_value = self.node_id
+        self.mock_state.get_run_series_context.return_value = None
         self.mock_object_store = Mock()
         self.mock_receive = Mock()
         self.mock_get_run = Mock()
@@ -76,13 +109,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def _prepare_for_pull_and_store_message(self) -> None:
         """Prepare mocks for pull_and_store_message."""
         # Prepare
-        message = Message(
+        message = make_message(
             content=RecordDict({"mock_cfg": ConfigRecord({"key": "value"})}),
-            dst_node_id=self.node_id,
-            message_type="query",
-            group_id="test_group",
+            metadata=Metadata(
+                run_id=self.run_id,
+                message_id="",
+                src_node_id=0,
+                dst_node_id=self.node_id,
+                reply_to_message_id="",
+                group_id="test_group",
+                created_at=now().timestamp(),
+                ttl=10.0,
+                message_type="query",
+            ),
         )
-        message.metadata.__dict__["_run_id"] = self.run_id
         message.metadata.__dict__["_message_id"] = message.object_id
         message_without_content = remove_content_from_message(message)
         self.mock_receive.return_value = (
@@ -109,7 +149,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_receive.assert_called_once()
         self.mock_confirm_message_received.assert_called_once()
         self.mock_state.get_run.assert_called_once()
-        self.mock_state.store_message.assert_called_once_with(message_without_content)
+        self.mock_state.store_messages.assert_called_once_with(
+            [message_without_content]
+        )
 
         # Assert: All objects should be pulled and stored
         for obj_id, obj_content in self.simple_store.items():
@@ -120,7 +162,11 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that a message of a known run ID is pulled and stored."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = Mock()  # Mock non-None return
+        fab_hash = "abc123"
+        self.mock_state.get_run.return_value = Mock(
+            fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
+        )
+        self.mock_state.create_task.return_value = 123
 
         # Execute
         res = _pull_and_store_message(
@@ -138,13 +184,117 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Assert
         assert res == self.run_id
         self._assert_message_pulled_and_stored()
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.CLIENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab_hash,
+        )
 
         # Assert: All are not called if run_id is known
         self.mock_get_run.assert_not_called()
         self.mock_get_fab.assert_not_called()
         self.mock_state.store_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
+
+    def test_pull_and_store_message_returns_none_if_create_task_fails(self) -> None:
+        """Test that message processing stops if task creation fails."""
+        self._prepare_for_pull_and_store_message()
+        fab_hash = "abc123"
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.create_task.return_value = None
+
+        res = _pull_and_store_message(
+            state=self.mock_state,
+            object_store=self.mock_object_store,
+            node_config={},
+            receive=self.mock_receive,
+            get_run=self.mock_get_run,
+            get_fab=self.mock_get_fab,
+            pull_object=self.mock_pull_object,
+            confirm_message_received=self.mock_confirm_message_received,
+            trusted_entities={},
+        )
+
+        assert res is None
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.CLIENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab_hash,
+        )
+        self.mock_object_store.preregister.assert_not_called()
+        self.mock_state.store_messages.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
+
+    @parameterized.expand([(True, False), (False, True), (True, True)])  # type: ignore
+    def test_pull_and_store_message_handles_failures(
+        self, pull_fails: bool, ack_fails: bool
+    ) -> None:
+        """Check pull-failure cleanup and propagation of ACK failures."""
+        self._prepare_for_pull_and_store_message()
+        fab_hash = "abc123"
+        task_id = 123
+        message_id = self.mock_receive.return_value[0].metadata.message_id
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.create_task.return_value = task_id
+        if pull_fails:
+            self.mock_pull_object.side_effect = RuntimeError("pull error")
+        if ack_fails:
+            self.mock_confirm_message_received.side_effect = RuntimeError("ACK error")
+        calls = Mock()
+        calls.attach_mock(self.mock_confirm_message_received, "ack")
+        calls.attach_mock(self.mock_state.cancel_messages, "cancel")
+        calls.attach_mock(self.mock_object_store.delete, "delete")
+        calls.attach_mock(self.mock_state.finish_task, "finish")
+
+        with (
+            pytest.raises(RuntimeError, match="ACK error")
+            if ack_fails
+            else nullcontext()
+        ):
+            res = _pull_and_store_message(
+                state=self.mock_state,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={},
+            )
+
+        self.mock_confirm_message_received.assert_called_once_with(
+            self.run_id, message_id
+        )
+        if not pull_fails:
+            self.mock_state.cancel_messages.assert_not_called()
+            self.mock_object_store.delete.assert_not_called()
+            self.mock_state.finish_task.assert_not_called()
+            return
+
+        if not ack_fails:
+            assert res is None
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.CLIENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab_hash,
+        )
+        self.mock_state.cancel_messages.assert_called_once_with(
+            message_ids=[message_id]
+        )
+        self.mock_object_store.delete.assert_called_once_with(message_id)
+        self.mock_state.finish_task.assert_called_once_with(
+            task_id,
+            sub_status=SubStatus.FAILED,
+            details="Pulling message objects failed: pull error",
+        )
+        assert [call[0] for call in calls.mock_calls] == [
+            "cancel",
+            "delete",
+            "finish",
+            "ack",
+        ]
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:
         """Test that a message of an unknown run ID is pulled and stored."""
@@ -162,9 +312,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             run_id=self.run_id,
             fab_hash=fab.hash_str,
             override_config={},
+            series_id=self.series_id,
+            primary_task_type=TaskType.AGENT_APP,
         )
         self.mock_get_run.return_value = mock_run
         self.mock_get_fab.return_value = fab
+        shared_state = RecordDict({"shared": ConfigRecord({"value": "kept"})})
+        self.mock_state.get_run_series_context.return_value = Context(
+            run_id=109,
+            node_id=self.node_id,
+            node_config={},
+            state=shared_state,
+            run_config={},
+            series_id=self.series_id,
+        )
 
         # Execute
         mock_fused_run_config = {"mock_key": "mock_value"}
@@ -193,16 +354,25 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
         self.mock_state.store_fab.assert_called_once_with(fab)
         self.mock_state.store_run.assert_called_once_with(mock_run)
+        self.mock_state.get_run_series_context.assert_called_once_with(self.series_id)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.AGENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+        )
 
         # Assert: the Context should be created and stored if run_id is unknown
-        self.mock_state.store_context.assert_called_once()
-        args, _ = self.mock_state.store_context.call_args
-        ctxt = args[0]
+        self.mock_state.set_run_series_context.assert_called_once()
+        args, _ = self.mock_state.set_run_series_context.call_args
+        assert args[0] == self.series_id
+        ctxt = args[1]
         assert isinstance(ctxt, Context)
         assert ctxt.run_id == self.run_id
         assert ctxt.node_id == self.node_id
         assert ctxt.node_config == {}
+        assert ctxt.state is shared_state
         assert ctxt.run_config == mock_fused_run_config
+        assert ctxt.series_id == self.series_id
 
     def test_pull_and_store_message_rejects_missing_verification_metadata(self) -> None:
         """Test that trusted-entity verification fails closed without metadata."""
@@ -242,12 +412,15 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         mock_verify_fab.assert_not_called()
         self.mock_get_run.assert_called_once_with(self.run_id)
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_confirm_message_received.assert_not_called()
+        self.mock_confirm_message_received.assert_called_once_with(
+            self.run_id, self.mock_receive.return_value[0].metadata.message_id
+        )
 
-        self.mock_state.store_message.assert_called_once()
-        stored_message = self.mock_state.store_message.call_args.args[0]
+        self.mock_state.store_messages.assert_called_once()
+        original, stored_message = self.mock_state.store_messages.call_args.args[0]
+        assert original is self.mock_receive.return_value[0]
         assert stored_message.has_error()
         assert stored_message.error == FAB_VERIFICATION_ERROR
         assert (
@@ -296,11 +469,144 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         mock_verify_fab.assert_called_once_with(
             fab, {"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"}
         )
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_confirm_message_received.assert_not_called()
+        self.mock_confirm_message_received.assert_called_once_with(
+            self.run_id, self.mock_receive.return_value[0].metadata.message_id
+        )
 
-        self.mock_state.store_message.assert_called_once()
-        stored_message = self.mock_state.store_message.call_args.args[0]
+        self.mock_state.store_messages.assert_called_once()
+        original, stored_message = self.mock_state.store_messages.call_args.args[0]
+        assert original is self.mock_receive.return_value[0]
         assert stored_message.has_error()
         assert stored_message.error == FAB_VERIFICATION_ERROR
+
+
+class _StopAfterSuperExecLaunch(Exception):
+    """Stop start_client_internal after command construction."""
+
+
+def _run_until_connection_start(
+    runtime_certificates: tuple[bytes, bytes, bytes] | None = None,
+    runtime_root_certificates_path: str | None = None,
+    runtime_api_address: str = "127.0.0.1:9094",
+) -> Mock:
+    """Run startup only far enough to inspect SuperExec HTTP wiring."""
+    objectstore_factory = Mock()
+    state_factory = Mock(objectstore_factory=objectstore_factory)
+    with (
+        patch("flwr.supernode.start_client_internal.register_signal_handlers"),
+        patch("flwr.supernode.start_client_internal.subprocess.Popen") as popen,
+        patch(
+            "flwr.supernode.start_client_internal._init_connection",
+            side_effect=_StopAfterSuperExecLaunch,
+        ),
+    ):
+        # `_init_connection` starts the long-running SuperNode/SuperLink connection.
+        # Raising there keeps this test focused on the setup performed before it.
+        with pytest.raises(_StopAfterSuperExecLaunch):
+            start_client_internal(
+                state_factory=state_factory,
+                server_address="127.0.0.1:9092",
+                node_config={},
+                root_certificates=None,
+                insecure=True,
+                runtime_api_address=runtime_api_address,
+                runtime_certificates=runtime_certificates,
+                runtime_root_certificates_path=runtime_root_certificates_path,
+            )
+
+    return popen
+
+
+def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
+    """Subprocess SuperExec should use insecure Runtime API when TLS is off."""
+    # This verifies the default subprocess-isolation path: when SuperNode starts
+    # Runtime API without server TLS means the spawned SuperExec uses plaintext too.
+    popen = _run_until_connection_start()
+
+    # No Runtime API server certificates means the local server is plaintext,
+    # so the child SuperExec must connect with `--insecure`.
+    command = popen.call_args.args[0]
+    assert command[:2] == ["flower-superexec", "--insecure"]
+    assert "--root-certificates" not in command
+    assert command[command.index("--runtime-api-address") + 1] == "127.0.0.1:9094"
+
+
+def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
+    None
+):
+    """Subprocess SuperExec should trust the secure Runtime API server CA."""
+    # This verifies the TLS subprocess-isolation path: when SuperNode starts
+    # Runtime API with server TLS means the spawned SuperExec receives trust roots.
+    certificates = (b"ca", b"cert", b"key")
+
+    popen = _run_until_connection_start(
+        runtime_certificates=certificates,
+        runtime_root_certificates_path="/tmp/ca.pem",
+    )
+
+    # When the Runtime API starts with TLS, SuperExec should verify that server
+    # certificate with the same CA file instead of falling back to plaintext.
+    command = popen.call_args.args[0]
+    assert "--insecure" not in command
+    assert command[:3] == ["flower-superexec", "--root-certificates", "/tmp/ca.pem"]
+
+
+def test_start_client_internal_launches_superexec_with_runtime_http_address() -> None:
+    """Subprocess SuperExec should use the Runtime HTTP API address."""
+    popen = _run_until_connection_start(runtime_api_address="localhost:54321")
+
+    command = popen.call_args.args[0]
+    assert command[command.index("--runtime-api-address") + 1] == "localhost:54321"
+
+
+def test_push_messages_pushes_each_requested_object_once() -> None:
+    """Shared objects in different branches should only be pushed once."""
+    instruction = make_message(
+        content=RecordDict(),
+        metadata=Metadata(
+            run_id=1,
+            message_id="instruction-id",
+            src_node_id=0,
+            dst_node_id=1,
+            reply_to_message_id="",
+            group_id="",
+            created_at=now().timestamp(),
+            ttl=10.0,
+            message_type="query",
+        ),
+    )
+    reply = Message(
+        content=RecordDict(
+            {
+                "first": ArrayRecord([np.array([1]), np.array([2]), np.array([3])]),
+                "second": ArrayRecord([np.array([1]), np.array([4]), np.array([5])]),
+            }
+        ),
+        reply_to=instruction,
+    )
+    reply.metadata.__dict__["_run_id"] = 1
+    reply.metadata.__dict__["_message_id"] = reply.object_id
+    object_tree = get_object_tree(reply)
+    tree_object_ids = [tree.object_id for tree in iterate_object_tree(object_tree)]
+    assert len(tree_object_ids) > len(set(tree_object_ids))
+    object_contents = {
+        object_id: obj.deflate()
+        for object_id, obj in get_all_nested_objects(reply).items()
+    }
+
+    state = Mock()
+    state.get_messages.return_value = [reply]
+    state.get_message_processing_duration.return_value = 0.1
+    object_store = Mock()
+    object_store.get_object_tree.return_value = object_tree
+    object_store.get.side_effect = object_contents.get
+    send = Mock(return_value=(set(object_contents), "session-id"))
+    push_object = Mock()
+
+    _push_messages(state, object_store, send, push_object)
+
+    pushed_object_ids = [call.args[2] for call in push_object.call_args_list]
+    assert len(pushed_object_ids) == len(set(pushed_object_ids))
+    assert set(pushed_object_ids) == set(object_contents)

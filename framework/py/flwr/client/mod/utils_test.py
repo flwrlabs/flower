@@ -18,8 +18,7 @@
 import unittest
 from typing import cast
 
-from flwr.client.typing import ClientAppCallable, Mod
-from flwr.common import (
+from flwr.app import (
     DEFAULT_TTL,
     ConfigRecord,
     Context,
@@ -27,9 +26,10 @@ from flwr.common import (
     Metadata,
     MetricRecord,
     RecordDict,
-    now,
 )
-from flwr.common.message import make_message
+from flwr.app.message import make_message
+from flwr.clientapp.typing import ClientAppCallable, Mod
+from flwr.supercore.date import now
 
 from .utils import make_ffn
 

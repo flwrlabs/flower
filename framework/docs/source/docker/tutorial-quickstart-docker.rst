@@ -69,12 +69,13 @@ Open your terminal and run:
     :substitutions:
 
     $ docker run --rm \
-          -p 9091:9091 -p 9092:9092 -p 9093:9093 \
+          -p 8000:8000 \
           --network flwr-network \
           --name superlink \
           --detach \
           flwr/superlink:|stable_flwr_version| \
           --insecure \
+          --host 0.0.0.0 \
           --isolation \
           process
 
@@ -82,10 +83,9 @@ Open your terminal and run:
 
     * ``docker run``: This tells Docker to run a container from an image.
     * ``--rm``: Remove the container once it is stopped or the command exits.
-    * ``-p 9091:9091 -p 9092:9092 -p 9093:9093``: Map port ``9091``, ``9092`` and ``9093`` of the
-      container to the same port of the host machine, allowing other services to access the
-      ServerAppIO API on ``http://localhost:9091``, the Fleet API on ``http://localhost:9092`` and
-      the Control API on ``http://localhost:9093``.
+    * ``-p 8000:8000``: Map port ``8000`` of the container to the same port of the host
+      machine, allowing other services to access the Runtime, Control, and Fleet APIs
+      on ``http://localhost:8000``.
     * ``--network flwr-network``: Make the container join the network named ``flwr-network``.
     * ``--name superlink``: Assign the name ``superlink`` to the container.
     * ``--detach``: Run the container in the background, freeing up the terminal.
@@ -93,6 +93,8 @@ Open your terminal and run:
       tag of the image. The tag :substitution-code:`|stable_flwr_version|` represents a :doc:`specific version <pin-version>` of the image.
     * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
       unencrypted communication.
+    * ``--host 0.0.0.0``: Make the Runtime, Control, and Fleet HTTP APIs reachable
+      outside the container.
     * ``--isolation process``: Tells the SuperLink that the ServerApp is executed by separate
       independent process. The SuperLink does not attempt to execute it. You can learn more about
       the different process modes here: :doc:`run-as-subprocess`.
@@ -115,9 +117,10 @@ Start two SuperNode containers.
            --detach \
            flwr/supernode:|stable_flwr_version|  \
            --insecure \
-           --superlink superlink:9092 \
+           --superlink superlink:8000 \
            --node-config "partition-id=0 num-partitions=2" \
-           --clientappio-api-address 0.0.0.0:9094 \
+           --host 0.0.0.0 \
+           --port 9094 \
            --isolation process
 
    .. dropdown:: Understand the command
@@ -134,12 +137,12 @@ Start two SuperNode containers.
          image to be run and the specific tag of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication.
-       * ``--superlink superlink:9092``: Connect to the SuperLink's Fleet API at the address
-         ``superlink:9092``.
+       * ``--superlink superlink:8000``: Connect to the SuperLink's Fleet API at the address
+         ``superlink:8000``.
        * ``--node-config "partition-id=0 num-partitions=2"``: Set the partition ID to ``0`` and the
          number of partitions to ``2`` for the SuperNode configuration.
-       * ``--clientappio-api-address 0.0.0.0:9094``: Set the address and port number that the
-         SuperNode is listening on to communicate with the ClientApp process. If
+       * ``--host 0.0.0.0``: Make the SuperNode Runtime API accessible outside the container.
+       * ``--port 9094``: Set the port where the SuperNode listens for the ClientApp process. If
          multiple SuperNodes are started on the same machine, use a different port number for each SuperNode.
          (E.g. In the next step, we set the second SuperNode container to listen on port 9095)
        * ``--isolation process``: Tells the SuperNode that the ClientApp is executed by a separate
@@ -157,9 +160,10 @@ Start two SuperNode containers.
            --detach \
            flwr/supernode:|stable_flwr_version|  \
            --insecure \
-           --superlink superlink:9092 \
+           --superlink superlink:8000 \
            --node-config "partition-id=1 num-partitions=2" \
-           --clientappio-api-address 0.0.0.0:9095 \
+           --host 0.0.0.0 \
+           --port 9095 \
            --isolation process
 
 ***************************************************
@@ -167,12 +171,11 @@ Start two SuperNode containers.
 ***************************************************
 
 The **SuperExec** Docker image comes with a pre-installed version of Flower and serves
-as a base for building your own image. Use a **single** image and select the desired
-behavior (ServerApps vs ClientApps) at runtime via the ``--plugin-type`` flag. SuperExec
-spawns the corresponding processes on demand.
+as a base for building your own image. SuperExec spawns the appropriate processes on
+demand based on the tasks it receives.
 
-When using SuperExec with the *serverapp* plugin, pass ``--appio-api-address`` pointing
-to the SuperLink's **ServerAppIO API** endpoint.
+To execute ServerApps, pass ``--runtime-api-address`` pointing to the SuperLink's
+**Runtime API** endpoint.
 
 1. Create a Dockerfile called ``superexec.Dockerfile`` and paste the following:
 
@@ -233,8 +236,7 @@ to the SuperLink's **ServerAppIO API** endpoint.
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type serverapp \
-           --appio-api-address superlink:9091
+           --runtime-api-address superlink:8000
 
    .. dropdown:: Understand the command
 
@@ -247,18 +249,15 @@ to the SuperLink's **ServerAppIO API** endpoint.
          of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication. Secure connections will be added in future releases.
-       * ``--plugin-type serverapp``: Load the *serverapp* plugin. SuperExec will spawn
-         ServerApp processes as needed.
-       * ``--appio-api-address superlink:9091``: Connect to the SuperLink's ServerAppIO API
-         at the address ``superlink:9091``.
+       * ``--runtime-api-address superlink:8000``: Connect to the SuperLink's Runtime API
+         at the address ``superlink:8000``.
 
 ***************************************************
  Step 5: Start the SuperExec to execute ClientApps
 ***************************************************
 
-For ClientApps, reuse the **same** image and change the plugin and API address. When
-using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the SuperNode's
-**ClientAppIO API** endpoint.
+For ClientApps, reuse the **same** image and pass ``--runtime-api-address`` pointing to
+the SuperNode's **Runtime API** endpoint.
 
 1. (No new Dockerfile is needed; reuse ``flwr_superexec:0.0.1``.)
 2. Start the first **SuperExec for ClientApps** container:
@@ -271,8 +270,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
-           --appio-api-address supernode-1:9094
+           --runtime-api-address supernode-1:9094
 
    .. dropdown:: Understand the command
 
@@ -285,9 +283,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
          of the image.
        * ``--insecure``: This flag tells the container to operate in an insecure mode, allowing
          unencrypted communication. Secure connections will be added in future releases.
-       * ``--plugin-type clientapp``: Load the *clientapp* plugin. SuperExec will spawn
-         ClientApp processes as needed.
-       * ``--appio-api-address supernode-1:9094``: Connect to the SuperNode's ClientAppIO API
+       * ``--runtime-api-address supernode-1:9094``: Connect to the SuperNode's Runtime API
          at the address ``supernode-1:9094``.
 
 3. Start the second **SuperExec for ClientApps** container:
@@ -300,8 +296,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
-           --appio-api-address supernode-2:9095
+           --runtime-api-address supernode-2:9095
 
 ************************************
  Step 6: Run the Quickstart Project
@@ -327,7 +322,7 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
        :caption: config.toml
 
        [superlink.local-deployment]
-       address = "127.0.0.1:9093"
+       address = "127.0.0.1:8000"
        insecure = true
 
 2. Run the ``quickstart-pytorch`` project and follow the ServerApp logs to track the
@@ -381,24 +376,21 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type serverapp \
-           --appio-api-address superlink:9091
+           --runtime-api-address superlink:8000
        $ docker run --rm \
            --network flwr-network \
             --name superexec-clientapp-1 \
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
-           --appio-api-address supernode-1:9094
+           --runtime-api-address supernode-1:9094
        $ docker run --rm \
            --network flwr-network \
            --name superexec-clientapp-2 \
            --detach \
            flwr_superexec:0.0.1 \
            --insecure \
-           --plugin-type clientapp \
-           --appio-api-address supernode-2:9095
+           --runtime-api-address supernode-2:9095
 
 5. Run the updated project:
 

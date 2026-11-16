@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Utilities for Actors in the Virtual Client Engine."""
+"""Utilities for Actors in the Simulation Runtime."""
 
 
 import traceback
 import warnings
 from logging import ERROR
 
-from flwr.common.logger import log
+from flwr.supercore import log
 
 try:
     import tensorflow as TF

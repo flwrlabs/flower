@@ -24,7 +24,7 @@ update-text:
 	make gettext
 
 update-lang:
-	sphinx-intl update -p build/gettext -l $(lang)
+	sphinx-intl update -p build/gettext -l $(lang) -w 76
 
 serve:
 	make docs

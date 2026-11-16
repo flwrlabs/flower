@@ -1,0 +1,26 @@
+##################################
+ [305] SUPERNODE_CONNECTION_ERROR
+##################################
+
+*************
+ Description
+*************
+
+This error occurs when the SuperNode cannot initialize its connection to the SuperLink.
+The error shown before this message contains additional details returned by the
+SuperLink or the local connection layer.
+
+****************
+ How to Resolve
+****************
+
+Check the reported error and verify the following:
+
+- The SuperLink address is correct and reachable from the SuperNode. Check network, DNS,
+  proxy, and firewall settings as applicable.
+- The TLS configuration matches the SuperLink, including any root certificates passed to
+  the SuperNode.
+- If ``--auth-supernode-private-key`` is set, the corresponding public key is still
+  registered with the SuperLink. Register it again if it was de-registered.
+- Another SuperNode is not already active with the same credentials. Stop the other
+  process or wait until the SuperLink marks it offline before retrying.

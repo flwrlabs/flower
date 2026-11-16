@@ -14,29 +14,65 @@
 # ==============================================================================
 """Tests for utility functions for the infrastructure."""
 
-
 import json
+import sys
 from typing import Any
 
 import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
-    get_metadata_bytes,
+    MetadataLookupError,
+    build_sql_in_params,
     get_metadata_str,
+    get_metadata_str_checked,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
     mask_string,
     parse_app_spec,
     request_download_link,
+    resolve_account_ids,
     simulation_config_from_json,
     simulation_config_to_json,
+    strict_json_dumps,
+    strict_json_loads,
+    strict_json_loads_object,
     uint64_to_int64,
 )
+
+
+@pytest.mark.parametrize(
+    ("prefix", "values", "expected_placeholders", "expected_params"),
+    [
+        ("a", [10, 20, 30], ":a_0,:a_1,:a_2", {"a_0": 10, "a_1": 20, "a_2": 30}),
+        ("x", ["hello"], ":x_0", {"x_0": "hello"}),
+        ("p", [], "", {}),
+    ],
+)
+def test_build_sql_in_params(
+    prefix: str,
+    values: list[Any],
+    expected_placeholders: str,
+    expected_params: dict[str, Any],
+) -> None:
+    """Build matching SQL placeholders and parameters from ordered values."""
+    placeholders, params = build_sql_in_params(values, prefix)
+
+    assert placeholders == expected_placeholders
+    assert params == expected_params
+
+
+def test_build_sql_in_params_from_set() -> None:
+    """Keep placeholders aligned with parameters for unordered values."""
+    placeholders, params = build_sql_in_params({10, 20, 30}, "value")
+
+    assert placeholders == ",".join(f":{key}" for key in params)
+    assert set(params.values()) == {10, 20, 30}
 
 
 def test_mask_string() -> None:
@@ -48,6 +84,47 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_resolve_account_ids_without_ee(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve the noop account id and ignore unknown ids."""
+    monkeypatch.setitem(sys.modules, "flwr.ee", None)
+    monkeypatch.setitem(sys.modules, "flwr.ee.utils", None)
+    assert resolve_account_ids([NOOP_FLWR_AID, "unknown"]) == {
+        NOOP_FLWR_AID: NOOP_ACCOUNT_NAME
+    }
+
+
+def test_strict_json_loads() -> None:
+    """Parse valid JSON values."""
+    assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_object() -> None:
+    """Accept strict JSON objects and reject other top-level values."""
+    assert strict_json_loads_object('{"key":[1,true,null]}') == {"key": [1, True, None]}
+    for raw in ("[]", "null", '{"key":NaN}'):
+        with pytest.raises(ValueError):
+            strict_json_loads_object(raw)
+
+
+def test_strict_json_loads_rejects_non_finite_numbers() -> None:
+    """Reject Python's non-standard JSON number constants."""
+    with pytest.raises(ValueError, match="non-finite number NaN"):
+        strict_json_loads('{"key":NaN}')
+
+
+def test_strict_json_dumps() -> None:
+    """Serialize valid JSON values."""
+    assert strict_json_dumps({"key": [1, True, None]}, compact=True) == (
+        '{"key":[1,true,null]}'
+    )
+
+
+def test_strict_json_dumps_rejects_non_finite_numbers() -> None:
+    """Reject non-finite floating-point values."""
+    with pytest.raises(ValueError, match="Out of range float values"):
+        strict_json_dumps({"key": float("nan")})
 
 
 @pytest.mark.parametrize(
@@ -73,19 +150,30 @@ def test_get_metadata_str(
 
 
 @pytest.mark.parametrize(
-    ("metadata", "key", "expected"),
+    ("metadata", "key", "expected_value", "expected_error"),
     [
-        ([("x-bin", b"value")], "x-bin", b"value"),
-        ([("x-bin", b"")], "x-bin", None),
-        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
-        ([("x-bin", "value")], "x-bin", None),
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
     ],
 )
-def test_get_metadata_bytes(
-    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
 ) -> None:
-    """Return exactly one non-empty bytes value of the expected type."""
-    assert get_metadata_bytes(metadata, key) == expected
+    """Preserve metadata validation outcomes for callers that need them."""
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
+
+    assert value == expected_value
+    assert error_type == expected_error
 
 
 @parameterized.expand(  # type: ignore
@@ -398,7 +486,7 @@ def test_simulation_config_from_json_rejects_unknown_fields() -> None:
         (90000, "1d 1h"),  # day + hour
     ]
 )
-def test_humanize_duration(seconds, expected) -> None:
+def test_humanize_duration(seconds: int, expected: str) -> None:
     """Test the humanize_duration function."""
     assert humanize_duration(seconds) == expected
 
@@ -412,6 +500,6 @@ def test_humanize_duration(seconds, expected) -> None:
         (3 * 1024**3, "3.0 GB"),  # GB < 10
     ]
 )
-def test_humanize_bytes(num_bytes, expected) -> None:
+def test_humanize_bytes(num_bytes: int, expected: str) -> None:
     """Test the humanize_bytes function."""
     assert humanize_bytes(num_bytes) == expected

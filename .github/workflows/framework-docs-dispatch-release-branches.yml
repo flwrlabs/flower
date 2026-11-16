@@ -7,6 +7,7 @@ on:
       - framework/docs/source/_static/docs-ui.js
       - framework/docs/source/_static/custom.css
       - framework/docs/source/conf_base.py
+      - framework/docs/source/ref-changelog.md
       - framework/docs/source/_templates/**
       - .github/workflows/framework-docs.yml
       - .github/workflows/framework-docs-dispatch-release-branches.yml
@@ -19,7 +20,7 @@ permissions:
 jobs:
   dispatch-release-docs-builds:
     if: ${{ github.repository == 'flwrlabs/flower' }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Dispatch framework-docs.yml to release branches

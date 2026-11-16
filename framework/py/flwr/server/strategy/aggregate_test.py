@@ -16,12 +16,14 @@
 
 
 import numpy as np
+import pytest
 
 from .aggregate import (
     _aggregate_n_closest_weights,
     _check_weights_equality,
     _find_reference_weights,
     aggregate,
+    aggregate_trimmed_avg,
     weighted_loss_avg,
 )
 
@@ -42,6 +44,20 @@ def test_aggregate() -> None:
 
     # Assert
     np.testing.assert_equal(expected, actual)
+
+
+@pytest.mark.parametrize("proportiontocut", [-0.1, 0.5])
+def test_aggregate_trimmed_avg_rejects_invalid_proportion(
+    proportiontocut: float,
+) -> None:
+    """Test that trimmed averaging rejects invalid cut proportions."""
+    results = [
+        ([np.array([1.0, 2.0])], 1),
+        ([np.array([3.0, 4.0])], 1),
+    ]
+
+    with pytest.raises(ValueError, match=r"\[0, 0\.5\)"):
+        aggregate_trimmed_avg(results, proportiontocut)
 
 
 def test_weighted_loss_avg_single_value() -> None:

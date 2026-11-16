@@ -29,6 +29,9 @@ def get_emb(msg: Message, context: Context):
     # Load model from state if available
     if model_record := context.state.get("model", None):
         model.load_state_dict(model_record.to_torch_state_dict())
+    else:
+        # Backward must use the weights that produced these first embeddings.
+        context.state["model"] = ArrayRecord(model.state_dict())
 
     # Do forward pass
     embedding = model(data)
@@ -64,8 +67,7 @@ def apply_grad(msg: Message, context: Context):
     optimizer.zero_grad()
 
     # Load model from state if available
-    if model_record := context.state.get("model", None):
-        model.load_state_dict(model_record.to_torch_state_dict())
+    model.load_state_dict(context.state["model"].to_torch_state_dict())
 
     # Load optimizer state from state if available
     if optimizer_state_record := context.state.get("optimizer_state", None):

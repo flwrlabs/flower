@@ -2,82 +2,70 @@
  Release Flower
 ################
 
-This document describes the current release process. It may or may not change in the
-future.
+Framework minor releases are mostly automated. The manual release process has two steps:
 
-********************
- During the release
-********************
+1. Trigger the release preparation workflow to create a release pull request.
+2. Review the generated changelog, then approve and merge the pull request.
 
-The version number of a release is stated in ``./framework/pyproject.toml``. To release
-a new version of Flower, the following things need to happen (in that order):
+After the release pull request is merged, the remaining release steps are performed
+automatically by GitHub Actions.
 
-1. Run ``python3 ./framework/dev/update_changelog.py <YOUR_GH_TOKEN>`` to add all new
-   changes to the changelog. You can make manual edits to the changelog afterward to
-   improve its formatting or wording. This script will also replace the ``##
-   Unreleased`` header with the new version number and current date, and add a thank-you
-   message for contributors. Open a pull request with these changes.
-2. Once the pull request is merged, tag the release commit with the version number:
-   ``git tag v<NEW_VERSION>`` (notice the ``v`` added before the version number), then
-   ``git push --tags``. This will create a draft release on GitHub containing the
-   correct artifacts and the relevant part of the changelog.
-3. Check the draft release on GitHub, and if everything is good, publish it.
+************************
+ Prepare the release PR
+************************
 
-*******************
- After the release
-*******************
+Trigger the release preparation workflow using the GitHub CLI:
 
-Create a pull request which contains the following changes:
+.. code-block:: bash
 
-1. Increase the minor version in ``pyproject.toml`` by one and update all files which
-   contain the current version number (if necessary) by running
-   ``./framework/dev/update_version.py``.
-2. Add a new ``## Unreleased`` section at the top of
-   ``./framework/docs/source/ref-changelog.md`` to prepare for future changes.
+    gh workflow run framework-release-prepare.yml \
+      --repo flwrlabs/flower \
+      -f version=X.Y.0
 
-Merge the pull request on the same day (i.e., before a new nightly release gets
-published to PyPI).
+Alternatively, trigger the `Framework Prepare Minor Release workflow
+<https://github.com/flwrlabs/flower/actions/workflows/framework-release-prepare.yml>`_
+from the GitHub web UI.
 
-**************************
- Publishing a pre-release
-**************************
+The version must use the ``X.Y.0`` format, for example ``1.34.0``.
 
-Pre-release naming
-==================
+The workflow pins the current ``main`` commit as the release source and creates a draft
+release PR. It generates and polishes the changelog and updates the version bookkeeping
+needed for the release and the next development cycle.
 
-PyPI supports pre-releases (alpha, beta, release candidate). Pre-releases MUST use one
-of the following naming patterns:
+If more changes land on ``main`` before the release PR is merged, trigger the workflow
+again with the same version. The existing release PR is refreshed instead of creating a
+new one, and the release source is re-pinned to the current ``main`` HEAD.
 
-- Alpha: ``MAJOR.MINOR.PATCHaN``
-- Beta: ``MAJOR.MINOR.PATCHbN``
-- Release candidate (RC): ``MAJOR.MINOR.PATCHrcN``
+The release PR is also checked automatically. These checks validate the generated
+version state and changelog and verify that the prebuilt release artifacts for the
+pinned source commit are available.
 
-Examples include:
+*************************
+ Review and merge the PR
+*************************
 
-- ``1.0.0a0``
-- ``1.0.0b0``
-- ``1.0.0rc0``
-- ``1.0.0rc1``
+Review the generated changelog in ``framework/docs/source/changelog/vX.Y.0.md`` and make
+any edits needed before the release. When the PR is ready, mark it ready for review if
+it is still a draft, approve it, and merge it into ``main``.
 
-This is in line with PEP-440 and the recommendations from the Python Packaging Authority
-(PyPA):
+That is the end of the manual release process. Do not manually create release tags or
+publish Python packages, Docker images, or a GitHub Release.
 
-- `PEP-440 <https://peps.python.org/pep-0440/>`_
-- `PyPA Choosing a versioning scheme
-  <https://packaging.python.org/en/latest/guides/distributing-packages-using-setuptools/#choosing-a-versioning-scheme>`_
+******************************
+ What happens after the merge
+******************************
 
-Note that the approach defined by PyPA is not compatible with SemVer 2.0.0 spec, for
-details consult the `Semantic Versioning Specification
-<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ (specifically item 11 on
-precedence).
+Merging the release PR automatically triggers ``framework-release-finalize.yml``. The
+workflow uses the release source commit recorded by the latest release preparation run
+and:
 
-Pre-release classification
-==========================
+- creates the ``framework-X.Y.0`` tag and the ``release/framework-X.Y`` maintenance
+  branch;
+- publishes the Python wheel and source distribution;
+- promotes the prebuilt Docker images to their stable release tags;
+- dispatches the Framework documentation build from the release branch; and
+- publishes the GitHub Release using the release changelog as the release notes.
 
-Should the next pre-release be called alpha, beta, or release candidate?
-
-- RC: feature complete, no known issues (apart from issues that are classified as "won't
-  fix" for the next stable release) - if no issues surface this will become the next
-  stable release
-- Beta: feature complete, allowed to have known issues
-- Alpha: not feature complete, allowed to have known issues
+The release artifacts are built ahead of time for commits on ``main`` by
+``framework-commit-artifacts.yml``. The finalization workflow promotes the artifacts for
+the exact pinned release source instead of rebuilding them during the release.

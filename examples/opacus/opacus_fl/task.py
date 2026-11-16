@@ -89,4 +89,5 @@ def test(net, test_loader, device):
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
     accuracy = correct / len(test_loader.dataset)
+    loss = loss / len(test_loader)
     return loss, accuracy

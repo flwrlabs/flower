@@ -100,7 +100,7 @@ class TestConfigMigration(unittest.TestCase):
         self.get_home_patcher.stop()
         self.temp_dir.cleanup()
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             ("local", ["my-federation"], True),  # single extra arg
             ("/abs/path", [], True),  # absolute path
@@ -202,7 +202,7 @@ class TestConfigMigration(unittest.TestCase):
         with self.assertRaises(click.ClickException):
             _ = read_superlink_connection("named-conn")
 
-    @parameterized.expand(  # type: ignore[misc]
+    @parameterized.expand(  # type: ignore[untyped-decorator]
         [
             (None, False),
             ("named-conn", False),

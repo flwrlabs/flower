@@ -1,0 +1,453 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Executor-bound AgentGrid implementation."""
+
+
+from __future__ import annotations
+
+import random
+import time
+from logging import DEBUG
+from typing import cast
+
+from flwr.agentapp import AgentEvents, AgentGrid
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
+from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.serverapp import Grid
+from flwr.supercore import log
+from flwr.supercore.constant import (
+    AGENT_MESSAGE_CONTENT_RECORD_KEY,
+    AGENT_MESSAGE_TEXT_KEY,
+)
+from flwr.supercore.task_process.connector.tool_schema import (
+    function_tool,
+    string_property,
+)
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
+
+_GRID_TOOL_NAMES = {"get_nodes", "push_messages", "pull_messages"}
+_SUPERNODE_GRID_TOOL_NAMES = {"push_reply_message"}
+
+
+def _grid_tools() -> list[JSONObject]:
+    """Return model-facing federation Grid tool schemas."""
+    return [
+        function_tool(
+            "get_nodes",
+            (
+                "Return all available SuperNodes, or a random sample if requested. "
+                "A SuperNode is a node in a federation that sits next to data, "
+                "performs operations on it, and returns results."
+            ),
+            properties={
+                "sample_size": {
+                    "type": ["integer", "null"],
+                    "minimum": 1,
+                    "description": (
+                        "Maximum number of SuperNodes to return, or null to return "
+                        "all available SuperNodes."
+                    ),
+                }
+            },
+            required=["sample_size"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "nodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": string_property(
+                                    "Selected SuperNode uint64 ID as a decimal string."
+                                ),
+                                "name": {
+                                    "type": ["string", "null"],
+                                    "description": "SuperNode name, if configured.",
+                                },
+                                "location": {
+                                    "type": ["string", "null"],
+                                    "description": "SuperNode location, if configured.",
+                                },
+                            },
+                            "required": ["id", "name", "location"],
+                            "additionalProperties": False,
+                        },
+                        "description": "All or a random sample of SuperNodes.",
+                    },
+                    "num_available": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Total number of available SuperNodes.",
+                    },
+                },
+                "required": ["nodes", "num_available"],
+                "additionalProperties": False,
+            },
+            strict=True,
+        ),
+        function_tool(
+            "push_messages",
+            (
+                "Send messages to nodes in the federation (SuperLink or SuperNodes) "
+                "and return one result per message in the same order. When replying, "
+                "copy the received message_id exactly into reply_to_message_id and "
+                "send only one message for that ID; do not resend earlier replies. "
+                "Pass accepted message IDs to pull_messages if replies are required."
+            ),
+            properties={
+                "messages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "dst_node_id": string_property(
+                                "Destination node ID (SuperNode or SuperLink) as a "
+                                "decimal uint64 string. For a reply, use the received "
+                                "message's src_node_id."
+                            ),
+                            "payload": string_property("String payload to send."),
+                            "reply_to_message_id": {
+                                "type": ["string", "null"],
+                                "minLength": 1,
+                                "description": (
+                                    "Copy the message_id of the message being "
+                                    "replied to exactly, or use null for a new "
+                                    "message."
+                                ),
+                            },
+                        },
+                        "required": [
+                            "dst_node_id",
+                            "payload",
+                            "reply_to_message_id",
+                        ],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            required=["messages"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "description": "One result per input message, in order.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message_id": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Accepted message ID, or null if rejected."
+                                    ),
+                                },
+                                "error": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Failure reason, or null if accepted."
+                                    ),
+                                },
+                            },
+                            "required": ["message_id", "error"],
+                            "additionalProperties": False,
+                        },
+                    }
+                },
+                "required": ["results"],
+                "additionalProperties": False,
+            },
+            strict=True,
+        ),
+        function_tool(
+            "push_reply_message",
+            (
+                "Send one reply to the last instruction message received for this "
+                "task. Do not resend a reply already sent."
+            ),
+            properties={
+                "payload": string_property("Reply payload to send."),
+            },
+            required=["payload"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "message_id": {
+                        "type": ["string", "null"],
+                        "description": "Accepted reply ID, or null if rejected.",
+                    },
+                    "error": {
+                        "type": ["string", "null"],
+                        "description": "Failure reason, or null if accepted.",
+                    },
+                },
+                "required": ["message_id", "error"],
+                "additionalProperties": False,
+            },
+            strict=True,
+        ),
+        function_tool(
+            "pull_messages",
+            "Wait for replies to message IDs returned by push_messages.",
+            properties={
+                "message_ids": {
+                    "type": "array",
+                    "items": string_property(
+                        "Accepted message ID returned by push_messages."
+                    ),
+                    "minItems": 1,
+                    "description": "Message IDs whose replies are awaited.",
+                },
+                "timeout": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 300,
+                    "description": "Maximum wait in seconds; zero checks once.",
+                },
+            },
+            required=["message_ids", "timeout"],
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message_id": string_property("Reply message ID."),
+                                "reply_to_message_id": string_property(
+                                    "ID of the message this replies to."
+                                ),
+                                "src_node_id": string_property(
+                                    "Source node ID (SuperNode or SuperLink) as a "
+                                    "decimal uint64 string."
+                                ),
+                                "payload": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Reply payload, or null for an error reply."
+                                    ),
+                                },
+                                "error": {
+                                    "type": ["string", "null"],
+                                    "description": (
+                                        "Error reason, or null for a content reply."
+                                    ),
+                                },
+                            },
+                            "required": [
+                                "message_id",
+                                "reply_to_message_id",
+                                "src_node_id",
+                                "payload",
+                                "error",
+                            ],
+                            "additionalProperties": False,
+                        },
+                        "description": "Replies received before the timeout.",
+                    },
+                    "pending_message_ids": {
+                        "type": "array",
+                        "items": string_property(
+                            "Requested message ID with no reply before the timeout."
+                        ),
+                    },
+                },
+                "required": ["messages", "pending_message_ids"],
+                "additionalProperties": False,
+            },
+            strict=True,
+        ),
+    ]
+
+
+class RuntimeAgentGrid(AgentGrid):
+    """Expose selected Grid operations as model tools."""
+
+    def __init__(
+        self,
+        grid: Grid,
+        events: AgentEvents,
+        node_id: int,
+        instruction_metadata: Metadata | None = None,
+    ) -> None:
+        self._grid = grid
+        self._events = events
+        self._is_superlink = node_id == SUPERLINK_NODE_ID
+        self._tool_names = (
+            _GRID_TOOL_NAMES if self._is_superlink else _SUPERNODE_GRID_TOOL_NAMES
+        )
+        self._instruction_metadata = instruction_metadata
+
+    def tools(self) -> list[JSONObject]:
+        """Return model-facing Grid tool schemas."""
+        return [tool for tool in _grid_tools() if tool["name"] in self._tool_names]
+
+    def call(self, tool_call: JSONObject) -> JSONObject:
+        """Execute one Grid function_call and return a function_call_output item."""
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = strict_json_loads(arguments)
+        name = cast(str, tool_call["name"])
+        call_id = cast(str, tool_call["call_id"])
+        if name not in self._tool_names:
+            raise ValueError(f"Unsupported Grid tool '{name}'.")
+
+        arguments_obj = cast(JSONObject, arguments)
+        arguments_json = strict_json_dumps(arguments_obj, compact=True)
+        log(DEBUG, "[AgentGrid] %s input: %s", name, arguments_json)
+        self._events.emit(
+            {
+                "type": "function_call",
+                "call_id": call_id,
+                "name": name,
+                "arguments": arguments_json,
+            }
+        )
+        output = cast(JSONObject, getattr(self, f"_{name}")(**arguments_obj))
+        output_json = strict_json_dumps(output, compact=True)
+        log(DEBUG, "[AgentGrid] %s output: %s", name, output_json)
+        output_item: JSONObject = {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": output_json,
+        }
+        self._events.emit(output_item)
+        return output_item
+
+    def _get_nodes(self, sample_size: int | None = None) -> JSONObject:
+        nodes = list(self._grid.get_nodes())
+        if sample_size is not None and sample_size < 1:
+            raise ValueError("Grid sample size must be positive.")
+        selected = (
+            nodes
+            if sample_size is None
+            else random.sample(nodes, min(sample_size, len(nodes)))
+        )
+        return {
+            "nodes": [
+                {
+                    "id": str(node.node_id),
+                    "name": node.name if node.HasField("name") else None,
+                    "location": node.location if node.HasField("location") else None,
+                }
+                for node in selected
+            ],
+            "num_available": len(nodes),
+        }
+
+    def _push_messages(self, messages: list[JSONObject]) -> JSONObject:
+        return {"results": self._send_messages(messages)}
+
+    def _push_reply_message(self, payload: str) -> JSONObject:
+        if self._instruction_metadata is None:
+            return {
+                "message_id": None,
+                "error": (
+                    "No instruction message to reply to. "
+                    "You may have already replied to it once."
+                ),
+            }
+        message: JSONObject = {
+            "dst_node_id": str(self._instruction_metadata.src_node_id),
+            "payload": payload,
+            "reply_to_message_id": self._instruction_metadata.message_id,
+        }
+        self._instruction_metadata = None
+        return self._send_messages([message])[0]
+
+    def _send_messages(self, messages: list[JSONObject]) -> list[JSONObject]:
+        if not messages:
+            raise ValueError("At least one message is required.")
+
+        outgoing = []
+        for item in messages:
+            config_record = ConfigRecord(
+                {AGENT_MESSAGE_TEXT_KEY: cast(str, item["payload"])}
+            )
+            content = RecordDict({AGENT_MESSAGE_CONTENT_RECORD_KEY: config_record})
+
+            message = Message(
+                content,
+                dst_node_id=int(cast(str, item["dst_node_id"])),
+                message_type="query",  # Replace with an AgentGrid message type.
+                group_id="",
+            )
+            reply_to_message_id = cast(str | None, item.get("reply_to_message_id"))
+            if reply_to_message_id is not None:
+                # Temporary: use a 6-hour TTL for replies instead of the default
+                # 12 hours to avoid replies expiring after the original message,
+                # which SuperLink rejects.
+                message.metadata.ttl = 21600
+                message.metadata.__dict__["_reply_to_message_id"] = reply_to_message_id
+            outgoing.append(message)
+
+        message_ids = list(self._grid.push_messages(outgoing))
+        if len(message_ids) != len(outgoing):
+            raise RuntimeError("Grid returned an unexpected number of message IDs.")
+        return [
+            {
+                "message_id": message_id or None,
+                "error": None if message_id else "Message was not accepted.",
+            }
+            for message_id in message_ids
+        ]
+
+    def _pull_messages(self, message_ids: list[str], timeout: float) -> JSONObject:
+        if not 0 <= timeout <= 300:
+            raise ValueError("Grid pull timeout must be between 0 and 300 seconds.")
+        pending = set(message_ids)
+        replies: list[Message] = []
+        deadline = time.monotonic() + timeout
+        while pending:
+            pulled = list(self._grid.pull_messages(pending))
+            replies.extend(pulled)
+            pending.difference_update(
+                message.metadata.reply_to_message_id for message in pulled
+            )
+            remaining = deadline - time.monotonic()
+            if not pending or remaining <= 0:
+                break
+            time.sleep(min(0.25, remaining))
+
+        messages: list[JSONObject] = []
+        for message in replies:
+            payload = None
+            error = None
+            if message.has_error():
+                error = message.error.reason
+            else:
+                payload = cast(
+                    str,
+                    message.content[AGENT_MESSAGE_CONTENT_RECORD_KEY][
+                        AGENT_MESSAGE_TEXT_KEY
+                    ],
+                )
+            messages.append(
+                {
+                    "message_id": message.metadata.message_id,
+                    "reply_to_message_id": message.metadata.reply_to_message_id,
+                    "src_node_id": str(message.metadata.src_node_id),
+                    "payload": payload,
+                    "error": error,
+                }
+            )
+
+        return {
+            "messages": messages,
+            "pending_message_ids": sorted(pending),
+        }

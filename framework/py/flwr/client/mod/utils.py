@@ -15,8 +15,8 @@
 """Utility functions for mods."""
 
 
-from flwr.client.typing import ClientAppCallable, Mod
-from flwr.common import Context, Message
+from flwr.app import Context, Message
+from flwr.clientapp.typing import ClientAppCallable, Mod
 
 
 def make_ffn(ffn: ClientAppCallable, mods: list[Mod]) -> ClientAppCallable:

@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import torch
 import torch.nn as nn
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import VerticalSizePartitioner
@@ -89,9 +88,8 @@ def load_and_preprocess(
 fds = None  # Cache FederatedDataset
 
 
-def load_data(partition_id: int, feature_splits: list[int]):
-    """..."""
-
+def load_partition(partition_id: int, feature_splits: list[int]):
+    """Load a feature or label partition with the same deterministic row order."""
     global fds
     if fds is None:
         partitioner = VerticalSizePartitioner(
@@ -101,14 +99,26 @@ def load_data(partition_id: int, feature_splits: list[int]):
         )
 
         fds = FederatedDataset(
-            dataset="julien-c/titanic-survival", partitioners={"train": partitioner}
+            dataset="julien-c/titanic-survival",
+            partitioners={"train": partitioner},
+            seed=42,
         )
 
-    # Load partition
-    partition = fds.load_partition(partition_id)
+    return fds.load_partition(partition_id)
+
+
+def load_data(partition_id: int, feature_splits: list[int]):
+    """Load and preprocess a client's feature columns."""
+    partition = load_partition(partition_id, feature_splits)
 
     # Process partition
     return load_and_preprocess(dataframe=partition.to_pandas())
+
+
+def load_labels(feature_splits: list[int]):
+    """Read labels from the final partition, aligned with the client features."""
+    partition = load_partition(len(feature_splits), feature_splits)
+    return np.asarray(partition["Survived"], dtype=np.float32)
 
 
 class ClientModel(nn.Module):
@@ -137,20 +147,3 @@ class ServerModel(nn.Module):
         x = self.bn(x)
         x = self.fc(x)
         return self.sigmoid(x)
-
-
-def evaluate_head_model(
-    head: ServerModel, embeddings: torch.Tensor, labels: torch.Tensor
-) -> float:
-    """Compute accuracy of head."""
-    head.eval()
-    with torch.no_grad():
-        correct = 0
-        # Re-compute embeddings for accuracy (detached from grad)
-        embeddings_eval = embeddings.detach()
-        output = head(embeddings_eval)
-        predicted = (output > 0.5).float()
-        correct += (predicted == labels).sum().item()
-        accuracy = correct / len(labels) * 100
-
-    return accuracy

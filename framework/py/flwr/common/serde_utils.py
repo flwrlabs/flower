@@ -17,7 +17,9 @@
 from collections.abc import MutableMapping
 from typing import Any, TypeVar, cast
 
-from google.protobuf.message import Message as GrpcMessage
+from google.protobuf.message import Message as ProtoMessage
+
+from flwr.app.message.typeddict import TypedDict
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
@@ -34,7 +36,6 @@ from flwr.proto.recorddict_pb2 import (
 from ..app.error import Error
 from ..app.metadata import Metadata
 from .constant import INT64_MAX_VALUE
-from .record.typeddict import TypedDict
 
 # pylint: enable=E0611
 
@@ -45,7 +46,7 @@ _type_to_field: dict[type, str] = {
     str: "string",
     bytes: "bytes",
 }
-_list_type_to_class_and_field: dict[type, tuple[type[GrpcMessage], str]] = {
+_list_type_to_class_and_field: dict[type, tuple[type[ProtoMessage], str]] = {
     float: (DoubleList, "double_list"),
     int: (SintList, "sint_list"),
     bool: (BoolList, "bool_list"),
@@ -92,7 +93,7 @@ def _record_value_to_proto(
     )
 
 
-def _record_value_from_proto(value_proto: GrpcMessage) -> Any:
+def _record_value_from_proto(value_proto: ProtoMessage) -> Any:
     """Deserialize `*RecordValue` from ProtoBuf."""
     value_field = cast(str, value_proto.WhichOneof("value"))
     if value_field.endswith("list"):
@@ -156,6 +157,10 @@ def metadata_to_proto(metadata: Metadata) -> ProtoMetadata:
         message_type=metadata.message_type,
         created_at=metadata.created_at,
     )
+    if metadata.src_task_id is not None:
+        proto.src_task_id = metadata.src_task_id
+    if metadata.dst_task_id is not None:
+        proto.dst_task_id = metadata.dst_task_id
     return proto
 
 
@@ -171,5 +176,15 @@ def metadata_from_proto(metadata_proto: ProtoMetadata) -> Metadata:
         created_at=metadata_proto.created_at,
         ttl=metadata_proto.ttl,
         message_type=metadata_proto.message_type,
+        src_task_id=(
+            metadata_proto.src_task_id
+            if metadata_proto.HasField("src_task_id")
+            else None
+        ),
+        dst_task_id=(
+            metadata_proto.dst_task_id
+            if metadata_proto.HasField("dst_task_id")
+            else None
+        ),
     )
     return metadata

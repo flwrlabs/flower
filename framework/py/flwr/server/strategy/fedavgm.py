@@ -30,9 +30,9 @@ from flwr.common import (
     ndarrays_to_parameters,
     parameters_to_ndarrays,
 )
-from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
+from flwr.supercore import log
 
 from .aggregate import aggregate
 from .fedavg import FedAvg

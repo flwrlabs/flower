@@ -5,8 +5,8 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from datasets import load_dataset
 from torch.utils.data import DataLoader, Subset
-from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, Normalize, ToTensor
 from tqdm import tqdm
 
@@ -20,8 +20,23 @@ from flwr.clientapp import ClientApp
 
 warnings.filterwarnings("ignore", category=UserWarning)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-SUBSET_SIZE = 1000
+SUBSET_SIZE = 100
 STATE_VAR = "timestamp"
+
+
+class Cifar10Dataset(torch.utils.data.Dataset):
+    """CIFAR-10 dataset loaded from Hugging Face."""
+
+    def __init__(self, split, transform):
+        self.dataset = load_dataset("uoft-cs/cifar10", split=split)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return self.transform(item["img"]), item["label"]
 
 
 class Net(nn.Module):
@@ -29,17 +44,17 @@ class Net(nn.Module):
 
     def __init__(self) -> None:
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv1 = nn.Conv2d(3, 4, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.conv2 = nn.Conv2d(4, 8, 5)
+        self.fc1 = nn.Linear(8 * 5 * 5, 32)
+        self.fc2 = nn.Linear(32, 16)
+        self.fc3 = nn.Linear(16, 10)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
+        x = x.view(-1, 8 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
@@ -73,8 +88,8 @@ def test(net, testloader):
 def load_data():
     """Load CIFAR-10 (training and test set)."""
     trf = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    trainset = CIFAR10("./../data", train=True, download=True, transform=trf)
-    testset = CIFAR10("./../data", train=False, download=True, transform=trf)
+    trainset = Cifar10Dataset("train", transform=trf)
+    testset = Cifar10Dataset("test", transform=trf)
     trainset = Subset(trainset, range(SUBSET_SIZE))
     testset = Subset(testset, range(10))
     return DataLoader(trainset, batch_size=32, shuffle=True), DataLoader(testset)
@@ -85,6 +100,7 @@ def load_data():
 # #############################################################################
 
 # Load model and data (simple CNN, CIFAR-10)
+torch.manual_seed(42)
 net = Net().to(DEVICE)
 trainloader, testloader = load_data()
 

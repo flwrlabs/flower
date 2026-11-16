@@ -25,12 +25,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationRequest,
     ArchiveFederationResponse,
 )
-from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.control import ControlHttpClient
 
 from ..utils import (
     cli_output_handler,
-    flwr_cli_grpc_exc_handler,
-    init_channel_from_connection,
+    flwr_cli_exc_handler,
+    init_http_client_from_connection,
     print_json_to_stdout,
 )
 
@@ -39,7 +39,7 @@ def archive(
     ctx: typer.Context,
     federation: Annotated[
         str,
-        typer.Argument(help="Name of the federation to archive."),
+        typer.Argument(help="Federation ID to archive."),
     ],
     superlink: Annotated[
         str | None,
@@ -61,36 +61,37 @@ def archive(
 
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
-        channel = None
+        control_client = None
 
         try:
-            channel = init_channel_from_connection(superlink_connection)
-            stub = ControlStub(channel)
+            control_client = init_http_client_from_connection(superlink_connection)
 
             request = ArchiveFederationRequest(
                 federation_name=federation,
             )
             _archive_federation(
-                stub=stub,
+                stub=control_client,
                 request=request,
                 is_json=is_json,
             )
 
         finally:
-            if channel:
-                channel.close()
+            if control_client:
+                control_client.close()
 
 
 def _archive_federation(  # pylint: disable=W0613
-    stub: ControlStub,
+    stub: ControlHttpClient,
     request: ArchiveFederationRequest,
     is_json: bool,
 ) -> None:
     """Archive a federation."""
-    with flwr_cli_grpc_exc_handler():
+    with flwr_cli_exc_handler():
         _: ArchiveFederationResponse = stub.ArchiveFederation(request)
 
     if is_json:
-        print_json_to_stdout({"success": True, "name": request.federation_name})
+        print_json_to_stdout(
+            {"success": True, "federation-id": request.federation_name}
+        )
     else:
         typer.secho(f"✅ Federation '{request.federation_name}' archived successfully.")

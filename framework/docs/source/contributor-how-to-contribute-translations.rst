@@ -2,14 +2,12 @@
  Contribute translations
 #########################
 
-Since `Flower 1.5
-<https://flower.ai/docs/framework/ref-changelog.html#v1-5-0-2023-08-31>`_ we have
-introduced translations to our doc pages, but, as you might have noticed, the
-translations are often imperfect. If you speak languages other than English, you might
-be able to help us in our effort to make Federated Learning accessible to as many people
-as possible by contributing to those translations! This might also be a great
-opportunity for those wanting to become open source contributors with little
-prerequisites.
+Since `Flower 1.5 <ref-changelog.html#v1-5-0-2023-08-31>`_ we have introduced
+translations to our doc pages, but, as you might have noticed, the translations are
+often imperfect. If you speak languages other than English, you might be able to help us
+in our effort to make Federated Learning accessible to as many people as possible by
+contributing to those translations! This might also be a great opportunity for those
+wanting to become open source contributors with little prerequisites.
 
 Our translation project is publicly available over on `Weblate
 <https://hosted.weblate.org/projects/flower-docs/framework/>`_, this where most of the

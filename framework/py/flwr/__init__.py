@@ -15,29 +15,52 @@
 """Flower main package."""
 
 
-import importlib
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
 
-from flwr.supercore.version import package_version as _package_version
+if TYPE_CHECKING:
+    from . import agentapp as agentapp
+    from . import app as app
+    from . import client as client
+    from . import clientapp as clientapp
+    from . import common as common
+    from . import server as server
+    from . import serverapp as serverapp
 
-from . import app, clientapp, serverapp
+    __version__: str
+
 
 __all__ = [
+    "agentapp",
     "app",
     "clientapp",
     "serverapp",
 ]
 
-__version__ = _package_version
+_LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "__version__": ("flwr.supercore.version", "package_version"),
+    "agentapp": ("flwr.agentapp", None),
+    "app": ("flwr.app", None),
+    "client": ("flwr.client", None),
+    "clientapp": ("flwr.clientapp", None),
+    "common": ("flwr.common", None),
+    "server": ("flwr.server", None),
+    "serverapp": ("flwr.serverapp", None),
+    "simulation": ("flwr.simulation", None),
+}
 
 
-# Lazy imports for legacy support
-_lazy_imports = {"simulation", "server", "client", "common"}
-
-
-def __getattr__(name: str) -> object:
-    """Lazy import for legacy support."""
-    if name in _lazy_imports:
-        module = importlib.import_module(f"{__name__}.{name}")
-        globals()[name] = module
-        return module
+def __getattr__(name: str) -> Any:
+    """Import package exports only when requested."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = module if attr_name is None else getattr(module, attr_name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Keep lazy exports visible to package introspection."""
+    return sorted(set(globals()) | _LAZY_EXPORTS.keys())

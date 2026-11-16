@@ -12,11 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Control API Servicer."""
-
-
-from .control_grpc import run_control_api_grpc
-
-__all__ = [
-    "run_control_api_grpc",
-]
+"""Control API handlers."""

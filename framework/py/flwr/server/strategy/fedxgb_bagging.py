@@ -21,8 +21,8 @@ from logging import WARNING
 from typing import Any, cast
 
 from flwr.common import EvaluateRes, FitRes, Parameters, Scalar
-from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
+from flwr.supercore import log
 
 from .fedavg import FedAvg
 

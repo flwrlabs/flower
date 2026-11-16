@@ -58,9 +58,9 @@ mocked_natural_id_datasets = [
     [
         # Downloaded
         # Image
-        ("mnist", "test", ""),
-        ("cifar10", "test", ""),
-        ("fashion_mnist", "test", ""),
+        ("ylecun/mnist", "test", ""),
+        ("uoft-cs/cifar10", "test", ""),
+        ("zalando-datasets/fashion_mnist", "test", ""),
         ("sasha/dog-food", "test", ""),
         ("zh-plus/tiny-imagenet", "valid", ""),
         ("Mike0307/MNIST-M", "test", ""),
@@ -377,7 +377,7 @@ class ShufflingResplittingOnArtificialDatasetTest(unittest.TestCase):
 class PartitionersSpecificationForFederatedDatasets(unittest.TestCase):
     """Test the specifications of partitioners for `FederatedDataset`."""
 
-    dataset_name = "cifar10"
+    dataset_name = "uoft-cs/cifar10"
     test_split = "test"
 
     def test_dict_of_partitioners_passes_partitioners(self) -> None:
@@ -519,7 +519,9 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
 
     def test_no_partitioner_for_split(self) -> None:
         """Test using load_partition with missing partitioner."""
-        dataset_fds = FederatedDataset(dataset="mnist", partitioners={"train": 100})
+        dataset_fds = FederatedDataset(
+            dataset="ylecun/mnist", partitioners={"train": 100}
+        )
 
         with pytest.raises(ValueError):
             dataset_fds.load_partition(0, "test")
@@ -527,7 +529,7 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
     def test_no_split_in_the_dataset(self) -> None:
         """Test using load_partition with non-existent split name."""
         dataset_fds = FederatedDataset(
-            dataset="mnist", partitioners={"non-existent-split": 100}
+            dataset="ylecun/mnist", partitioners={"non-existent-split": 100}
         )
 
         with pytest.raises(ValueError):
@@ -535,9 +537,9 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
 
     def test_cannot_use_the_old_split_names(self) -> None:
         """Test if the initial split names can not be used."""
-        datasets.load_dataset("mnist")
+        datasets.load_dataset("ylecun/mnist")
         fds = FederatedDataset(
-            dataset="mnist",
+            dataset="ylecun/mnist",
             partitioners={"train": 100},
             preprocessor={"full": ("train", "test")},
         )
@@ -553,7 +555,7 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
         Use split which makes the load_dataset return a Dataset.
         """
         fds = FederatedDataset(
-            dataset="mnist",
+            dataset="ylecun/mnist",
             shuffle=False,
             partitioners={"train": 10},
             split="train",
@@ -572,7 +574,7 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
         second_split = "test"
         with self.assertRaises(ValueError) as context:
             FederatedDataset(
-                dataset="mnist",
+                dataset="ylecun/mnist",
                 partitioners=partitioners,
             )
         self.assertIn(
@@ -603,7 +605,7 @@ class IncorrectUsageFederatedDatasets(unittest.TestCase):
         ) as context:
 
             FederatedDataset(
-                dataset="mnist", partitioners=partitioners, preprocessor=divider
+                dataset="ylecun/mnist", partitioners=partitioners, preprocessor=divider
             )
 
         self.assertIn(

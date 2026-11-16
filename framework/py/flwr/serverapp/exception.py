@@ -16,7 +16,7 @@
 
 
 from flwr.app.exception import AppExitException
-from flwr.common.exit import ExitCode
+from flwr.supercore.exit import ExitCode
 
 
 class InconsistentMessageReplies(AppExitException):
@@ -33,6 +33,15 @@ class AggregationError(AppExitException):
     """Exception triggered when aggregation fails."""
 
     exit_code = ExitCode.SERVERAPP_STRATEGY_AGGREGATION_ERROR
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+
+
+class PrivacyBudgetExhausted(AppExitException):
+    """Exception triggered before a release would exceed the privacy budget."""
+
+    exit_code = ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET
 
     def __init__(self, reason: str):
         super().__init__(reason)

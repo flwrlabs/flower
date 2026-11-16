@@ -15,17 +15,62 @@
 """Tests all CoreState implementations have to conform to."""
 
 
+# pylint: disable=too-many-lines
 import unittest
-from datetime import timedelta
-from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
+from datetime import UTC, datetime, timedelta
+from operator import attrgetter
+from threading import Event as ThreadEvent
+from typing import Any, cast
+from unittest.mock import call, patch
+from uuid import UUID
 
-from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from parameterized import parameterized
+from sqlalchemy import delete
+
+from flwr.app import Context, Message, RecordDict
+from flwr.common.constant import (
+    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
+    Status,
+    SubStatus,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Agent,
+    AgentConfig,
+    Automation,
+    StartRunRequest,
+    StreamEventsResponse,
+)
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    TaskEvent,
+    TaskStatus,
+    TaskUsage,
+)
+from flwr.supercore.constant import (
+    FLOWER_AGENT_APP_ID,
+    OBJECT_PUSH_SESSION_TTL_SECONDS,
+    AutomationStatus,
+    EventType,
+    TaskType,
+)
+from flwr.supercore.date import now
+from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.fab import Fab
+from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 
 from . import CoreState
+from .in_memory_corestate import InMemoryCoreState
+from .sql_corestate import SqlCoreState
+from .utils_test import create_task_message
 
 
-class StateTest(unittest.TestCase):
+class StateTest(unittest.TestCase):  # pylint: disable=R0904
     """Test all CoreState implementations."""
 
     # This is to True in each child class
@@ -35,118 +80,2457 @@ class StateTest(unittest.TestCase):
         """Provide state implementation to test."""
         raise NotImplementedError()
 
-    def test_create_verify_and_delete_token(self) -> None:
-        """Test creating, verifying, and deleting tokens."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
+    def task_run_id(self, _state: CoreState) -> int:
+        """Return the run ID to use in task-related tests.
 
-        # Execute: create a token
-        token = state.create_token(run_id)
-        assert token is not None
+        Subclasses can override this hook when task creation requires an existing run
+        record instead of an arbitrary placeholder ID.
+        """
+        return 42
 
-        # Assert: token should be valid
-        self.assertTrue(state.verify_token(run_id, token))
+    def other_task_run_id(self, _state: CoreState) -> int:
+        """Return a second run ID for task tests that need multiple runs.
 
-        # Execute: delete the token
-        state.delete_token(run_id)
+        Subclasses can override this hook when task creation requires existing run
+        records instead of arbitrary placeholder IDs.
+        """
+        return 123
 
-        # Assert: token should no longer be valid
-        self.assertFalse(state.verify_token(run_id, token))
+    def _patch_task_log_datetime_now(self, *timestamps: datetime) -> ExitStack:
+        """Patch the shared datetime source used for task-log timestamps."""
+        stack = ExitStack()
+        mock_datetime = stack.enter_context(
+            patch("flwr.supercore.date.datetime.datetime")
+        )
+        mock_datetime.now.side_effect = timestamps
+        return stack
 
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
+    def _patch_message_time(self, current: datetime) -> ExitStack:
+        """Freeze message lifecycle clocks without replacing datetime's type."""
+        stack = ExitStack()
+        for module in (
+            "flwr.supercore.corestate.in_memory_corestate",
+            "flwr.supercore.corestate.sql_corestate",
+            "flwr.supercore.corestate.utils",
+        ):
+            stack.enter_context(patch(f"{module}.now", return_value=current))
+        return stack
 
-        # Execute
-        ret = state.create_token(run_id)
+    def assert_message_metadata_equal(
+        self, actual: list[Message], expected: list[Message]
+    ) -> None:
+        """Compare complete Message metadata without regard to order."""
+        self.assertEqual(
+            sorted((msg.metadata for msg in actual), key=attrgetter("message_id")),
+            sorted((msg.metadata for msg in expected), key=attrgetter("message_id")),
+        )
 
-        # Assert: The return is None
-        self.assertIsNone(ret)
-
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
-
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-    def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
-        """Test acknowledging heartbeat with nonexistent token."""
-        # Prepare
+    def test_get_file_and_list_files_when_absent(self) -> None:
+        """An empty scope has no file content or metadata."""
         state = self.state_factory()
 
-        # Execute: acknowledge heartbeat with invalid token
-        result = state.acknowledge_app_heartbeat("nonexistent_token")
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
 
-        # Assert: should return False
-        self.assertFalse(result)
-
-    def test_acknowledge_app_heartbeat_extends_expiration_and_cleanup(self) -> None:
-        """Test that acknowledging app heartbeat extends token expiration and cleanup is
-        performed when expired."""
-        # Prepare
+    @parameterized.expand([(b"hello",), (b"",), (b"\x00\xff",)])  # type: ignore
+    def test_put_file_and_get_file(self, data: bytes) -> None:
+        """Creating a file preserves its bytes and returns matching metadata."""
         state = self.state_factory()
-        created_at = now()
-        run_id1 = 42
-        run_id2 = 123
-        token1 = state.create_token(run_id1)
-        token2 = state.create_token(run_id2)
-        assert token1 is not None and token2 is not None
 
-        # Execute: send heartbeat for token2 to keep it alive
-        state.acknowledge_app_heartbeat(token2)
+        revision = state.put_file("scope", "file", data, expected_revision=None)
 
-        # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
+        self.assertIsInstance(revision, int)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=revision, size_bytes=len(data)
+                ),
+                data=data,
+            ),
+        )
+
+    def test_put_file_updates_matching_revision(self) -> None:
+        """Updating a live file replaces its content and changes its revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+
+        self.assertNotEqual(updated_revision, revision)
+        self.assertEqual(
+            state.get_file("scope", "file"),
+            File(
+                metadata=FileMetadata(
+                    key="file", revision=updated_revision, size_bytes=7
+                ),
+                data=b"updated",
+            ),
+        )
+
+    def test_put_file_rejects_conflicting_revision(self) -> None:
+        """Create-only and mismatched updates leave an existing file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"original", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        for expected_revision in (None, revision + 1):
+            with self.subTest(expected_revision=expected_revision):
+                with self.assertRaises(FlowerError) as exc:
+                    state.put_file(
+                        "scope",
+                        "file",
+                        b"conflict",
+                        expected_revision=expected_revision,
+                    )
+                self.assertEqual(
+                    exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+                )
+                self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_put_file_update_requires_live_file(self, deleted: bool) -> None:
+        """An update cannot create a missing file or revive a deleted file."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"old", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.put_file("scope", "file", b"new", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_list_files_filters_and_orders_metadata(self) -> None:
+        """List by scope, prefix and exclusive cursor before applying the limit."""
+        state = self.state_factory()
+        metadata = {}
+        for key in ("dir/c", "other", "dir/a", "dir/b"):
+            revision = state.put_file("scope", key, b"data", expected_revision=None)
+            metadata[key] = FileMetadata(key=key, revision=revision, size_bytes=4)
+        state.put_file("other-scope", "dir/b", b"other", expected_revision=None)
+
+        for prefix, start_after, limit, keys in (
+            ("", "", None, ["dir/a", "dir/b", "dir/c", "other"]),
+            ("dir/", "", None, ["dir/a", "dir/b", "dir/c"]),
+            ("dir/", "dir/a", 1, ["dir/b"]),
+            ("dir/", "dir/c", None, []),
+            ("missing/", "", None, []),
+        ):
+            with self.subTest(prefix=prefix, start_after=start_after, limit=limit):
+                self.assertEqual(
+                    list(state.list_files("scope", prefix, start_after, limit)),
+                    [metadata[key] for key in keys],
+                )
+
+    def test_delete_file_and_recreate(self) -> None:
+        """Deletion hides a file and create-only can recreate it with a new revision."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"old", expected_revision=None)
+
+        state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertIsNone(state.get_file("scope", "file"))
+        self.assertEqual(list(state.list_files("scope", "", "", None)), [])
+        recreated_revision = state.put_file(
+            "scope", "file", b"new", expected_revision=None
+        )
+        self.assertNotEqual(recreated_revision, revision)
+        file = state.get_file("scope", "file")
+        assert file is not None
+        self.assertEqual(file.data, b"new")
+        self.assertEqual(file.metadata.revision, recreated_revision)
+
+    def test_delete_file_rejects_mismatched_revision(self) -> None:
+        """A mismatched delete leaves the live file unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"data", expected_revision=None)
+        original = state.get_file("scope", "file")
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision + 1)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertEqual(state.get_file("scope", "file"), original)
+
+    @parameterized.expand([(False,), (True,)])  # type: ignore
+    def test_delete_file_requires_live_file(self, deleted: bool) -> None:
+        """Deleting a missing or already deleted file raises a revision conflict."""
+        state = self.state_factory()
+        revision = 1
+        if deleted:
+            revision = state.put_file("scope", "file", b"data", expected_revision=None)
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        with self.assertRaises(FlowerError) as exc:
+            state.delete_file("scope", "file", expected_revision=revision)
+
+        self.assertEqual(
+            exc.exception.code, ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT
+        )
+        self.assertIsNone(state.get_file("scope", "file"))
+
+    def test_files_are_isolated_by_scope(self) -> None:
+        """Writing and deleting a key in one scope leaves another scope unchanged."""
+        state = self.state_factory()
+        revision = state.put_file("scope", "file", b"first", expected_revision=None)
+        state.put_file("other-scope", "file", b"second", expected_revision=None)
+        other = state.get_file("other-scope", "file")
+
+        updated_revision = state.put_file(
+            "scope", "file", b"updated", expected_revision=revision
+        )
+        self.assertEqual(state.get_file("other-scope", "file"), other)
+        state.delete_file("scope", "file", expected_revision=updated_revision)
+        self.assertEqual(state.get_file("other-scope", "file"), other)
+
+    def test_store_messages_returns_acceptance_results(self) -> None:
+        """Return per-Message results and accept duplicates before body upload."""
+        # Prepare: Create valid and invalid Messages without uploading their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        invalid = create_task_message(run_id=run_id)
+        invalid.metadata.__dict__["_message_id"] = ""
+        other = create_task_message(run_id=run_id, has_error=True)
+
+        # Execute & Assert: Empty batches succeed and the first body is unuploaded.
+        self.assertEqual(state.store_messages([]), [])
+        self.assertIsNone(state.object_store.get(message.metadata.message_id))
+
+        # Execute & Assert: Reject only the invalid Message and accept duplicates.
+        self.assertEqual(
+            state.store_messages([message, invalid, other]), [True, False, True]
+        )
+        self.assertEqual(state.store_messages([message, other]), [True, True])
+
+        # Assert: Only the two accepted Messages remain pending.
+        self.assert_message_metadata_equal(
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID),
+            [message, other],
+        )
+
+    def test_get_messages_intersects_destination_run_and_correlation(self) -> None:
+        """Destination always applies; omitted and empty filters differ."""
+        # Prepare: Store a Message whose ID will be used in reply_to_message_id.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        self.assertEqual(state.store_messages([message]), [True])
+        reply_to_message_id = message.metadata.message_id
+
+        # Prepare: Vary destination, run, and reply_to_message_id across Messages.
+        matching_message = create_task_message(
+            run_id=run_id, reply_to_message_id=reply_to_message_id
+        )
+        other_destination = create_task_message(
+            run_id=run_id, reply_to_message_id=reply_to_message_id
+        )
+        other_destination.metadata.dst_node_id = 123
+        other_destination.metadata.__dict__["_message_id"] = other_destination.object_id
+        other_run = create_task_message(run_id=other_run_id)
+        messages = [matching_message, other_destination, other_run]
+        self.assertEqual(state.store_messages(messages), [True] * len(messages))
+
+        # Prepare: Define results for omitted, intersecting, and empty filters.
+        cases: list[tuple[dict[str, Any], list[Message]]] = [
+            ({}, [message, matching_message, other_run]),
+            ({"run_id": run_id}, [message, matching_message]),
+            ({"reply_to_message_ids": {reply_to_message_id}}, [matching_message]),
+            (
+                {"run_id": run_id, "reply_to_message_ids": {reply_to_message_id}},
+                [matching_message],
+            ),
+            (
+                {"run_id": other_run_id, "reply_to_message_ids": {reply_to_message_id}},
+                [],
+            ),
+            ({"reply_to_message_ids": set()}, []),
+            ({"reply_to_message_ids": {"unknown"}}, []),
+        ]
+
+        # Execute & Assert: Check each filter combination within the destination inbox.
+        for filters, expected in cases:
+            with self.subTest(filters=filters):
+                self.assert_message_metadata_equal(
+                    state.get_messages(dst_node_id=SUPERLINK_NODE_ID, **filters),
+                    expected,
+                )
+
+    def test_get_messages_orders_limits_and_keeps_pending(self) -> None:
+        """Filter TTL before LIMIT and order by creation time, then Message ID."""
+        # Prepare: Create Messages with different deadlines and tied creation times.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        current = now()
+        expired = create_task_message(
+            run_id=run_id, created_at=current.timestamp() - 2, ttl=3
+        )
+        first = create_task_message(run_id=run_id, created_at=current.timestamp() - 1)
+        tied = [
+            create_task_message(run_id=run_id, created_at=current.timestamp()),
+            create_task_message(
+                run_id=run_id, created_at=current.timestamp(), has_error=True
+            ),
+        ]
+        tied.sort(key=lambda msg: msg.metadata.message_id)
+
+        # Prepare: Freeze time and store Messages out of retrieval order.
+        with self._patch_message_time(current):
+            self.assertEqual(
+                state.store_messages([tied[1], expired, tied[0], first]), [True] * 4
             )
 
-            # Verify tokens are valid
-            self.assertTrue(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+        # Execute: Advance time past the oldest Message's TTL.
+        with self._patch_message_time(current + timedelta(seconds=2)):
 
-            # Advance time past token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
+            # Execute & Assert: Limited reads return the same first two live Messages.
+            for _ in range(2):
+                self.assertEqual(
+                    [
+                        msg.metadata
+                        for msg in state.get_messages(
+                            dst_node_id=SUPERLINK_NODE_ID, limit=2
+                        )
+                    ],
+                    [first.metadata, tied[0].metadata],
+                )
+
+            # Execute & Assert: An unlimited read returns all live Messages in order.
+            self.assertEqual(
+                [
+                    msg.metadata
+                    for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)
+                ],
+                [msg.metadata for msg in [first, *tied]],
+            )
+
+    @parameterized.expand([(0,), (-1,)])  # type: ignore
+    def test_get_messages_rejects_non_positive_limit(self, limit: int) -> None:
+        """A limit must be positive even for an empty inbox."""
+        # Prepare: Use an empty inbox with the parameterized non-positive limit.
+        state = self.state_factory()
+
+        # Execute & Assert: Reject the invalid limit with ValueError.
+        with self.assertRaises(ValueError):
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID, limit=limit)
+
+    def test_acknowledge_messages_releases_only_acknowledged_bodies(self) -> None:
+        """ACK removes selected Messages from retrieval and releases their bodies."""
+        # Prepare: Store two Messages, including their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        message = create_task_message(run_id=run_id)
+        message_id = message.metadata.message_id
+        other = create_task_message(run_id=run_id, has_error=True)
+        self.assertEqual(state.store_messages([message, other]), [True, True])
+        for msg in (message, other):
+            state._store_generated_message(msg)  # pylint: disable=protected-access
+
+        # Execute & Assert: An empty ACK preserves the Message's body.
+        state.acknowledge_messages([])
+        self.assertIsNotNone(state.object_store.get(message_id))
+
+        # Execute: ACK the same Message twice and include an unknown ID.
+        state.acknowledge_messages([message_id, "unknown"])
+        state.acknowledge_messages([message_id])
+
+        # Assert: Only the acknowledged body is released.
+        self.assertIsNone(state.object_store.get(message_id))
+        self.assertIsNotNone(state.object_store.get(other.metadata.message_id))
+
+        # Execute & Assert: Re-storing an acknowledged Message keeps its status.
+        self.assertEqual(state.store_messages([message]), [True])
+        self.assertEqual(
+            [msg.metadata for msg in state.get_messages(dst_node_id=SUPERLINK_NODE_ID)],
+            [other.metadata],
+        )
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("ids", [0, 2], False, [1]),
+            ("run", None, True, [2]),
+            ("intersection", [0, 2], True, [1, 2]),
+            ("empty_ids", [], False, [0, 1, 2]),
+            ("empty_ids_with_run", [], True, [0, 1, 2]),
+        ]
+    )
+    def test_cancel_messages_intersects_filters_and_releases_bodies(
+        self,
+        _name: str,
+        message_indexes: list[int] | None,
+        filter_run: bool,
+        remaining_indexes: list[int],
+    ) -> None:
+        """Cancel matching pending Messages without affecting other Messages."""
+        # Prepare: Store three Messages across two runs, including their bodies.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        messages = [
+            create_task_message(run_id=run_id),
+            create_task_message(run_id=run_id, has_error=True),
+            create_task_message(run_id=other_run_id),
+        ]
+        self.assertEqual(state.store_messages(messages), [True] * 3)
+        for message in messages:
+            state._store_generated_message(message)  # pylint: disable=protected-access
+
+        # Prepare: Select Message IDs and an optional run filter for this case.
+        message_ids = (
+            None
+            if message_indexes is None
+            else [messages[index].metadata.message_id for index in message_indexes]
+        )
+
+        # Execute: Repeat cancellation to verify idempotency.
+        for _ in range(2):
+            state.cancel_messages(
+                message_ids=message_ids, run_id=run_id if filter_run else None
+            )
+
+        # Execute & Assert: Re-storing Messages preserves their delivery status.
+        self.assertEqual(state.store_messages(messages), [True] * 3)
+
+        # Assert: Only unmatched Messages remain pending and retain their bodies.
+        self.assert_message_metadata_equal(
+            state.get_messages(dst_node_id=SUPERLINK_NODE_ID),
+            [messages[index] for index in remaining_indexes],
+        )
+        for index, message in enumerate(messages):
+            self.assertEqual(
+                state.object_store.get(message.metadata.message_id) is not None,
+                index in remaining_indexes,
+            )
+
+    def test_cancel_messages_requires_a_filter(self) -> None:
+        """Cancellation without an ID or run filter must fail."""
+        # Prepare: Use an empty state without cancellation filters.
+        state = self.state_factory()
+
+        # Execute & Assert: Reject unfiltered cancellation with ValueError.
+        with self.assertRaises(ValueError):
+            state.cancel_messages()
+
+    def test_store_list_and_delete_apps(self) -> None:
+        """Federation apps can be stored, listed, limited, and deleted."""
+        state = self.state_factory()
+
+        server_hash = state.store_app(
+            fab=Fab("", b"server", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-a",
+        )
+        agent_hash = state.store_app(
+            fab=Fab("", b"agent", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/z-agent",
+            app_type=TaskType.AGENT_APP,
+            added_by="account-a",
+            is_hub_app=True,
+            display_name="Agent",
+            description="Agent description",
+            color="sky",
+        )
+        state.store_app(
+            fab=Fab("", b"other", {}),
+            federation_id="@me/fed-b",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-b",
+        )
+
+        apps = state.list_apps("@me/fed-a")
+        self.assertEqual(
+            [(app.app_id, app.fab_hash, app.app_type, app.is_hub_app) for app in apps],
+            [
+                ("@me/z-agent", agent_hash, TaskType.AGENT_APP, True),
+                ("@me/server", server_hash, TaskType.SERVER_APP, False),
+            ],
+        )
+        self.assertIsNotNone(state.get_fab(agent_hash))
+        self.assertEqual(apps[0].display_name, "Agent")
+        self.assertEqual(apps[0].description, "Agent description")
+        self.assertEqual(apps[0].color, "sky")
+        self.assertEqual(
+            (apps[1].display_name, apps[1].description, apps[1].color),
+            ("", "", ""),
+        )
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", server_hash),
+            Fab(server_hash, b"server", {}),
+        )
+        self.assertIsNone(state.get_app("@me/fed-b", "@me/server", server_hash))
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/z-agent", server_hash))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a", limit=1)],
+            ["@me/z-agent"],
+        )
+        self.assertCountEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-a", "@me/fed-b"],
+        )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a"]),
+            ["@me/fed-a"],
+        )
+        self.assertEqual(state.list_app_associations("@me/missing", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("", ["@me/fed-a"]), [])
+        self.assertEqual(state.list_app_associations("@me/server", []), [])
+        self.assertEqual(
+            state.list_app_associations(
+                FLOWER_AGENT_APP_ID, ["@me/fed-b", "@me/fed-a"]
+            ),
+            ["@me/fed-b", "@me/fed-a"],
+        )
+        self.assertEqual(state.list_apps("@me/fed-a", limit=0), [])
+        with self.assertRaises(AssertionError):
+            state.list_apps("@me/fed-a", limit=-1)
+
+        updated_hash = state.store_app(
+            fab=Fab("", b"updated", {}),
+            federation_id="@me/fed-a",
+            app_id="@me/server",
+            app_type=TaskType.SERVER_APP,
+            added_by="account-c",
+            is_hub_app=True,
+        )
+        updated = state.list_apps("@me/fed-a")
+        self.assertEqual(len(updated), 2)
+        self.assertEqual(updated[1].fab_hash, updated_hash)
+        self.assertTrue(updated[1].is_hub_app)
+        self.assertEqual(updated[0].display_name, "Agent")
+        self.assertEqual(updated[0].description, "Agent description")
+        self.assertEqual(updated[0].color, "sky")
+        self.assertIsNone(state.get_app("@me/fed-a", "@me/server", server_hash))
+        self.assertEqual(
+            state.get_app("@me/fed-a", "@me/server", updated_hash),
+            Fab(updated_hash, b"updated", {}),
+        )
+        refreshed_hash = state.store_fab(Fab("", b"refreshed", {}))
+        self.assertTrue(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
+        cached = state.get_hub_app("@me/fed-a", "@me/server")
+        self.assertEqual(cached[0].hash_str if cached else None, refreshed_hash)
+        self.assertEqual(state.list_apps("@me/fed-a")[1].app_type, TaskType.AGENT_APP)
+        self.assertFalse(
+            state.update_hub_app(
+                "@me/fed-a",
+                "@me/server",
+                updated_hash,
+                refreshed_hash,
+                TaskType.AGENT_APP,
+            )
+        )
+
+        self.assertTrue(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertFalse(state.delete_app("@me/fed-a", "@me/server"))
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-a")],
+            ["@me/z-agent"],
+        )
+        self.assertEqual(
+            [app.app_id for app in state.list_apps("@me/fed-b")],
+            ["@me/server"],
+        )
+        self.assertEqual(
+            state.list_app_associations("@me/server", ["@me/fed-a", "@me/fed-b"]),
+            ["@me/fed-b"],
+        )
+        self.assertIsNotNone(state.get_fab(updated_hash))
+
+    def test_connector_create_list_and_delete(self) -> None:
+        """Multiple connectors of one provider can be created and deleted by ID."""
+        state = self.state_factory()
+        federation_id = "@bob/fed-a"
+
+        first_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"first"}',
+            config_json='{"calendar":"primary"}',
+            created_by="account-a",
+        )
+        second_id = state.create_connector(
+            federation_id=federation_id,
+            connector_ref="calendar",
+            credentials_json='{"token":"second"}',
+            config_json='{"calendar":"work"}',
+            created_by="account-a",
+        )
+        assert first_id is not None
+        assert second_id is not None
+        connectors = list(state.get_connectors_by_ref(federation_id, "calendar"))
+        self.assertGreater(second_id, first_id)
+        self.assertEqual(
+            [item.connector_id for item in connectors], [first_id, second_id]
+        )
+        self.assertEqual(state.get_connector_by_id(second_id), connectors[1])
+
+        self.assertTrue(state.delete_connector(federation_id, second_id))
+        self.assertEqual(
+            [
+                connector.connector_id
+                for connector in state.get_connectors_by_ref(federation_id, "calendar")
+            ],
+            [first_id],
+        )
+
+    def test_update_connector_credentials(self) -> None:
+        """Persist credential updates and roll back failures without changing config."""
+        state = self.state_factory()
+        connector_id = state.create_connector(
+            "@bob/fed-a",
+            "calendar",
+            '{"token":"old"}',
+            '{"calendar":"work"}',
+            "account-a",
+        )
+        assert connector_id is not None
+
+        def rotate() -> str:
+            return '{"token":"new"}'
+
+        assert (
+            state.update_connector_credentials(connector_id, '{"token":"old"}', rotate)
+            == '{"token":"new"}'
+        )
+        stored = state.get_connector_by_id(connector_id)
+        assert stored is not None
+        assert stored.credentials_json == '{"token":"new"}'
+        assert stored.config_json == '{"calendar":"work"}'
+
+        def fail() -> str:
+            raise RuntimeError("refresh failed")
+
+        assert (
+            state.update_connector_credentials(connector_id, '{"token":"old"}', fail)
+            == '{"token":"new"}'
+        )
+        with self.assertRaisesRegex(RuntimeError, "refresh failed"):
+            state.update_connector_credentials(connector_id, '{"token":"new"}', fail)
+        assert state.get_connector_by_id(connector_id) == stored
+        assert (
+            state.update_connector_credentials(
+                connector_id + 1, '{"token":"new"}', fail
+            )
+            is None
+        )
+
+    def test_bind_and_get_run_connectors(self) -> None:
+        """Run connector bindings should be deterministic and idempotent."""
+        state = self.state_factory()
+
+        state.bind_connectors_to_run(
+            run_id=42,
+            connector_ids=[2, 1, 2],
+        )
+        state.bind_connectors_to_run(run_id=42, connector_ids=[2])
+
+        self.assertEqual(
+            list(state.get_run_connector_ids(run_id=42)),
+            [1, 2],
+        )
+
+        self.assertFalse(
+            state.bind_connectors_to_run(run_id=43, connector_ids="notion")  # type: ignore
+        )
+        self.assertEqual(list(state.get_run_connector_ids(run_id=43)), [])
+
+    def test_run_series_context_roundtrip(self) -> None:
+        """A run series context can be stored and retrieved."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_run_series_context(series_id=42))
+        context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "value"},
+            state=RecordDict(),
+            run_config={"run": "value"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=context)
+
+        retrieved = state.get_run_series_context(series_id=42)
+
+        assert retrieved is not None
+        self.assertEqual(retrieved.run_id, context.run_id)
+        self.assertEqual(retrieved.node_id, context.node_id)
+        self.assertEqual(retrieved.node_config, context.node_config)
+        self.assertEqual(retrieved.run_config, context.run_config)
+        self.assertEqual(retrieved.series_id, context.series_id)
+
+        updated_context = Context(
+            run_id=456,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"node": "updated"},
+            state=RecordDict(),
+            run_config={"run": "updated"},
+            series_id=42,
+        )
+        state.set_run_series_context(series_id=42, context=updated_context)
+
+        updated = state.get_run_series_context(series_id=42)
+
+        assert updated is not None
+        self.assertEqual(updated.run_id, updated_context.run_id)
+        self.assertEqual(updated.node_config, updated_context.node_config)
+        self.assertEqual(updated.run_config, updated_context.run_config)
+
+    def test_store_compacted_context(self) -> None:
+        """Store summaries at distinct event boundaries for an agent."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
+        state.store_compacted_context(agent.id, 2**63, "First", token_count=123)
+        with self.assertRaises(ValueError):
+            state.store_compacted_context(agent.id, 2**63, "Duplicate", token_count=123)
+        state.store_compacted_context(
+            agent.id, 2**63 + 100, "Second", token_count=2**63
+        )
+        state.store_compacted_context(other.id, 2**63, "Other", token_count=789)
+
+        second, first = state.get_compacted_contexts(agent.id, limit=2)
+        (other_context,) = state.get_compacted_contexts(other.id)
+
+        self.assertGreater(first.id, 0)
+        self.assertLess(first.id, second.id)
+        self.assertTrue(first.created_at)
+        self.assertEqual(first.agent_id, agent.id)
+        self.assertEqual(first.through_event_id, 2**63)
+        self.assertEqual(first.text, "First")
+        self.assertEqual(first.token_count, 123)
+        self.assertEqual(second.through_event_id, 2**63 + 100)
+        self.assertEqual(second.text, "Second")
+        self.assertEqual(second.token_count, 2**63)
+        self.assertNotEqual(second.id, first.id)
+        self.assertEqual(
+            state.get_compacted_contexts(agent.id, before_context_id=second.id), [first]
+        )
+        self.assertEqual(other_context.agent_id, other.id)
+        self.assertEqual(other_context.text, "Other")
+
+    def test_connector_oauth_session_lifecycle(self) -> None:
+        """An OAuth session can be created, retrieved, and completed once."""
+        state = self.state_factory()
+        expires_at = now() + timedelta(minutes=10)
+
+        session = state.create_connector_oauth_session(
+            oauth_session_id="session-1",
+            flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=expires_at,
+        )
+        assert session is not None
+        self.assertEqual(session.federation_id, "@account-a/fed-a")
+        self.assertEqual(session.expires_at, expires_at.isoformat())
+        self.assertIsNone(session.completed_at)
+        self.assertEqual(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            ),
+            session,
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="session-1",
+                flwr_aid="account-a",
+                federation_id="@account-a/fed-a",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.create_connector_oauth_session(
+                oauth_session_id="missing-federation",
+                flwr_aid="account-a",
+                federation_id="",
+                connector_ref="calendar",
+                state="oauth-state",
+                redirect_uri="https://example.test/callback",
+                pkce_verifier=None,
+                expires_at=expires_at,
+            )
+        )
+        self.assertIsNone(
+            state.get_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-b"
+            )
+        )
+        self.assertTrue(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        completed = state.get_connector_oauth_session(
+            oauth_session_id="session-1", flwr_aid="account-a"
+        )
+        assert completed is not None
+        self.assertIsNotNone(completed.completed_at)
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="session-1", flwr_aid="account-a"
+            )
+        )
+        expired = state.create_connector_oauth_session(
+            oauth_session_id="expired-session",
+            flwr_aid="account-a",
+            federation_id="@account-a/fed-a",
+            connector_ref="calendar",
+            state="oauth-state",
+            redirect_uri="https://example.test/callback",
+            pkce_verifier=None,
+            expires_at=now() - timedelta(minutes=10),
+        )
+        assert expired is not None
+        self.assertFalse(
+            state.complete_connector_oauth_session(
+                oauth_session_id="expired-session", flwr_aid="account-a"
+            )
+        )
+
+    def store_automation(  # pylint: disable=too-many-arguments
+        self,
+        state: CoreState,
+        *,
+        series_id: int,
+        federation_id: str = "@me/fed-a",
+        flwr_aid: str = "aid-a",
+        next_run_at: str | None = None,
+        fixed_interval: int | None = None,
+        max_runs: int | None = 1,
+    ) -> Automation:
+        """Store a minimal automation."""
+        return state.store_automation(
+            federation_id=federation_id,
+            flwr_aid=flwr_aid,
+            start_run_request=StartRunRequest(
+                federation=federation_id,
+                series_id=series_id,
+            ),
+            series_id=series_id,
+            next_run_at=next_run_at or now().isoformat(),
+            fixed_interval=fixed_interval,
+            max_runs=max_runs,
+        )
+
+    def test_preregister_object_tree(self) -> None:
+        """Preregistering an object tree returns its missing objects."""
+        state = self.state_factory()
+        object_id = "a" * 64
+        object_tree = ObjectTree(object_id=object_id)
+        run_id = self.task_run_id(state)
+
+        missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+        replacement_missing_objects = state.preregister_object_tree(
+            object_tree, state.start_session(run_id)
+        )
+
+        self.assertEqual(missing_objects, [object_id])
+        self.assertEqual(replacement_missing_objects, [object_id])
+
+    def test_delete_sessions_in_run(self) -> None:
+        """Deleting sessions for a run preserves sessions belonging to other runs."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        session_ids = [state.start_session(run_id) for _ in range(2)]
+        other_session_id = state.start_session(other_run_id)
+        object_ids = ["a" * 64, "b" * 64, "c" * 64]
+        for session_id, object_id in zip(
+            [*session_ids, other_session_id], object_ids, strict=True
+        ):
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        state.delete_sessions_in_run(run_id)
+
+        for session_id in session_ids:
+            with self.assertRaisesRegex(ValueError, "Unknown object push session"):
+                state.preregister_object_tree(
+                    ObjectTree(object_id="d" * 64), session_id
+                )
+        self.assertEqual(
+            state.preregister_object_tree(
+                ObjectTree(object_id="e" * 64), other_session_id
+            ),
+            ["e" * 64],
+        )
+
+    def test_store_object_rejects_invalid_session_membership(self) -> None:
+        """Objects must be pending in a session belonging to the run."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertFalse(
+                state.store_object(run_id + 1, session_id, object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, "unknown-session", object_id, b"content")
+            )
+            self.assertFalse(
+                state.store_object(run_id, session_id, "unknown-object-id", b"content")
+            )
+
+        put_object.assert_not_called()
+        cleanup_session.assert_not_called()
+
+    def test_store_object_resolves_empty_session_id(self) -> None:
+        """An empty session ID resolves through pending object membership."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(state.object_store, "put") as put_object:
+            self.assertTrue(state.store_object(run_id, "", object_id, b"content"))
+
+        put_object.assert_called_once_with(object_id, b"content")
+
+    def test_store_object_cleans_up_expired_session(self) -> None:
+        """An object cannot be stored after its push session expires."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            patch("flwr.supercore.date.datetime.datetime") as mock_datetime,
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            mock_datetime.now.return_value = expired_at
+            stored = state.store_object(run_id, session_id, object_id, b"content")
+
+        self.assertFalse(stored)
+        put_object.assert_not_called()
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=True)
+
+    def test_store_object_refreshes_session_and_cleans_up_on_completion(self) -> None:
+        """A successful store refreshes TTL and cleans up an empty session."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        parent_id = "a" * 64
+        child_id = "b" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        object_tree = ObjectTree(
+            object_id=parent_id,
+            children=[ObjectTree(object_id=child_id)],
+        )
+        with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+            mock_datetime.now.return_value = created_at
+            session_id = state.start_session(run_id)
+            state.preregister_object_tree(object_tree, session_id)
+
+        first_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS - 1
+        )
+        second_store_at = created_at + timedelta(
+            seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1
+        )
+        with (
+            patch.object(state.object_store, "put") as put_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = first_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, child_id, b"child")
+                )
+            cleanup_session.assert_not_called()
+
+            with patch("flwr.supercore.date.datetime.datetime") as mock_datetime:
+                mock_datetime.now.return_value = second_store_at
+                self.assertTrue(
+                    state.store_object(run_id, session_id, parent_id, b"parent")
+                )
+
+        self.assertEqual(put_object.call_count, 2)
+        cleanup_session.assert_called_once_with(session_id, cleanup_messages=False)
+
+    def test_store_object_preserves_pending_claim_when_object_store_fails(self) -> None:
+        """An ObjectStore error returns False without consuming the pending claim."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        session_id = state.start_session(run_id)
+        state.preregister_object_tree(ObjectTree(object_id=object_id), session_id)
+
+        with patch.object(
+            state.object_store,
+            "put",
+            side_effect=[RuntimeError("write failed"), None],
+        ) as put_object:
+            self.assertFalse(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+            self.assertTrue(
+                state.store_object(run_id, session_id, object_id, b"content")
+            )
+
+        self.assertEqual(put_object.call_count, 2)
+
+    def test_get_object_returns_object_store_result_without_cleanup(self) -> None:
+        """Available, unknown, and unowned unavailable objects are returned directly."""
+        state = self.state_factory()
+        with (
+            patch.object(
+                state.object_store,
+                "get",
+                side_effect=[b"content", None, b""],
+            ) as load_object,
+            patch.object(state, "_cleanup_push_session") as cleanup_session,
+        ):
+            self.assertEqual(state.get_object(1, "available"), b"content")
+            self.assertIsNone(state.get_object(1, "unknown"))
+            self.assertEqual(state.get_object(1, "unavailable"), b"")
+
+        self.assertEqual(load_object.call_count, 3)
+        cleanup_session.assert_not_called()
+
+    def test_get_object_cleans_up_expired_sessions_and_reloads(self) -> None:
+        """An unavailable object triggers cleanup for all expired sessions."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        object_id = "a" * 64
+        created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        with self._patch_message_time(created_at):
+            session_ids = []
+            for root_object_id in ("b" * 64, "c" * 64):
+                session_id = state.start_session(run_id)
+                session_ids.append(session_id)
+                state.preregister_object_tree(
+                    ObjectTree(
+                        object_id=root_object_id,
+                        children=[ObjectTree(object_id=object_id)],
+                    ),
+                    session_id,
+                )
+
+        expired_at = created_at + timedelta(seconds=OBJECT_PUSH_SESSION_TTL_SECONDS + 1)
+        with (
+            self._patch_message_time(expired_at),
+            patch.object(
+                state,
+                "_cleanup_push_session",
+                wraps=state._cleanup_push_session,  # pylint: disable=W0212
+            ) as cleanup_session,
+        ):
+            self.assertIsNone(state.get_object(run_id, "unknown-object-id"))
+            cleanup_session.assert_not_called()
+            self.assertIsNone(state.get_object(run_id, object_id))
+
+        cleanup_session.assert_has_calls(
+            [call(session_id, cleanup_messages=True) for session_id in session_ids],
+            any_order=True,
+        )
+        self.assertEqual(cleanup_session.call_count, 2)
+
+    def test_store_run_in_series_creates_id(self) -> None:
+        """Storing a run in a run series should create a nonzero ID."""
+        state = self.state_factory()
+
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
+        self.assertGreater(series_id, 0)
+        self.assertEqual(
+            state.store_run_in_series(
+                run_id=456,
+                federation_id="@me/fed-a",
+                is_agent=False,
+                series_id=series_id,
+                description="Replacement description",
+            ),
+            series_id,
+        )
+        run_series = state.get_run_series(series_ids=[series_id])
+        self.assertEqual(run_series[0].description, "Initial description")
+        self.assertEqual(state.get_run_series(is_agent=True), run_series)
+        self.assertEqual(state.get_run_series(is_agent=False), [])
+
+    def test_set_run_series_description(self) -> None:
+        """A valid RunSeries description can be changed."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=True,
+            series_id=None,
+            description="Initial description",
+        )
+        assert series_id is not None
+
+        self.assertIsNone(
+            state.set_run_series_description(series_id, "  Generated title  ")
+        )
+        updated = state.get_run_series(series_ids=[series_id])[0]
+        self.assertEqual(updated.description, "Generated title")
+
+    def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
+        state = self.state_factory()
+
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.store_run_in_series(
+                run_id=123,
+                federation_id="@me/fed-a",
+                is_agent=False,
+                series_id=123,
+            )
+
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
+
+    def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return None."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
+        )
+        assert series_id is not None
+
+        stored = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=series_id,
+        )
+
+        self.assertIsNone(stored)
+
+    def test_get_run_series_filters_by_series_ids_and_federation_ids(self) -> None:
+        """RunSeries lookup should filter by series IDs and federation IDs."""
+        state = self.state_factory()
+        series_id_a = state.store_run_in_series(
+            run_id=123,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
+        )
+        series_id_b = state.store_run_in_series(
+            run_id=456,
+            federation_id="@me/fed-b",
+            is_agent=False,
+            series_id=None,
+        )
+        series_id_c = state.store_run_in_series(
+            run_id=789,
+            federation_id="@me/fed-a",
+            is_agent=False,
+            series_id=None,
+        )
+        assert series_id_a is not None
+        assert series_id_b is not None
+        assert series_id_c is not None
+
+        fed_a_series = state.get_run_series(federation_ids=["@me/fed-a"])
+        self.assertSetEqual(
+            {entry.series_id for entry in fed_a_series},
+            {series_id_a, series_id_c},
+        )
+
+        id_filtered_series = state.get_run_series(series_ids=[series_id_b])
+        self.assertEqual(
+            [entry.series_id for entry in id_filtered_series],
+            [series_id_b],
+        )
+
+        combined_series = state.get_run_series(
+            series_ids=[series_id_a, series_id_b],
+            federation_ids=["@me/fed-a"],
+        )
+        self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
+
+        self.assertEqual(state.get_run_series(series_ids=[]), [])
+        self.assertEqual(state.get_run_series(federation_ids=[]), [])
+
+    def test_store_list_and_stop_automation(self) -> None:
+        """Automation storage should support list, due filtering, and stop."""
+        state = self.state_factory()
+        current = now()
+        due_at = (current - timedelta(seconds=60)).isoformat()
+
+        due = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=due_at,
+            fixed_interval=60,
+        )
+        future = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=(current + timedelta(seconds=60)).isoformat(),
+        )
+        other = self.store_automation(
+            state,
+            series_id=3,
+            federation_id="@me/fed-b",
+            next_run_at=(current - timedelta(seconds=30)).isoformat(),
+        )
+
+        self.assertEqual(due.next_run_at, due_at)
+
+        listed = state.list_automations(
+            federations=["@me/fed-a"], order_by="updated_at"
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed},
+            {due.automation_id, future.automation_id},
+        )
+
+        listed_across_federations = state.list_automations(
+            federations=["@me/fed-a", "@me/fed-b"],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_across_federations},
+            {due.automation_id, future.automation_id, other.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(federations=[], order_by="updated_at"), []
+        )
+
+        listed_by_id = state.list_automations(
+            automation_ids=[due.automation_id, future.automation_id],
+            order_by="updated_at",
+        )
+        self.assertSetEqual(
+            {automation.automation_id for automation in listed_by_id},
+            {due.automation_id, future.automation_id},
+        )
+        self.assertEqual(
+            state.list_automations(automation_ids=[], order_by="updated_at"), []
+        )
+
+        due_list = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=["active"],
+            due_before=current,
+            order_by="next_run_at",
+            limit=10,
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in due_list], [due.automation_id]
+        )
+        self.assertEqual(due_list[0].remaining_runs, 1)
+
+        self.assertTrue(state.stop_automation(due.automation_id))
+        self.assertFalse(state.stop_automation(due.automation_id))
+
+        stopped = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.STOPPED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in stopped], [due.automation_id]
+        )
+        self.assertEqual(stopped[0].next_run_at, due_at)
+
+    def test_advance_and_finish_automation(self) -> None:
+        """Automation advance should update records and finish terminally."""
+        state = self.state_factory()
+        current = now()
+
+        # Create a recurring automation with two finite occurrences.
+        previous_next_run_at = (current - timedelta(seconds=30)).isoformat()
+        next_run_at = (current + timedelta(seconds=30)).isoformat()
+        recurring = self.store_automation(
+            state,
+            series_id=1,
+            next_run_at=previous_next_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+
+        # Advance the first occurrence and reject the stale due-time claim.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        self.assertFalse(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            )
+        )
+        updated = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.ACTIVE],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 1)
+        self.assertEqual(updated[0].next_run_at, next_run_at)
+
+        # Advance the final occurrence, then complete the automation.
+        self.assertTrue(
+            state.advance_automation(
+                recurring.automation_id,
+                previous_next_run_at=next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                recurring.automation_id,
+                status=AutomationStatus.COMPLETED,
+            )
+        )
+        completed = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.COMPLETED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in completed],
+            [recurring.automation_id],
+        )
+
+        # Mark an advanced automation as failed when execution cannot proceed.
+        failed_previous_next_run_at = (current - timedelta(seconds=15)).isoformat()
+        failing = self.store_automation(
+            state,
+            series_id=2,
+            next_run_at=failed_previous_next_run_at,
+        )
+        self.assertTrue(
+            state.advance_automation(
+                failing.automation_id,
+                previous_next_run_at=failed_previous_next_run_at,
+                next_run_at=None,
+            )
+        )
+        self.assertTrue(
+            state.finish_automation(
+                failing.automation_id,
+                status=AutomationStatus.FAILED,
+            )
+        )
+        failed = state.list_automations(
+            federations=["@me/fed-a"],
+            statuses=[AutomationStatus.FAILED],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            [automation.automation_id for automation in failed],
+            [failing.automation_id],
+        )
+        self.assertEqual(failed[0].next_run_at, failed_previous_next_run_at)
+
+    def test_claim_automation(self) -> None:
+        """Claiming should return the request and advance one occurrence."""
+        state = self.state_factory()
+        current = now()
+        first_run_at = current.isoformat()
+        second_run_at = (current + timedelta(seconds=60)).isoformat()
+        automation = self.store_automation(
+            state,
+            series_id=123,
+            flwr_aid="aid-claim",
+            next_run_at=first_run_at,
+            fixed_interval=60,
+            max_runs=2,
+        )
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=None,
+            )
+        )
+
+        claimed = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=first_run_at,
+            next_run_at=second_run_at,
+        )
+
+        self.assertIsNotNone(claimed)
+        assert claimed is not None
+        request, flwr_aid = claimed
+        self.assertEqual(request.series_id, 123)
+        self.assertEqual(flwr_aid, "aid-claim")
+        self.assertIsNone(
+            state.claim_automation(
+                automation.automation_id,
+                previous_next_run_at=first_run_at,
+                next_run_at=second_run_at,
+            )
+        )
+
+        final_claim = state.claim_automation(
+            automation.automation_id,
+            previous_next_run_at=second_run_at,
+            next_run_at=None,
+        )
+
+        self.assertIsNotNone(final_claim)
+        updated = state.list_automations(
+            automation_ids=[automation.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(updated[0].remaining_runs, 0)
+
+    def test_store_automation_preserves_series_id_without_validation(self) -> None:
+        """Automation storage should preserve caller-provided series IDs."""
+        state = self.state_factory()
+        series_id = 123
+
+        automation = self.store_automation(
+            state, federation_id="@me/fed-b", series_id=series_id
+        )
+
+        self.assertEqual(automation.series_id, series_id)
+        self.assertEqual(automation.federation, "@me/fed-b")
+
+    def test_create_and_get_task(self) -> None:
+        """Test creating and retrieving a task."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=run_id,
+            fab_hash=None,
+            connector_ref="web_search",
+        )
+        assert task_id is not None
+        tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(task.task_id, task_id)
+        self.assertEqual(task.type, TaskType.CONNECTOR)
+        self.assertEqual(task.run_id, run_id)
+        self.assertEqual(
+            task.status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertFalse(task.HasField("fab_hash"))
+        self.assertEqual(task.connector_ref, "web_search")
+        self.assertFalse(task.HasField("connector_id"))
+        self.assertTrue(task.pending_at)
+        self.assertEqual(task.starting_at, "")
+        self.assertEqual(task.running_at, "")
+        self.assertEqual(task.finished_at, "")
+
+    def test_create_task_rejects_finished_requesting_task(self) -> None:
+        """Task creation should fail if the requesting task is already finished."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        requesting_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+        )
+        assert requesting_task_id is not None
+        self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
+
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=run_id,
+            connector_ref="connector://test",
+            requesting_task_id=requesting_task_id,
+        )
+
+        self.assertIsNone(task_id)
+
+    def test_get_tasks_missing_returns_empty(self) -> None:
+        """Missing tasks should return an empty sequence."""
+        state = self.state_factory()
+        self.assertEqual(state.get_tasks(task_ids=[123]), [])
+
+    def test_get_tasks_run_id_matches(self) -> None:
+        """Run ID filters should match only tasks from the requested runs."""
+        state = self.state_factory()
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        assert task_id_1 and task_id_2 and task_id_3
+
+        tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
+
+    def test_get_tasks_single_status_matches(self) -> None:
+        """A single-item status sequence should match pending tasks."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert task_id
+
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
+
+    def test_get_tasks_negative_limit_raises(self) -> None:
+        """Negative limits should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(limit=-1)
+
+    def test_get_tasks_invalid_order_by_raises(self) -> None:
+        """Unsupported order_by values should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(order_by=cast(Any, "foo"))
+
+    def test_get_task_message_invalid_order_by_raises(self) -> None:
+        """Unsupported task-message order_by values should be rejected."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_task_message(order_by=cast(Any, "foo"))
+
+    def test_get_task_returns_copy(self) -> None:
+        """Retrieved task should be a defensive copy."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+        )
+        assert task_id is not None
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        task.fab_hash = "mutated"
+
+        reloaded_tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(reloaded_tasks), 1)
+        reloaded = reloaded_tasks[0]
+        self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_usage(self) -> None:
+        """Task usage should round-trip and filter by task ID."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=run_id,
+        )
+        assert task_id is not None
+
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
+        state.add_task_usage(
+            task_id,
+            TaskUsage(
+                input_tokens=999,
+                usage_type="model_inference",
+                provider="openai/gpt-test",
+            ),
+        )
+
+        usages = state.get_task_usage(task_ids=[task_id])
+        usages_by_run = state.get_task_usage(run_ids=[run_id])
+        empty_by_task = state.get_task_usage(task_ids=[])
+        empty_by_run = state.get_task_usage(run_ids=[])
+
+        self.assertEqual(len(usages), 2)
+        self.assertEqual(usages_by_run, usages)
+        self.assertEqual(empty_by_task, [])
+        self.assertEqual(empty_by_run, [])
+        usage = usages[0]
+        self.assertEqual(usage.input_tokens, 10)
+        self.assertEqual(usage.output_tokens, 20)
+        self.assertEqual(usage.total_tokens, 30)
+        self.assertEqual(usage.usage_type, "model_inference")
+        self.assertEqual(usage.provider, "openai/gpt-test")
+        self.assertEqual(usages[1].input_tokens, 999)
+
+    def test_add_and_get_task_log(self) -> None:
+        """Adding and retrieving task logs should preserve concatenation order."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now - timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=1),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # Reading from before the first log should return both entries and the
+        # timestamp of the newest returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 + log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp(self) -> None:
+        """Retrieving task logs after a specific timestamp should filter old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=2),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # A timestamp between the two entries should filter out only the older
+        # log and advance the checkpoint to the returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 not in retrieved_logs
+        assert log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp_no_logs(self) -> None:
+        """Retrieving task logs after the last entry should return an empty result."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry")
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        # Polling after the latest known entry should return no logs and no new
+        # checkpoint.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest == 0
+        assert retrieved_logs == ""
+
+    def test_get_task_log_does_not_repeat_logs_at_checkpoint_timestamp(self) -> None:
+        """Polling with the last returned timestamp should not repeat old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry 1")
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=None)
+
+        assert retrieved_logs == "Log entry 1"
+        assert latest == fixed_now.timestamp()
+
+        # Reusing the returned timestamp as the next checkpoint must not replay
+        # the log that produced that checkpoint.
+        next_logs, next_latest = state.get_task_log(task_id, after_timestamp=latest)
+
+        assert next_logs == ""
+        assert next_latest == 0
+
+    def test_claim_task_transitions_pending_to_starting(self) -> None:
+        """Claiming a task should create a token and move it to starting."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Claim should persist token ownership and move the task to STARTING.
+        token = state.claim_task(task_id)
+
+        self.assertIsNotNone(token)
+        assert token is not None
+        assert (task := state.get_task_by_token(token))
+        self.assertEqual(task.task_id, task_id)
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.STARTING)
+        self.assertTrue(tasks[0].starting_at)
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
+        """Only existing pending unclaimed tasks should be claimable."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+
+        # Missing tasks cannot be claimed.
+        self.assertIsNone(state.claim_task(61016))
+
+        claimed_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        finished_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
+        assert claimed_task_id is not None and finished_task_id is not None
+
+        # Claiming is single-owner and cannot be repeated.
+        self.assertIsNotNone(state.claim_task(claimed_task_id))
+        self.assertIsNone(state.claim_task(claimed_task_id))
+
+        # Finished tasks are not claimable.
+        self.assertTrue(state.finish_task(finished_task_id, SubStatus.FAILED, "done"))
+        self.assertIsNone(state.claim_task(finished_task_id))
+
+    def test_activate_task_transitions_starting_to_running(self) -> None:
+        """Only starting tasks should transition to running."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Task does not exist, so it cannot be activated.
+        self.assertFalse(state.activate_task(61016))
+        # Task exists but is pending, so it must be claimed before activation.
+        self.assertFalse(state.activate_task(task_id))
+        # Claiming the task returns a token.
+        self.assertIsNotNone(state.claim_task(task_id))
+        # The task is in starting status, so it can be activated.
+        self.assertTrue(state.activate_task(task_id))
+        # The task is already in running status, so it cannot be activated again.
+        self.assertFalse(state.activate_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.RUNNING)
+        self.assertTrue(tasks[0].running_at)
+        self.assertEqual(tasks[0].finished_at, "")
+
+    @parameterized.expand(  # type: ignore
+        [
+            (SubStatus.FAILED, False),
+            (SubStatus.STOPPED, False),
+            (SubStatus.COMPLETED, True),
+        ]
+    )
+    def test_finish_task_transitions_unfinished_task_to_finished(
+        self, sub_status: str, requires_running: bool
+    ) -> None:
+        """Finishing a task should store the terminal status details."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+        )
+        assert task_id is not None
+
+        # Task does not exist.
+        self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
+
+        if requires_running:
+            # FINISHED:COMPLETED is only valid once the task is RUNNING.
+            self.assertFalse(state.finish_task(task_id, sub_status, "boom"))
+            self.assertIsNotNone(state.claim_task(task_id))
+            self.assertTrue(state.activate_task(task_id))
+
+        # Valid unfinished task transition should succeed.
+        self.assertTrue(state.finish_task(task_id, sub_status, "boom"))
+        # Task is already finished, so it cannot be finished again.
+        self.assertFalse(state.finish_task(task_id, SubStatus.FAILED, "again"))
+        # Finished tasks cannot be claimed.
+        self.assertIsNone(state.claim_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(
+            task.status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=sub_status,
+                details="boom",
+            ),
+        )
+        self.assertTrue(task.finished_at)
+
+    def test_task_heartbeat_extends_token_expiration(self) -> None:
+        """Task heartbeat should keep a claimed task token valid."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Heartbeat extends only existing claimed task leases.
+            self.assertFalse(state.acknowledge_task_heartbeat(61016))
+            self.assertTrue(state.acknowledge_task_heartbeat(task_id))
+
+            # The heartbeat extension should keep the token valid past its
+            # initial claim deadline.
+            mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
+            assert (task := state.get_task_by_token(token))
+            self.assertEqual(task.task_id, task_id)
 
-            # Assert: token1 should be cleaned up, token2 should still be valid
-            self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+            # Once the extended deadline passes, the token no longer resolves.
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+    def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
+        """Expired STARTING task claims should make tasks pending again."""
+        # Prepare: create and claim a connector task.
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            assert task_id is not None
+            pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
+
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Execute: advance past claim expiry and trigger cleanup.
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+        # Assert: task is pending again and can be claimed with a fresh token.
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(tasks[0].pending_at, pending_at)
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+        self.assertIsNone(state.get_task_by_token(token))
+        new_token = state.claim_task(task_id)
+        self.assertNotEqual(new_token, token)
+        assert new_token is not None
+        new_task = state.get_task_by_token(new_token)
+        self.assertIsNotNone(new_task)
+        assert new_task is not None
+        self.assertEqual(new_task.task_id, task_id)
+
+    def test_expired_running_task_token_transitions_task_to_finished_failed(
+        self,
+    ) -> None:
+        """Expired RUNNING task claims should transition tasks to FINISHED:FAILED."""
+        state = self.state_factory()
+        fixed_now = now()
+        active_until = fixed_now + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        )
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            assert task_id is not None
+
+            token = state.claim_task(task_id)
+            assert token is not None
+            self.assertTrue(state.activate_task(task_id))
+
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertTrue(tasks[0].finished_at)
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
+    def test_activate_task_extends_token_expiration(self) -> None:
+        """Activating a task should give it the regular heartbeat grace period."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+            self.assertTrue(state.activate_task(task_id))
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            task = state.get_task_by_token(token)
+            self.assertIsNotNone(task)
+            assert task is not None
+            self.assertEqual(task.task_id, task_id)
+
+    def test_get_tasks_expires_stale_task_tokens(self) -> None:
+        """Reading tasks should expire stale claimed task tokens first."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            assert task_id is not None
+            assert (token := state.claim_task(task_id))
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertIsNone(state.get_task_by_token(token))
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_get_tasks_refreshes_cached_task_in_shared_session(self) -> None:
+        """Task reads should reflect raw-SQL status changes in a shared session."""
+        state = self.state_factory()
+        if not hasattr(state, "session"):
+            self.skipTest("SQL session test")
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert task_id is not None
+
+        with state.session():
+            tasks = state.get_tasks(task_ids=[task_id])
+            self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+            assert state.claim_task(task_id) is not None
+            refreshed_tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(refreshed_tasks[0].status.status, Status.STARTING)
+        self.assertTrue(refreshed_tasks[0].starting_at)
+
+    def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
+        """Revived STARTING tasks should not be passed to expiry hooks."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch.object(  # pylint: disable=protected-access
+            state, "_on_task_tokens_expired"
+        ) as on_expired:
+            with patch("datetime.datetime") as mock_dt:
+                mock_dt.now.return_value = fixed_now
+                task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+                assert task_id is not None
+                assert state.claim_task(task_id) is not None
+
+                mock_dt.now.return_value = fixed_now + timedelta(
+                    seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+                )
+                state.get_tasks(task_ids=[task_id])
+
+            on_expired.assert_not_called()
+
+    def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
+        """Unknown task tokens should not resolve to a task."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_task_by_token("missing-token"))
+
+    def test_store_and_get_task_message(self) -> None:
+        """Task Messages should round-trip, filter, and be delivered once."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        other_dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_dst_task_id is not None
+        )
+
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=run_id,
+        )
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=now().timestamp() - 2.0,
+            ttl=1.0,
+        )
+        other_destination = create_task_message(src_task_id, other_dst_task_id, run_id)
+
+        self.assertTrue(state.store_task_message(message))
+        self.assertFalse(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+        pulled_other_again = state.get_task_message(dst_task_ids=[other_dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled_again, [])
+        self.assertEqual(len(pulled_other), 1)
+        self.assertEqual(pulled_other_again, [])
+        pulled_message = pulled[0]
+        pulled_other_message = pulled_other[0]
+        self.assertEqual(
+            pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(
+            pulled_other_message.metadata.message_id,
+            other_destination.metadata.message_id,
+        )
+        self.assertEqual(pulled_message.metadata.run_id, run_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
+        self.assertTrue(pulled_message.has_content())
+
+    def test_store_task_message_validates_task_relationship(self) -> None:
+        """Task Messages should only be stored for valid same-run destinations."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        other_run_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=other_run_id
+        )
+        finished_src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id
+        )
+        finished_dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id
+        )
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_run_task_id is not None
+            and finished_src_task_id is not None
+            and finished_dst_task_id is not None
+        )
+        assert state.finish_task(finished_src_task_id, SubStatus.FAILED, "done")
+        assert state.finish_task(finished_dst_task_id, SubStatus.FAILED, "done")
+
+        missing_task_id = (
+            max(
+                src_task_id,
+                dst_task_id,
+                other_run_task_id,
+                finished_src_task_id,
+                finished_dst_task_id,
+            )
+            + 1
+        )
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+        invalid_messages = [
+            create_task_message(missing_task_id, dst_task_id, run_id),
+            create_task_message(src_task_id, missing_task_id, run_id),
+            create_task_message(src_task_id, other_run_task_id, run_id),
+            create_task_message(src_task_id, finished_dst_task_id, run_id),
+            create_task_message(src_task_id, dst_task_id, 0),
+            create_task_message(src_task_id, dst_task_id, other_run_id),
+        ]
+        finished_source_message = create_task_message(
+            finished_src_task_id, dst_task_id, run_id
+        )
+
+        for message in invalid_messages:
+            self.assertFalse(state.store_task_message(message))
+        self.assertTrue(state.store_task_message(finished_source_message))
+
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(
+            pulled[0].metadata.message_id,
+            finished_source_message.metadata.message_id,
+        )
+        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
+        self.assertEqual(
+            state.get_task_message(dst_task_ids=[finished_dst_task_id]), []
+        )
+        self.assertEqual(state.get_task_message(), [])
+
+    def test_get_task_message_does_not_return_expired_messages(self) -> None:
+        """Getting task Messages should not return expired Messages."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        msg_ttl = 60.0
+        current = now()
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current.timestamp(),
+            ttl=msg_ttl,
+        )
+        self.assertTrue(state.store_task_message(expired))
+
+        future = current + timedelta(seconds=msg_ttl + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future
+            self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
+
+    def test_get_task_message_limit(self) -> None:
+        """Getting task Messages should respect the provided limit."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        current = now().timestamp()
+        msg_1 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 2.0
+        )
+        msg_2 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 1.0
+        )
+        self.assertTrue(state.store_task_message(msg_2))
+        self.assertTrue(state.store_task_message(msg_1))
+
+        pulled = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+        pulled_next = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(len(pulled_next), 1)
+        self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
+        self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
+
+    def test_get_task_message_filters_by_source_task(self) -> None:
+        """A source-specific claim should not consume another task's message."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert (
+            src_task_id_1 is not None
+            and src_task_id_2 is not None
+            and dst_task_id is not None
+        )
+        reply_1 = create_task_message(src_task_id_1, dst_task_id, run_id)
+        reply_2 = create_task_message(src_task_id_2, dst_task_id, run_id)
+        self.assertTrue(state.store_task_message(reply_1))
+        self.assertTrue(state.store_task_message(reply_2))
+
+        pulled_2 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_2],
+            limit=1,
+            order_by="created_at",
+        )
+        pulled_1 = state.get_task_message(
+            dst_task_ids=[dst_task_id],
+            src_task_ids=[src_task_id_1],
+            limit=1,
+            order_by="created_at",
+        )
+
+        self.assertEqual(pulled_2[0].metadata.message_id, reply_2.metadata.message_id)
+        self.assertEqual(pulled_1[0].metadata.message_id, reply_1.metadata.message_id)
+
+    def test_store_and_get_task_events(self) -> None:
+        """Task events should round-trip in assigned ID order."""
+        # Prepare: Create one run with a task and two valid task events.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event_1 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.created",
+            data='{"type":"response.created"}',
+        )
+        event_2 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.output_text.delta",
+            data='{"type":"response.output_text.delta","delta":"Hel"}',
+        )
+
+        # Execute: Store the events and read them through full and cursored fetches.
+        self.assertFalse(state.store_task_events([]))
+        self.assertTrue(state.store_task_events([event_1, event_2]))
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
+        latest_id = events[-1].id
+        after_first = state.get_task_events(
+            run_ids=[run_id], after_task_event_id=events[0].id
+        )
+        no_new = state.get_task_events(run_ids=[run_id], after_task_event_id=latest_id)
+        filtered = state.get_task_events(run_ids=[run_id], task_ids=[task_id])
+        excluded = state.get_task_events(run_ids=[run_id], task_ids=[task_id + 1])
+        no_runs = state.get_task_events(run_ids=[])
+
+        # Assert: Events keep assigned ID order and cursor filtering works.
+        self.assertEqual(len(events), 2)
+        self.assertIsInstance(events[0], TaskEvent)
+        self.assertGreater(events[0].id, 0)
+        self.assertGreater(events[1].id, events[0].id)
+        self.assertTrue(events[0].timestamp)
+        self.assertEqual(events[0].run_id, run_id)
+        self.assertEqual(events[1].run_id, run_id)
+        self.assertEqual(
+            (events[0].task_id, events[0].event, events[0].data),
+            (task_id, event_1.event, event_1.data),
+        )
+        self.assertEqual(
+            (events[1].task_id, events[1].event, events[1].data),
+            (task_id, event_2.event, event_2.data),
+        )
+        self.assertEqual(latest_id, events[1].id)
+        self.assertEqual(after_first, [events[1]])
+        self.assertEqual(no_new, [])
+        self.assertEqual(filtered, events)
+        self.assertEqual(excluded, [])
+        self.assertEqual(no_runs, [])
+
+    def _create_task_events_for_filter_tests(
+        self,
+    ) -> tuple[CoreState, int, int, list[TaskEvent]]:
+        """Store task events with several types and return them in ID order."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        state.store_task_events(
+            [
+                TaskEvent(
+                    run_id=run_id,
+                    task_id=task_id,
+                    event=event_type,
+                    data=f'{{"type":"{event_type}"}}',
+                )
+                for event_type in (
+                    "message",
+                    "response.created",
+                    "function_call",
+                    "message",
+                    "function_call_output",
+                )
+            ]
+        )
+        return state, run_id, task_id, list(state.get_task_events(run_ids=[run_id]))
+
+    def test_get_task_events_filters_by_type(self) -> None:
+        """Return requested event types, including types outside the summary set."""
+        state, run_id, _, events = self._create_task_events_for_filter_tests()
+
+        self.assertEqual(
+            state.get_task_events(run_ids=[run_id], event_types=["message"]),
+            [events[0], events[3]],
+        )
+        self.assertEqual(
+            state.get_task_events(run_ids=[run_id], event_types=["response.created"]),
+            [events[1]],
+        )
+        self.assertEqual(state.get_task_events(run_ids=[run_id], event_types=[]), [])
+
+    def test_get_task_events_filters_by_id(self) -> None:
+        """Treat both event ID bounds as exclusive."""
+        state, run_id, _, events = self._create_task_events_for_filter_tests()
+
+        self.assertEqual(
+            state.get_task_events(
+                run_ids=[run_id],
+                after_task_event_id=events[1].id,
+                before_task_event_id=events[4].id,
+            ),
+            events[2:4],
+        )
+
+    def test_get_task_events_returns_last_matching(self) -> None:
+        """Apply filters before selecting the newest N events in ID order."""
+        state, run_id, task_id, events = self._create_task_events_for_filter_tests()
+
+        filtered = state.get_task_events(
+            run_ids=[run_id],
+            task_ids=[task_id],
+            event_types=["message", "response.created", "function_call"],
+            after_task_event_id=events[0].id,
+            before_task_event_id=events[-1].id,
+            last_n=2,
+        )
+
+        self.assertEqual(list(filtered), [events[2], events[3]])
+        self.assertEqual(state.get_task_events(run_ids=[run_id], last_n=0), events)
+
+    def test_get_task_events_rejects_negative_last_n(self) -> None:
+        """Reject negative limits consistently across state implementations."""
+        state, run_id, _, _ = self._create_task_events_for_filter_tests()
+
+        with self.assertRaisesRegex(ValueError, "last_n must be non-negative"):
+            state.get_task_events(run_ids=[run_id], last_n=-1)
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("malformed", "{"),
+            ("array", "[]"),
+            ("string", '"value"'),
+            ("non_finite", '{"value": NaN}'),
+        ]
+    )
+    def test_store_task_events_requires_json_object_payload(
+        self, _name: str, data: str
+    ) -> None:
+        """Task event data should be a JSON object string."""
+        # Prepare: Create one valid event followed by an invalid payload variant.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+
+        # Execute: Attempt to store the mixed event batch.
+        self.assertFalse(
+            state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.output_text.delta",
+                        data=data,
+                    ),
+                ]
+            )
+        )
+
+        # Assert: The invalid payload rejects the whole batch.
+        events = state.get_task_events(run_ids=[run_id], after_task_event_id=None)
+        self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""
@@ -218,3 +2602,185 @@ class StateTest(unittest.TestCase):
                     expires_at=created_at.timestamp() + 10.0,
                 )
             )
+
+    def test_user_event_bootstrap(self) -> None:
+        """Snapshot owned state and replay shared user and agent messages."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        assert agent is not None
+        snapshot = state.get_bootstrap("alice")
+        self.assertEqual(list(snapshot.agents), [agent])
+        self.assertEqual(list(snapshot.spaces), list(state.get_spaces("alice")))
+        self.assertEqual(snapshot.cursor, 2)
+        self.assertEqual(state.get_bootstrap("bob").cursor, 0)
+        alice = SpaceParticipant(flwr_aid="alice")
+        author = SpaceParticipant(agent_id=agent.id)
+        space = state.create_space(
+            participants=[alice, SpaceParticipant(flwr_aid="bob"), author]
+        )
+        message = state.create_space_message(UUID(space.id), author, "Hello")
+        assert message is not None
+        entries = state.get_user_events("alice", snapshot.cursor)
+        self.assertEqual(
+            [(entry.seq, entry.event.type) for entry in entries],
+            [(3, "space.created"), (4, "message.created")],
+        )
+        self.assertEqual(
+            [entry.event for entry in entries],
+            [entry.event for entry in state.get_user_events("bob")],
+        )
+        self.assertEqual(entries[1].event.payload["space_id"], space.id)
+        self.assertEqual(entries[1].event.payload["id"], str(message.id))
+
+    def test_user_event_replay(self) -> None:
+        """Assign event metadata and replay immutable payloads in feed order."""
+        state = self.state_factory()
+        payload = Agent(id=2**64 - 1)
+        created_at = now()
+        with self._patch_message_time(created_at):
+            event_id = state.store_event(
+                EventType.AGENT_CREATED, payload, ["bob", "alice", "bob"]
+            )
+        first = state.get_user_events("alice")[0].event
+        self.assertEqual(first.event_id, str(event_id))
+        self.assertEqual(first.created_at, created_at.isoformat())
+        self.assertEqual(
+            [entry.event for entry in state.get_user_events("bob")], [first]
+        )
+        self.assertEqual(state.get_user_events("charlie"), [])
+        with self._patch_message_time(created_at - timedelta(days=1)):
+            state.store_event(EventType.AGENT_CREATED, Agent(), ["alice"])
+        second = state.get_user_events("alice", 1)[0].event
+        self.assertNotEqual(first.event_id, second.event_id)
+        self.assertTrue(second.HasField("payload"))
+        page = state.get_user_events("alice", limit=1)
+        self.assertEqual(page[0].event.payload["id"], str(2**64 - 1))
+        self.assertEqual(state.get_user_events("alice", page[0].seq)[0].event, second)
+        self.assertEqual(state.get_user_events("alice", 2), [])
+        payload.id = 1
+        first.type = "changed"
+        self.assertEqual(state.get_user_events("alice", limit=1), page)
+
+    def test_user_event_agent_creation_failure(self) -> None:
+        """Roll back the Agent and its event if initial Space creation fails."""
+        state = self.state_factory()
+        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+            with self.assertRaises(ValueError):
+                state.create_agent(
+                    "alice", AgentConfig(name="Agent", app_spec="@test/app")
+                )
+        snapshot = state.get_bootstrap("alice")
+        self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
+
+    def test_user_event_access(self) -> None:
+        """Filter revoked access and advance through the hidden tail after paging."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        space = state.create_space(
+            participants=[alice, SpaceParticipant(flwr_aid="bob")]
+        )
+        state.create_space_message(UUID(space.id), alice, "Private")
+        visible = state.create_space(participants=[alice])
+        state.create_space_message(UUID(visible.id), alice, "Visible")
+        state.create_space_message(UUID(space.id), alice, "Hidden tail")
+        if isinstance(state, SqlCoreState):
+            with state.session() as session:
+                session.execute(
+                    delete(SpaceParticipantTable).where(
+                        SpaceParticipantTable.c.space_id == UUID(space.id),
+                        SpaceParticipantTable.c.flwr_aid == "alice",
+                    )
+                )
+        else:
+            assert isinstance(state, InMemoryCoreState)
+            with state.lock_space_store:
+                state.space_store[UUID(space.id)].participants.remove(alice)
+        page = state.get_user_events("alice", limit=1)
+        self.assertEqual(
+            [(entry.seq, entry.event.space_id) for entry in page], [(3, visible.id)]
+        )
+        page = state.get_user_events("alice", 3, limit=1)
+        self.assertEqual(
+            [(entry.seq, entry.event.type) for entry in page], [(4, "message.created")]
+        )
+        self.assertEqual(
+            state.get_user_events("alice", 4), [StreamEventsResponse(seq=5)]
+        )
+        self.assertEqual(state.get_user_events("alice", 5), [])
+        self.assertEqual(state.get_bootstrap("alice").cursor, 5)
+
+    def test_user_event_invalid_cursors(self) -> None:
+        """Reject cursors outside the feed and nonpositive page sizes."""
+        state = self.state_factory()
+        for cursor in (-1, 1, 2**64):
+            with self.subTest(cursor=cursor), self.assertRaises(ValueError):
+                state.get_user_events("alice", cursor)
+        for limit in (0, -1):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                state.get_user_events("alice", limit=limit)
+
+    def test_user_event_bootstrap_replay(self) -> None:
+        """Allow writes during bootstrap and replay them after its captured cursor."""
+        state = self.state_factory()
+        reading, release = ThreadEvent(), ThreadEvent()
+        list_agents = state.list_agents
+
+        def paused_list_agents(flwr_aid: str) -> list[Agent]:
+            agents = list(list_agents(flwr_aid))
+            reading.set()
+            assert release.wait(5)
+            return agents
+
+        with (
+            patch.object(state, "list_agents", paused_list_agents),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            bootstrap = executor.submit(state.get_bootstrap, "alice")
+            try:
+                self.assertTrue(reading.wait(5))
+                agent = executor.submit(
+                    state.create_agent,
+                    "alice",
+                    AgentConfig(name="Agent", app_spec="@test/app"),
+                ).result(timeout=5)
+            finally:
+                release.set()
+            snapshot = bootstrap.result(timeout=5)
+        self.assertFalse(snapshot.agents or snapshot.cursor)
+        self.assertEqual(len(snapshot.spaces), 1)
+        entries = state.get_user_events("alice", snapshot.cursor)
+        assert agent is not None
+        self.assertEqual(entries[0].event.type, "agent.created")
+        self.assertEqual(entries[0].event.payload["id"], str(agent.id))
+        self.assertEqual(entries[1].event.payload["id"], snapshot.spaces[0].id)
+
+    def test_user_event_sql_transactions(self) -> None:
+        """Keep SQL events atomic, persistent, and committed in feed order."""
+        state = self.state_factory()
+        if (
+            not isinstance(state, SqlCoreState)
+            or state._is_in_memory_sqlite  # pylint: disable=protected-access
+        ):
+            self.skipTest("Requires persistent SQL state")
+        config = AgentConfig(name="Agent", app_spec="@test/app")
+        state.create_agent("alice", config)
+        snapshot = state.get_bootstrap("alice")
+        events = state.get_user_events("alice")
+        with self.assertRaises(ValueError), state.session():
+            state.create_agent("alice", config)
+            raise ValueError("abort")
+        state.initialize()
+        self.assertEqual(state.get_bootstrap("alice"), snapshot)
+        self.assertEqual(state.get_user_events("alice"), events)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with state.session():
+                state.create_agent("alice", config)
+                follower = executor.submit(state.create_agent, "alice", config)
+                with self.assertRaises(TimeoutError):
+                    follower.result(timeout=0.1)
+            follower.result(timeout=5)
+        self.assertEqual(
+            [entry.seq for entry in state.get_user_events("alice")], [1, 2, 3, 4, 5, 6]
+        )

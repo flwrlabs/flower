@@ -18,7 +18,10 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+)
 
 from .simulationio_connection import SimulationIoConnection
 
@@ -26,27 +29,26 @@ from .simulationio_connection import SimulationIoConnection
 class TestSimulationIoConnection(unittest.TestCase):
     """Tests for `SimulationIoConnection`."""
 
-    @patch("flwr.simulation.simulationio_connection.wrap_stub")
-    @patch("flwr.simulation.simulationio_connection.ServerAppIoStub")
-    @patch("flwr.simulation.simulationio_connection.create_channel")
-    def test_connect_adds_client_interceptor(
+    @patch(
+        "flwr.simulation.simulationio_connection.RuntimeHttpClient.from_server_address"
+    )
+    def test_connect_adds_client_interceptors(
         self,
-        mock_create_channel: Mock,
-        _mock_serverappio_stub: Mock,
-        _mock_wrap_stub: Mock,
+        from_server_address: Mock,
     ) -> None:
-        """`_connect` should pass the token interceptor to create_channel."""
-        mock_create_channel.return_value = Mock()
+        """`_connect` should pass version and token HTTP interceptors."""
+        from_server_address.return_value = Mock()
         conn = SimulationIoConnection(token="test-token")
 
         conn._connect()  # pylint: disable=protected-access
 
-        kwargs = mock_create_channel.call_args.kwargs
+        kwargs = from_server_address.call_args.kwargs
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
-        self.assertEqual(len(interceptors), 1)
-        self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+        self.assertEqual(len(interceptors), 3)
+        self.assertIsInstance(interceptors[1], RuntimeVersionHttpInterceptor)
+        self.assertIsInstance(interceptors[2], RuntimeTokenHttpInterceptor)
 
     def test_init_requires_token(self) -> None:
         """`SimulationIoConnection` should require token values."""

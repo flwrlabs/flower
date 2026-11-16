@@ -1,0 +1,17 @@
+##############################################
+ [605] COMMON_TLS_SERVER_CERTIFICATES_INVALID
+##############################################
+
+*************
+ Description
+*************
+
+TLS server certificate configuration is incomplete or invalid.
+
+****************
+ How to Resolve
+****************
+
+Provide all required TLS server certificate options for the server being started, or
+remove the partial TLS configuration. Check the error message for the specific
+certificate options required by that server.

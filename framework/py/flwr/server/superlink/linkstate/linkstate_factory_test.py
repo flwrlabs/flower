@@ -22,6 +22,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.object_store.sql_object_store import SqlObjectStore
 from flwr.superlink.federation import NoOpFederationManager
@@ -73,3 +74,13 @@ class TestLinkStateFactory(unittest.TestCase):
 
             self.assertEqual(init_calls, 1)
             self.assertEqual(len({id(state) for state in returned_states}), 1)
+
+    def test_linkstatefactory_raises_for_non_sqlite_url(self) -> None:
+        """LinkStateFactory raises for non-SQLite URLs."""
+        factory = LinkStateFactory(
+            "dummysql://localhost/flwr",
+            NoOpFederationManager(),
+            ObjectStoreFactory(FLWR_IN_MEMORY_DB_NAME),
+        )
+        with self.assertRaisesRegex(ValueError, "Unsupported SQL dialect"):
+            _ = factory.state()

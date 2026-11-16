@@ -16,6 +16,7 @@ from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
 
 key = jax.random.PRNGKey(0)
+NUM_EPOCHS = 5
 
 
 def load_data() -> (
@@ -41,7 +42,7 @@ def loss_fn(params, X, y) -> Callable:
 
 def train(params, grad_fn, X, y) -> Tuple[np.array, float, int]:
     num_examples = X.shape[0]
-    for epochs in range(50):
+    for epochs in range(NUM_EPOCHS):
         grads = grad_fn(params, X, y)
         params = jax.tree_util.tree_map(lambda p, g: p - 0.05 * g, params, grads)
         loss = loss_fn(params, X, y)

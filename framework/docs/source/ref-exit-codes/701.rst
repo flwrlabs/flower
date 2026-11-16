@@ -12,10 +12,14 @@ Extra dependencies required for simulation are missing.
  How to Resolve
 ****************
 
-To use simulation with the Ray backend, install ``flwr`` with the ``simulation`` extra:
+To use simulation with the Ray backend, add ``flwr`` with the ``simulation`` extra to
+the app's ``pyproject.toml`` dependencies:
 
-.. code-block:: bash
+.. code-block:: toml
 
-    pip install "flwr[simulation]"
+    dependencies = [
+        "flwr[simulation]",
+    ]
 
-Ensure that the installation completes successfully, and then retry.
+Then install the app dependencies manually unless automatic runtime dependency
+installation is enabled, and retry.

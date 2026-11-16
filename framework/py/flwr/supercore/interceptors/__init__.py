@@ -12,33 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared gRPC interceptors used across supercore services."""
+"""Shared client and server interceptors used across supercore services."""
 
+from flwr.supercore.constant import TASK_TOKEN_HEADER
 
-from .appio_token_interceptor import (
-    APP_TOKEN_HEADER,
-    AUTHENTICATION_FAILED_MESSAGE,
-    AppIoTokenClientInterceptor,
-    AppIoTokenServerInterceptor,
-    create_clientappio_token_auth_server_interceptor,
-    create_serverappio_token_auth_server_interceptor,
-)
-from .superexec_auth_interceptor import (
-    SuperExecAuthClientInterceptor,
-    SuperExecAuthServerInterceptor,
-    create_clientappio_superexec_auth_server_interceptor,
-    create_serverappio_superexec_auth_server_interceptor,
+from .http import (
+    FlowerErrorHttpInterceptor,
+    RuntimeTokenHttpInterceptor,
+    RuntimeVersionHttpInterceptor,
+    SuperExecAuthHttpInterceptor,
 )
 
 __all__ = [
-    "APP_TOKEN_HEADER",
-    "AUTHENTICATION_FAILED_MESSAGE",
-    "AppIoTokenClientInterceptor",
-    "AppIoTokenServerInterceptor",
-    "SuperExecAuthClientInterceptor",
-    "SuperExecAuthServerInterceptor",
-    "create_clientappio_superexec_auth_server_interceptor",
-    "create_clientappio_token_auth_server_interceptor",
-    "create_serverappio_superexec_auth_server_interceptor",
-    "create_serverappio_token_auth_server_interceptor",
+    "FlowerErrorHttpInterceptor",
+    "RuntimeTokenHttpInterceptor",
+    "RuntimeVersionHttpInterceptor",
+    "SuperExecAuthHttpInterceptor",
+    "TASK_TOKEN_HEADER",
 ]

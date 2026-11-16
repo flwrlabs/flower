@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from flwr.proto import node_pb2 as flwr_dot_proto_dot_node__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x66lwr/proto/heartbeat.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\"V\n\x18SendNodeHeartbeatRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x1a\n\x12heartbeat_interval\x18\x02 \x01(\x01\",\n\x19SendNodeHeartbeatResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"(\n\x17SendAppHeartbeatRequest\x12\r\n\x05token\x18\x01 \x01(\t\"+\n\x18SendAppHeartbeatResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1a\x66lwr/proto/heartbeat.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\"V\n\x18SendNodeHeartbeatRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x1a\n\x12heartbeat_interval\x18\x02 \x01(\x01\",\n\x19SendNodeHeartbeatResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,8 +36,4 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SENDNODEHEARTBEATREQUEST']._serialized_end=151
   _globals['_SENDNODEHEARTBEATRESPONSE']._serialized_start=153
   _globals['_SENDNODEHEARTBEATRESPONSE']._serialized_end=197
-  _globals['_SENDAPPHEARTBEATREQUEST']._serialized_start=199
-  _globals['_SENDAPPHEARTBEATREQUEST']._serialized_end=239
-  _globals['_SENDAPPHEARTBEATRESPONSE']._serialized_start=241
-  _globals['_SENDAPPHEARTBEATRESPONSE']._serialized_end=284
 # @@protoc_insertion_point(module_scope)

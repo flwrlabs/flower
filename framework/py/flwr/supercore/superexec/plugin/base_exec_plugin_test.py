@@ -14,99 +14,97 @@
 # ==============================================================================
 """Tests for SuperExec base plugin launch behavior."""
 
-
-import subprocess
+from typing import cast
 from unittest.mock import Mock, patch
 
-from flwr.common.typing import Run
-from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
-from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
-
-from .serverapp_exec_plugin import ServerAppExecPlugin
-
-
-def _get_run(_: int) -> Run:
-    """Return a minimal dummy run."""
-    return Run.create_empty(run_id=1)
+from flwr.supercore.constant import TaskType
+from flwr.supercore.superexec.executor import ExecutionSpec
+from flwr.supercore.superexec.plugin.base_exec_plugin import (
+    AutoExecPlugin,
+    BaseExecPlugin,
+)
 
 
-def test_clientapp_launch_inherits_default_stdio() -> None:
-    """ClientApp launch should use default stdio behavior."""
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        get_run=_get_run,
+def _get_task(
+    *,
+    task_id: int = 1,
+    task_type: str = TaskType.CLIENT_APP,
+    fab_hash: str | None = None,
+) -> Mock:
+    """Return a minimal dummy task-like object."""
+    task = Mock()
+    task.task_id = task_id
+    task.type = task_type
+    task.fab_hash = fab_hash
+    return task
+
+
+def _execution_spec_from_executor(executor: Mock) -> ExecutionSpec:
+    """Return the ExecutionSpec passed to a mock executor."""
+    return cast(ExecutionSpec, executor.launch.call_args.args[0])
+
+
+def test_default_plugin_uses_task_type() -> None:
+    """Default plugin should pass task type and FAB identity to the executor."""
+    executor = Mock()
+    plugin = AutoExecPlugin(
+        runtime_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        executor=executor,
     )
 
-    with patch("subprocess.Popen") as popen:
-        plugin.launch_app(token="token", run_id=7)
-
-    assert "stdout" not in popen.call_args.kwargs
-    assert "stderr" not in popen.call_args.kwargs
-
-
-def test_serverapp_launch_isolates_stdio() -> None:
-    """ServerApp launch should not inherit parent stdio streams."""
-    plugin = ServerAppExecPlugin(
-        appio_api_address="127.0.0.1:9092",
-        get_run=_get_run,
+    plugin.launch_task(
+        token="token",
+        task=_get_task(task_type=TaskType.AGENT_APP, fab_hash="fab-hash"),
     )
 
-    with patch("subprocess.Popen") as popen:
-        plugin.launch_app(token="token", run_id=5)
+    executor.launch.assert_called_once()
 
-    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
-    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+    spec = _execution_spec_from_executor(executor)
+    assert spec.task_type == TaskType.AGENT_APP
+    assert spec.fab_hash == "fab-hash"
 
 
 class DummyExecPlugin(BaseExecPlugin):
-    """Minimal plugin for testing command construction."""
+    """Minimal plugin for testing execution spec construction."""
 
-    command = "dummy-app"
-    appio_api_address_arg = "--appio-api-address"
+    supported_task_types = frozenset({TaskType.CLIENT_APP})
 
 
-def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
-    """Ensure app launch forwards runtime install flag."""
+def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
+    """Ensure execution spec forwards runtime install flag."""
+    executor = Mock()
     plugin = DummyExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=Mock(),
+        runtime_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
         runtime_dependency_install=True,
-    )
-
-    with (
-        patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
-            return_value=1234,
-        ),
-        patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-        ) as popen,
-    ):
-        plugin.launch_app(token="token-123", run_id=7)
-
-    assert popen.call_args.args[0] == [
-        "dummy-app",
-        "--insecure",
-        "--appio-api-address",
-        "127.0.0.1:9091",
-        "--token",
-        "token-123",
-        "--parent-pid",
-        "1234",
-        "--allow-runtime-dependency-installation",
-    ]
-
-
-def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
-    """Ensure app launch omits optional runtime install flags by default."""
-    plugin = DummyExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=Mock(),
+        executor=executor,
     )
 
     with patch(
-        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-    ) as popen:
-        plugin.launch_app(token="token-123", run_id=7)
+        "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
+        return_value=1234,
+    ):
+        plugin.launch_task(token="token-123", task=_get_task(task_id=7))
 
-    assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
+    spec = _execution_spec_from_executor(executor)
+    assert spec.runtime_dependency_install is True
+    assert spec.parent_pid == 1234
+    assert spec.task_id == 7
+
+
+def test_launch_task_skips_optional_runtime_flags_by_default() -> None:
+    """Ensure execution spec omits optional runtime install flags by default."""
+    executor = Mock()
+    plugin = DummyExecPlugin(
+        runtime_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        executor=executor,
+    )
+
+    plugin.launch_task(token="token-123", task=_get_task(task_id=7))
+
+    assert _execution_spec_from_executor(executor).runtime_dependency_install is False

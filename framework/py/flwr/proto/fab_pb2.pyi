@@ -51,9 +51,9 @@ class Fab(google.protobuf.message.Message):
     CONTENT_FIELD_NUMBER: builtins.int
     VERIFICATIONS_FIELD_NUMBER: builtins.int
     hash_str: builtins.str
-    """This field is the hash of the data field. It is used to identify the data.
-    The hash is calculated using the SHA-256 algorithm and is represented as a
-    hex string (sha256hex).
+    """This field identifies FAB content using its SHA-256 hex digest. When
+    `content` is empty in StartRunRequest, SuperLink uses this hash to resolve
+    an existing FAB from the LinkState.
     """
     content: builtins.bytes
     """This field contains the fab file contents a one bytes blob."""

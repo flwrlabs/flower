@@ -50,6 +50,10 @@ class Metadata:  # pylint: disable=too-many-instance-attributes
     message_type : str
         A string that encodes the action to be executed on
         the receiving end.
+    src_task_id : Optional[int] (default: None)
+        An identifier for the source task sending this message.
+    dst_task_id : Optional[int] (default: None)
+        An identifier for the destination task receiving this message.
     """
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -63,12 +67,16 @@ class Metadata:  # pylint: disable=too-many-instance-attributes
         created_at: float,
         ttl: float,
         message_type: str,
+        src_task_id: int | None = None,
+        dst_task_id: int | None = None,
     ) -> None:
         var_dict = {
             "_run_id": run_id,
             "_message_id": message_id,
             "_src_node_id": src_node_id,
             "_dst_node_id": dst_node_id,
+            "_src_task_id": src_task_id,
+            "_dst_task_id": dst_task_id,
             "_reply_to_message_id": reply_to_message_id,
             "_group_id": group_id,
             "_created_at": created_at,
@@ -109,6 +117,26 @@ class Metadata:  # pylint: disable=too-many-instance-attributes
         self.__dict__["_dst_node_id"] = value
 
     @property
+    def src_task_id(self) -> int | None:
+        """An identifier for the source task sending this message."""
+        return cast(int | None, self.__dict__["_src_task_id"])
+
+    @src_task_id.setter
+    def src_task_id(self, value: int | None) -> None:
+        """Set src_task_id."""
+        self.__dict__["_src_task_id"] = value
+
+    @property
+    def dst_task_id(self) -> int | None:
+        """An identifier for the destination task receiving this message."""
+        return cast(int | None, self.__dict__["_dst_task_id"])
+
+    @dst_task_id.setter
+    def dst_task_id(self, value: int | None) -> None:
+        """Set dst_task_id."""
+        self.__dict__["_dst_task_id"] = value
+
+    @property
     def group_id(self) -> str:
         """An identifier for grouping messages."""
         return cast(str, self.__dict__["_group_id"])
@@ -127,16 +155,6 @@ class Metadata:  # pylint: disable=too-many-instance-attributes
     def created_at(self, value: float) -> None:
         """Set creation timestamp of this message."""
         self.__dict__["_created_at"] = value
-
-    @property
-    def delivered_at(self) -> str:
-        """Unix timestamp when the message was delivered."""
-        return cast(str, self.__dict__["_delivered_at"])
-
-    @delivered_at.setter
-    def delivered_at(self, value: str) -> None:
-        """Set delivery timestamp of this message."""
-        self.__dict__["_delivered_at"] = value
 
     @property
     def ttl(self) -> float:

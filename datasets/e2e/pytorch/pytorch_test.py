@@ -39,8 +39,8 @@ class SimpleCNN(nn.Module):
 #    and then normalizes it.
 @parameterized_class(
     [
-        {"dataset_name": "cifar10", "test_split": "test", "transforms": ToTensor()},
-        {"dataset_name": "cifar10", "test_split": "test", "transforms": Compose(
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test", "transforms": ToTensor()},
+        {"dataset_name": "uoft-cs/cifar10", "test_split": "test", "transforms": Compose(
             [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         )},
     ]
@@ -66,12 +66,20 @@ class FdsToPyTorch(unittest.TestCase):
         fds = FederatedDataset(dataset=self.dataset_name, partitioners={"train": 100})
         partition = fds.load_partition(partition_id, "train")
         partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
-        partition_train_test = partition_train_test.map(
-            lambda img: {"img": self.transforms(img)}, input_columns="img"
-        )
+
+        def apply_transforms(batch):
+            images = batch["img"]
+            if isinstance(images, list):
+                batch["img"] = [self.transforms(img) for img in images]
+            else:
+                batch["img"] = self.transforms(images)
+            return batch
+
+        # Avoid Dataset.with_format("torch"), which imports torchvision.io.VideoReader.
         trainloader = DataLoader(
-            partition_train_test["train"].with_format("torch"), batch_size=batch_size,
-            shuffle=True
+            partition_train_test["train"].with_transform(apply_transforms),
+            batch_size=batch_size,
+            shuffle=True,
         )
         return trainloader
 

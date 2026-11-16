@@ -5,7 +5,7 @@ import flwr as fl
 hist = fl.simulation.start_simulation(
     client_fn=client_fn,
     num_clients=2,
-    config=fl.server.ServerConfig(num_rounds=3),
+    config=fl.server.ServerConfig(num_rounds=2),
 )
 
 assert (

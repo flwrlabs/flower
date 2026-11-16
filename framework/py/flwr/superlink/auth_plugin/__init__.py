@@ -15,12 +15,10 @@
 """Account auth plugin for ControlServicer."""
 
 
-from .auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
-from .noop_auth_plugin import NoOpControlAuthnPlugin, NoOpControlAuthzPlugin
+from .auth_plugin import ControlAuthnPlugin
+from .noop_auth_plugin import NoOpControlAuthnPlugin
 
 __all__ = [
     "ControlAuthnPlugin",
-    "ControlAuthzPlugin",
     "NoOpControlAuthnPlugin",
-    "NoOpControlAuthzPlugin",
 ]

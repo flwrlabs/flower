@@ -25,7 +25,7 @@
 # hadolint global ignore=DL3018
 ARG PYTHON_VERSION=3.11
 ARG DISTRO=alpine
-ARG DISTRO_VERSION=3.22
+ARG DISTRO_VERSION=3.23
 FROM python:${PYTHON_VERSION}-${DISTRO}${DISTRO_VERSION} AS compile
 
 # Install system dependencies
@@ -44,9 +44,10 @@ ENV PATH=/python/venv/bin:$PATH
 # Install specific version of pip, setuptools and flwr
 ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
-RUN pip install -U --no-cache-dir \
-    pip==${PIP_VERSION} \
-    setuptools==${SETUPTOOLS_VERSION}
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION}
 
 ARG FLWR_VERSION
 ARG FLWR_VERSION_REF
@@ -56,18 +57,26 @@ RUN if [ -z "${FLWR_VERSION_REF}" ]; then \
     pip install -U --no-cache-dir ${FLWR_PACKAGE}==${FLWR_VERSION}; \
     else \
     pip install -U --no-cache-dir ${FLWR_PACKAGE}@${FLWR_VERSION_REF}; \
-    fi
+    fi \
+    # Keep pip and its bundled dependencies out of the runtime virtualenv.
+    && python -m pip uninstall --yes pip
 
 FROM python:${PYTHON_VERSION}-${DISTRO}${DISTRO_VERSION} AS base
 
-# Keep the version of system Python pip and setuptools in sync with those installed in the
-# virtualenv.
+# Keep system setuptools aligned with the virtualenv, then remove system pip
+# and the bundled wheel that could reinstall it.
 ARG PIP_VERSION
 ARG SETUPTOOLS_VERSION
-RUN pip install -U --no-cache-dir pip==${PIP_VERSION} setuptools==${SETUPTOOLS_VERSION}
+RUN pip_wheel='pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70' \
+    && test "${PIP_VERSION}" = "26.2.2" \
+    && python -m pip install -U --no-cache-dir "${pip_wheel}" \
+    && python -m pip install -U --no-cache-dir setuptools==${SETUPTOOLS_VERSION} \
+    && python -m pip uninstall --yes pip \
+    && rm -rf /usr/local/lib/python*/ensurepip
 
-# required by the grpc package
-RUN apk add --no-cache \
+# Upgrade inherited packages before adding runtime dependencies.
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
     libstdc++ \
     ca-certificates \
     # add non-root user

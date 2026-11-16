@@ -118,8 +118,6 @@ def test_ipv6_incorrect(address: str) -> None:
         ("sub2.sub1.flower.ai:123", ("sub2.sub1.flower.ai", 123, None)),
         ("s5.s4.s3.s2.s1.flower.ai:123", ("s5.s4.s3.s2.s1.flower.ai", 123, None)),
         ("localhost:123", ("localhost", 123, None)),
-        ("https://localhost:123", ("https://localhost", 123, None)),
-        ("http://localhost:123", ("http://localhost", 123, None)),
     ],
 )
 def test_domain_correct(address: str, expected: tuple[str, int, bool]) -> None:
@@ -136,6 +134,8 @@ def test_domain_correct(address: str, expected: tuple[str, int, bool]) -> None:
     [
         "flower.ai",  # Missing port
         "flower.ai:65536",  # Port number out of range
+        "https://localhost:123",  # URL prefix
+        "http://localhost:123",  # URL prefix
     ],
 )
 def test_domain_incorrect(address: str) -> None:
