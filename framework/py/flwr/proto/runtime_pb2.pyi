@@ -490,6 +490,34 @@ class RecordTaskUsageResponse(google.protobuf.message.Message):
 global___RecordTaskUsageResponse = RecordTaskUsageResponse
 
 @typing.final
+class ListAgentConnectorsRequest(google.protobuf.message.Message):
+    """ListAgentConnectors messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ListAgentConnectorsRequest = ListAgentConnectorsRequest
+
+@typing.final
+class ListAgentConnectorsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONNECTORS_FIELD_NUMBER: builtins.int
+    @property
+    def connectors(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.control_pb2.Connector]: ...
+    def __init__(
+        self,
+        *,
+        connectors: collections.abc.Iterable[flwr.proto.control_pb2.Connector] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["connectors", b"connectors"]) -> None: ...
+
+global___ListAgentConnectorsResponse = ListAgentConnectorsResponse
+
+@typing.final
 class GetConnectorRequest(google.protobuf.message.Message):
     """GetConnector messages"""
 
