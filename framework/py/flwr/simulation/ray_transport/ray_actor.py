@@ -253,21 +253,14 @@ def _log_kfd_diagnostics() -> None:
         )
 
 
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
-
-
 def _ray_client_conn_host() -> str | None:
     """Return the host this process's Ray Client connection targets, if known.
 
     No public Ray API exposes the connected host; the private
     `client_worker._conn_str` is read best-effort, and any failure to read it
     returns `None` rather than raising, since this only feeds a diagnostic
-    message. A `127.0.0.1`/`::1`/`localhost` endpoint does not by itself prove
-    the Ray Client server shares this process's device namespace: an SSH port
-    forward or a sidecar container that only shares this host's network
-    namespace presents the same loopback address while `/dev` belongs to a
-    different machine or container, so callers must treat a loopback result as
-    ambiguous rather than as confirmation of co-location.
+    message. The caller must not treat `None` as confirmation of remoteness --
+    it means locality could not be checked at all, not that it was ruled out.
     """
     try:
         client_worker = (
@@ -279,26 +272,59 @@ def _ray_client_conn_host() -> str | None:
     return conn_str.rsplit(":", 1)[0].strip("[]")
 
 
+def _local_ips() -> set[str]:
+    """Best-effort enumeration of this host's own IP addresses.
+
+    The standard library has no portable API to enumerate every local network
+    interface. Loopback addresses always refer to this machine regardless of
+    what the hostname resolves to (e.g. Debian's `127.0.1.1` convention, or a
+    hostname registered only to a LAN address), so they are included
+    unconditionally rather than relying on `socket.gethostname()` resolution
+    to surface them. The outbound-interface address for IPv4 and IPv6 is also
+    added on a best-effort basis via a UDP "connect" -- which only selects a
+    route and never actually sends a packet -- to additionally catch a LAN or
+    container address the hostname does not resolve to.
+    """
+    ips = {"127.0.0.1", "::1"}
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            sockaddr_host = info[4][0]
+            if isinstance(sockaddr_host, str):
+                ips.add(sockaddr_host)
+    except OSError:
+        pass
+    for family, probe_addr in (
+        (socket.AF_INET, ("1.1.1.1", 53)),
+        (socket.AF_INET6, ("2001:4860:4860::8888", 53)),
+    ):
+        try:
+            with socket.socket(family, socket.SOCK_DGRAM) as probe_sock:
+                probe_sock.connect(probe_addr)
+                ips.add(probe_sock.getsockname()[0])
+        except OSError:
+            pass
+    return ips
+
+
 def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
     """Return whether `conn_host` is confirmed to not be this machine.
 
-    Called only for a non-loopback `conn_host`: a DNS name or LAN address can
-    still resolve back to this host (e.g. `ray://gpu-box:10001` where
-    `gpu-box` is this machine's own hostname), in which case the Ray Client
-    server may share this process's device namespace despite not using a
-    loopback literal. Resolve both sides and compare; any resolution failure
-    is treated as "not confirmed remote" so the caller falls back to the
-    ambiguous, probe-running branch rather than asserting a remoteness it
+    A DNS name or LAN address can still resolve back to this host (e.g.
+    `ray://gpu-box:10001` where `gpu-box` is this machine's own hostname, or
+    `ray://LOCALHOST:10001`, which resolves to loopback regardless of its
+    case), in which case the Ray Client server may share this process's
+    device namespace despite not using an exact loopback literal. Resolve
+    `conn_host` and compare against every local IP this host can determine
+    (`_local_ips`, not just the hostname's own resolution); any resolution
+    failure is treated as "not confirmed remote" so the caller falls back to
+    the ambiguous, probe-running branch rather than asserting a remoteness it
     cannot actually support.
     """
     try:
         conn_ips = {info[4][0] for info in socket.getaddrinfo(conn_host, None)}
-        local_ips = {
-            info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None)
-        }
     except OSError:
         return False
-    return conn_ips.isdisjoint(local_ips)
+    return conn_ips.isdisjoint(_local_ips())
 
 
 def _log_node_locality_diagnostics(
@@ -343,38 +369,39 @@ def _log_node_locality_diagnostics(
         # `active_node_id` from `ray.nodes()` even though this process's own
         # `/dev` is not necessarily on the client host. A NodeID comparison can
         # therefore never detect this case; checking
-        # `ray.util.client.ray.is_connected()` instead. A loopback connection
-        # endpoint (`ray://127.0.0.1:10001`) does not by itself prove this
-        # host's `/dev` is the cluster node's -- an SSH port forward or a
-        # sidecar sharing only the network namespace presents the same
-        # endpoint while the server's `/dev` is elsewhere -- and neither does
-        # a non-loopback hostname/LAN address, since it can still resolve
-        # back to this same host (`_ray_client_host_confirmed_remote`). Both
-        # cases are flagged as ambiguous rather than excluded, and the local
-        # KFD probe still runs afterwards in case the connection does turn
-        # out to be genuinely co-located.
+        # `ray.util.client.ray.is_connected()` instead. Neither a loopback
+        # connection endpoint (`ray://127.0.0.1:10001`) nor a resolvable
+        # non-loopback hostname/LAN address proves this host's `/dev` is the
+        # cluster node's -- an SSH port forward or a sidecar sharing only the
+        # network namespace presents the same endpoint while the server's
+        # `/dev` is elsewhere (`_ray_client_host_confirmed_remote`) -- and
+        # when the endpoint itself cannot be determined
+        # (`_ray_client_conn_host` returning `None`), there is nothing to
+        # confirm remoteness from either. All three cases are flagged as
+        # ambiguous rather than excluded, and the local KFD probe still runs
+        # afterwards in case the connection does turn out to be genuinely
+        # co-located.
         conn_host = _ray_client_conn_host()
-        if conn_host is not None and (
-            conn_host in _LOOPBACK_HOSTS
-            or not _ray_client_host_confirmed_remote(conn_host)
-        ):
+        if conn_host is None or not _ray_client_host_confirmed_remote(conn_host):
             log(
                 WARNING,
                 "This process connected to the Ray cluster over Ray Client "
                 "at %s, which this host cannot confirm is a different "
-                "machine from its own (a loopback literal, or a hostname/"
-                "LAN address that resolves to one of this host's own "
-                "addresses). That usually means the Ray Client server runs "
-                "on this same host, but an SSH port forward or a sidecar "
-                "container that only shares this host's network namespace "
-                "can present the same endpoint while the Ray Client "
-                "server's `/dev` belongs to a different machine or "
+                "machine from its own. That usually means the Ray Client "
+                "server runs on this same host, but an SSH port forward or "
+                "a sidecar container that only shares this host's network "
+                "namespace can present the same endpoint while the Ray "
+                "Client server's `/dev` belongs to a different machine or "
                 "container. The `/dev/kfd` and `/dev/dri/renderD*` check "
                 "that follows assumes they are shared with the cluster "
                 "node (NodeID=%s) that reported zero GPUs; if that "
                 "assumption turns out to be wrong, check device access on "
                 "the actual Ray Client server host instead.",
-                conn_host,
+                (
+                    conn_host
+                    if conn_host is not None
+                    else "an address this host could not determine"
+                ),
                 active_node_id,
             )
             _log_kfd_diagnostics()

@@ -336,11 +336,19 @@ exported, silently leaving Ray's original import failure in place:
                 _bad_range=1
             elif [ "${#_trimmed_id}" -gt "${#_bash_int_max}" ] ||
                 { [ "${#_trimmed_id}" -eq "${#_bash_int_max}" ] &&
-                    [ "$_trimmed_id" -gt "$_bash_int_max" ]; }; then
+                    [[ "$_trimmed_id" > "$_bash_int_max" ]]; }; then
                 # Same digit-length comparison as above, against Bash's own
                 # integer range rather than `_n` -- needed even when
                 # ROCR_VISIBLE_DEVICES is unset, since nothing else stops the
                 # `$((10#$_id))` below from silently wrapping this ordinal.
+                # The equal-length arm uses `[[ > ]]` (lexicographic string
+                # compare), not `[ -ge ]`/`-gt` (arithmetic): at this digit
+                # length `_trimmed_id` sits right at Bash's signed integer
+                # boundary, so it can itself be a value `-gt` cannot
+                # represent -- the same "integer expression expected"
+                # failure this branch exists to catch in the first place.
+                # Equal-length, all-digit strings compare lexicographically
+                # the same as numerically, so no arithmetic is needed here.
                 _bad_syntax=1
             else
                 _norm_ids+=("$((10#$_id))")
@@ -506,11 +514,11 @@ Then Ray, which is what the Simulation Runtime actually schedules against:
     python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
 
 If your run connects to an existing cluster through a specific ``address`` -- whether
-via ``RAY_ADDRESS``, an ``--init-args-address`` passed to the Simulation Runtime, or a
-manually started multi-node cluster -- reuse that same address here. A bare
-``ray.init()`` with no address can start or attach to a *different* local cluster
-instead of the one your run actually uses, in which case this check validates the wrong
-cluster and a non-zero ``GPU`` result tells you nothing about the one that matters:
+via ``RAY_ADDRESS`` or a manually started multi-node cluster -- reuse that same address
+here. A bare ``ray.init()`` with no address can start or attach to a *different* local
+cluster instead of the one your run actually uses, in which case this check validates
+the wrong cluster and a non-zero ``GPU`` result tells you nothing about the one that
+matters:
 
 .. code-block:: shell
 
@@ -632,6 +640,13 @@ what else it can detect about device access:
   ``ROCM_PATH`` will not help. Fix render-node pass-through/permissions so that an
   AMD-backed node specifically (identified by its sysfs PCI vendor ID) is accessible,
   not just any render node.
+- If ``/dev/kfd`` and a render node are both accessible, but this host cannot determine
+  that render node's PCI vendor ID at all -- sysfs is missing or unreadable, as in some
+  restricted containers -- Flower reports the vendor as undetermined rather than
+  guessing either way, and does not name ``ROCM_PATH`` as the fix, since the node is not
+  confirmed AMD-backed. Check the node's vendor manually (``cat
+  /sys/class/drm/<node>/device/vendor``, expecting ``0x1002`` for AMD) before assuming
+  ``ROCM_PATH`` is the issue -- it is not if this node turns out not to be AMD's.
 - Only when both ``/dev/kfd`` and an AMD-backed render node are accessible does Flower
   name the ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at the
   ROCm SMI library`_.
@@ -639,7 +654,7 @@ what else it can detect about device access:
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
 
-The four checks above assume this driver process shares the cluster node's device
+The five checks above assume this driver process shares the cluster node's device
 namespace; Flower qualifies or skips them whenever that assumption does not hold, since
 the driver's own ``/dev/kfd``/render-node state cannot diagnose a different machine:
 
