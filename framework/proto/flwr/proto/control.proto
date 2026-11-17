@@ -118,7 +118,7 @@ message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;
   repeated Space spaces = 2;
-  // Feed head read before the snapshot; replay may repeat snapshot updates.
+  // Feed head from the same snapshot as agents and spaces.
   uint64 cursor = 3;
   // Minimal lifecycle projections for active Space-bound agent runs.
   repeated Run active_runs = 4;
