@@ -82,6 +82,13 @@ from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supernode.nodestate import NodeState
 
 
+def _get_agent_id(state: NodeState, task: Task) -> int:
+    """Resolve the authenticated task's agent ID for file scoping."""
+    return core_runtime_handlers.require_agent_id(
+        state.get_run(task.run_id), task.run_id
+    )
+
+
 def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:
     """Acquire an eligible pending task."""
     return core_runtime_handlers.acquire_task(request, state)
