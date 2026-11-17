@@ -19,7 +19,7 @@
 from logging import DEBUG, ERROR
 from uuid import UUID
 
-from flwr.common.constant import Status
+from flwr.common.constant import INT64_MAX_VALUE, Status
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -248,21 +248,18 @@ def create_task(
     request: CreateTaskRequest,
     state: CoreState,
     task: Task,
+    run: Run,
 ) -> CreateTaskResponse:
-    """Create a task."""
+    """Validate and create a child task within the authenticated Run."""
     log(DEBUG, "Runtime.CreateTask")
-
-    run_id = task.run_id
-
+    _validate_create_task_request(request, task)
     connector_ref = request.connector_ref or None
-
-    _validate_create_task_request(request, task, connector_ref)
     connector_id = None
-    if request.type == TaskType.CONNECTOR and connector_ref:
-        connector_id = _resolve_connector_id(task, connector_ref, state)
+    if request.type == TaskType.CONNECTOR:
+        connector_ref, connector_id = _resolve_connector(request, state, run)
     created_task_id = state.create_task(
         task_type=request.type,
-        run_id=run_id,
+        run_id=run.run_id,
         fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
         model_ref=request.model_ref if request.HasField("model_ref") else None,
         connector_ref=connector_ref,
@@ -273,7 +270,6 @@ def create_task(
         raise FlowerError(
             ApiErrorCode.RUNTIME_TASK_CREATION_FAILED, "Failed to create task"
         )
-
     return CreateTaskResponse(task_id=created_task_id)
 
 
@@ -449,9 +445,9 @@ def _file_scope(agent_id: int) -> str:
 def _validate_create_task_request(
     request: CreateTaskRequest,
     requesting_task: Task,
-    connector_ref: str | None,
 ) -> None:
     """Validate the task creation request."""
+    connector_ref = request.connector_ref
     if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
         raise FlowerError(
             ApiErrorCode.RUNTIME_TASK_CREATION_NOT_ALLOWED,
@@ -470,41 +466,64 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not connector_ref:
+    if request.HasField("connector_id") and (
+        request.type != TaskType.CONNECTOR
+        or not 0 < request.connector_id <= INT64_MAX_VALUE
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
+            "connector_id must be a positive signed 64-bit ID for a connector task.",
+        )
+
+    if (
+        request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF
+        and not connector_ref
+        and not request.HasField("connector_id")
+    ):
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST,
             f"Task type '{request.type}' requires connector_ref.",
         )
 
-    # Check if the connector ref is valid.
     if request.type == TaskType.CONNECTOR and connector_ref:
-        if connector_registry.has_builtin_connector(connector_ref):
-            return
-
         try:
             connector_registry.get_connector_tools(connector_ref)
         except ValueError as err:
             raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, str(err)) from err
 
 
-def _resolve_connector_id(
-    requesting_task: Task,
-    connector_ref: str,
+def _resolve_connector(
+    request: CreateTaskRequest,
     state: CoreState,
-) -> int | None:
-    """Resolve the connector ID for a connector task."""
-    if connector_registry.has_builtin_connector(connector_ref):
-        return None
+    run: Run,
+) -> tuple[str, int | None]:
+    """Select one connector from the connections authorized for this run."""
+    connector_ref = request.connector_ref
+    connector_id = request.connector_id if request.HasField("connector_id") else None
+    if connector_id is None and connector_registry.has_builtin_connector(connector_ref):
+        return connector_ref, None
 
-    matching_ids = [
-        connector_id
-        for connector_id in state.get_run_connector_ids(requesting_task.run_id)
-        if (connector := state.get_connector_by_id(connector_id)) is not None
-        and connector.connector_ref == connector_ref
+    # Read live agent connections or the legacy run's explicit grants.
+    if run.agent_id is not None:
+        connectors = state.get_agent_connectors(run.agent_id)
+    else:
+        connectors = [
+            connector
+            for bound_id in state.get_run_connector_ids(run.run_id)
+            if (connector := state.get_connector_by_id(bound_id)) is not None
+            and connector.agent_id is None
+        ]
+    connectors = [
+        item
+        for item in connectors
+        if (connector_id is None or item.connector_id == connector_id)
+        and (not connector_ref or item.connector_ref == connector_ref)
     ]
-    if len(matching_ids) != 1:
+    # A provider alone must not silently select among multiple accounts.
+    if len(connectors) != 1:
         raise FlowerError(
             ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
             "Connector is not available to this run.",
         )
-    return matching_ids[0]
+    connector = connectors[0]
+    return connector.connector_ref, connector.connector_id

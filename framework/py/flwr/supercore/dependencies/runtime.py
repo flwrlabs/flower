@@ -33,6 +33,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
@@ -43,6 +45,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -83,6 +87,16 @@ class RuntimeHandlers(Protocol[StateT_contra]):
 
     def _get_agent_id(self, state: StateT_contra, task: Task) -> int:
         """Resolve the authenticated task's agent ID for file scoping."""
+
+    def create_task(
+        self, request: CreateTaskRequest, state: StateT_contra, task: Task
+    ) -> CreateTaskResponse:
+        """Create a child task within the authenticated Run."""
+
+    def list_agent_connectors(
+        self, request: ListAgentConnectorsRequest, state: StateT_contra, task: Task
+    ) -> ListAgentConnectorsResponse:
+        """List connections available to the authenticated agent."""
 
     def acquire_task(
         self, request: AcquireTaskRequest, state: StateT_contra
