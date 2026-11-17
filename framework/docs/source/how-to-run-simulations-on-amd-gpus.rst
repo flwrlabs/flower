@@ -272,14 +272,28 @@ exported, silently leaving Ray's original import failure in place:
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
             [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
             _n=0
+        elif [[ "$ROCR_VISIBLE_DEVICES" == *, ]] || [ -n "$(printf '%s\n' \
+            "${ROCR_VISIBLE_DEVICES//,/$'\n'}" | sort | uniq -d)" ]; then
+            # A trailing comma or a duplicated entry (e.g. `0,` or `0,0`)
+            # makes the plain comma count below overstate how many distinct
+            # devices ROCR_VISIBLE_DEVICES actually exposes -- `0,0` is one
+            # device, not two -- so deriving `_n` from it would size both the
+            # HIP_VISIBLE_DEVICES synthesis and the ordinal-bounds check below
+            # off a wrong count. Leave `_n` unset instead, handled the same
+            # "bound unknown" way as ROCR_VISIBLE_DEVICES itself being unset.
+            echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has a" \
+                 "stray trailing comma or a duplicated entry -- the number" \
+                 "of devices it exposes cannot be derived from it. Fix" \
+                 "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
         else
             _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
-        # Only synthesize a value when ROCR_VISIBLE_DEVICES is set -- `_n` is
-        # otherwise unknown, and there is nothing to derive a mask from.
-        if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
+        # Only synthesize a value when `_n` was actually derived above -- it
+        # is otherwise unknown (ROCR_VISIBLE_DEVICES unset or malformed), and
+        # there is nothing to derive a mask from.
+        if [ -n "${_n+x}" ]; then
             if [ "$_n" -gt 0 ]; then
                 export HIP_VISIBLE_DEVICES="$(seq -s, 0 $((_n - 1)))"
             else
@@ -287,12 +301,13 @@ exported, silently leaving Ray's original import failure in place:
             fi
         fi
     else
-        # The syntax/duplicate checks below must run even when
-        # ROCR_VISIBLE_DEVICES is unset -- an existing HIP_VISIBLE_DEVICES can
-        # be malformed (e.g. `0,0` or `0,1,`) independently of ROCr, and Ray
-        # still sizes its advertised GPU resources from this mask either way.
-        # Only the ordinal-bounds check below needs `_n`, so it alone stays
-        # conditional on ROCR_VISIBLE_DEVICES being set.
+        # The syntax/duplicate checks below must run even when `_n` is
+        # unknown (ROCR_VISIBLE_DEVICES unset or itself malformed) -- an
+        # existing HIP_VISIBLE_DEVICES can be malformed (e.g. `0,0` or
+        # `0,1,`) independently of ROCr, and Ray still sizes its advertised
+        # GPU resources from this mask either way. Only the ordinal-bounds
+        # check below needs `_n`, so it alone stays conditional on `_n`
+        # being known.
         _bad_syntax=0
         _bad_range=0
         # Bash's arithmetic expansion (used below to normalize each ordinal)
@@ -330,7 +345,7 @@ exported, silently leaving Ray's original import failure in place:
             # numerically is safe.
             _trimmed_id="${_id#"${_id%%[!0]*}"}"
             [ -z "$_trimmed_id" ] && _trimmed_id=0
-            if [ -n "${ROCR_VISIBLE_DEVICES+x}" ] &&
+            if [ -n "${_n+x}" ] &&
                 { [ "${#_trimmed_id}" -gt "${#_n}" ] ||
                     { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; }; then
                 _bad_range=1
@@ -356,7 +371,7 @@ exported, silently leaving Ray's original import failure in place:
         done
         _dup=$(printf '%s\n' "${_norm_ids[@]}" | sort -n | uniq -d | paste -sd ',')
         if [ "$_bad_syntax" -eq 1 ] || [ "$_bad_range" -eq 1 ]; then
-            if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
+            if [ -n "${_n+x}" ]; then
                 echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
                      "valid selection of ordinals 0..$((_n - 1)) -- the only" \
                      "ordinals ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES exposes" \
@@ -388,6 +403,16 @@ exported, silently leaving Ray's original import failure in place:
                      "concurrent ClientApps collide on it. Left unchanged, so" \
                      "remove the duplicate and re-run this snippet." >&2
             else
+                if [ -z "${_n+x}" ]; then
+                    echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is" \
+                         "syntactically valid, but no device-count bound is" \
+                         "known (ROCR_VISIBLE_DEVICES is unset or could not be" \
+                         "parsed) to confirm these ordinals actually exist --" \
+                         "Ray will still size its advertised GPU resources from" \
+                         "this mask. Exported as-is; verify each ordinal maps" \
+                         "to a real device if ClientApps still see no usable" \
+                         "GPU." >&2
+                fi
                 # HIP_VISIBLE_DEVICES was already set (not synthesized above),
                 # but may only be a plain shell variable, not an exported one
                 # (e.g. a setup script assigned it without `export`) -- Ray

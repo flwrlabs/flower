@@ -236,6 +236,21 @@ def _log_kfd_diagnostics() -> None:
             "`libamd_smi.so` symlink, rather than only a versioned "
             "`libamd_smi.so.<N>`.",
         )
+    elif inconclusive_access_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "opening the `/dev/dri/renderD*` node(s) (%s) failed for a reason "
+            "other than a permissions problem (e.g. a driver-level "
+            "`ENODEV`/`EIO`, or this process running out of file "
+            "descriptors). This is inconclusive: it is not the common "
+            "group-membership/container `--device` issue, so adding "
+            "`--device=/dev/dri --group-add render` or adjusting "
+            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
+            "process's open-file limit and the kernel/dmesg log for driver "
+            "errors on these nodes.",
+            ", ".join(inconclusive_access_render_nodes),
+        )
     elif unknown_vendor_render_nodes:
         log(
             WARNING,
@@ -253,21 +268,6 @@ def _log_kfd_diagnostics() -> None:
             "out not to be AMD's.",
             ", ".join(unknown_vendor_render_nodes),
             _AMD_PCI_VENDOR_ID,
-        )
-    elif inconclusive_access_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
-            "opening the `/dev/dri/renderD*` node(s) (%s) failed for a reason "
-            "other than a permissions problem (e.g. a driver-level "
-            "`ENODEV`/`EIO`, or this process running out of file "
-            "descriptors). This is inconclusive: it is not the common "
-            "group-membership/container `--device` issue, so adding "
-            "`--device=/dev/dri --group-add render` or adjusting "
-            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
-            "process's open-file limit and the kernel/dmesg log for driver "
-            "errors on these nodes.",
-            ", ".join(inconclusive_access_render_nodes),
         )
     elif other_vendor_render_nodes:
         log(
