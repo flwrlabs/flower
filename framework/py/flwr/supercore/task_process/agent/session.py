@@ -34,6 +34,7 @@ from httpx import HTTPStatusError
 from flwr.agentapp import (
     AgentConnectors,
     AgentEvents,
+    AgentFiles,
     AgentGrid,
     AgentSession,
     AgentSpace,
@@ -277,6 +278,11 @@ class RuntimeAgentSession(AgentSession):
     def grid(self) -> AgentGrid:
         """Model-facing federation Grid API."""
         return self._grid
+
+    @property
+    def files(self) -> AgentFiles:
+        """Reject persistent file access for unsupported sessions."""
+        raise NotImplementedError("Persistent files are unavailable in this session.")
 
     @property
     def space(self) -> AgentSpace | None:

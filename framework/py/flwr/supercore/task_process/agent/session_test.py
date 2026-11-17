@@ -20,7 +20,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 
-from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
+from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentFiles, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -29,21 +29,29 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationResponse,
     StartRunRequest,
 )
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullTaskInputResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
     PutCompactedContextRequest,
+    PutFileRequest,
+    PutFileResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceMessagesRequest,
@@ -71,7 +79,7 @@ from .session import (
     RuntimeAgentEvents,
     RuntimeAgentSession,
 )
-from .space_session import SpaceEvents, create_space_session
+from .space_session import SpaceAgentFiles, SpaceEvents, create_space_session
 
 
 @pytest.fixture(autouse=True)
@@ -118,6 +126,8 @@ def test_runtime_agent_session_exposes_prompt() -> None:
     assert session.prompt == "Initial prompt"
     assert session.identity is None
     assert session.space is None
+    with pytest.raises(NotImplementedError, match="Persistent files"):
+        _ = session.files
 
 
 def test_space_session_exposes_agent_identity() -> None:
@@ -134,6 +144,86 @@ def test_space_session_exposes_agent_identity() -> None:
     assert agent.identity == identity
     assert agent.identity is not None
     assert agent.identity.config.description == "Cite sources."
+    assert isinstance(agent.files, AgentFiles)
+
+
+@pytest.mark.parametrize("data", [None, b"", b"memory"])
+def test_space_files_get(data: bytes | None) -> None:
+    """Distinguish missing files from empty files and retain revision metadata."""
+    stub = Mock()
+    file = (
+        File(metadata=FileMetadata(key="memory.md", revision=7), data=data)
+        if data is not None
+        else None
+    )
+    stub.GetFile.return_value = GetFileResponse(file=file)
+    agent = create_space_session(
+        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
+    )
+
+    assert agent.files.get("memory.md") == file
+    stub.GetFile.assert_called_once_with(GetFileRequest(key="memory.md"))
+
+
+@pytest.mark.parametrize("revision", [None, 0, 7])
+def test_space_files_put(revision: int | None) -> None:
+    """Preserve create-only and explicit revision preconditions, including zero."""
+    stub = Mock()
+    stub.PutFile.return_value = PutFileResponse(revision=8)
+
+    assert SpaceAgentFiles(stub).put("memory.md", b"", expected_revision=revision) == 8
+    stub.PutFile.assert_called_once_with(
+        PutFileRequest(key="memory.md", data=b"", expected_revision=revision)
+    )
+    assert stub.PutFile.call_args.args[0].HasField("expected_revision") == (
+        revision is not None
+    )
+
+
+@pytest.mark.parametrize("limit", [None, 0, 2])
+def test_space_files_list_and_delete(limit: int | None) -> None:
+    """Keep pagination metadata and require the caller's revision for deletion."""
+    stub = Mock()
+    metadata = FileMetadata(key="notes/a", revision=7, size_bytes=4)
+    stub.ListFiles.return_value = ListFilesResponse(
+        files=[metadata], next_start_after="notes/a"
+    )
+    files = SpaceAgentFiles(stub)
+
+    assert files.list(prefix="notes/", start_after="notes/0", limit=limit) == (
+        [metadata],
+        "notes/a",
+    )
+    stub.ListFiles.assert_called_once_with(
+        ListFilesRequest(prefix="notes/", start_after="notes/0", limit=limit)
+    )
+    files.delete(metadata.key, expected_revision=metadata.revision)
+    stub.DeleteFile.assert_called_once_with(
+        DeleteFileRequest(key="notes/a", expected_revision=7)
+    )
+
+
+@pytest.mark.parametrize("operation", ["put", "delete"])
+def test_space_files_propagate_conflicts(operation: str) -> None:
+    """Leave conflict handling to the AgentApp without retrying the write."""
+    stub = Mock()
+    error = httpx.HTTPStatusError(
+        "Revision conflict",
+        request=httpx.Request("POST", "http://runtime"),
+        response=httpx.Response(409),
+    )
+    rpc = stub.PutFile if operation == "put" else stub.DeleteFile
+    rpc.side_effect = error
+    files = SpaceAgentFiles(stub)
+
+    with pytest.raises(httpx.HTTPStatusError) as caught:
+        if operation == "put":
+            files.put("memory.md", b"updated", expected_revision=7)
+        else:
+            files.delete("memory.md", expected_revision=7)
+
+    assert caught.value is error
+    assert rpc.call_count == 1
 
 
 def test_space_session_reads_messages() -> None:
