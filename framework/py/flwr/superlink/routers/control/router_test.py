@@ -193,6 +193,42 @@ def test_space_routes(
     assert not state.get_run_series() and not state.get_tasks()
 
 
+@pytest.mark.parametrize(
+    "endpoint,response_type",
+    [("bootstrap", BootstrapResponse), ("list-spaces", ListSpacesResponse)],
+)
+def test_space_latest_user_prompt_routes(
+    space_client: tuple[TestClient, LinkState],
+    endpoint: str,
+    response_type: type[BootstrapResponse] | type[ListSpacesResponse],
+) -> None:
+    """Serialize the latest user prompt in bootstrap and space listings."""
+    client, state = space_client
+    agent = state.create_agent(
+        _ACCOUNT.flwr_aid, AgentConfig(name="Agent", app_spec="@flower/research")
+    )
+    assert agent is not None
+    space = state.get_spaces(_ACCOUNT.flwr_aid)[0]
+    prompt = "Follow up: €100.\nNext line."
+    sent = client.post(
+        "/v1/control/send-space-message",
+        content=SendSpaceMessageRequest(
+            space_id=space.id, content=prompt
+        ).SerializeToString(),
+    )
+    assert sent.status_code == 200
+    state.create_space_message(
+        UUID(space.id), SpaceParticipant(agent_id=agent.id), "Agent reply"
+    )
+
+    response = client.post(f"/v1/control/{endpoint}", content=b"")
+
+    assert response.status_code == 200
+    spaces = response_type.FromString(response.content).spaces
+    assert len(spaces) == 1
+    assert spaces[0].latest_user_prompt == prompt
+
+
 def test_create_space_rejects_invalid_participants(
     space_client: tuple[TestClient, LinkState],
 ) -> None:
