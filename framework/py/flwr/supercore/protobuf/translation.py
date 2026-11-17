@@ -98,6 +98,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetSpaceEventsRequest,
+    ListAgentConnectorsRequest,
     ListFilesRequest,
     PullAppMessagesRequest,
     PullTaskInputRequest,
@@ -132,6 +133,7 @@ from flwr.supercore.protobuf.streaming import (
 RouteKey = tuple[str, str]
 
 PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
+    ("POST", "/v1/runtime/list-agent-connectors"): ListAgentConnectorsRequest,
     ("POST", "/v1/control/bootstrap"): BootstrapRequest,
     ("POST", "/v1/control/stream-events"): StreamEventsRequest,
     ("POST", "/v1/fleet/register-node"): RegisterNodeFleetRequest,

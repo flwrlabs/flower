@@ -941,26 +941,27 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_automation(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID the automation belongs to.
+        federation_id : str | None (default: None)
+            Federation ID for a run-series automation; None for an agent automation.
         flwr_aid : str
             FLWR account ID used to dispatch the automation.
         start_run_request : StartRunRequest
             Unresolved run request to execute for each scheduled occurrence.
-        series_id : int
-            Run series ID to use when dispatching automation runs.
+        series_id : int | None (default: None)
+            Run series ID for a run-series automation; None for an agent automation.
         next_run_at : str
             Initial due time as a timestamp string. This is required when
             storing an automation. For one-shot automations, this is the
@@ -971,11 +972,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         max_runs : int | None (default: None)
             Maximum number of runs, if finite. The value initializes the
             persisted `remaining_runs` counter.
+        agent_id : int | None (default: None)
+            Agent associated with the automation, if any.
 
         Returns
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        ValueError
+            If neither or both automation ownership forms are provided.
         """
 
     @abstractmethod

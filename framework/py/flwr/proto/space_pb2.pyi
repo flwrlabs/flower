@@ -139,10 +139,12 @@ class SpaceMessage(google.protobuf.message.Message):
     AUTHOR_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
+    HIDDEN_FIELD_NUMBER: builtins.int
     id: builtins.int
     space_id: builtins.str
     created_at: builtins.str
     content: builtins.str
+    hidden: builtins.bool
     @property
     def author(self) -> global___SpaceParticipant: ...
     def __init__(
@@ -153,9 +155,10 @@ class SpaceMessage(google.protobuf.message.Message):
         author: global___SpaceParticipant | None = ...,
         created_at: builtins.str = ...,
         content: builtins.str = ...,
+        hidden: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["author", b"author"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "id", b"id", "space_id", b"space_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "hidden", b"hidden", "id", b"id", "space_id", b"space_id"]) -> None: ...
 
 global___SpaceMessage = SpaceMessage
 
