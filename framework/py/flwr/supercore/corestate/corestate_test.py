@@ -1572,6 +1572,31 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored.agent_id, agent.id)
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
 
+    def test_store_automation_requires_one_owner(self) -> None:
+        """Reject missing, partial, or mixed automation ownership."""
+        state = self.state_factory()
+        invalid_owners = [
+            (None, None, None),
+            ("@me/fed-a", None, None),
+            (None, 123, None),
+            ("@me/fed-a", None, 456),
+            (None, 123, 456),
+            ("@me/fed-a", 123, 456),
+        ]
+        for federation_id, series_id, agent_id in invalid_owners:
+            with self.subTest(
+                federation_id=federation_id, series_id=series_id, agent_id=agent_id
+            ):
+                with self.assertRaisesRegex(ValueError, "Provide agent_id"):
+                    state.store_automation(
+                        federation_id=federation_id,
+                        flwr_aid="aid-a",
+                        start_run_request=StartRunRequest(user_prompt="Do work"),
+                        series_id=series_id,
+                        next_run_at=now().isoformat(),
+                        agent_id=agent_id,
+                    )
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()

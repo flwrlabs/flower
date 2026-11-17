@@ -979,6 +979,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        ValueError
+            If neither or both automation ownership forms are provided.
         """
 
     @abstractmethod

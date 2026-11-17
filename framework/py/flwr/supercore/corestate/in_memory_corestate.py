@@ -1394,6 +1394,14 @@ class InMemoryCoreState(
         agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        if not (
+            (agent_id is not None and federation_id is None and series_id is None)
+            or (
+                agent_id is None and federation_id is not None and series_id is not None
+            )
+        ):
+            raise ValueError("Provide agent_id or both federation_id and series_id.")
+
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
