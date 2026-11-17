@@ -787,10 +787,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     UserEventFeedModel.user_id == flwr_aid
                 )
             )
-        agents = self.list_agents(flwr_aid)
         spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=agents,
+            agents=self.list_agents(flwr_aid),
             spaces=spaces,
             active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
             cursor=head or 0,
@@ -2618,6 +2617,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
+            # Commit expiry and its lifecycle events together.
             if expired_tasks:
                 self._on_task_tokens_expired(expired_tasks)
 

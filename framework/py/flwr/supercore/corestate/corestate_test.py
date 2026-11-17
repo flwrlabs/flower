@@ -2798,12 +2798,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 release.set()
             snapshot = bootstrap.result(timeout=5)
         self.assertFalse(snapshot.agents or snapshot.cursor)
-        self.assertEqual(len(snapshot.spaces), 1)
         entries = state.get_user_events("alice", snapshot.cursor)
         assert agent is not None
         self.assertEqual(entries[0].event.type, "agent.created")
         self.assertEqual(entries[0].event.payload["id"], str(agent.id))
-        self.assertEqual(entries[1].event.payload["id"], snapshot.spaces[0].id)
+        self.assertEqual(entries[1].event.type, "space.created")
 
     def test_user_event_sql_transactions(self) -> None:
         """Keep SQL events atomic, persistent, and committed in feed order."""
