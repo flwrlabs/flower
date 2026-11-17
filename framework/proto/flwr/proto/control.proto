@@ -117,7 +117,7 @@ message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;
   repeated Space spaces = 2;
-  // Feed head from the same snapshot as agents and spaces.
+  // Feed head read before the snapshot; replay may repeat snapshot updates.
   uint64 cursor = 3;
 }
 

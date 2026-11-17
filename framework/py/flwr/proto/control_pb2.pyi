@@ -530,7 +530,7 @@ class BootstrapResponse(google.protobuf.message.Message):
     SPACES_FIELD_NUMBER: builtins.int
     CURSOR_FIELD_NUMBER: builtins.int
     cursor: builtins.int
-    """Feed head from the same snapshot as agents and spaces."""
+    """Feed head read before the snapshot; replay may repeat snapshot updates."""
     @property
     def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Agent]: ...
     @property
