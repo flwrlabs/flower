@@ -129,8 +129,8 @@ message Event {
   string event_id = 1;
   string type = 2;
   optional string space_id = 3;
-  // run.created (queued), run.started (primary task running), and run.finished
-  // (completed, failed or stopped) carry a minimal Run: run_id, agent_id,
+  // run.created (queued) and run.finished (completed, failed or stopped)
+  // carry a minimal Run: run_id, agent_id,
   // space_id, status/sub_status and lifecycle timestamps. Config and failure
   // details are omitted. As in protobuf JSON, uint64 identifiers in this Struct
   // are decimal strings.

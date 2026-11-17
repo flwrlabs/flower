@@ -141,14 +141,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 space_id=run.space_id,
             )
 
-    def activate_task(self, task_id: int) -> bool:
-        """Activate a task and publish a primary run transition atomically."""
-        with self.session():
-            result = super().activate_task(task_id)
-            if result:
-                self._store_run_event(EventType.RUN_STARTED, task_id)
-            return result
-
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
         with self.session() as session:

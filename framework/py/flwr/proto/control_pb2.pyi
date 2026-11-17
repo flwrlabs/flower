@@ -574,8 +574,8 @@ class Event(google.protobuf.message.Message):
     created_at: builtins.str
     @property
     def payload(self) -> google.protobuf.struct_pb2.Struct:
-        """run.created (queued), run.started (primary task running), and run.finished
-        (completed, failed or stopped) carry a minimal Run: run_id, agent_id,
+        """run.created (queued) and run.finished (completed, failed or stopped)
+        carry a minimal Run: run_id, agent_id,
         space_id, status/sub_status and lifecycle timestamps. Config and failure
         details are omitted. As in protobuf JSON, uint64 identifiers in this Struct
         are decimal strings.
