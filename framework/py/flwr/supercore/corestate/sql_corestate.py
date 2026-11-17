@@ -2847,6 +2847,7 @@ def _automation_from_model(model: AutomationModel) -> Automation:
         federation=model.federation_id,
         series_id=model.series_id,
         flwr_aid=model.flwr_aid,
+        agent_id=model.agent_id,
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
         next_run_at=timestamp_to_iso(model.next_run_at),
