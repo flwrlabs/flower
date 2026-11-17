@@ -142,7 +142,12 @@ def test_space_session_reads_messages() -> None:
     stub.GetSpaceMessages.return_value = GetSpaceMessagesResponse(
         messages=[
             SpaceMessage(id=1, author=SpaceParticipant(flwr_aid="alice"), content="Hi"),
-            SpaceMessage(id=2, author=SpaceParticipant(agent_id=42), content="Hello"),
+            SpaceMessage(
+                id=2,
+                author=SpaceParticipant(agent_id=42),
+                content="Hello",
+                hidden=True,
+            ),
         ]
     )
     agent = create_space_session(
@@ -162,6 +167,7 @@ def test_space_session_reads_messages() -> None:
         {"agent_id": 42},
     ]
     assert [message["id"] for message in messages] == [1, 2]
+    assert [message["hidden"] for message in messages] == [False, True]
 
 
 @pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
@@ -188,6 +194,7 @@ def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
         "author": {"agent_id": 42},
         "created_at": "",
         "content": "Hello",
+        "hidden": False,
     }
     stub.SendSpaceMessage.assert_called_once_with(
         SendSpaceMessageRequest(content="Hello")

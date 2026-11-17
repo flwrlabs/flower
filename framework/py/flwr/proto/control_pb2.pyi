@@ -855,13 +855,17 @@ class ListConnectorsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
     federation: builtins.str
+    agent_id: builtins.int
+    """Select an agent instead of a federation; 0 leaves the agent unset."""
     def __init__(
         self,
         *,
         federation: builtins.str = ...,
+        agent_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["federation", b"federation"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "federation", b"federation"]) -> None: ...
 
 global___ListConnectorsRequest = ListConnectorsRequest
 
@@ -915,17 +919,21 @@ class DisconnectConnectorRequest(google.protobuf.message.Message):
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_ID_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     connector_id: builtins.int
     federation: builtins.str
+    agent_id: builtins.int
+    """Select an agent instead of a federation; 0 leaves the agent unset."""
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
         connector_id: builtins.int = ...,
         federation: builtins.str = ...,
+        agent_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_id", b"connector_id", "connector_ref", b"connector_ref", "federation", b"federation"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "connector_id", b"connector_id", "connector_ref", b"connector_ref", "federation", b"federation"]) -> None: ...
 
 global___DisconnectConnectorRequest = DisconnectConnectorRequest
 
@@ -946,17 +954,21 @@ class BeginConnectorOAuthRequest(google.protobuf.message.Message):
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     REDIRECT_URI_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
     connector_ref: builtins.str
     redirect_uri: builtins.str
     federation: builtins.str
+    agent_id: builtins.int
+    """Select an agent instead of a federation; 0 leaves the agent unset."""
     def __init__(
         self,
         *,
         connector_ref: builtins.str = ...,
         redirect_uri: builtins.str = ...,
         federation: builtins.str = ...,
+        agent_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["connector_ref", b"connector_ref", "federation", b"federation", "redirect_uri", b"redirect_uri"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "connector_ref", b"connector_ref", "federation", b"federation", "redirect_uri", b"redirect_uri"]) -> None: ...
 
 global___BeginConnectorOAuthRequest = BeginConnectorOAuthRequest
 
