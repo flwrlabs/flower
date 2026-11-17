@@ -573,12 +573,21 @@ class TestGetConnector(unittest.TestCase):
     def setUp(self) -> None:
         """Create an authorized connector task and mocked state."""
         self.state = Mock(spec=LinkState)
-        self.task = Task(type=TaskType.CONNECTOR, connector_id=42, run_id=123)
-        self.state.get_run_info.return_value = [Mock(federation_id="@bob/fed-a")]
+        self.task = Task(
+            type=TaskType.CONNECTOR,
+            connector_id=42,
+            connector_ref="example",
+            run_id=123,
+        )
+        self.state.get_run_info.return_value = [
+            Mock(federation_id="@bob/fed-a", agent_id=None)
+        ]
         self.state.get_run_connector_ids.return_value = [42]
         self.connector = Mock(
             connector_id=42,
             connector_ref="example",
+            federation_id="@bob/fed-a",
+            agent_id=None,
             credentials_json=(
                 '{"access_token":"old-token","refresh_token":"refresh-secret",'
                 '"expires_at":0}'
@@ -800,7 +809,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
-        response = core_runtime_handlers.create_task(
+        response = runtime_handlers.create_task(
             CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
             self.state,
             self._auth_task,

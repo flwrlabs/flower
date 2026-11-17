@@ -50,6 +50,7 @@ _UNARY_UNARY_PATHS = (
     "put-compacted-context",
     "pull-task-message",
     "record-task-usage",
+    "list-agent-connectors",
     "get-connector",
 )
 _RESPONSE_NAME_OVERRIDES = {

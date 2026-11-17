@@ -82,6 +82,7 @@ def fixture_client(state: NodeState) -> TestClient:
 @pytest.fixture(name="valid_token")
 def fixture_valid_token(state: NodeState) -> str:
     """Claim the ClientApp task and return its token."""
+    state.store_run(Run.create_empty(run_id=99))
     task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
     assert task_id is not None
     token = state.claim_task(task_id)
@@ -123,6 +124,23 @@ def test_runtime_flower_error_is_translated(
 
     assert response.status_code == 412
     assert response.json()["code"] == ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST
+
+
+def test_create_task_rejects_run_bound_connector(
+    client: TestClient, state: NodeState, valid_token: str
+) -> None:
+    """Deny stored connections even when the local run has an explicit grant."""
+    connector_id = state.create_connector("federation", "slack", "{}", "{}", "account")
+    assert connector_id is not None
+    assert state.bind_connectors_to_run(99, [connector_id])
+    response = _post(
+        client,
+        "create-task",
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_id=connector_id),
+        token=valid_token,
+    )
+    assert response.status_code == 403
+    assert len(state.get_tasks()) == 1
 
 
 def test_pull_object_denied_without_metadata_token(client: TestClient) -> None:
