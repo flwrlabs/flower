@@ -15,7 +15,7 @@
 """Add hidden flag to space messages.
 
 Revision ID: 90887a746bff
-Revises: 41d8f4daf401
+Revises: 1bd8ba160a3f
 Create Date: 2026-11-17 10:55:30.798438
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "90887a746bff"
-down_revision: str | Sequence[str] | None = "41d8f4daf401"
+down_revision: str | Sequence[str] | None = "1bd8ba160a3f"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
