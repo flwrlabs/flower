@@ -587,6 +587,78 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_agent_default_space_migration_preserves_ids(self) -> None:
+        """Backfill the default Space without reusing deleted SQLite agent IDs."""
+        engine = self.create_engine("agent_default_space.db")
+        try:
+            self.upgrade_to_revision(engine, "90887a746bff")
+            space_id = "12345678123456781234567812345678"
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO space (id, created_at, title) "
+                        "VALUES (:id, :at, '')"
+                    ),
+                    {"id": space_id, "at": "2026-11-17 00:00:00+00:00"},
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO agent (agent_id, name, app_spec, flwr_aid, "
+                        "created_at, updated_at) VALUES "
+                        "(:id, 'Agent', '@test/app', 'alice', :at, :at)"
+                    ),
+                    [
+                        {"id": agent_id, "at": "2026-11-17 00:00:00+00:00"}
+                        for agent_id in (1, 100)
+                    ],
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO space_participant (space_id, agent_id) "
+                        "VALUES (:space_id, 1)"
+                    ),
+                    {"space_id": space_id},
+                )
+                connection.execute(text("DELETE FROM agent WHERE agent_id = 100"))
+
+            self.upgrade_to_revision(engine, "0d0ae5ae64ef")
+            with engine.begin() as connection:
+                self.assertEqual(
+                    connection.scalar(
+                        text("SELECT default_space_id FROM agent WHERE agent_id = 1")
+                    ),
+                    space_id,
+                )
+                self.assertEqual(
+                    connection.scalar(
+                        text("SELECT seq FROM sqlite_sequence WHERE name = 'agent'")
+                    ),
+                    100,
+                )
+                new_id = connection.scalar(
+                    text(
+                        "INSERT INTO agent (name, app_spec, flwr_aid, "
+                        "created_at, updated_at) VALUES "
+                        "('Agent', '@test/app', 'alice', :at, :at) RETURNING agent_id"
+                    ),
+                    {"at": "2026-11-17 00:00:00+00:00"},
+                )
+                self.assertEqual(new_id, 101)
+                connection.execute(
+                    text("DELETE FROM agent WHERE agent_id = :id"), {"id": new_id}
+                )
+
+            self.downgrade_to_revision(engine, "90887a746bff")
+            with engine.connect() as connection:
+                self.assertEqual(
+                    connection.scalar(
+                        text("SELECT seq FROM sqlite_sequence WHERE name = 'agent'")
+                    ),
+                    101,
+                )
+        finally:
+            engine.dispose()
+
     def test_primary_task_backfill_populates_historical_runs(self) -> None:
         """Ensure historical runs get backfilled primary tasks during migration."""
         engine = self.create_engine("primary_task_backfill.db")
