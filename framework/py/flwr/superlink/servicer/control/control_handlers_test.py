@@ -1039,7 +1039,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             AgentConfig(name="Other", app_spec="@publisher/other"),
         )
 
-        message = control_handlers._store_hidden_agent_automation_message(
+        message = control_handlers._store_hidden_agent_automation_message(  # pylint: disable=protected-access
             self.state,
             flwr_aid=self.account.flwr_aid,
             agent_id=agent.id,
