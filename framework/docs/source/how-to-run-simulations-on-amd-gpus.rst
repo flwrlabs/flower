@@ -387,15 +387,19 @@ exported, silently leaving Ray's original import failure in place:
                      "that both map to the same ROCr-visible device, letting" \
                      "concurrent ClientApps collide on it. Left unchanged, so" \
                      "remove the duplicate and re-run this snippet." >&2
+            else
+                # HIP_VISIBLE_DEVICES was already set (not synthesized above),
+                # but may only be a plain shell variable, not an exported one
+                # (e.g. a setup script assigned it without `export`) -- Ray
+                # subprocesses would then still only inherit
+                # ROCR_VISIBLE_DEVICES and hit its import guard. Export the
+                # preserved value now that it has passed the syntax/range/
+                # duplicate checks above -- a duplicate ordinal still leaves a
+                # usable (if suboptimal) mask, but exporting it would silence
+                # the warning above on every subsequent run, so the export is
+                # skipped until the duplicate is actually removed.
+                export HIP_VISIBLE_DEVICES
             fi
-            # HIP_VISIBLE_DEVICES was already set (not synthesized above), but
-            # may only be a plain shell variable, not an exported one (e.g. a
-            # setup script assigned it without `export`) -- Ray subprocesses
-            # would then still only inherit ROCR_VISIBLE_DEVICES and hit its
-            # import guard. Export the preserved value now that it has passed
-            # the syntax/range checks above (a duplicate ordinal only warns,
-            # it does not block exporting).
-            export HIP_VISIBLE_DEVICES
         fi
         unset _hip_ids _id _bad_syntax _bad_range _dup _norm_ids _trimmed_id
         unset _bash_int_max

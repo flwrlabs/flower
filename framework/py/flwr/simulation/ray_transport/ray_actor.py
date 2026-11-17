@@ -254,21 +254,6 @@ def _log_kfd_diagnostics() -> None:
             ", ".join(unknown_vendor_render_nodes),
             _AMD_PCI_VENDOR_ID,
         )
-    elif other_vendor_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and an accessible `/dev/dri/renderD*` node "
-            "exists (%s), but it is not AMD-backed (its PCI vendor "
-            "ID is not `%s`) -- ROCm cannot use it. This usually "
-            "means the AMD GPU's own render node is missing or "
-            "permission-denied on this host or container, not that "
-            "`amdsmi`/ROCM_PATH needs adjusting: check that `--device=/dev/dri "
-            "--group-add render` passes through and grants access to "
-            "the AMD device specifically, not just any render node.",
-            ", ".join(other_vendor_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
     elif inconclusive_access_render_nodes:
         log(
             WARNING,
@@ -283,6 +268,21 @@ def _log_kfd_diagnostics() -> None:
             "process's open-file limit and the kernel/dmesg log for driver "
             "errors on these nodes.",
             ", ".join(inconclusive_access_render_nodes),
+        )
+    elif other_vendor_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), and an accessible `/dev/dri/renderD*` node "
+            "exists (%s), but it is not AMD-backed (its PCI vendor "
+            "ID is not `%s`) -- ROCm cannot use it. This usually "
+            "means the AMD GPU's own render node is missing or "
+            "permission-denied on this host or container, not that "
+            "`amdsmi`/ROCM_PATH needs adjusting: check that `--device=/dev/dri "
+            "--group-add render` passes through and grants access to "
+            "the AMD device specifically, not just any render node.",
+            ", ".join(other_vendor_render_nodes),
+            _AMD_PCI_VENDOR_ID,
         )
     else:
         log(
@@ -357,8 +357,10 @@ def _local_ips() -> set[str]:
     return ips
 
 
-def _bind_confirms_local_address(ip: str) -> bool:
-    """Whether binding a socket to `ip` succeeds, confirming it is local.
+def _bind_confirms_local_address(
+    sockaddr: tuple[str, int] | tuple[str, int, int, int],
+) -> bool | None:
+    """Whether binding a socket to `sockaddr` confirms it is local.
 
     `_local_ips` is an enumeration of likely addresses, not an exhaustive
     one: a secondary NIC or alias can be reached without ever surfacing in
@@ -367,15 +369,24 @@ def _bind_confirms_local_address(ip: str) -> bool:
     an address actually assigned to one of this host's interfaces, failing
     with `EADDRNOTAVAIL` otherwise -- so this is used as a fallback
     confirmation for an address `_local_ips` missed, without needing a
-    portable full interface enumeration.
+    portable full interface enumeration. `sockaddr` is the full tuple from
+    `getaddrinfo` (not just the address string) because an IPv6 link-local
+    address only binds successfully with its `scope_id` included. Returns
+    `True` if the bind succeeds, `False` only for a `bind(2)` failing with
+    `EADDRNOTAVAIL` specifically (the kernel's authoritative "not a local
+    address" signal), or `None` for any other `OSError` (e.g.
+    `EACCES`/`EPERM`/`EMFILE`/`ENOBUFS`), which is inconclusive rather than
+    proof of non-locality.
     """
-    family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+    family = socket.AF_INET6 if len(sockaddr) == 4 else socket.AF_INET
     try:
         with socket.socket(family, socket.SOCK_DGRAM) as probe_sock:
-            probe_sock.bind((ip, 0))
+            probe_sock.bind(sockaddr)
         return True
-    except OSError:
-        return False
+    except OSError as exc:
+        if exc.errno == errno.EADDRNOTAVAIL:
+            return False
+        return None
 
 
 def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
@@ -398,14 +409,33 @@ def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
     that is disjoint from all of the above is not yet proof of remoteness,
     since `_local_ips` is explicitly best-effort: it is given one more,
     authoritative check via `_bind_confirms_local_address` before this
-    function will call it confirmed remote.
+    function will call it confirmed remote -- and since that check is itself
+    tri-state, only a confirmed-`False` (not an inconclusive `None`) result
+    lets this function conclude "remote".
     """
     try:
-        conn_ips = {str(info[4][0]) for info in socket.getaddrinfo(conn_host, None)}
+        addr_infos = socket.getaddrinfo(conn_host, None)
     except OSError:
         return False
     local_ips = _local_ips()
-    for conn_ip in conn_ips:
+    seen_ips: set[str] = set()
+    for info in addr_infos:
+        # Keep the full sockaddr (not just the address string) so an IPv6
+        # link-local address's `scope_id` survives to the bind check below;
+        # dedup on the address string since repeated socktype/proto entries
+        # for the same address are common and would otherwise probe it twice.
+        sockaddr = info[4]
+        if not isinstance(sockaddr[0], str):
+            # Only AF_INET/AF_INET6 sockaddrs (first element a host string)
+            # are relevant here; `getaddrinfo` with no family restriction can
+            # in principle also yield other families (e.g. AF_PACKET's
+            # `(int, bytes)` shape), which this check can't meaningfully
+            # reason about.
+            continue
+        conn_ip = str(sockaddr[0])
+        if conn_ip in seen_ips:
+            continue
+        seen_ips.add(conn_ip)
         if conn_ip in local_ips:
             return False
         try:
@@ -413,7 +443,7 @@ def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
                 return False
         except ValueError:
             pass
-        if _bind_confirms_local_address(conn_ip):
+        if _bind_confirms_local_address(sockaddr) is not False:
             return False
     return True
 
