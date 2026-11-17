@@ -16,6 +16,7 @@
 
 
 import numpy as np
+import pytest
 
 from .differential_privacy import (
     CLIENTS_DISCREPANCY_WARNING,
@@ -220,48 +221,36 @@ def test_compute_adaptive_noise_params() -> None:
     assert np.isclose(result[1], temp_value, rtol=1e-6)
 
 
-def test_differential_privacy_with_integer_arrays() -> None:
-    """Test that integer arrays (e.g. BatchNorm num_batches_tracked) are not scaled."""
+def test_non_floating_arrays_raise_error() -> None:
+    """Test that non-floating arrays (e.g. num_batches_tracked) raise an error."""
     # Prepare: float weights update and an integer buffer (like num_batches_tracked)
     float_array = np.array([3.0, 4.0], dtype=np.float32)  # norm is 5.0
     int_array = np.array([10], dtype=np.int64)
     updates = [float_array, int_array]
 
-    # Test get_norm ignores integer arrays when float arrays exist
-    norm = get_norm(updates)
-    assert norm == 5.0
+    # Clipping and noise addition reject integer buffers with a clear error
+    # instead of silently leaving them outside the DP guarantee
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        clip_inputs_inplace(updates, clipping_norm=2.5)
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        adaptive_clip_inputs_inplace(updates, clipping_norm=2.5)
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        add_gaussian_noise_inplace(updates, std_dev=0.5)
 
-    # Test clip_inputs_inplace with clipping_norm = 2.5 (scaling factor 0.5)
-    # Float updates should be scaled down by 0.5, integer updates should remain untouched
-    clip_inputs_inplace(updates, clipping_norm=2.5)
+    # The error tells users to keep such tracking buffers local
+    with pytest.raises(ValueError, match="num_batches_tracked"):
+        clip_inputs_inplace(updates, clipping_norm=2.5)
+
+    # The error is raised before any in-place modification happens
     np.testing.assert_array_almost_equal(
-        updates[0], np.array([1.5, 2.0], dtype=np.float32)
+        float_array, np.array([3.0, 4.0], dtype=np.float32)
     )
-    assert updates[1].dtype == np.int64
-    assert updates[1][0] == 10
-
-    # Test adaptive_clip_inputs_inplace
-    float_array2 = np.array([3.0, 4.0], dtype=np.float32)
-    int_array2 = np.array([20], dtype=np.int64)
-    updates2 = [float_array2, int_array2]
-    clipped = adaptive_clip_inputs_inplace(updates2, clipping_norm=2.5)
-    assert clipped is True
-    np.testing.assert_array_almost_equal(
-        updates2[0], np.array([1.5, 2.0], dtype=np.float32)
-    )
-    assert updates2[1][0] == 20
-
-    # Test add_gaussian_noise_inplace: noise is only added to floating point arrays
-    add_gaussian_noise_inplace(updates2, std_dev=0.5)
-    assert updates2[1][0] == 20
 
 
-def test_zero_norm_counter_only_update() -> None:
-    """Test zero norm does not cause ZeroDivisionError when only counter changes."""
-    # Zero float updates (no parameter change) and changed integer counter
-    float_array = np.array([0.0, 0.0], dtype=np.float32)
-    int_array = np.array([5], dtype=np.int64)
-    updates = [float_array, int_array]
+def test_zero_norm_update_returns_gracefully() -> None:
+    """Test zero norm does not cause ZeroDivisionError during clipping."""
+    # Zero float updates (no parameter change)
+    updates = [np.array([0.0, 0.0], dtype=np.float32)]
 
     norm = get_norm(updates)
     assert norm == 0.0
@@ -269,10 +258,7 @@ def test_zero_norm_counter_only_update() -> None:
     # clip_inputs_inplace should return gracefully without ZeroDivisionError
     clip_inputs_inplace(updates, clipping_norm=1.0)
     assert updates[0][0] == 0.0
-    assert updates[1][0] == 5
 
     # adaptive_clip_inputs_inplace should return False
     clipped = adaptive_clip_inputs_inplace(updates, clipping_norm=1.0)
     assert clipped is False
-
-

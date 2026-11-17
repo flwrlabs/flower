@@ -171,8 +171,13 @@ def test_budget_is_checked_before_training() -> None:
     accountant.compose.assert_not_called()
 
 
-def test_mixed_dtype_two_round_dp_strategy() -> None:
-    """Regression test: integer buffers survive multiple rounds without float promotion."""
+def test_integer_buffer_in_updates_raises_clear_error() -> None:
+    """Regression test: integer buffers in updates raise a clear error, not silence.
+
+    Integer tracking buffers like `num_batches_tracked` can depend on private data,
+    so the DP wrapper must reject them instead of leaving them unclipped and
+    un-noised inside the aggregate.
+    """
     wrapper = DifferentialPrivacyServerSideFixedClipping(
         strategy=FedAvg(min_train_nodes=2, min_available_nodes=2),
         noise_multiplier=0.0,
@@ -188,8 +193,8 @@ def test_mixed_dtype_two_round_dp_strategy() -> None:
         }
     )
 
-    # Round 1
     _ = list(wrapper.configure_train(1, arrays, ConfigRecord(), _grid()))
+
     reply1 = Mock(spec=Message)
     reply1.content = RecordDict(
         {
@@ -218,15 +223,7 @@ def test_mixed_dtype_two_round_dp_strategy() -> None:
     )
     reply2.has_error.return_value = False
 
-    agg_arrays, _ = wrapper.aggregate_train(1, [reply1, reply2])
-    assert agg_arrays is not None
-    # Verify integer buffer kept its integer dtype and didn't get promoted to float
-    assert agg_arrays["num_batches_tracked"].numpy().dtype == np.int64
-    assert agg_arrays["num_batches_tracked"].numpy()[0] == 15
-
-    # Round 2: ensure subtract in round 2 doesn't fail or promote to float norm
-    _ = list(wrapper.configure_train(2, agg_arrays, ConfigRecord(), _grid()))
-    agg_arrays_r2, _ = wrapper.aggregate_train(2, [reply1, reply2])
-    assert agg_arrays_r2 is not None
-    assert agg_arrays_r2["num_batches_tracked"].numpy().dtype == np.int64
-
+    # Aggregation raises a clear error instead of silently passing the
+    # integer buffer through without clipping or noise
+    with pytest.raises(ValueError, match="num_batches_tracked"):
+        wrapper.aggregate_train(1, [reply1, reply2])
