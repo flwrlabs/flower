@@ -1388,15 +1388,26 @@ class InMemoryCoreState(
     def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        if not (
+            (agent_id is not None and federation_id is None and series_id is None)
+            or (
+                agent_id is None and federation_id is not None and series_id is not None
+            )
+        ):
+            raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+            raise ValueError("Agent not found.")
+
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
@@ -1404,14 +1415,15 @@ class InMemoryCoreState(
             automation = Automation(
                 automation_id=automation_id,
                 status=AutomationStatus.ACTIVE,
-                federation=federation_id,
-                series_id=series_id,
+                federation=federation_id or "",
+                series_id=series_id or 0,
                 flwr_aid=flwr_aid,
                 created_at=current.isoformat(),
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
                 remaining_runs=max_runs,
+                agent_id=agent_id,
             )
 
             stored_request = StartRunRequest()
