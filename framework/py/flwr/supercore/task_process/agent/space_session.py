@@ -14,14 +14,18 @@
 # ==============================================================================
 """Space AgentApp session capabilities."""
 
+import hashlib
 from collections.abc import Sequence
 from typing import cast
 
 from flwr.agentapp import AgentGrid
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetSpaceEventsRequest,
+    ListAgentConnectorsRequest,
     PullTaskInputResponse,
 )
+from flwr.supercore.runtime import RuntimeHttpClient
+from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     has_builtin_connector,
@@ -74,22 +78,95 @@ class SpaceEvents(RuntimeAgentEvents):
 
 
 class _SpaceAgentConnectors(RuntimeAgentConnectors):
-    """Expose built-in connectors without federation-owned tools or automations."""
+    """Expose built-ins and the Space agent's own connections."""
 
-    def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
-        """Return schemas for the requested built-in connectors."""
-        return super().tools(
-            [name for name in names if has_builtin_connector(name)], refresh=refresh
+    def __init__(self, agent_runtime: AgentRuntime, stub: RuntimeHttpClient) -> None:
+        super().__init__(agent_runtime)
+        self._stub = stub
+        self._tool_calls: dict[str, tuple[str, int]] = {}
+
+    def get_connections(self) -> list[JSONObject]:
+        """Read current connection metadata from the task-authenticated Runtime."""
+        return [
+            {
+                "connector_id": connector.connector_id,
+                "connector_ref": connector.connector_ref,
+                "display_name": connector.display_name,
+                "description": connector.description,
+            }
+            for connector in self._stub.ListAgentConnectors(
+                ListAgentConnectorsRequest()
+            ).connectors
+        ]
+
+    def tools(self, names: Sequence[str], refresh: bool = False) -> list[JSONObject]:
+        """Return requested built-ins and tools for each owned provider connection."""
+        connections = (
+            self.get_connections()
+            if any(
+                not has_builtin_connector(name) and name != START_AUTOMATION_TOOL_NAME
+                for name in names
+            )
+            else []
         )
+        tools: list[JSONObject] = []
+        for name in dict.fromkeys(names):
+            if name == START_AUTOMATION_TOOL_NAME:
+                continue
+            if has_builtin_connector(name):
+                tools.extend(
+                    self._agent_runtime.get_connector_tools(name, refresh=refresh)
+                )
+                continue
+            for connection in connections:
+                if connection["connector_ref"] != name:
+                    continue
+                connector_id = cast(int, connection["connector_id"])
+                for tool in self._agent_runtime.get_connector_tools(
+                    name, refresh=refresh, connector_id=connector_id
+                ):
+                    tool_name = cast(str, tool["name"])
+                    alias = _connection_tool_name(tool_name, connector_id)
+                    previous = self._tool_calls.get(alias)
+                    if previous is not None and previous != (tool_name, connector_id):
+                        raise ValueError("Conflicting connection tool names.")
+                    self._tool_calls[alias] = (tool_name, connector_id)
+                    tool["name"] = alias
+                    tool["description"] = (
+                        f"{tool.get('description', '')}\n"
+                        f"Connection: {connection['display_name']}."
+                    )
+                    tools.append(tool)
+        return tools
 
     def call(self, tool_call: JSONObject) -> JSONObject:
-        """Execute built-ins and reject unsupported tools before Runtime requests."""
+        """Route advertised tools to their connection and reject federation tools."""
         name = cast(str, tool_call["name"]).strip().lower()
-        if not has_builtin_connector(get_connector_ref(name)):
-            raise NotImplementedError(
-                "Space sessions only support built-in connectors."
-            )
-        return super().call(tool_call)
+        if name == START_AUTOMATION_TOOL_NAME:
+            raise NotImplementedError("Space sessions do not support automations.")
+        if has_builtin_connector(get_connector_ref(name)):
+            return super().call(tool_call)
+        if name not in self._tool_calls:
+            raise ValueError(f"Tool '{name}' is not available in this Space session.")
+        tool_name, connector_id = self._tool_calls[name]
+        arguments = tool_call["arguments"]
+        if isinstance(arguments, str):
+            arguments = strict_json_loads(arguments)
+        return self._agent_runtime.call_connector_with_events(
+            name=tool_name,
+            call_id=cast(str, tool_call["call_id"]),
+            arguments=cast(JSONObject, arguments),
+            connector_id=connector_id,
+            event_name=name,
+        )
+
+
+def _connection_tool_name(name: str, connector_id: int) -> str:
+    """Keep connection-specific function names stable and at most 64 characters."""
+    suffix = f"__{connector_id}"
+    if len(name) + len(suffix) > 64:
+        suffix = f"_{hashlib.sha256(name.encode()).hexdigest()[:12]}{suffix}"
+    return f"{name[:64 - len(suffix)]}{suffix}"
 
 
 class _SpaceAgentGrid(AgentGrid):
@@ -123,7 +200,7 @@ def create_space_session(
     Returns
     -------
     RuntimeAgentSession
-        Session with built-in connectors and federation Grid tools disabled.
+        Session with agent-owned connections, built-ins, and federation Grid disabled.
     """
     stub = grid._runtime_client  # pylint: disable=protected-access
     runtime = AgentRuntime(
@@ -134,7 +211,7 @@ def create_space_session(
     )
     return RuntimeAgentSession(
         prompt="",
-        connectors=_SpaceAgentConnectors(runtime),
+        connectors=_SpaceAgentConnectors(runtime, stub),
         events=events,
         grid=_SpaceAgentGrid(),
         space=RuntimeAgentSpace(stub, events),

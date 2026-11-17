@@ -595,9 +595,8 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
-    agent_runtime._discovered_tools["example"] = [  # pylint: disable=protected-access
-        {"name": "example_Search"}
-    ]
+    # pylint: disable-next=protected-access
+    agent_runtime._discovered_tools[("example", None)] = [{"name": "example_Search"}]
     reply = ConnectorResponse(
         dst_task_id=789,
         name="example_Search",
