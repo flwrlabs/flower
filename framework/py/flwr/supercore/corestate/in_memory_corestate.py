@@ -893,14 +893,23 @@ class InMemoryCoreState(
 
     def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
+        agent_id: int | None = None,
     ) -> int | None:
-        """Create a connector for a federation."""
-        if not federation_id or not connector_ref or not created_by:
+        """Create a connector owned by a federation or an existing agent."""
+        if not connector_ref or not created_by:
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+        ):
+            return None
+        if agent_id is not None and self.get_agent(created_by, agent_id) is None:
             return None
         with self.lock_connector_store:
             self.connector_id_counter += 1
@@ -908,6 +917,7 @@ class InMemoryCoreState(
             connector = ConnectorRecord(
                 connector_id=connector_id,
                 federation_id=federation_id,
+                agent_id=agent_id,
                 connector_ref=connector_ref,
                 credentials_json=credentials_json,
                 config_json=config_json,
@@ -937,6 +947,20 @@ class InMemoryCoreState(
         with self.lock_connector_store:
             return self.connector_store.get(connector_id)
 
+    def get_agent_connectors(self, agent_id: int) -> Sequence[ConnectorRecord]:
+        """List an agent's connectors in ascending connector ID order."""
+        if agent_id <= 0:
+            return []
+        with self.lock_connector_store:
+            return sorted(
+                (
+                    connector
+                    for connector in self.connector_store.values()
+                    if connector.agent_id == agent_id
+                ),
+                key=lambda connector: connector.connector_id,
+            )
+
     def update_connector_credentials(
         self,
         connector_id: int,
@@ -956,13 +980,27 @@ class InMemoryCoreState(
             )
             return credentials_json
 
-    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
-        """Delete a federation's connector if it exists."""
-        if not federation_id or connector_id <= 0:
+    def delete_connector(
+        self,
+        federation_id: str | None,
+        connector_id: int,
+        agent_id: int | None = None,
+    ) -> bool:
+        """Delete a connector belonging to the specified federation or agent."""
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+            or connector_id <= 0
+        ):
             return False
         with self.lock_connector_store:
             connector = self.connector_store.get(connector_id)
-            if connector is None or connector.federation_id != federation_id:
+            if (
+                connector is None
+                or connector.federation_id != federation_id
+                or connector.agent_id != agent_id
+            ):
                 return False
             del self.connector_store[connector_id]
             return True
@@ -984,27 +1022,36 @@ class InMemoryCoreState(
         self,
         oauth_session_id: str,
         flwr_aid: str,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
         expires_at: datetime,
+        agent_id: int | None = None,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
         if (
             not oauth_session_id
             or not flwr_aid
-            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
         ):
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+        ):
+            return None
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
             return None
         expires_at = expires_at.astimezone(UTC)
         session = ConnectorOAuthSessionRecord(
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             federation_id=federation_id,
+            agent_id=agent_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -1337,15 +1384,26 @@ class InMemoryCoreState(
     def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        if not (
+            (agent_id is not None and federation_id is None and series_id is None)
+            or (
+                agent_id is None and federation_id is not None and series_id is not None
+            )
+        ):
+            raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+            raise ValueError("Agent not found.")
+
         with self.lock_automation_store:
             current = now()
             automation_id = self._next_automation_id
@@ -1353,14 +1411,15 @@ class InMemoryCoreState(
             automation = Automation(
                 automation_id=automation_id,
                 status=AutomationStatus.ACTIVE,
-                federation=federation_id,
-                series_id=series_id,
+                federation=federation_id or "",
+                series_id=series_id or 0,
                 flwr_aid=flwr_aid,
                 created_at=current.isoformat(),
                 updated_at=current.isoformat(),
                 next_run_at=next_run_at,
                 fixed_interval=fixed_interval,
                 remaining_runs=max_runs,
+                agent_id=agent_id,
             )
 
             stored_request = StartRunRequest()
