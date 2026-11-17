@@ -183,7 +183,11 @@ message RefreshAuthTokensResponse {
   string refresh_token = 2;
 }
 
-message ListConnectorsRequest { string federation = 1; }
+message ListConnectorsRequest {
+  string federation = 1;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 2;
+}
 message Connector {
   string connector_ref = 1;
   string display_name = 2;
@@ -197,6 +201,8 @@ message DisconnectConnectorRequest {
   string connector_ref = 1;
   uint64 connector_id = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message DisconnectConnectorResponse {}
 
@@ -204,6 +210,8 @@ message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;
