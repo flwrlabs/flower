@@ -128,7 +128,7 @@ class _SpaceAgentConnectors(RuntimeAgentConnectors):
                     connection_tools = self._agent_runtime.get_connector_tools(
                         name, refresh=refresh, connector_id=connector_id
                     )
-                except (RuntimeError, TimeoutError):
+                except Exception:  # pylint: disable=broad-exception-caught
                     log(
                         ERROR,
                         "Skipping failed tool discovery for %s connection %d.",
