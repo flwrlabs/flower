@@ -1785,6 +1785,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+            raise ValueError("Agent not found.")
 
         current = now()
         stmt = (
