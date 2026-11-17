@@ -1026,6 +1026,31 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             "timestamp with a timezone.",
         )
 
+    def test_store_hidden_agent_automation_message(self) -> None:
+        """Route a hidden trigger to the intended agent's Space."""
+        agent = self.state.create_agent(
+            self.account.flwr_aid,
+            AgentConfig(name="Agent", app_spec="@publisher/app"),
+        )
+        assert agent is not None
+        space_id = self.state.get_spaces(self.account.flwr_aid)[0].id
+        self.state.create_agent(
+            self.account.flwr_aid,
+            AgentConfig(name="Other", app_spec="@publisher/other"),
+        )
+
+        message = control_handlers._store_hidden_agent_automation_message(
+            self.state,
+            flwr_aid=self.account.flwr_aid,
+            agent_id=agent.id,
+            content="Scheduled work",
+        )
+
+        self.assertEqual(message.space_id, space_id)
+        self.assertEqual(message.content, "Scheduled work")
+        self.assertTrue(message.hidden)
+        self.assertEqual(message.author.flwr_aid, self.account.flwr_aid)
+
     def test_list_automations(self) -> None:
         """List automations for a federation."""
         # Prepare

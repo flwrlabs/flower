@@ -1156,7 +1156,12 @@ class InMemoryCoreState(
             return spaces
 
     def create_space_message(
-        self, space_id: UUID, author: SpaceParticipant, content: str
+        self,
+        space_id: UUID,
+        author: SpaceParticipant,
+        content: str,
+        *,
+        hidden: bool = False,
     ) -> SpaceMessage | None:
         """Store a participant's message atomically with its membership check."""
         if not content.strip():
@@ -1171,6 +1176,7 @@ class InMemoryCoreState(
                 author=author,
                 created_at=now().isoformat(),
                 content=content,
+                hidden=hidden,
             )
             self.store_event(
                 EventType.MESSAGE_CREATED,

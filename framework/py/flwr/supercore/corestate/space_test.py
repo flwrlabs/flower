@@ -97,6 +97,24 @@ def test_participation_controls_message_access(state: CoreState) -> None:
     )
 
 
+def test_create_hidden_space_message(state: CoreState) -> None:
+    """Persist the hidden flag and make the message readable by the agent."""
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+    )
+    assert agent is not None
+    space_id = UUID(state.get_spaces("alice")[0].id)
+
+    message = state.create_space_message(
+        space_id, SpaceParticipant(flwr_aid="alice"), "Scheduled work", hidden=True
+    )
+
+    assert message is not None and message.hidden is True
+    assert state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id)) == [
+        message
+    ]
+
+
 def test_message_history_and_pagination(state: CoreState) -> None:
     """Keep messages ordered, preserve text, and isolate space history."""
     author = SpaceParticipant(flwr_aid="alice")
