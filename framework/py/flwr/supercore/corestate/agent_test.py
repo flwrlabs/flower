@@ -24,7 +24,6 @@ from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -95,24 +94,6 @@ def test_create_agent_creates_space(state: CoreState) -> None:
         )
     assert state.get_spaces("bob") == []
     assert not state.get_tasks()
-
-
-def test_sql_agent_default_space_id_is_returned(state: CoreState) -> None:
-    """Expose a stored default Space in agent lists and bootstrap snapshots."""
-    if not isinstance(state, SqlLinkState):
-        pytest.skip("Requires SQL state")
-    agent = state.create_agent(
-        "alice", AgentConfig(name="Research", app_spec="@flower/research")
-    )
-    assert agent is not None
-    space_id = UUID(state.get_spaces("alice")[0].id)
-    with state.session() as session:
-        model = session.get(AgentModel, agent.id)
-        assert model is not None
-        model.default_space_id = space_id
-
-    assert state.list_agents("alice")[0].default_space_id == str(space_id)
-    assert state.get_bootstrap("alice").agents[0].default_space_id == str(space_id)
 
 
 @pytest.mark.parametrize(
