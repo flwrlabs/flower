@@ -238,6 +238,7 @@ class Agent(FlwrBase):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     app_spec: Mapped[str] = mapped_column(String, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    # Each agent has an immutable default Space shared exclusively with its creator.
     default_space_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=True
     )
