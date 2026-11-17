@@ -55,6 +55,8 @@ def test_create_and_list_agents(state: CoreState) -> None:
         app_spec="@flower/research==1.2.3",
         title="Researcher",
         description="Investigate and cite sources.",
+        avatar="robot",
+        color="sky",
     )
     minimal_config = AgentConfig(name="Research Agent", app_spec="@flower/research")
     first = state.create_agent(flwr_aid="alice", config=config)

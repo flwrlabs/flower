@@ -380,7 +380,12 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
-    config = AgentConfig(name="Research Agent", app_spec="@flower/research==1.2.3")
+    config = AgentConfig(
+        name="Research Agent",
+        app_spec="@flower/research==1.2.3",
+        avatar="robot",
+        color="sky",
+    )
     assert state.create_agent(flwr_aid="other-account", config=config) is not None
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
