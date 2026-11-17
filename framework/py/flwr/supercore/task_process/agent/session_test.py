@@ -499,6 +499,35 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     runtime.get_connector_tools.assert_called_once_with("example", refresh=False)
 
 
+def test_space_discovery_failure_does_not_hide_healthy_connections(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep tools from a healthy account when another account's discovery fails."""
+    stub = Mock()
+    stub.ListAgentConnectors.return_value.connectors = [
+        Mock(
+            connector_id=connector_id,
+            connector_ref="github",
+            display_name="Account",
+            description="",
+        )
+        for connector_id in (1, 2)
+    ]
+    agent = create_space_session(
+        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
+    )
+    with patch.object(
+        AgentRuntime,
+        "get_connector_tools",
+        side_effect=[RuntimeError("credential-secret"), [{"name": "github_search"}]],
+    ) as discover:
+        tools = agent.connectors.tools(["github"])
+    assert [tool["name"] for tool in tools] == ["github_search__2"]
+    assert [item.kwargs["connector_id"] for item in discover.call_args_list] == [1, 2]
+    assert "github connection 1" in caplog.text
+    assert "credential-secret" not in caplog.text
+
+
 def test_call_automation_embeds_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare

@@ -16,6 +16,7 @@
 
 import hashlib
 from collections.abc import Sequence
+from logging import ERROR
 from typing import cast
 
 from flwr.agentapp import AgentGrid
@@ -24,6 +25,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ListAgentConnectorsRequest,
     PullTaskInputResponse,
 )
+from flwr.supercore import log
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
 from flwr.supercore.task_process.connector.registry import (
@@ -122,9 +124,19 @@ class _SpaceAgentConnectors(RuntimeAgentConnectors):
                 if connection["connector_ref"] != name:
                     continue
                 connector_id = cast(int, connection["connector_id"])
-                for tool in self._agent_runtime.get_connector_tools(
-                    name, refresh=refresh, connector_id=connector_id
-                ):
+                try:
+                    connection_tools = self._agent_runtime.get_connector_tools(
+                        name, refresh=refresh, connector_id=connector_id
+                    )
+                except (RuntimeError, TimeoutError):
+                    log(
+                        ERROR,
+                        "Skipping failed tool discovery for %s connection %d.",
+                        name,
+                        connector_id,
+                    )
+                    continue
+                for tool in connection_tools:
                     tool_name = cast(str, tool["name"])
                     alias = _connection_tool_name(tool_name, connector_id)
                     previous = self._tool_calls.get(alias)
