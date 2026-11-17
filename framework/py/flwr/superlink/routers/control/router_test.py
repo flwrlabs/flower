@@ -163,15 +163,6 @@ def test_space_routes(
     assert response.status_code == 200
     space = CreateSpaceResponse.FromString(response.content).space
     assert list(space.participants) == [caller, agent_participant]
-    listed = client.post(
-        "/v1/control/list-spaces",
-        content=ListSpacesRequest().SerializeToString(),
-    )
-    assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
-        space,
-        personal,
-    ]
     response = client.post(
         "/v1/control/send-space-message",
         content=SendSpaceMessageRequest(
@@ -181,6 +172,16 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
+    space.latest_user_prompt = message.content
+    listed = client.post(
+        "/v1/control/list-spaces",
+        content=ListSpacesRequest().SerializeToString(),
+    )
+    assert listed.status_code == 200
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
+        space,
+        personal,
+    ]
     history = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
@@ -191,42 +192,6 @@ def test_space_routes(
     ]
     assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
-
-
-@pytest.mark.parametrize(
-    "endpoint,response_type",
-    [("bootstrap", BootstrapResponse), ("list-spaces", ListSpacesResponse)],
-)
-def test_space_latest_user_prompt_routes(
-    space_client: tuple[TestClient, LinkState],
-    endpoint: str,
-    response_type: type[BootstrapResponse] | type[ListSpacesResponse],
-) -> None:
-    """Serialize the latest user prompt in bootstrap and space listings."""
-    client, state = space_client
-    agent = state.create_agent(
-        _ACCOUNT.flwr_aid, AgentConfig(name="Agent", app_spec="@flower/research")
-    )
-    assert agent is not None
-    space = state.get_spaces(_ACCOUNT.flwr_aid)[0]
-    prompt = "Follow up: €100.\nNext line."
-    sent = client.post(
-        "/v1/control/send-space-message",
-        content=SendSpaceMessageRequest(
-            space_id=space.id, content=prompt
-        ).SerializeToString(),
-    )
-    assert sent.status_code == 200
-    state.create_space_message(
-        UUID(space.id), SpaceParticipant(agent_id=agent.id), "Agent reply"
-    )
-
-    response = client.post(f"/v1/control/{endpoint}", content=b"")
-
-    assert response.status_code == 200
-    spaces = response_type.FromString(response.content).spaces
-    assert len(spaces) == 1
-    assert spaces[0].latest_user_prompt == prompt
 
 
 def test_create_space_rejects_invalid_participants(
@@ -1375,11 +1340,15 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
 def test_bootstrap_uses_authenticated_account(
     space_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Return the caller's Agents, Spaces, and cursor without message history."""
+    """Return the caller's Agents, Space summaries, and cursor."""
     client, state = space_client
     config = AgentConfig(name="Agent", app_spec="@test/app")
     state.create_agent(_ACCOUNT.flwr_aid, config)
     state.create_agent("other-account", config)
+    space = state.get_spaces(_ACCOUNT.flwr_aid)[0]
+    state.create_space_message(
+        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid), "Latest prompt"
+    )
     response = client.post(
         "/v1/control/bootstrap",
         content=BootstrapRequest().SerializeToString(),
@@ -1389,7 +1358,8 @@ def test_bootstrap_uses_authenticated_account(
     snapshot = BootstrapResponse.FromString(response.content)
     assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.cursor == 2
+    assert snapshot.spaces[0].latest_user_prompt == "Latest prompt"
+    assert snapshot.cursor == 3
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])

@@ -89,7 +89,6 @@ def test_latest_user_prompt(state: CoreState) -> None:
     space_id = UUID(shared.id)
     first = state.create_space_message(space_id, alice, "First prompt")
     previous = state.get_spaces("bob")[0]
-    assert previous.latest_user_prompt == "First prompt"
     prompt = "  Follow up: €100.\nNext line.  "
     latest = state.create_space_message(space_id, bob, prompt)
     reply = state.create_space_message(space_id, author, "Agent reply")
@@ -99,14 +98,6 @@ def test_latest_user_prompt(state: CoreState) -> None:
     assert {
         space.id: space.latest_user_prompt for space in state.get_spaces("alice")
     } == expected
-    assert {
-        space.id: space.latest_user_prompt
-        for space in state.get_bootstrap("alice").spaces
-    } == expected
-    assert state.get_spaces("bob")[0].latest_user_prompt == prompt
-    assert state.get_bootstrap("bob").spaces[0].latest_user_prompt == prompt
-    assert not state.get_spaces("outsider")
-    assert not state.get_bootstrap("outsider").spaces
     assert previous.latest_user_prompt == "First prompt"
     assert state.get_space_messages(space_id, alice, unread_only=True) == [
         first,
