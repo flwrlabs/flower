@@ -1547,6 +1547,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(automation.series_id, series_id)
         self.assertEqual(automation.federation, "@me/fed-b")
+        self.assertFalse(automation.HasField("agent_id"))
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""

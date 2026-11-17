@@ -23,6 +23,7 @@ erDiagram
 
   automation {
     INTEGER automation_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP created_at
     VARCHAR federation_id
     BIGINT fixed_interval "nullable"
@@ -331,6 +332,7 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
   agent ||--o{ connector_oauth_session : agent_id
