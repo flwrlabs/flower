@@ -18,12 +18,14 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -85,6 +87,17 @@ def test_create_agent_creates_space(state: CoreState) -> None:
         assert agent is not None
         member = SpaceParticipant(agent_id=agent.id)
         space = next(space for space in spaces if member in space.participants)
+        if isinstance(state, SqlLinkState):
+            with state.session() as session:
+                default_space_id = session.scalar(
+                    select(AgentModel.default_space_id).where(
+                        AgentModel.agent_id == agent.id
+                    )
+                )
+        else:
+            assert isinstance(state, InMemoryLinkState)
+            default_space_id = state.agent_default_space_store[agent.id]
+        assert default_space_id == UUID(space.id)
         assert len(space.participants) == 2
         assert SpaceParticipant(flwr_aid="alice") in space.participants
         assert space.title == ""
