@@ -338,10 +338,6 @@ def _validate_connector_owner(
             "exactly one of federation or agent_id is required"
         )
     if agent_id is not None:
-        if not 0 < agent_id <= INT64_MAX_VALUE:
-            raise InvalidConnectorRequestError(
-                "agent_id must be a positive signed 64-bit integer"
-            )
         if state.get_agent(flwr_aid, agent_id) is None:
             raise InvalidConnectorRequestError("agent does not belong to this account")
     elif federation_id is not None:
