@@ -2790,6 +2790,7 @@ def _space_message_from_model(
         author=author,
         created_at=model.created_at.isoformat(),
         content=model.content,
+        hidden=model.hidden,
     )
 
 

@@ -253,6 +253,7 @@ erDiagram
     TEXT content
     TIMESTAMP created_at
     VARCHAR flwr_aid "nullable"
+    BOOLEAN hidden
   }
 
   space_participant {
