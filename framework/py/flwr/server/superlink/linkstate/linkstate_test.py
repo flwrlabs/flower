@@ -2155,8 +2155,10 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     @parameterized.expand(  # type: ignore[untyped-decorator]
         ["started", "finished", "expired"]
     )
-    def test_run_activity_journal_failure_rolls_back(self, transition: str) -> None:
-        """Journal failure rolls back the SQL task transition and feed deliveries."""
+    def test_run_activity_event_storage_failure_rolls_back(
+        self, transition: str
+    ) -> None:
+        """Event storage failure rolls back the SQL transition and feed deliveries."""
         state, run_id, task_id, _, _ = self._create_activity_run()
         assert state.claim_task(task_id) is not None
         if transition != "started":
@@ -2164,12 +2166,12 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         before = state.get_bootstrap("alice")
         store_event = state.store_event
 
-        def fail_journal(*args: Any, **kwargs: Any) -> UUID:
+        def fail_event_storage(*args: Any, **kwargs: Any) -> UUID:
             store_event(*args, **kwargs)
-            raise RuntimeError("Journal failure")
+            raise RuntimeError("Event storage failed")
 
-        with patch.object(state, "store_event", side_effect=fail_journal):
-            with self.assertRaisesRegex(RuntimeError, "Journal failure"):
+        with patch.object(state, "store_event", side_effect=fail_event_storage):
+            with self.assertRaisesRegex(RuntimeError, "Event storage failed"):
                 if transition == "started":
                     state.activate_task(task_id)
                 elif transition == "finished":
