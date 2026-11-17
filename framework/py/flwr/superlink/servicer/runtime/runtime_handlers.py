@@ -195,6 +195,14 @@ def put_compacted_context(
     )
 
 
+def _get_agent_id(state: LinkState, task: Task) -> int:
+    """Resolve the authenticated task's agent ID for file scoping."""
+    runs = state.get_run_info(run_ids=[task.run_id])
+    return core_runtime_handlers.require_agent_id(
+        runs[0] if runs else None, task.run_id
+    )
+
+
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
     """Process automations and pending agent Runs, then claim queued work."""
     process_due_automations(state, limit=AUTOMATION_BATCH_LIMIT)
