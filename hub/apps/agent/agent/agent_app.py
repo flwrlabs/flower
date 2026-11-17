@@ -10,6 +10,7 @@ from flwr.app import Context
 from openai import OpenAI
 
 MODEL = "openai/gpt-5.6-sol"
+BASE_INSTRUCTIONS = "Answer the latest user message using the conversation as context."
 
 app = AgentApp()
 
@@ -82,6 +83,11 @@ def _conversation(agent: AgentSession, context: Context) -> list[dict[str, str]]
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Send the conversation to the model."""
+    identity = getattr(agent, "identity", None)
+    description = identity.config.description if identity else ""
+    instructions = BASE_INSTRUCTIONS
+    if description:
+        instructions += f"\n\nAgent description: {description}"
     client = OpenAI(
         base_url=os.environ["FLWR_RUNTIME_BASE_URL"],
         api_key=os.environ["FLWR_RUNTIME_API_KEY"],
@@ -91,6 +97,7 @@ def main(agent: AgentSession, context: Context) -> None:
     )
     stream = client.responses.create(
         model=MODEL,
+        instructions=instructions,
         input=_conversation(agent, context),
         stream=True,
     )
