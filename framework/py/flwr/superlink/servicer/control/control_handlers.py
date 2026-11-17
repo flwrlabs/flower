@@ -188,6 +188,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.task_process.connector.json_utils import connector_display_name
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
@@ -325,18 +326,44 @@ class ConnectorFailureError(FlowerError):
         )
 
 
+def _validate_connector_owner(
+    state: LinkState,
+    flwr_aid: str,
+    federation_id: str | None,
+    agent_id: int | None,
+) -> None:
+    """Authorize exactly one connector owner for the authenticated account."""
+    if (federation_id is None) == (agent_id is None):
+        raise InvalidConnectorRequestError(
+            "exactly one of federation or agent_id is required"
+        )
+    if agent_id is not None:
+        if not 0 < agent_id <= INT64_MAX_VALUE:
+            raise InvalidConnectorRequestError(
+                "agent_id must be a positive signed 64-bit integer"
+            )
+        if state.get_agent(flwr_aid, agent_id) is None:
+            raise InvalidConnectorRequestError("agent does not belong to this account")
+    elif federation_id is not None:
+        state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
+        _validate_federation_membership_in_request(state, flwr_aid, federation_id)
+
+
 def list_connectors(
     request: ListConnectorsRequest,
     account: AccountInfo,
     state: LinkState,
 ) -> ListConnectorsResponse:
-    """List OAuth connectors available in the requested federation."""
-    if not request.federation:
+    """List OAuth connectors available to the requested federation or agent."""
+    federation_id = request.federation.strip() or None
+    agent_id = request.agent_id or None
+    if federation_id is None and agent_id is None:
         return ListConnectorsResponse()
 
-    flwr_aid = account.flwr_aid
-    state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)
-    _validate_federation_membership_in_request(state, flwr_aid, request.federation)
+    _validate_connector_owner(state, account.flwr_aid, federation_id, agent_id)
+    agent_connectors = (
+        state.get_agent_connectors(agent_id) if agent_id is not None else None
+    )
 
     connectors: list[Connector] = []
     for flow in sorted(
@@ -344,14 +371,20 @@ def list_connectors(
         key=lambda item: item.connector_ref,
     ):
         connector_ref = flow.connector_ref
-        stored_connectors = state.get_connectors_by_ref(
-            request.federation, connector_ref
+        stored_connectors = (
+            [
+                connector
+                for connector in agent_connectors
+                if connector.connector_ref == connector_ref
+            ]
+            if agent_connectors is not None
+            else state.get_connectors_by_ref(request.federation.strip(), connector_ref)
         )
         connectors.extend(
             Connector(
                 connector_id=stored_connector.connector_id,
                 connector_ref=connector_ref,
-                display_name=_connector_display_name(
+                display_name=connector_display_name(
                     stored_connector.config_json, flow.display_name
                 ),
                 description=flow.description,
@@ -370,29 +403,16 @@ def list_connectors(
     return ListConnectorsResponse(connectors=connectors)
 
 
-def _connector_display_name(config_json: str, fallback: str) -> str:
-    """Return the stored connection name, falling back to the provider name."""
-    try:
-        config = json.loads(config_json)
-    except (TypeError, ValueError):
-        return fallback
-    if isinstance(config, dict):
-        name = config.get("display_name")
-        if isinstance(name, str) and name.strip():
-            return name.strip()
-    return fallback
-
-
 def disconnect_connector(
     request: DisconnectConnectorRequest,
     account: AccountInfo,
     state: LinkState,
 ) -> DisconnectConnectorResponse:
-    """Delete one connector from the requested federation."""
+    """Delete one connector belonging to the requested federation or agent."""
     connector_id = request.connector_id
-    federation_id = request.federation.strip()
-    state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
-    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    federation_id = request.federation.strip() or None
+    agent_id = request.agent_id or None
+    _validate_connector_owner(state, account.flwr_aid, federation_id, agent_id)
     # SQLite INTEGER cannot represent the full protobuf uint64 range.
     if connector_id > INT64_MAX_VALUE:
         raise InvalidConnectorRequestError(
@@ -401,11 +421,11 @@ def disconnect_connector(
     if connector_id <= 0:
         raise InvalidConnectorRequestError("connector_id is required")
 
-    deleted = state.delete_connector(federation_id, connector_id)
+    deleted = state.delete_connector(federation_id, connector_id, agent_id)
     if not deleted:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
-            f"Connector '{connector_id}' is not connected for this federation.",
+            f"Connector '{connector_id}' is not connected for this owner.",
         )
     return DisconnectConnectorResponse()
 
@@ -415,11 +435,11 @@ def begin_connector_oauth(  # pylint: disable=too-many-locals
     account: AccountInfo,
     state: LinkState,
 ) -> BeginConnectorOAuthResponse:
-    """Create a short-lived OAuth session for the requested federation."""
+    """Create an OAuth session for the requested federation or agent."""
     connector_ref = request.connector_ref.strip().lower()
-    federation_id = request.federation.strip()
-    state.federation_manager.ensure_default_federations_exist(account.flwr_aid)
-    _validate_federation_membership_in_request(state, account.flwr_aid, federation_id)
+    federation_id = request.federation.strip() or None
+    agent_id = request.agent_id or None
+    _validate_connector_owner(state, account.flwr_aid, federation_id, agent_id)
     if not connector_ref:
         raise InvalidConnectorRequestError("connector_ref is required")
     redirect_uri = request.redirect_uri.strip()
@@ -483,6 +503,7 @@ def begin_connector_oauth(  # pylint: disable=too-many-locals
         redirect_uri=redirect_uri,
         pkce_verifier=pkce_verifier,
         expires_at=expires_at,
+        agent_id=agent_id,
     )
     if session is None:
         raise ConnectorFailureError("OAuth session could not be created")
@@ -500,7 +521,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
     account: AccountInfo,
     state: LinkState,
 ) -> CompleteConnectorOAuthResponse:
-    """Exchange an OAuth code and persist a federation-scoped connection."""
+    """Exchange an OAuth code and persist a connection for the session's owner."""
     oauth_session_id = request.oauth_session_id.strip()
     if not oauth_session_id:
         raise InvalidConnectorRequestError("oauth_session_id is required")
@@ -513,13 +534,13 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
     session = state.get_connector_oauth_session(
         oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
     )
-    if session is None or session.federation_id is None:
+    if session is None:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
             "Connector OAuth session was not found for this account.",
         )
-    _validate_federation_membership_in_request(
-        state, account.flwr_aid, session.federation_id
+    _validate_connector_owner(
+        state, account.flwr_aid, session.federation_id, session.agent_id
     )
 
     try:
@@ -585,6 +606,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
         credentials_json=credentials_json,
         config_json=config_json,
         created_by=account.flwr_aid,
+        agent_id=session.agent_id,
     )
     if connector_id is None:
         raise ConnectorFailureError("Connector credentials could not be stored")
