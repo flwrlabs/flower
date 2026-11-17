@@ -29,6 +29,7 @@ from flwr.common.serde import (
     run_to_proto,
 )
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    Connector,
     StartAutomationRequest,
     StartAutomationResponse,
 )
@@ -43,6 +44,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
@@ -53,6 +56,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -81,6 +86,7 @@ from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
+from flwr.supercore.task_process.connector.json_utils import connector_display_name
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads_object
 from flwr.superlink.servicer.control.control_handlers import (
@@ -302,6 +308,39 @@ def pull_messages(  # pylint: disable=R0914
     )
 
 
+def create_task(
+    request: CreateTaskRequest, state: LinkState, task: Task
+) -> CreateTaskResponse:
+    """Create a child task using the authenticated task's Run."""
+    return core_runtime_handlers.create_task(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def list_agent_connectors(
+    request: ListAgentConnectorsRequest, state: LinkState, task: Task
+) -> ListAgentConnectorsResponse:
+    """Return connection metadata for the primary Space AgentApp."""
+    run = _get_task_run(state, task)
+    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    connectors = []
+    for connector in state.get_agent_connectors(participant.agent_id):
+        flow = connector_registry.OAUTH_FLOWS.get(connector.connector_ref)
+        connectors.append(
+            Connector(
+                connector_id=connector.connector_id,
+                connector_ref=connector.connector_ref,
+                display_name=connector_display_name(
+                    connector.config_json,
+                    flow.display_name if flow is not None else connector.connector_ref,
+                ),
+                description=flow.description if flow is not None else "",
+                connected=True,
+            )
+        )
+    return ListAgentConnectorsResponse(connectors=connectors)
+
+
 def get_connector(
     request: GetConnectorRequest,
     state: LinkState,
@@ -317,13 +356,22 @@ def get_connector(
 
     runs = state.get_run_info(run_ids=[task.run_id])
     run = runs[0] if runs else None
-    if run is None or not run.federation_id:
+    if run is None:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
-    if task.connector_id not in state.get_run_connector_ids(task.run_id):
-        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
     connector = state.get_connector_by_id(task.connector_id)
-    if connector is None:
+    if connector is None or connector.connector_ref != task.connector_ref:
+        raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
+    if run.agent_id is not None:
+        authorized = connector.agent_id == run.agent_id
+    else:
+        authorized = (
+            bool(run.federation_id)
+            and connector.federation_id == run.federation_id
+            and connector.agent_id is None
+            and task.connector_id in state.get_run_connector_ids(task.run_id)
+        )
+    if not authorized:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
     credentials_json = connector.credentials_json

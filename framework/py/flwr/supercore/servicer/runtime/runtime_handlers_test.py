@@ -98,6 +98,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def setUp(self) -> None:
         """Set up test fixture."""
         self.state = Mock()
+        self.auth_run = Run.create_empty(run_id=123)
         self.state.get_tasks.return_value = []
 
     def test_get_compacted_contexts(self) -> None:
@@ -182,6 +183,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+            self.auth_run,
         )
 
     def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
@@ -264,6 +266,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+            self.auth_run,
         )
 
         # Assert
@@ -293,6 +296,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     request,
                     self.state,
                     Mock(task_id=789, run_id=123, type=requesting_task_type),
+                    self.auth_run,
                 )
 
                 # Assert
@@ -313,7 +317,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Resolve a run-bound connector without requiring an OAuth application."""
         self.state.get_run_connector_ids.return_value = [42]
         self.state.get_connector_by_id.return_value = SimpleNamespace(
-            connector_ref="notion"
+            connector_id=42, connector_ref="notion", agent_id=None
         )
         self.state.create_task.return_value = 456
 
@@ -384,6 +388,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
                 self.state,
                 Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                self.auth_run,
             )
 
         # Assert
@@ -422,6 +427,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                         request,
                         self.state,
                         Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                        self.auth_run,
                     )
 
                 self.assertEqual(
@@ -446,6 +452,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 self.state,
                 Mock(run_id=123, type=TaskType.SERVER_APP),
+                self.auth_run,
             )
 
         # Assert
@@ -664,6 +671,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                         ),
                         self.state,
                         Mock(run_id=123, type=requesting_task_type),
+                        self.auth_run,
                     )
 
                 # Assert
