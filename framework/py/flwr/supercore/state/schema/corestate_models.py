@@ -380,6 +380,11 @@ class Automation(FlwrBase):
     )
     federation_id: Mapped[str] = mapped_column(String, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("agent.agent_id", name="fk_automation_agent_id"),
+        nullable=True,
+    )
     series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     start_run_request: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
