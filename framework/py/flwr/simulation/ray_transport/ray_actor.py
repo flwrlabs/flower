@@ -14,6 +14,7 @@
 # ==============================================================================
 """Ray-based Flower Actor and ActorPool implementation."""
 
+# pylint: disable=too-many-lines
 
 import errno
 import glob
@@ -137,6 +138,7 @@ def _can_open_device(path: str) -> bool | None:
     return True
 
 
+# pylint: disable-next=too-many-branches
 def _log_kfd_diagnostics() -> None:
     """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
 
@@ -185,7 +187,17 @@ def _log_kfd_diagnostics() -> None:
     # `amdsmi`/ROCM_PATH -- the fix for the common case below -- would not help
     # at all.
     render_nodes = glob.glob("/dev/dri/renderD*")
-    accessible_render_nodes = [node for node in render_nodes if _can_open_device(node)]
+    # `_can_open_device` is tri-state: a `None` (inconclusive) result must not
+    # collapse into "not accessible" via plain truthiness, the same way the
+    # `/dev/kfd` branches above distinguish it from a confirmed `False`.
+    accessible_render_nodes = []
+    inconclusive_access_render_nodes = []
+    for node in render_nodes:
+        openable = _can_open_device(node)
+        if openable is True:
+            accessible_render_nodes.append(node)
+        elif openable is None:
+            inconclusive_access_render_nodes.append(node)
     # A hybrid host or container can expose an accessible render node that ROCm
     # cannot use (e.g. an integrated Intel GPU's renderD128) while the AMD one is
     # missing or permission-denied; only a node confirmed AMD-backed rules out a
@@ -256,6 +268,21 @@ def _log_kfd_diagnostics() -> None:
             "the AMD device specifically, not just any render node.",
             ", ".join(other_vendor_render_nodes),
             _AMD_PCI_VENDOR_ID,
+        )
+    elif inconclusive_access_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "opening the `/dev/dri/renderD*` node(s) (%s) failed for a reason "
+            "other than a permissions problem (e.g. a driver-level "
+            "`ENODEV`/`EIO`, or this process running out of file "
+            "descriptors). This is inconclusive: it is not the common "
+            "group-membership/container `--device` issue, so adding "
+            "`--device=/dev/dri --group-add render` or adjusting "
+            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
+            "process's open-file limit and the kernel/dmesg log for driver "
+            "errors on these nodes.",
+            ", ".join(inconclusive_access_render_nodes),
         )
     else:
         log(
@@ -330,6 +357,27 @@ def _local_ips() -> set[str]:
     return ips
 
 
+def _bind_confirms_local_address(ip: str) -> bool:
+    """Whether binding a socket to `ip` succeeds, confirming it is local.
+
+    `_local_ips` is an enumeration of likely addresses, not an exhaustive
+    one: a secondary NIC or alias can be reached without ever surfacing in
+    hostname resolution or the outbound-route probe. The kernel itself knows
+    the complete, authoritative answer, though -- `bind(2)` only succeeds on
+    an address actually assigned to one of this host's interfaces, failing
+    with `EADDRNOTAVAIL` otherwise -- so this is used as a fallback
+    confirmation for an address `_local_ips` missed, without needing a
+    portable full interface enumeration.
+    """
+    family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+    try:
+        with socket.socket(family, socket.SOCK_DGRAM) as probe_sock:
+            probe_sock.bind((ip, 0))
+        return True
+    except OSError:
+        return False
+
+
 def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
     """Return whether `conn_host` is confirmed to not be this machine.
 
@@ -346,10 +394,14 @@ def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
     IPv4 (`127.0.0.0/8`) or IPv6 (`::1`) loopback range is treated as local
     even if it is not an exact match against `_local_ips`'s enumerated
     addresses, since the whole range -- not just `127.0.0.1` -- always refers
-    back to this same host (e.g. `ray://127.0.0.2:10001`).
+    back to this same host (e.g. `ray://127.0.0.2:10001`). A resolved address
+    that is disjoint from all of the above is not yet proof of remoteness,
+    since `_local_ips` is explicitly best-effort: it is given one more,
+    authoritative check via `_bind_confirms_local_address` before this
+    function will call it confirmed remote.
     """
     try:
-        conn_ips = {info[4][0] for info in socket.getaddrinfo(conn_host, None)}
+        conn_ips = {str(info[4][0]) for info in socket.getaddrinfo(conn_host, None)}
     except OSError:
         return False
     local_ips = _local_ips()
@@ -361,6 +413,8 @@ def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
                 return False
         except ValueError:
             pass
+        if _bind_confirms_local_address(conn_ip):
+            return False
     return True
 
 

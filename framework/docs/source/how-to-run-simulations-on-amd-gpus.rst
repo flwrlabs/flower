@@ -378,14 +378,24 @@ exported, silently leaving Ray's original import failure in place:
                      "Correct it to a well-formed comma-separated list of" \
                      "ordinals." >&2
             fi
-        elif [ -n "$_dup" ]; then
-            echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
-                 "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
-                 "sizes its advertised GPU resources from the length of this" \
-                 "mask, so a repeated ordinal creates two schedulable slots" \
-                 "that both map to the same ROCr-visible device, letting" \
-                 "concurrent ClientApps collide on it. Left unchanged, so" \
-                 "remove the duplicate and re-run this snippet." >&2
+        else
+            if [ -n "$_dup" ]; then
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
+                     "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
+                     "sizes its advertised GPU resources from the length of this" \
+                     "mask, so a repeated ordinal creates two schedulable slots" \
+                     "that both map to the same ROCr-visible device, letting" \
+                     "concurrent ClientApps collide on it. Left unchanged, so" \
+                     "remove the duplicate and re-run this snippet." >&2
+            fi
+            # HIP_VISIBLE_DEVICES was already set (not synthesized above), but
+            # may only be a plain shell variable, not an exported one (e.g. a
+            # setup script assigned it without `export`) -- Ray subprocesses
+            # would then still only inherit ROCR_VISIBLE_DEVICES and hit its
+            # import guard. Export the preserved value now that it has passed
+            # the syntax/range checks above (a duplicate ordinal only warns,
+            # it does not block exporting).
+            export HIP_VISIBLE_DEVICES
         fi
         unset _hip_ids _id _bad_syntax _bad_range _dup _norm_ids _trimmed_id
         unset _bash_int_max
@@ -629,10 +639,19 @@ what else it can detect about device access:
   in `Check that ROCm can reach the GPU`_ -- Flower reports a permissions problem and
   states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
   instructions instead, not the ``ROCM_PATH`` steps below.
+- If opening ``/dev/kfd`` fails for a reason other than permissions (for example
+  ``ENODEV``, ``EIO``, or this process running out of file descriptors), Flower reports
+  this as inconclusive rather than a permissions problem, and does not suggest the
+  group/container fix -- check this process's open-file limit and the kernel/``dmesg``
+  log for driver errors instead.
 - If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node is accessible at all,
   Flower reports that render-node gap instead -- again stating that ``ROCM_PATH`` will
   not help, since ROCm needs both device nodes. Fix render-node access the same way as
   ``/dev/kfd`` access above.
+- If ``/dev/kfd`` is accessible but opening the render node fails for a reason other
+  than permissions, Flower likewise reports this as inconclusive rather than a
+  permissions problem -- check this process's open-file limit and the kernel/``dmesg``
+  log the same way as the ``/dev/kfd`` case above.
 - If ``/dev/kfd`` and a render node are both accessible, but that render node is not
   AMD-backed -- for example a hybrid host or container exposing an integrated Intel
   GPU's ``renderD128`` while the AMD device's own render node is missing or
@@ -654,7 +673,7 @@ what else it can detect about device access:
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
 
-The five checks above assume this driver process shares the cluster node's device
+The seven checks above assume this driver process shares the cluster node's device
 namespace; Flower qualifies or skips them whenever that assumption does not hold, since
 the driver's own ``/dev/kfd``/render-node state cannot diagnose a different machine:
 
@@ -672,7 +691,7 @@ the driver's own ``/dev/kfd``/render-node state cannot diagnose a different mach
   (``ray://127.0.0.1:10001``) or a hostname/LAN address that happens to resolve back to
   this host can still be an SSH port forward or a sidecar sharing only the network
   namespace, with the server's ``/dev`` elsewhere. In that ambiguous case Flower logs a
-  warning naming the endpoint and still runs the four checks above against this host, on
+  warning naming the endpoint and still runs the six checks above against this host, on
   the chance the connection is genuinely co-located; only once the endpoint resolves to
   an address confirmed *not* to be this host does Flower skip the checks outright and
   point you at the remote node instead.
