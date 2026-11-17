@@ -12,6 +12,7 @@
 erDiagram
   agent {
     BIGINT agent_id PK
+    CHAR(32) default_space_id FK "nullable"
     VARCHAR app_spec
     TIMESTAMP created_at
     TEXT description "nullable"
@@ -333,6 +334,7 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  space ||--o{ agent : default_space_id
   agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
