@@ -85,6 +85,7 @@ def test_participation_controls_message_access(state: CoreState) -> None:
     assert state.create_space_message(space_id, outsider, "No access") is None
     message = state.create_space_message(space_id, bob, "Hello")
     assert message is not None and message.author == bob
+    assert message.hidden is False
     assert state.get_space_messages(space_id, SpaceParticipant(flwr_aid="bob")) == [
         message
     ]
