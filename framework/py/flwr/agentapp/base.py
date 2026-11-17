@@ -39,8 +39,24 @@ RUN_SUMMARY_EVENT_TYPES: tuple[str, ...] = (
 class AgentConnectors(ABC):
     """Abstract base class for AgentApp connector execution."""
 
+    def get_connections(self) -> list[JSONObject]:
+        """List the current Space agent's connections without credentials.
+
+        Returns
+        -------
+        list[JSONObject]
+            Connection metadata with connector_id, connector_ref, display_name,
+            and description.
+
+        Raises
+        ------
+        NotImplementedError
+            If the session does not support agent-owned connections.
+        """
+        raise NotImplementedError("Agent-owned connections require a Space session.")
+
     @abstractmethod
-    def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
+    def tools(self, names: Sequence[str], refresh: bool = False) -> list[JSONObject]:
         """Return model-facing schemas for static and discovered connector tools.
 
         Parameters
@@ -55,6 +71,12 @@ class AgentConnectors(ABC):
         -------
         list[JSONObject]
             Independent copies of the model-facing tool schemas.
+
+        Notes
+        -----
+        Space sessions include only agent-owned connections and built-ins. Their
+        credential-backed tool names identify a connection; pass those names
+        unchanged to ``call``.
         """
 
     @abstractmethod
