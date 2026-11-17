@@ -32,10 +32,11 @@ class ConnectorRecord:
     """Persisted connector configuration and credentials."""
 
     connector_id: int
-    federation_id: str
+    federation_id: str | None
     connector_ref: str
     credentials_json: str
     config_json: str
+    agent_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,7 @@ class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attribut
 
     oauth_session_id: str
     flwr_aid: str
-    federation_id: str
+    federation_id: str | None
     connector_ref: str
     state: str
     redirect_uri: str
@@ -52,6 +53,7 @@ class ConnectorOAuthSessionRecord:  # pylint: disable=too-many-instance-attribut
     created_at: str
     expires_at: str
     completed_at: str | None
+    agent_id: int | None = None
 
 
 @dataclass(frozen=True)

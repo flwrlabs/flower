@@ -1114,19 +1114,27 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
+        agent_id: int | None = None,
     ) -> int | None:
-        """Create a connector for a federation."""
-        if not federation_id or not connector_ref or not created_by:
+        """Create a connector owned by a federation or an existing agent."""
+        if not connector_ref or not created_by:
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+        ):
             return None
         stmt = (
             insert(ConnectorModel)
             .values(
                 federation_id=federation_id,
+                agent_id=agent_id,
                 connector_ref=connector_ref,
                 credentials_json=credentials_json,
                 config_json=config_json,
@@ -1136,6 +1144,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+                return None
             return session.scalar(stmt)
 
     def get_connectors_by_ref(
@@ -1162,6 +1172,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if row is None:
                 return None
             return _connector_from_model(row)
+
+    def get_agent_connectors(self, agent_id: int) -> Sequence[ConnectorRecord]:
+        """List an agent's connectors in ascending connector ID order."""
+        if agent_id <= 0:
+            return []
+        stmt = select(ConnectorModel).where(ConnectorModel.agent_id == agent_id)
+        stmt = stmt.execution_options(populate_existing=True)
+        with self.session() as session:
+            rows = session.scalars(stmt.order_by(ConnectorModel.connector_id)).all()
+            return [_connector_from_model(row) for row in rows]
 
     def update_connector_credentials(
         self,
@@ -1190,15 +1210,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return credentials_json
 
-    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
-        """Delete a federation's connector if it exists."""
-        if not federation_id or connector_id <= 0:
+    def delete_connector(
+        self,
+        federation_id: str | None,
+        connector_id: int,
+        agent_id: int | None = None,
+    ) -> bool:
+        """Delete a connector belonging to the specified federation or agent."""
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+            or connector_id <= 0
+        ):
             return False
         with self.session() as session:
             deleted_connector_id = session.scalar(
                 delete(ConnectorModel)
                 .where(
                     ConnectorModel.federation_id == federation_id,
+                    ConnectorModel.agent_id == agent_id,
                     ConnectorModel.connector_id == connector_id,
                 )
                 .returning(ConnectorModel.connector_id)
@@ -1235,20 +1266,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
         expires_at: datetime,
+        agent_id: int | None = None,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
         if (
             not oauth_session_id
             or not flwr_aid
-            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
+        ):
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
         ):
             return None
         expires_at = expires_at.astimezone(UTC)
@@ -1257,6 +1294,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             federation_id=federation_id,
+            agent_id=agent_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -1267,6 +1305,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as db_session:
+                if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+                    return None
                 db_session.add(model)
                 db_session.flush()
                 return _connector_oauth_session_from_model(model)
@@ -2651,6 +2691,7 @@ def _connector_oauth_session_from_model(
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
         completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
+        agent_id=model.agent_id,
     )
 
 
@@ -2662,6 +2703,7 @@ def _connector_from_model(model: ConnectorModel) -> ConnectorRecord:
         connector_ref=model.connector_ref,
         credentials_json=model.credentials_json,
         config_json=model.config_json,
+        agent_id=model.agent_id,
     )
 
 

@@ -513,7 +513,7 @@ def complete_connector_oauth(  # pylint: disable=too-many-locals,too-many-branch
     session = state.get_connector_oauth_session(
         oauth_session_id=oauth_session_id, flwr_aid=account.flwr_aid
     )
-    if session is None:
+    if session is None or session.federation_id is None:
         raise FlowerError(
             ApiErrorCode.CONNECTOR_NOT_FOUND,
             "Connector OAuth session was not found for this account.",
