@@ -25,12 +25,12 @@ erDiagram
     INTEGER automation_id PK
     BIGINT agent_id FK "nullable"
     TIMESTAMP created_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
     TIMESTAMP next_run_at
     INTEGER remaining_runs "nullable"
-    BIGINT series_id
+    BIGINT series_id "nullable"
     BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
@@ -253,6 +253,7 @@ erDiagram
     TEXT content
     TIMESTAMP created_at
     VARCHAR flwr_aid "nullable"
+    BOOLEAN hidden
   }
 
   space_participant {
