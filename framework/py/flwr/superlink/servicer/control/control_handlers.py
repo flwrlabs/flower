@@ -1391,7 +1391,7 @@ def list_runs(
 ) -> ListRunsResponse:
     """Handle `flwr ls` command."""
     flwr_aid = account.user_id
-    account_name = _require_account_handle(account)
+    account_name = _require_user_handle(account)
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
         federation_ids: list[str | None] = [
@@ -1855,7 +1855,7 @@ def register_node(
     )
 
     # Account name exists if `flwr_aid` exists
-    account_name = _require_account_handle(account)
+    account_name = _require_user_handle(account)
     try:
         node_id = state.create_node(
             owner_aid=flwr_aid,
@@ -2115,9 +2115,7 @@ def create_federation(
 
     # Keep explicitly selected namespaces compatible with federation ID consumers.
     handle = (
-        request.handle
-        if request.HasField("handle")
-        else _require_account_handle(account)
+        request.handle if request.HasField("handle") else _require_user_handle(account)
     )
     if request.HasField("handle") and not re.fullmatch(r"[a-zA-Z0-9_-]+", handle):
         raise FlowerError(
@@ -2378,14 +2376,14 @@ def configure_simulation_federation(
     return ConfigureSimulationFederationResponse(federation_name=federation_id)
 
 
-def _require_account_handle(account: AuthenticatedUser) -> str:
-    """Require the resolved local handle before using an account namespace."""
-    if not account.handle:
+def _require_user_handle(user: AuthenticatedUser) -> str:
+    """Require the resolved local handle before using a user namespace."""
+    if not user.handle:
         raise FlowerError(
             ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED,
             "The authenticated user has no resolved local account handle.",
         )
-    return account.handle
+    return user.handle
 
 
 def _resolve_federation_id(
@@ -2397,7 +2395,7 @@ def _resolve_federation_id(
         if isinstance(federation_manager, NoOpFederationManager):
             federation_id = NOOP_FEDERATION_ID
         else:
-            handle = _require_account_handle(account)
+            handle = _require_user_handle(account)
             federation_id = f"@{handle}/{DEFAULT_FEDERATION_SIMULATION}"
     return federation_id
 
