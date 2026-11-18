@@ -57,7 +57,7 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -91,7 +91,7 @@ from .control_handlers import (
     update_run_series_description,
 )
 
-_ACCOUNT = AccountInfo(flwr_aid="alice", account_name="Alice")
+_ACCOUNT = AuthenticatedUser(user_id="alice", handle="Alice")
 
 
 class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
@@ -104,9 +104,9 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             NoOpFederationManager(),
             Mock(),
         ).state()
-        self.account = AccountInfo(
-            flwr_aid=NOOP_FLWR_AID,
-            account_name=NOOP_ACCOUNT_NAME,
+        self.account = AuthenticatedUser(
+            user_id=NOOP_FLWR_AID,
+            handle=NOOP_ACCOUNT_NAME,
         )
 
     def _create_dummy_run(self, federation_id: str = NOOP_FEDERATION_ID) -> int:
@@ -118,20 +118,20 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             {},
             federation_id,
             None,
-            self.account.flwr_aid,
+            self.account.user_id,
             TaskType.SERVER_APP,
         )
 
     def test_process_pending_agent_runs(self) -> None:
         """Resolve an AgentApp and create one Run for an unread user message."""
         agent = self.state.create_agent(
-            self.account.flwr_aid,
+            self.account.user_id,
             AgentConfig(name="Agent", app_spec="@publisher/app"),
         )
         assert agent is not None
-        space_id = UUID(self.state.get_spaces(self.account.flwr_aid)[0].id)
+        space_id = UUID(self.state.get_spaces(self.account.user_id)[0].id)
         self.state.create_space_message(
-            space_id, SpaceParticipant(flwr_aid=self.account.flwr_aid), "User message"
+            space_id, SpaceParticipant(flwr_aid=self.account.user_id), "User message"
         )
         config = {
             "project": {"name": "app", "version": "1.0"},
@@ -165,7 +165,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         list_runs(ListRunsRequest(), self.account, state)
 
         state.get_run_info.assert_called_once_with(
-            flwr_aids=[self.account.flwr_aid],
+            flwr_aids=[self.account.user_id],
             federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
@@ -190,7 +190,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 space_id=space_id,
                 user_prompt="Hello",
             )
-            for flwr_aid in [self.account.flwr_aid, "other-account"]
+            for flwr_aid in [self.account.user_id, "other-account"]
         ]
         owned_space_run_id = space_run_ids[0]
         self._create_dummy_run("@owner/inaccessible")
@@ -270,7 +270,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         runs = self.state.get_run_info(run_ids=run_ids)
         notify_result_delivered.assert_has_calls(
             [
-                call(run, self.account.flwr_aid, RESULT_DELIVERY_CHANNEL_CHAT)
+                call(run, self.account.user_id, RESULT_DELIVERY_CHANNEL_CHAT)
                 for run in runs
             ],
             any_order=True,
@@ -403,7 +403,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             (REFRESH_TOKEN_KEY, "new-refresh-token"),
         ]
         invalid_results: list[
-            tuple[list[tuple[str, str | bytes]] | None, AccountInfo | None]
+            tuple[list[tuple[str, str | bytes]] | None, AuthenticatedUser | None]
         ] = [
             (None, None),
             (valid_tokens, None),
@@ -449,6 +449,19 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(exc_context.exception.code, ApiErrorCode.NO_ACCOUNT_AUTH)
 
+    def test_start_run_requires_resolved_handle_before_creating_state(self) -> None:
+        """A provider username cannot substitute for a local account namespace."""
+        state = Mock(spec=LinkState)
+        user = AuthenticatedUser(user_id="aid", provider_username="provider-name")
+
+        with self.assertRaises(FlowerError) as error:
+            start_run(StartRunRequest(), user, state)
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
+        )
+        state.create_run.assert_not_called()
+
     def test_start_run_reuses_fab_by_hash(self) -> None:
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
@@ -458,7 +471,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         with (
@@ -498,7 +511,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             NOOP_FEDERATION_ID,
             "@flwr/demo",
             TaskType.SERVER_APP,
-            self.account.flwr_aid,
+            self.account.user_id,
             is_hub_app=True,
         )
         request = StartRunRequest(app_spec="@flwr/demo", federation=NOOP_FEDERATION_ID)
@@ -631,7 +644,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         with (
@@ -699,7 +712,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         response = list_apps(
@@ -732,7 +745,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 federation_id=federation_id,
                 app_id="@flwr/demo",
                 app_type=TaskType.SERVER_APP,
-                added_by=self.account.flwr_aid,
+                added_by=self.account.user_id,
             )
 
         with (
@@ -786,7 +799,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         response = list_apps(
@@ -807,7 +820,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
             is_hub_app=True,
         )
 
@@ -971,7 +984,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/agent",
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
             is_hub_app=True,
         )
         request = StartAutomationRequest(
@@ -1031,7 +1044,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.account.flwr_aid,
+            flwr_aid=self.account.user_id,
             start_run_request=StartRunRequest(series_id=1),
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
@@ -1056,7 +1069,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.account.flwr_aid,
+            flwr_aid=self.account.user_id,
             start_run_request=StartRunRequest(series_id=1),
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",

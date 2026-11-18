@@ -79,7 +79,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
@@ -510,9 +510,9 @@ def start_automation(
     )
     return start_control_automation(
         request,
-        AccountInfo(
-            flwr_aid=run.flwr_aid,
-            account_name=run.account_name,
+        AuthenticatedUser(
+            user_id=run.flwr_aid,
+            handle=run.account_name,
         ),
         state,
     )

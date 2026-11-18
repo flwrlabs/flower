@@ -21,12 +21,12 @@ from collections.abc import Sequence
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
 
 
 class ControlAuthnPlugin(ABC):
-    """Abstract Flower Authentication Plugin class for ControlServicer."""
+    """Await authentication I/O independently of synchronous Control handlers."""
 
     @abstractmethod
     def __init__(self) -> None:
@@ -39,7 +39,7 @@ class ControlAuthnPlugin(ABC):
     @abstractmethod
     def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[bool, AccountInfo | None]:
+    ) -> tuple[bool, AuthenticatedUser | None]:
         """Validate authentication tokens in the provided metadata."""
 
     @abstractmethod
@@ -49,5 +49,5 @@ class ControlAuthnPlugin(ABC):
     @abstractmethod
     def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AccountInfo | None]:
+    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""
