@@ -34,6 +34,7 @@ from httpx import HTTPStatusError
 from flwr.agentapp import (
     AgentConnectors,
     AgentEvents,
+    AgentFiles,
     AgentGrid,
     AgentSession,
     AgentSpace,
@@ -243,6 +244,7 @@ class RuntimeAgentSession(AgentSession):
         events: AgentEvents,
         grid: AgentGrid,
         *,
+        files: AgentFiles,
         space: AgentSpace | None = None,
         identity: Agent | None = None,
     ) -> None:
@@ -250,6 +252,7 @@ class RuntimeAgentSession(AgentSession):
         self._connectors = connectors
         self._events = events
         self._grid = grid
+        self._files = files
         self._space = space
         self._identity = identity
 
@@ -277,6 +280,11 @@ class RuntimeAgentSession(AgentSession):
     def grid(self) -> AgentGrid:
         """Model-facing federation Grid API."""
         return self._grid
+
+    @property
+    def files(self) -> AgentFiles:
+        """Return the agent's persistent file API."""
+        return self._files
 
     @property
     def space(self) -> AgentSpace | None:
