@@ -358,8 +358,8 @@ erDiagram
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
-  agent ||--o{ run : agent_id
   agent_config ||--o{ run : agent_id
+  agent ||--o{ run : agent_id
   agent_config ||--o{ run : agent_config_version
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id

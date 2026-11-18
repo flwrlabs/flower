@@ -14,20 +14,16 @@
 # ==============================================================================
 """Tests for account-owned agents across CoreState implementations."""
 
-from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
 import pytest
-from sqlalchemy import update
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
-from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
