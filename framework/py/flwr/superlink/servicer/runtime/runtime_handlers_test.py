@@ -31,6 +31,7 @@ from uuid import UUID
 
 import pytest
 from parameterized import parameterized
+from sqlalchemy import update as sql_update
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
@@ -77,6 +78,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
+from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -93,6 +95,8 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.superlink.federation import NoOpFederationManager
@@ -209,8 +213,10 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("backend", ["memory", "sqlite"])
-def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> None:
-    """Resolve an accountless agent run to its owner and supply its identity."""
+def test_agent_task_input_includes_latest_identity(
+    backend: str, tmp_path: Path
+) -> None:
+    """Supply current metadata for an agent run while retaining its fixed AgentApp."""
     database = (
         FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
     )
@@ -242,6 +248,27 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
     )
     assert run_id
     assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    if isinstance(state, SqlLinkState):
+        # An edit after acceptance must be visible when the task pulls its input.
+        with state.session() as session:
+            session.add(
+                AgentConfigModel(
+                    agent_id=agent.id,
+                    version=2,
+                    name="Updated Research",
+                    title="Updated title",
+                    description="Updated description",
+                    created_at=datetime.now(UTC),
+                )
+            )
+            session.execute(
+                sql_update(AgentModel)
+                .where(AgentModel.agent_id == agent.id)
+                .values(config_version=2, revision=2)
+            )
+        agent.config.name = "Updated Research"
+        agent.config.title = "Updated title"
+        agent.config.description = "Updated description"
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
@@ -251,6 +278,7 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
     )
 
     assert response.agent == agent
+    assert response.run.fab_hash == fab_hash
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

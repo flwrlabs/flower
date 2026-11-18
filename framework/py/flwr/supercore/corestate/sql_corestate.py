@@ -736,6 +736,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         created_at = now()
         model = AgentModel(
             flwr_aid=flwr_aid,
+            app_spec=config.app_spec,
             config_version=1,
             revision=1,
             created_at=created_at,
@@ -752,7 +753,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
-                app_spec=config.app_spec,
                 created_at=created_at,
             )
             session.add(snapshot)
@@ -2704,7 +2704,7 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
             name=config.name,
             title=config.title,
             description=config.description,
-            app_spec=config.app_spec,
+            app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),

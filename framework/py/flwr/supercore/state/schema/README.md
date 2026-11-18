@@ -14,6 +14,7 @@ erDiagram
     BIGINT agent_id PK,FK
     BIGINT config_version FK
     CHAR(32) default_space_id FK "nullable"
+    VARCHAR app_spec
     TIMESTAMP created_at
     VARCHAR flwr_aid
     BIGINT revision
@@ -23,7 +24,6 @@ erDiagram
   agent_config {
     BIGINT agent_id PK,FK
     BIGINT version PK
-    VARCHAR app_spec
     TIMESTAMP created_at
     TEXT description "nullable"
     VARCHAR name
@@ -201,7 +201,6 @@ erDiagram
   }
 
   run {
-    BIGINT agent_config_version FK "nullable"
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
@@ -358,9 +357,7 @@ erDiagram
   object_push_sessions ||--o| object_push_session_pending : session_id
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
-  agent_config ||--o{ run : agent_id
   agent ||--o{ run : agent_id
-  agent_config ||--o{ run : agent_config_version
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id

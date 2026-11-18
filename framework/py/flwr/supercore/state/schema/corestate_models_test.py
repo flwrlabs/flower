@@ -168,6 +168,7 @@ def test_connector_requires_exactly_one_existing_owner(
             agent_table.insert().values(
                 agent_id=1,
                 flwr_aid="user",
+                app_spec="@user/app",
                 config_version=1,
                 revision=1,
                 created_at=timestamp,
@@ -179,7 +180,6 @@ def test_connector_requires_exactly_one_existing_owner(
                 agent_id=1,
                 version=1,
                 name="Agent",
-                app_spec="@user/app",
                 created_at=timestamp,
             )
         )

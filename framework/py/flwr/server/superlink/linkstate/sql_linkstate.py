@@ -434,7 +434,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
         with self.session() as session:
-            agent_config_version = None
             if agent_id is not None:
                 # Serialize admission before checking for an open Run.
                 session.execute(
@@ -455,18 +454,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                     .exists()
                 )
-                session.execute(
-                    update(AgentModel)
-                    .where(AgentModel.agent_id == agent_id)
-                    .values(config_version=AgentModel.config_version)
-                )
-                row = session.execute(
-                    select(AgentModel, AgentConfigModel)
-                    .join(
-                        AgentConfigModel,
-                        (AgentConfigModel.agent_id == AgentModel.agent_id)
-                        & (AgentConfigModel.version == AgentModel.config_version),
-                    )
+                agent = session.scalar(
+                    select(AgentModel)
                     .join(
                         SpaceParticipantTable,
                         SpaceParticipantTable.c.agent_id == AgentModel.agent_id,
@@ -477,12 +466,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         ~open_run,
                     )
                     .execution_options(populate_existing=True)
-                ).one_or_none()
-                if row is None:
+                )
+                if agent is None:
                     return 0
-                agent, config = row
-                agent_config_version = config.version
-                app_id, version = parse_app_spec(config.app_spec)
+                app_id, version = parse_app_spec(agent.app_spec)
                 if app_id != f"@{fab_id}" or (version and version != fab_version):
                     return 0
                 if not fab_hash or self.get_fab(fab_hash) is None:
@@ -521,7 +508,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         series_id=resolved_series_id,
                         space_id=space_id,
                         agent_id=agent_id,
-                        agent_config_version=agent_config_version,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,

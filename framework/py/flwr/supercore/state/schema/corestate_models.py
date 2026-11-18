@@ -217,7 +217,7 @@ class Message(FlwrBase):
 
 
 class Agent(FlwrBase):
-    """Represent a persistent agent and its current configuration version."""
+    """Represent an agent with a fixed AgentApp and current configuration version."""
 
     __tablename__ = "agent"
     __table_args__ = (
@@ -242,6 +242,7 @@ class Agent(FlwrBase):
         nullable=False,
     )
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    app_spec: Mapped[str] = mapped_column(String, nullable=False)
     config_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
     # Each agent has an immutable default Space shared exclusively with its creator.
@@ -253,10 +254,7 @@ class Agent(FlwrBase):
 
 
 class AgentConfig(FlwrBase):
-    """Represent an immutable, complete configuration snapshot for an agent.
-
-    ``app_spec`` identifies the AgentApp and an optional version.
-    """
+    """Represent an immutable snapshot of an agent's editable metadata."""
 
     __tablename__ = "agent_config"
     __table_args__ = (
@@ -270,7 +268,6 @@ class AgentConfig(FlwrBase):
     name: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    app_spec: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
