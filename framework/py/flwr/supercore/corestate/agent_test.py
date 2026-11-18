@@ -109,6 +109,23 @@ def test_create_agent_creates_space(state: CoreState) -> None:
     assert not state.get_tasks()
 
 
+def test_get_default_space_is_owner_scoped(state: CoreState) -> None:
+    """Resolve the recorded default even if an agent joins another Space."""
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@test/app"))
+    assert agent is not None
+    default_space_id = UUID(state.get_spaces("alice")[0].id)
+    state.create_space(
+        participants=[
+            SpaceParticipant(flwr_aid="alice"),
+            SpaceParticipant(agent_id=agent.id),
+        ]
+    )
+
+    assert state.get_default_space("alice", agent.id) == default_space_id
+    assert state.get_default_space("bob", agent.id) is None
+    assert state.get_default_space("alice", agent.id + 1) is None
+
+
 @pytest.mark.parametrize(
     "field", ["flwr_aid", "name", "app_spec", "title", "description"]
 )

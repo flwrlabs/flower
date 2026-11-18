@@ -788,6 +788,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return _agent_from_model(model) if model is not None else None
 
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID."""
+        with self.session() as session:
+            return session.scalar(
+                select(AgentModel.default_space_id).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
+
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:
