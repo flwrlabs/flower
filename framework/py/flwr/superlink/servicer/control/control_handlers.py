@@ -1391,7 +1391,6 @@ def list_runs(
 ) -> ListRunsResponse:
     """Handle `flwr ls` command."""
     flwr_aid = account.user_id
-    account_name = _require_user_handle(account)
     # Build a set of run IDs for `flwr ls --runs`
     if not request.HasField("run_id"):
         federation_ids: list[str | None] = [
@@ -1428,12 +1427,13 @@ def list_runs(
             state, flwr_aid, runs[0].federation_id
         )
 
-    # Clean up resources of finished runs
-    # Resolve only non-caller run owners; caller-owned runs use `account_name`.
-    account_names = resolve_account_ids(
-        {run.flwr_aid for run in runs if run.flwr_aid != flwr_aid}
-    )
-    account_names[flwr_aid] = account_name
+    # Only caller-owned results need the authenticated user's local handle.
+    run_owner_ids = {run.flwr_aid for run in runs}
+    account_names = resolve_account_ids(run_owner_ids - {flwr_aid})
+    if flwr_aid in run_owner_ids:
+        account_names[flwr_aid] = _require_user_handle(account)
+
+    # Clean up resources of finished runs.
     for run in runs:
         run.account_name = account_names[run.flwr_aid]
         if run.status.status == Status.FINISHED:

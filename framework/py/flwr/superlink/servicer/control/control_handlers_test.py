@@ -157,12 +157,15 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         assert len(runs) == 1 and runs[0].agent_id == agent.id
 
     def test_list_runs_defaults_to_twenty(self) -> None:
-        """Apply the default page size in the shared Control handler."""
+        """Apply default pagination to an empty page without a caller handle."""
         state = Mock(spec=LinkState)
         state.federation_manager = NoOpFederationManager()
         state.get_run_info.return_value = []
 
-        list_runs(ListRunsRequest(), self.account, state)
+        account = AuthenticatedUser(user_id=self.account.user_id)
+        response = list_runs(ListRunsRequest(), account, state)
+
+        self.assertFalse(response.run_dict)
 
         state.get_run_info.assert_called_once_with(
             flwr_aids=[self.account.user_id],
