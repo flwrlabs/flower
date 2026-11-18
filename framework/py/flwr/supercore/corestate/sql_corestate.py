@@ -734,7 +734,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         created_at = now()
         with self.session() as session:
+            # Insert the Space first so the agent can reference it as its default.
             space_model = SpaceModel(id=uuid4(), title="", created_at=created_at)
+            session.add(space_model)
+            session.flush()
             model = AgentModel(
                 name=config.name,
                 title=config.title if config.HasField("title") else None,
@@ -743,11 +746,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 ),
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
-                default_space=space_model,
+                default_space_id=space_model.id,
                 created_at=created_at,
                 updated_at=created_at,
             )
-            session.add_all([space_model, model])
+            session.add(model)
             session.flush()
             agent = _agent_from_model(model)
             participants = [
