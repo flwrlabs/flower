@@ -268,13 +268,16 @@ exported, silently leaving Ray's original import failure in place:
 
 .. code-block:: bash
 
+    unset _n
     if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
             [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
             _n=0
-        elif [[ "$ROCR_VISIBLE_DEVICES" == *, ]] || [ -n "$(printf '%s\n' \
+        elif [[ "$ROCR_VISIBLE_DEVICES" =~ (^,|,,|,$) ]] || [ -n "$(printf '%s\n' \
             "${ROCR_VISIBLE_DEVICES//,/$'\n'}" | sort | uniq -d)" ]; then
-            # A trailing comma or a duplicated entry (e.g. `0,` or `0,0`)
+            # A leading, trailing, or doubled separator (e.g. `,0`, `0,`, or
+            # `0,,1`) leaves an empty field that a plain comma count would
+            # read as a listed device, and a duplicated entry (e.g. `0,0`)
             # makes the plain comma count below overstate how many distinct
             # devices ROCR_VISIBLE_DEVICES actually exposes -- `0,0` is one
             # device, not two -- so deriving `_n` from it would size both the
@@ -282,9 +285,10 @@ exported, silently leaving Ray's original import failure in place:
             # off a wrong count. Leave `_n` unset instead, handled the same
             # "bound unknown" way as ROCR_VISIBLE_DEVICES itself being unset.
             echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has a" \
-                 "stray trailing comma or a duplicated entry -- the number" \
-                 "of devices it exposes cannot be derived from it. Fix" \
-                 "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+                 "leading, trailing, or doubled comma, or a duplicated" \
+                 "entry -- the number of devices it exposes cannot be" \
+                 "derived from it. Fix ROCR_VISIBLE_DEVICES itself and" \
+                 "re-run this snippet." >&2
         else
             _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))
         fi

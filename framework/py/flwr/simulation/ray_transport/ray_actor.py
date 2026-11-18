@@ -18,9 +18,7 @@
 
 import errno
 import glob
-import ipaddress
 import os
-import socket
 import threading
 from abc import ABC
 from collections.abc import Callable
@@ -191,6 +189,7 @@ def _log_kfd_diagnostics() -> None:
     # collapse into "not accessible" via plain truthiness, the same way the
     # `/dev/kfd` branches above distinguish it from a confirmed `False`.
     accessible_render_nodes = []
+    denied_render_nodes = []
     inconclusive_access_render_nodes = []
     for node in render_nodes:
         openable = _can_open_device(node)
@@ -198,6 +197,8 @@ def _log_kfd_diagnostics() -> None:
             accessible_render_nodes.append(node)
         elif openable is None:
             inconclusive_access_render_nodes.append(node)
+        else:
+            denied_render_nodes.append(node)
     # A hybrid host or container can expose an accessible render node that ROCm
     # cannot use (e.g. an integrated Intel GPU's renderD128) while the AMD one is
     # missing or permission-denied; only a node confirmed AMD-backed rules out a
@@ -235,6 +236,20 @@ def _log_kfd_diagnostics() -> None:
             "pointing at a root containing the unversioned "
             "`libamd_smi.so` symlink, rather than only a versioned "
             "`libamd_smi.so.<N>`.",
+        )
+    elif denied_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "this process cannot open the `/dev/dri/renderD*` node(s) (%s) "
+            "(no read/write access). This is a permissions issue, not a "
+            "missing or unimportable `amdsmi`: the current user is likely "
+            "missing from the `render` (and `video`) group that owns these "
+            "nodes, or the container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`. Ray and the ML framework "
+            "will both keep reporting zero GPUs until device access is "
+            "fixed; fixing `amdsmi`/ROCM_PATH configuration will not help.",
+            ", ".join(denied_render_nodes),
         )
     elif inconclusive_access_render_nodes:
         log(
@@ -323,131 +338,6 @@ def _ray_client_conn_host() -> str | None:
     return conn_str.rsplit(":", 1)[0].strip("[]")
 
 
-def _local_ips() -> set[str]:
-    """Best-effort enumeration of this host's own IP addresses.
-
-    The standard library has no portable API to enumerate every local network
-    interface. Loopback addresses always refer to this machine regardless of
-    what the hostname resolves to (e.g. Debian's `127.0.1.1` convention, or a
-    hostname registered only to a LAN address), so they are included
-    unconditionally rather than relying on `socket.gethostname()` resolution
-    to surface them. The outbound-interface address for IPv4 and IPv6 is also
-    added on a best-effort basis via a UDP "connect" -- which only selects a
-    route and never actually sends a packet -- to additionally catch a LAN or
-    container address the hostname does not resolve to.
-    """
-    ips = {"127.0.0.1", "::1"}
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None):
-            sockaddr_host = info[4][0]
-            if isinstance(sockaddr_host, str):
-                ips.add(sockaddr_host)
-    except OSError:
-        pass
-    for family, probe_addr in (
-        (socket.AF_INET, ("1.1.1.1", 53)),
-        (socket.AF_INET6, ("2001:4860:4860::8888", 53)),
-    ):
-        try:
-            with socket.socket(family, socket.SOCK_DGRAM) as probe_sock:
-                probe_sock.connect(probe_addr)
-                ips.add(probe_sock.getsockname()[0])
-        except OSError:
-            pass
-    return ips
-
-
-def _bind_confirms_local_address(
-    sockaddr: tuple[str, int] | tuple[str, int, int, int],
-) -> bool | None:
-    """Whether binding a socket to `sockaddr` confirms it is local.
-
-    `_local_ips` is an enumeration of likely addresses, not an exhaustive
-    one: a secondary NIC or alias can be reached without ever surfacing in
-    hostname resolution or the outbound-route probe. The kernel itself knows
-    the complete, authoritative answer, though -- `bind(2)` only succeeds on
-    an address actually assigned to one of this host's interfaces, failing
-    with `EADDRNOTAVAIL` otherwise -- so this is used as a fallback
-    confirmation for an address `_local_ips` missed, without needing a
-    portable full interface enumeration. `sockaddr` is the full tuple from
-    `getaddrinfo` (not just the address string) because an IPv6 link-local
-    address only binds successfully with its `scope_id` included. Returns
-    `True` if the bind succeeds, `False` only for a `bind(2)` failing with
-    `EADDRNOTAVAIL` specifically (the kernel's authoritative "not a local
-    address" signal), or `None` for any other `OSError` (e.g.
-    `EACCES`/`EPERM`/`EMFILE`/`ENOBUFS`), which is inconclusive rather than
-    proof of non-locality.
-    """
-    family = socket.AF_INET6 if len(sockaddr) == 4 else socket.AF_INET
-    try:
-        with socket.socket(family, socket.SOCK_DGRAM) as probe_sock:
-            probe_sock.bind(sockaddr)
-        return True
-    except OSError as exc:
-        if exc.errno == errno.EADDRNOTAVAIL:
-            return False
-        return None
-
-
-def _ray_client_host_confirmed_remote(conn_host: str) -> bool:
-    """Return whether `conn_host` is confirmed to not be this machine.
-
-    A DNS name or LAN address can still resolve back to this host (e.g.
-    `ray://gpu-box:10001` where `gpu-box` is this machine's own hostname, or
-    `ray://LOCALHOST:10001`, which resolves to loopback regardless of its
-    case), in which case the Ray Client server may share this process's
-    device namespace despite not using an exact loopback literal. Resolve
-    `conn_host` and compare against every local IP this host can determine
-    (`_local_ips`, not just the hostname's own resolution); any resolution
-    failure is treated as "not confirmed remote" so the caller falls back to
-    the ambiguous, probe-running branch rather than asserting a remoteness it
-    cannot actually support. Separately, any resolved address anywhere in the
-    IPv4 (`127.0.0.0/8`) or IPv6 (`::1`) loopback range is treated as local
-    even if it is not an exact match against `_local_ips`'s enumerated
-    addresses, since the whole range -- not just `127.0.0.1` -- always refers
-    back to this same host (e.g. `ray://127.0.0.2:10001`). A resolved address
-    that is disjoint from all of the above is not yet proof of remoteness,
-    since `_local_ips` is explicitly best-effort: it is given one more,
-    authoritative check via `_bind_confirms_local_address` before this
-    function will call it confirmed remote -- and since that check is itself
-    tri-state, only a confirmed-`False` (not an inconclusive `None`) result
-    lets this function conclude "remote".
-    """
-    try:
-        addr_infos = socket.getaddrinfo(conn_host, None)
-    except OSError:
-        return False
-    local_ips = _local_ips()
-    seen_ips: set[str] = set()
-    for info in addr_infos:
-        # Keep the full sockaddr (not just the address string) so an IPv6
-        # link-local address's `scope_id` survives to the bind check below;
-        # dedup on the address string since repeated socktype/proto entries
-        # for the same address are common and would otherwise probe it twice.
-        sockaddr = info[4]
-        if not isinstance(sockaddr[0], str):
-            # Only AF_INET/AF_INET6 sockaddrs (first element a host string)
-            # are relevant here; `getaddrinfo` with no family restriction can
-            # in principle also yield other families (e.g. AF_PACKET's
-            # `(int, bytes)` shape), which this check can't meaningfully
-            # reason about.
-            continue
-        conn_ip = str(sockaddr[0])
-        if conn_ip in seen_ips:
-            continue
-        seen_ips.add(conn_ip)
-        if conn_ip in local_ips:
-            return False
-        try:
-            if ipaddress.ip_address(conn_ip).is_loopback:
-                return False
-        except ValueError:
-            pass
-        if _bind_confirms_local_address(sockaddr) is not False:
-            return False
-    return True
-
-
 def _log_node_locality_diagnostics(
     active_node_count: int, active_node_id: str | None
 ) -> None:
@@ -490,54 +380,41 @@ def _log_node_locality_diagnostics(
         # `active_node_id` from `ray.nodes()` even though this process's own
         # `/dev` is not necessarily on the client host. A NodeID comparison can
         # therefore never detect this case; checking
-        # `ray.util.client.ray.is_connected()` instead. Neither a loopback
-        # connection endpoint (`ray://127.0.0.1:10001`) nor a resolvable
-        # non-loopback hostname/LAN address proves this host's `/dev` is the
-        # cluster node's -- an SSH port forward or a sidecar sharing only the
-        # network namespace presents the same endpoint while the server's
-        # `/dev` is elsewhere (`_ray_client_host_confirmed_remote`) -- and
-        # when the endpoint itself cannot be determined
-        # (`_ray_client_conn_host` returning `None`), there is nothing to
-        # confirm remoteness from either. All three cases are flagged as
-        # ambiguous rather than excluded, and the local KFD probe still runs
-        # afterwards in case the connection does turn out to be genuinely
-        # co-located.
+        # `ray.util.client.ray.is_connected()` instead. Whether the Ray Client
+        # server actually runs on a different machine can never be confirmed
+        # from the connection endpoint alone: a loopback or resolvable
+        # hostname/LAN address doesn't prove it's local (an SSH port forward
+        # or a sidecar sharing only the network namespace can present either),
+        # and the absence of a local match doesn't prove it's remote either
+        # (a NAT-hairpinned or VIP address can resolve to this same host while
+        # never itself binding to a local interface). This is therefore always
+        # treated as ambiguous rather than attempting -- and inevitably
+        # mis-trusting -- a remoteness determination, and the local KFD probe
+        # always runs afterwards in case the connection does turn out to be
+        # genuinely co-located.
         conn_host = _ray_client_conn_host()
-        if conn_host is None or not _ray_client_host_confirmed_remote(conn_host):
-            log(
-                WARNING,
-                "This process connected to the Ray cluster over Ray Client "
-                "at %s, which this host cannot confirm is a different "
-                "machine from its own. That usually means the Ray Client "
-                "server runs on this same host, but an SSH port forward or "
-                "a sidecar container that only shares this host's network "
-                "namespace can present the same endpoint while the Ray "
-                "Client server's `/dev` belongs to a different machine or "
-                "container. The `/dev/kfd` and `/dev/dri/renderD*` check "
-                "that follows assumes they are shared with the cluster "
-                "node (NodeID=%s) that reported zero GPUs; if that "
-                "assumption turns out to be wrong, check device access on "
-                "the actual Ray Client server host instead.",
-                (
-                    conn_host
-                    if conn_host is not None
-                    else "an address this host could not determine"
-                ),
-                active_node_id,
-            )
-            _log_kfd_diagnostics()
-        else:
-            log(
-                WARNING,
-                "This process connected to the Ray cluster over Ray Client "
-                "(a `ray://` address) at a host confirmed to not be this "
-                "one, so it runs on a different host than the cluster node "
-                "(NodeID=%s) that reported zero GPUs. Checking `/dev/kfd` "
-                "and `/dev/dri/renderD*` on this host cannot diagnose a "
-                "device on the remote cluster node; check device access "
-                "there instead.",
-                active_node_id,
-            )
+        log(
+            WARNING,
+            "This process connected to the Ray cluster over Ray Client "
+            "at %s, which this host cannot confirm is a different "
+            "machine from its own. That usually means the Ray Client "
+            "server runs on this same host, but an SSH port forward or "
+            "a sidecar container that only shares this host's network "
+            "namespace can present the same endpoint while the Ray "
+            "Client server's `/dev` belongs to a different machine or "
+            "container. The `/dev/kfd` and `/dev/dri/renderD*` check "
+            "that follows assumes they are shared with the cluster "
+            "node (NodeID=%s) that reported zero GPUs; if that "
+            "assumption turns out to be wrong, check device access on "
+            "the actual Ray Client server host instead.",
+            (
+                conn_host
+                if conn_host is not None
+                else "an address this host could not determine"
+            ),
+            active_node_id,
+        )
+        _log_kfd_diagnostics()
     elif active_node_id is not None and active_node_id != (
         driver_node_id := ray.get_runtime_context().get_node_id()
     ):

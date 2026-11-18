@@ -214,7 +214,8 @@ Create ``superexec-clientapp-gpu.sbatch``:
     # nonempty sentinel masquerade as an assigned device and pass a plain emptiness
     # check.
     no_gpu=1
-    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" && "${CUDA_VISIBLE_DEVICES}" != "NoDevFiles" ]]; then
+    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" && "${CUDA_VISIBLE_DEVICES}" != "-1" \
+            && "${CUDA_VISIBLE_DEVICES}" != "NoDevFiles" ]]; then
         no_gpu=0
     fi
     if [[ -n "${ROCR_VISIBLE_DEVICES:-}" && "${ROCR_VISIBLE_DEVICES}" != "-1" \
