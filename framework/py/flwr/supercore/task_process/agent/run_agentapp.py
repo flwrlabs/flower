@@ -101,6 +101,7 @@ from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
+    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
 from .space_session import SpaceEvents, create_space_session
@@ -392,6 +393,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=self._agent_events,
             grid=agent_grid,
+            files=RuntimeAgentFiles(grid._runtime_client),
         )
 
     def _prepare_task_app(

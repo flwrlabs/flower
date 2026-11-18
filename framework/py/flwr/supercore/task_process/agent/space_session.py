@@ -17,17 +17,11 @@
 from collections.abc import Sequence
 from typing import cast
 
-from flwr.agentapp import AgentFiles, AgentGrid
-from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
+from flwr.agentapp import AgentGrid
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
-    DeleteFileRequest,
-    GetFileRequest,
     GetSpaceEventsRequest,
-    ListFilesRequest,
     PullTaskInputResponse,
-    PutFileRequest,
 )
-from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.registry import (
     get_connector_ref,
     has_builtin_connector,
@@ -40,6 +34,7 @@ from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
+    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
 from .space import RuntimeAgentSpace
@@ -112,80 +107,9 @@ class _SpaceAgentGrid(AgentGrid):
         )
 
 
-class SpaceAgentFiles(AgentFiles):
-    """Access the agent's persistent files through the Runtime API."""
-
-    def __init__(self, stub: RuntimeHttpClient) -> None:
-        self._stub = stub
-
-    def get(self, key: str) -> File | None:
-        """Return the current file, or None if absent or deleted."""
-        response = self._stub.GetFile(GetFileRequest(key=key))
-        return response.file if response.HasField("file") else None
-
-    def put(
-        self, key: str, data: bytes, *, expected_revision: int | None = None
-    ) -> int:
-        """Create or update a file using the supplied revision precondition."""
-        response = self._stub.PutFile(
-            PutFileRequest(key=key, data=data, expected_revision=expected_revision)
-        )
-        return response.revision
-
-    def list(
-        self,
-        *,
-        prefix: str = "",
-        start_after: str = "",
-        limit: int | None = None,
-    ) -> tuple[list[FileMetadata], str]:
-        """Return one page of metadata and its continuation cursor."""
-        response = self._stub.ListFiles(
-            ListFilesRequest(prefix=prefix, start_after=start_after, limit=limit)
-        )
-        return list(response.files), response.next_start_after
-
-    def delete(self, key: str, *, expected_revision: int) -> None:
-        """Delete a file only if the current revision matches."""
-        self._stub.DeleteFile(
-            DeleteFileRequest(key=key, expected_revision=expected_revision)
-        )
-
-
-class SpaceAgentSession(RuntimeAgentSession):
-    """AgentSession with Space messaging and persistent files."""
-
-    def __init__(
-        self,
-        stub: RuntimeHttpClient,
-        events: SpaceEvents,
-        task_input: PullTaskInputResponse,
-    ) -> None:
-        runtime = AgentRuntime(
-            stub=stub,
-            run_id=task_input.run.run_id,
-            task_id=task_input.task_id,
-            events=events,
-        )
-        super().__init__(
-            prompt="",
-            connectors=_SpaceAgentConnectors(runtime),
-            events=events,
-            grid=_SpaceAgentGrid(),
-            space=RuntimeAgentSpace(stub, events),
-            identity=task_input.agent if task_input.HasField("agent") else None,
-        )
-        self._files = SpaceAgentFiles(stub)
-
-    @property
-    def files(self) -> AgentFiles:
-        """Return the agent's persistent file API."""
-        return self._files
-
-
 def create_space_session(
     grid: HttpGrid, events: SpaceEvents, task_input: PullTaskInputResponse
-) -> SpaceAgentSession:
+) -> RuntimeAgentSession:
     """Initialize a session whose AgentApp retrieves its own Space messages.
 
     Parameters
@@ -199,8 +123,22 @@ def create_space_session(
 
     Returns
     -------
-    SpaceAgentSession
+    RuntimeAgentSession
         Session with built-in connectors and federation Grid tools disabled.
     """
     stub = grid._runtime_client  # pylint: disable=protected-access
-    return SpaceAgentSession(stub, events, task_input)
+    runtime = AgentRuntime(
+        stub=stub,
+        run_id=task_input.run.run_id,
+        task_id=task_input.task_id,
+        events=events,
+    )
+    return RuntimeAgentSession(
+        prompt="",
+        connectors=_SpaceAgentConnectors(runtime),
+        events=events,
+        grid=_SpaceAgentGrid(),
+        files=RuntimeAgentFiles(stub),
+        space=RuntimeAgentSpace(stub, events),
+        identity=task_input.agent if task_input.HasField("agent") else None,
+    )

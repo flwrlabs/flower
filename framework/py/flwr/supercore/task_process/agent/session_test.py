@@ -77,9 +77,10 @@ from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
+    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
-from .space_session import SpaceAgentFiles, SpaceEvents, create_space_session
+from .space_session import SpaceEvents, create_space_session
 
 
 @pytest.fixture(autouse=True)
@@ -116,18 +117,19 @@ def test_emit_event_pushes_task_event() -> None:
 
 def test_runtime_agent_session_exposes_prompt() -> None:
     """Expose the initial prompt without additional runtime calls."""
+    files = RuntimeAgentFiles(Mock())
     session = RuntimeAgentSession(
         prompt="Initial prompt",
         connectors=Mock(),
         events=Mock(),
         grid=Mock(),
+        files=files,
     )
 
     assert session.prompt == "Initial prompt"
     assert session.identity is None
     assert session.space is None
-    with pytest.raises(NotImplementedError, match="Persistent files"):
-        _ = session.files
+    assert session.files is files
 
 
 def test_space_session_exposes_agent_identity() -> None:
@@ -148,7 +150,7 @@ def test_space_session_exposes_agent_identity() -> None:
 
 
 @pytest.mark.parametrize("data", [None, b"", b"memory"])
-def test_space_files_get(data: bytes | None) -> None:
+def test_runtime_files_get(data: bytes | None) -> None:
     """Distinguish missing files from empty files and retain revision metadata."""
     stub = Mock()
     file = (
@@ -166,12 +168,14 @@ def test_space_files_get(data: bytes | None) -> None:
 
 
 @pytest.mark.parametrize("revision", [None, 0, 7])
-def test_space_files_put(revision: int | None) -> None:
+def test_runtime_files_put(revision: int | None) -> None:
     """Preserve create-only and explicit revision preconditions, including zero."""
     stub = Mock()
     stub.PutFile.return_value = PutFileResponse(revision=8)
 
-    assert SpaceAgentFiles(stub).put("memory.md", b"", expected_revision=revision) == 8
+    assert (
+        RuntimeAgentFiles(stub).put("memory.md", b"", expected_revision=revision) == 8
+    )
     stub.PutFile.assert_called_once_with(
         PutFileRequest(key="memory.md", data=b"", expected_revision=revision)
     )
@@ -181,14 +185,14 @@ def test_space_files_put(revision: int | None) -> None:
 
 
 @pytest.mark.parametrize("limit", [None, 0, 2])
-def test_space_files_list_and_delete(limit: int | None) -> None:
+def test_runtime_files_list_and_delete(limit: int | None) -> None:
     """Keep pagination metadata and require the caller's revision for deletion."""
     stub = Mock()
     metadata = FileMetadata(key="notes/a", revision=7, size_bytes=4)
     stub.ListFiles.return_value = ListFilesResponse(
         files=[metadata], next_start_after="notes/a"
     )
-    files = SpaceAgentFiles(stub)
+    files = RuntimeAgentFiles(stub)
 
     assert files.list(prefix="notes/", start_after="notes/0", limit=limit) == (
         [metadata],
@@ -204,7 +208,7 @@ def test_space_files_list_and_delete(limit: int | None) -> None:
 
 
 @pytest.mark.parametrize("operation", ["put", "delete"])
-def test_space_files_propagate_conflicts(operation: str) -> None:
+def test_runtime_files_propagate_conflicts(operation: str) -> None:
     """Leave conflict handling to the AgentApp without retrying the write."""
     stub = Mock()
     error = httpx.HTTPStatusError(
@@ -214,7 +218,7 @@ def test_space_files_propagate_conflicts(operation: str) -> None:
     )
     rpc = stub.PutFile if operation == "put" else stub.DeleteFile
     rpc.side_effect = error
-    files = SpaceAgentFiles(stub)
+    files = RuntimeAgentFiles(stub)
 
     with pytest.raises(httpx.HTTPStatusError) as caught:
         if operation == "put":
