@@ -142,7 +142,12 @@ def test_space_session_reads_messages() -> None:
     stub.GetSpaceMessages.return_value = GetSpaceMessagesResponse(
         messages=[
             SpaceMessage(id=1, author=SpaceParticipant(flwr_aid="alice"), content="Hi"),
-            SpaceMessage(id=2, author=SpaceParticipant(agent_id=42), content="Hello"),
+            SpaceMessage(
+                id=2,
+                author=SpaceParticipant(agent_id=42),
+                content="Hello",
+                hidden=True,
+            ),
         ]
     )
     agent = create_space_session(
@@ -162,6 +167,7 @@ def test_space_session_reads_messages() -> None:
         {"agent_id": 42},
     ]
     assert [message["id"] for message in messages] == [1, 2]
+    assert [message["hidden"] for message in messages] == [False, True]
 
 
 @pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
@@ -188,6 +194,7 @@ def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
         "author": {"agent_id": 42},
         "created_at": "",
         "content": "Hello",
+        "hidden": False,
     }
     stub.SendSpaceMessage.assert_called_once_with(
         SendSpaceMessageRequest(content="Hello")
@@ -492,6 +499,35 @@ def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
     runtime.get_connector_tools.assert_called_once_with("example", refresh=False)
 
 
+def test_space_discovery_failure_does_not_hide_healthy_connections(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep tools from a healthy account when another account's discovery fails."""
+    stub = Mock()
+    stub.ListAgentConnectors.return_value.connectors = [
+        Mock(
+            connector_id=connector_id,
+            connector_ref="github",
+            display_name="Account",
+            description="",
+        )
+        for connector_id in (1, 2)
+    ]
+    agent = create_space_session(
+        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
+    )
+    with patch.object(
+        AgentRuntime,
+        "get_connector_tools",
+        side_effect=[RuntimeError("credential-secret"), [{"name": "github_search"}]],
+    ) as discover:
+        tools = agent.connectors.tools(["github"])
+    assert [tool["name"] for tool in tools] == ["github_search__2"]
+    assert [item.kwargs["connector_id"] for item in discover.call_args_list] == [1, 2]
+    assert "github connection 1" in caplog.text
+    assert "credential-secret" not in caplog.text
+
+
 def test_call_automation_embeds_input_in_control_request() -> None:
     """Embed model input in the Control request sent to the Runtime API."""
     # Prepare
@@ -595,9 +631,8 @@ def test_create_connector_response_resolves_canonical_name() -> None:
         start_run_request=StartRunRequest(),
         events=Mock(),
     )
-    agent_runtime._discovered_tools["example"] = [  # pylint: disable=protected-access
-        {"name": "example_Search"}
-    ]
+    # pylint: disable-next=protected-access
+    agent_runtime._discovered_tools[("example", None)] = [{"name": "example_Search"}]
     reply = ConnectorResponse(
         dst_task_id=789,
         name="example_Search",

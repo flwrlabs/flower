@@ -416,18 +416,19 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
+        agent_id: int | None = None,
     ) -> int | None:
-        """Create a connector for a federation.
+        """Create a connector owned by exactly one federation or agent.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID owning the connector.
+        federation_id : str | None
+            Federation ID owning the connector, or ``None`` for an agent owner.
         connector_ref : str
             Connector reference.
         credentials_json : str
@@ -436,11 +437,15 @@ class CoreState(ABC):  # pylint: disable=R0904
             Serialized connector configuration.
         created_by : str
             Account ID creating the connector.
+        agent_id : int | None (default: None)
+            Agent owning the connector. Must belong to ``created_by`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         int | None
-            The connector ID if the connector is created, otherwise ``None``.
+            The connector ID, or ``None`` if the owner is invalid, the agent is not
+            owned by ``created_by``, or a required identifier is empty.
         """
 
     @abstractmethod
@@ -467,6 +472,21 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return a connector by ID, if present."""
 
     @abstractmethod
+    def get_agent_connectors(self, agent_id: int) -> Sequence[ConnectorRecord]:
+        """List an agent's connectors in ascending connector ID order.
+
+        Parameters
+        ----------
+        agent_id : int
+            Agent ID owning the connectors.
+
+        Returns
+        -------
+        Sequence[ConnectorRecord]
+            The agent's connections. Invalid IDs return an empty sequence.
+        """
+
+    @abstractmethod
     def update_connector_credentials(
         self,
         connector_id: int,
@@ -481,15 +501,22 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
-        """Delete a federation's connector if it exists.
+    def delete_connector(
+        self,
+        federation_id: str | None,
+        connector_id: int,
+        agent_id: int | None = None,
+    ) -> bool:
+        """Delete a connector belonging to the specified federation or agent.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID owning the connector.
+        federation_id : str | None
+            Federation ID owning the connector, or ``None`` for an agent owner.
         connector_id : int
             ID of the connector to delete.
+        agent_id : int | None (default: None)
+            Agent ID owning the connector. Requires ``federation_id=None``.
 
         Returns
         -------
@@ -510,12 +537,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
         expires_at: datetime,
+        agent_id: int | None = None,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session.
 
@@ -525,8 +553,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Unique ID of the OAuth session.
         flwr_aid : str
             Account ID owning the OAuth session.
-        federation_id : str
-            Federation receiving the connector.
+        federation_id : str | None
+            Federation receiving the connector, or ``None`` for an agent owner.
         connector_ref : str
             Reference of the connector being authorized.
         state : str
@@ -537,12 +565,16 @@ class CoreState(ABC):  # pylint: disable=R0904
             PKCE verifier used for the authorization code exchange, if present.
         expires_at : datetime
             Timezone-aware expiration timestamp, normalized to UTC before storage.
+        agent_id : int | None (default: None)
+            Agent receiving the connector. Must belong to ``flwr_aid`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         ConnectorOAuthSessionRecord | None
             The created session, or `None` if the session ID already exists, a
-            required identifier is empty, or `expires_at` is timezone-naive.
+            required identifier is empty, the owner is invalid, the agent is not
+            owned by ``flwr_aid``, or `expires_at` is timezone-naive.
         """
 
     @abstractmethod
@@ -909,26 +941,27 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_automation(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID the automation belongs to.
+        federation_id : str | None (default: None)
+            Federation ID for a run-series automation; None for an agent automation.
         flwr_aid : str
             FLWR account ID used to dispatch the automation.
         start_run_request : StartRunRequest
             Unresolved run request to execute for each scheduled occurrence.
-        series_id : int
-            Run series ID to use when dispatching automation runs.
+        series_id : int | None (default: None)
+            Run series ID for a run-series automation; None for an agent automation.
         next_run_at : str
             Initial due time as a timestamp string. This is required when
             storing an automation. For one-shot automations, this is the
@@ -939,11 +972,18 @@ class CoreState(ABC):  # pylint: disable=R0904
         max_runs : int | None (default: None)
             Maximum number of runs, if finite. The value initializes the
             persisted `remaining_runs` counter.
+        agent_id : int | None (default: None)
+            Agent associated with the automation, if any.
 
         Returns
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        ValueError
+            If neither or both automation ownership forms are provided.
         """
 
     @abstractmethod

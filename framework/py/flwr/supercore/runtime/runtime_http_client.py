@@ -49,6 +49,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -315,6 +317,17 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/RecordTaskUsage",
             request=request,
             response_type=RecordTaskUsageResponse,
+        )
+
+    def ListAgentConnectors(
+        self, request: ListAgentConnectorsRequest
+    ) -> ListAgentConnectorsResponse:
+        """List connections owned by the authenticated task's agent."""
+        return self._unary_unary(
+            path="/v1/runtime/list-agent-connectors",
+            rpc_method="/flwr.proto.Runtime/ListAgentConnectors",
+            request=request,
+            response_type=ListAgentConnectorsResponse,
         )
 
     def GetConnector(self, request: GetConnectorRequest) -> GetConnectorResponse:

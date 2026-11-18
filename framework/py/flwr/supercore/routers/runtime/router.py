@@ -53,6 +53,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -215,10 +217,11 @@ def confirm_message_received(
 def create_task(
     request: Annotated[CreateTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> CreateTaskResponse:
     """Create a task."""
-    return core_runtime_handlers.create_task(request, state, task)
+    return handlers.create_task(request, state, task)
 
 
 @router.post("/start-automation")
@@ -338,6 +341,17 @@ def record_task_usage(
     return core_runtime_handlers.record_task_usage(request, state, task)
 
 
+@router.post("/list-agent-connectors")
+def list_agent_connectors(
+    request: Annotated[ListAgentConnectorsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> ListAgentConnectorsResponse:
+    """List connection metadata for the authenticated agent."""
+    return handlers.list_agent_connectors(request, state, task)
+
+
 @router.post("/get-connector")
 def get_connector(
     request: Annotated[GetConnectorRequest, PROTOBUF_REQUEST_DEPENDENCY],
@@ -393,40 +407,52 @@ def get_nodes(
 
 
 @router.post("/put-file")
-def put_file(
+def put_file(  # pylint: disable=protected-access
     request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PutFileResponse:
     """Store a file."""
-    return core_runtime_handlers.put_file(request, state, task)
+    return core_runtime_handlers.put_file(
+        request, state, handlers._get_agent_id(state, task)
+    )
 
 
 @router.post("/get-file")
-def get_file(
+def get_file(  # pylint: disable=protected-access
     request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetFileResponse:
     """Get a file."""
-    return core_runtime_handlers.get_file(request, state, task)
+    return core_runtime_handlers.get_file(
+        request, state, handlers._get_agent_id(state, task)
+    )
 
 
 @router.post("/list-files")
-def list_files(
+def list_files(  # pylint: disable=protected-access
     request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> ListFilesResponse:
     """List file metadata."""
-    return core_runtime_handlers.list_files(request, state, task)
+    return core_runtime_handlers.list_files(
+        request, state, handlers._get_agent_id(state, task)
+    )
 
 
 @router.post("/delete-file")
-def delete_file(
+def delete_file(  # pylint: disable=protected-access
     request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> DeleteFileResponse:
     """Delete a file."""
-    return core_runtime_handlers.delete_file(request, state, task)
+    return core_runtime_handlers.delete_file(
+        request, state, handlers._get_agent_id(state, task)
+    )
