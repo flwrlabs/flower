@@ -73,11 +73,11 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
+from .files import RuntimeAgentFiles
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
 from .space_session import SpaceEvents, create_space_session

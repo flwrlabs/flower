@@ -45,20 +45,15 @@ from flwr.common.serde import message_from_proto, message_to_proto
 
 # pylint: disable=E0611
 from flwr.proto.control_pb2 import Agent, StartAutomationRequest, StartRunRequest
-from flwr.proto.file_pb2 import File, FileMetadata
 from flwr.proto.runseries_pb2 import CompactedContext
 from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
-    DeleteFileRequest,
     GetCompactedContextsRequest,
-    GetFileRequest,
     GetRunSeriesEventsRequest,
-    ListFilesRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskMessageRequest,
     PutCompactedContextRequest,
-    PutFileRequest,
 )
 from flwr.proto.task_pb2 import TaskEvent
 
@@ -237,46 +232,6 @@ class RuntimeAgentEvents(AgentEvents):
             error = self._error
         if error is not None:
             raise RuntimeError("Failed to publish AgentApp events.") from error
-
-
-class RuntimeAgentFiles(AgentFiles):
-    """Access the agent's persistent files through the Runtime API."""
-
-    def __init__(self, stub: RuntimeHttpClient) -> None:
-        self._stub = stub
-
-    def get(self, key: str) -> File | None:
-        """Return the current file, or None if absent or deleted."""
-        response = self._stub.GetFile(GetFileRequest(key=key))
-        return response.file if response.HasField("file") else None
-
-    def put(
-        self, key: str, data: bytes, *, expected_revision: int | None = None
-    ) -> int:
-        """Create or update a file using the supplied revision precondition."""
-        response = self._stub.PutFile(
-            PutFileRequest(key=key, data=data, expected_revision=expected_revision)
-        )
-        return response.revision
-
-    def list(
-        self,
-        *,
-        prefix: str = "",
-        start_after: str = "",
-        limit: int | None = None,
-    ) -> tuple[list[FileMetadata], str]:
-        """Return one page of metadata and its continuation cursor."""
-        response = self._stub.ListFiles(
-            ListFilesRequest(prefix=prefix, start_after=start_after, limit=limit)
-        )
-        return list(response.files), response.next_start_after
-
-    def delete(self, key: str, *, expected_revision: int) -> None:
-        """Delete a file only if the current revision matches."""
-        self._stub.DeleteFile(
-            DeleteFileRequest(key=key, expected_revision=expected_revision)
-        )
 
 
 class RuntimeAgentSession(AgentSession):

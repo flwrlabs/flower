@@ -30,11 +30,11 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 from flwr.superlink.grid import HttpGrid
 
+from .files import RuntimeAgentFiles
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
 from .space import RuntimeAgentSpace

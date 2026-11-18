@@ -96,12 +96,12 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
 
+from .files import RuntimeAgentFiles
 from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
     RuntimeAgentEvents,
-    RuntimeAgentFiles,
     RuntimeAgentSession,
 )
 from .space_session import SpaceEvents, create_space_session
