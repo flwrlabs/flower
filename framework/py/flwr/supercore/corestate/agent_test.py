@@ -18,12 +18,14 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -85,6 +87,17 @@ def test_create_agent_creates_space(state: CoreState) -> None:
         assert agent is not None
         member = SpaceParticipant(agent_id=agent.id)
         space = next(space for space in spaces if member in space.participants)
+        if isinstance(state, SqlLinkState):
+            with state.session() as session:
+                default_space_id = session.scalar(
+                    select(AgentModel.default_space_id).where(
+                        AgentModel.agent_id == agent.id
+                    )
+                )
+        else:
+            assert isinstance(state, InMemoryLinkState)
+            default_space_id = state.agent_default_space_store[agent.id]
+        assert default_space_id == UUID(space.id)
         assert len(space.participants) == 2
         assert SpaceParticipant(flwr_aid="alice") in space.participants
         assert space.title == ""
@@ -94,6 +107,23 @@ def test_create_agent_creates_space(state: CoreState) -> None:
         )
     assert state.get_spaces("bob") == []
     assert not state.get_tasks()
+
+
+def test_get_default_space_is_owner_scoped(state: CoreState) -> None:
+    """Resolve the recorded default even if an agent joins another Space."""
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@test/app"))
+    assert agent is not None
+    default_space_id = UUID(state.get_spaces("alice")[0].id)
+    state.create_space(
+        participants=[
+            SpaceParticipant(flwr_aid="alice"),
+            SpaceParticipant(agent_id=agent.id),
+        ]
+    )
+
+    assert state.get_default_space("alice", agent.id) == default_space_id
+    assert state.get_default_space("bob", agent.id) is None
+    assert state.get_default_space("alice", agent.id + 1) is None
 
 
 @pytest.mark.parametrize(

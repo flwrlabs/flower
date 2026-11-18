@@ -733,25 +733,47 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         ):
             return None
         created_at = now()
-        model = AgentModel(
-            name=config.name,
-            title=config.title if config.HasField("title") else None,
-            description=config.description if config.HasField("description") else None,
-            app_spec=config.app_spec,
-            flwr_aid=flwr_aid,
-            created_at=created_at,
-            updated_at=created_at,
-        )
         with self.session() as session:
+            # Insert the Space first so the agent can reference it as its default.
+            space_model = SpaceModel(id=uuid4(), title="", created_at=created_at)
+            session.add(space_model)
+            session.flush()
+            model = AgentModel(
+                name=config.name,
+                title=config.title if config.HasField("title") else None,
+                description=(
+                    config.description if config.HasField("description") else None
+                ),
+                app_spec=config.app_spec,
+                flwr_aid=flwr_aid,
+                default_space_id=space_model.id,
+                created_at=created_at,
+                updated_at=created_at,
+            )
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
+            participants = [
+                SpaceParticipant(flwr_aid=flwr_aid),
+                SpaceParticipant(agent_id=agent.id),
+            ]
+            session.execute(
+                insert(SpaceParticipantTable),
+                [
+                    {
+                        "space_id": space_model.id,
+                        "flwr_aid": participant.flwr_aid or None,
+                        "agent_id": participant.agent_id or None,
+                    }
+                    for participant in participants
+                ],
+            )
+            # Emit events after membership is complete, preserving their order.
             self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
-            self.create_space(
-                participants=[
-                    SpaceParticipant(flwr_aid=flwr_aid),
-                    SpaceParticipant(agent_id=agent.id),
-                ]
+            space = _space_from_model(space_model)
+            space.participants.extend(participants)
+            self.store_event(
+                EventType.SPACE_CREATED, space, [flwr_aid], space_id=space_model.id
             )
             return agent
 
@@ -765,6 +787,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
             return _agent_from_model(model) if model is not None else None
+
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID."""
+        with self.session() as session:
+            return session.scalar(
+                select(AgentModel.default_space_id).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
