@@ -40,7 +40,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from flwr.supercore.state.schema.types import UInt64, UTCDateTime
 from flwr.supercore.typing import JSONValue
@@ -242,6 +242,7 @@ class Agent(FlwrBase):
     default_space_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=True
     )
+    default_space: Mapped["Space | None"] = relationship()
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
