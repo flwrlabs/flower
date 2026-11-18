@@ -18,8 +18,10 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     LargeBinary,
     MetaData,
@@ -29,7 +31,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from flwr.supercore.state.schema.corestate_models import Agent, Space
+from flwr.supercore.state.schema.corestate_models import Agent, AgentConfig, Space
 from flwr.supercore.state.schema.types import UInt64
 
 
@@ -73,6 +75,16 @@ class Run(LinkStateBase):
 
     __tablename__ = "run"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["agent_id", "agent_config_version"],
+            [AgentConfig.agent_id, AgentConfig.version],
+            name="fk_run_agent_config_version",
+        ),
+        CheckConstraint(
+            "(agent_id IS NULL AND agent_config_version IS NULL) OR "
+            "(agent_id IS NOT NULL AND agent_config_version IS NOT NULL)",
+            name="ck_run_agent_config_version",
+        ),
         Index("idx_run_series_id", "series_id"),
         Index("idx_run_space_id", "space_id"),
     )
@@ -98,6 +110,7 @@ class Run(LinkStateBase):
     agent_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey(Agent.agent_id, name="fk_run_agent_id"), nullable=True
     )
+    agent_config_version: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")

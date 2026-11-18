@@ -14,16 +14,20 @@
 # ==============================================================================
 """Tests for account-owned agents across CoreState implementations."""
 
+from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
 import pytest
+from sqlalchemy import update
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -73,6 +77,40 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert state.get_agent("alice", other.id) is None
     assert state.list_agents("unknown") == []
     assert state.list_agents("") == []
+
+
+def test_sql_agent_retains_previous_configuration(state: CoreState) -> None:
+    """Advancing the current version retains the exact previous configuration."""
+    if not isinstance(state, SqlLinkState):
+        pytest.skip("SQL configuration snapshots")
+    original = state.create_agent(
+        "alice", AgentConfig(name="Original", app_spec="@flower/research")
+    )
+    assert original is not None
+    with state.session() as session:
+        session.add(
+            AgentConfigModel(
+                agent_id=original.id,
+                version=2,
+                name="Updated",
+                app_spec="@flower/research",
+                created_at=datetime.fromisoformat(original.created_at),
+            )
+        )
+        session.execute(
+            update(AgentModel)
+            .where(AgentModel.agent_id == original.id)
+            .values(config_version=2, revision=2)
+        )
+    current = state.get_agent("alice", original.id)
+    assert current is not None
+    assert current.config.name == "Updated"
+    with state.session() as session:
+        previous = session.get(AgentConfigModel, (original.id, 1))
+        assert previous is not None
+        assert previous.name == original.config.name
+        assert previous.app_spec == original.config.app_spec
+    assert state.list_agents("alice") == [current]
 
 
 def test_create_agent_creates_space(state: CoreState) -> None:

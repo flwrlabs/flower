@@ -11,15 +11,23 @@
 ---
 erDiagram
   agent {
-    BIGINT agent_id PK
+    BIGINT agent_id PK,FK
+    BIGINT config_version FK
     CHAR(32) default_space_id FK "nullable"
+    TIMESTAMP created_at
+    VARCHAR flwr_aid
+    BIGINT revision
+    TIMESTAMP updated_at
+  }
+
+  agent_config {
+    BIGINT agent_id PK,FK
+    BIGINT version PK
     VARCHAR app_spec
     TIMESTAMP created_at
     TEXT description "nullable"
-    VARCHAR flwr_aid
     VARCHAR name
     VARCHAR title "nullable"
-    TIMESTAMP updated_at
   }
 
   automation {
@@ -193,6 +201,7 @@ erDiagram
   }
 
   run {
+    BIGINT agent_config_version FK "nullable"
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
     BIGINT bytes_recv "nullable"
@@ -334,7 +343,10 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent_config ||--o| agent : agent_id
+  agent_config ||--o{ agent : config_version
   space ||--o{ agent : default_space_id
+  agent ||--o| agent_config : agent_id
   agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
@@ -347,6 +359,8 @@ erDiagram
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
   agent ||--o{ run : agent_id
+  agent_config ||--o{ run : agent_id
+  agent_config ||--o{ run : agent_config_version
   objects ||--o| run_objects : object_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
