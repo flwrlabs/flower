@@ -28,19 +28,19 @@ from flwr.supercore.runtime import RuntimeHttpClient
 class RuntimeAgentFiles(AgentFiles):
     """Access the agent's persistent files through the Runtime API."""
 
-    def __init__(self, stub: RuntimeHttpClient) -> None:
-        self._stub = stub
+    def __init__(self, client: RuntimeHttpClient) -> None:
+        self._client = client
 
     def get(self, key: str) -> File | None:
         """Return the current file, or None if absent or deleted."""
-        response = self._stub.GetFile(GetFileRequest(key=key))
+        response = self._client.GetFile(GetFileRequest(key=key))
         return response.file if response.HasField("file") else None
 
     def put(
         self, key: str, data: bytes, *, expected_revision: int | None = None
     ) -> int:
         """Create or update a file using the supplied revision precondition."""
-        response = self._stub.PutFile(
+        response = self._client.PutFile(
             PutFileRequest(key=key, data=data, expected_revision=expected_revision)
         )
         return response.revision
@@ -53,13 +53,13 @@ class RuntimeAgentFiles(AgentFiles):
         limit: int | None = None,
     ) -> tuple[list[FileMetadata], str]:
         """Return one page of metadata and its continuation cursor."""
-        response = self._stub.ListFiles(
+        response = self._client.ListFiles(
             ListFilesRequest(prefix=prefix, start_after=start_after, limit=limit)
         )
         return list(response.files), response.next_start_after
 
     def delete(self, key: str, *, expected_revision: int) -> None:
         """Delete a file only if the current revision matches."""
-        self._stub.DeleteFile(
+        self._client.DeleteFile(
             DeleteFileRequest(key=key, expected_revision=expected_revision)
         )
