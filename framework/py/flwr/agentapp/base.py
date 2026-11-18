@@ -172,11 +172,7 @@ class AgentSpace(ABC):
 
 
 class AgentFiles(ABC):
-    """Persistent files owned by the authenticated agent.
-
-    Operations use the server-derived agent scope. Runtime errors propagate to
-    the caller; revision conflicts are not automatically retried or merged.
-    """
+    """Persistent files owned by the authenticated agent."""
 
     @abstractmethod
     def get(self, key: str) -> File | None:
