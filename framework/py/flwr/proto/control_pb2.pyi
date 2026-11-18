@@ -74,9 +74,11 @@ class Agent(google.protobuf.message.Message):
     CONFIG_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
+    DEFAULT_SPACE_ID_FIELD_NUMBER: builtins.int
     id: builtins.int
     created_at: builtins.str
     updated_at: builtins.str
+    default_space_id: builtins.str
     @property
     def config(self) -> global___AgentConfig: ...
     def __init__(
@@ -86,9 +88,11 @@ class Agent(google.protobuf.message.Message):
         config: global___AgentConfig | None = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
+        default_space_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["config", b"config", "created_at", b"created_at", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_default_space_id", b"_default_space_id", "config", b"config", "default_space_id", b"default_space_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_default_space_id", b"_default_space_id", "config", b"config", "created_at", b"created_at", "default_space_id", b"default_space_id", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_default_space_id", b"_default_space_id"]) -> typing.Literal["default_space_id"] | None: ...
 
 global___Agent = Agent
 
