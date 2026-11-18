@@ -196,8 +196,42 @@ If that fails, install ``amdsmi`` one of two ways:
 .. note::
 
     Pinned to an older Ray release (before 2.56)? AMD GPU discovery there opens
-    ``librocm_smi64.so`` directly, exactly as described under this section's previous
-    approach -- the ``amdsmi`` requirement above does not apply.
+    ``$ROCM_PATH/lib/librocm_smi64.so`` directly instead of going through ``amdsmi`` --
+    the ``amdsmi`` requirement above does not apply. ``ROCM_PATH`` defaults to
+    ``/opt/rocm``, but a wheel-based ROCm install usually has no ``/opt/rocm`` at all, so
+    it must be set explicitly, and Ray opens the library by its **unversioned** name -- a
+    ROCm tree that ships only a versioned ``librocm_smi64.so.<N>`` with no unversioned
+    symlink is not sufficient.
+
+    Confirm the library is where Ray will look for it, using the same unset-vs-empty test
+    as ``ROCR_VISIBLE_DEVICES`` below rather than a plain ``${ROCM_PATH:-/opt/rocm}``
+    substitution -- older Ray only applies its own ``/opt/rocm`` default when
+    ``ROCM_PATH`` is completely absent from the environment, not when it is set to an
+    empty string:
+
+    .. code-block:: shell
+
+        if [ -n "${ROCM_PATH+x}" ]; then
+            _rocm_path="$ROCM_PATH"
+        else
+            _rocm_path="/opt/rocm"
+        fi
+        test -f "$_rocm_path/lib/librocm_smi64.so" && echo "ROCm SMI found"
+        unset _rocm_path
+
+    If that prints nothing, set ``ROCM_PATH`` to a ROCm root that contains the
+    unversioned symlink. When ROCm is installed from wheels, only ``_rocm_sdk_devel``
+    (the ``devel`` extra) ships that symlink -- ``_rocm_sdk_core`` ships only the
+    versioned ``librocm_smi64.so.<N>`` -- and ``rocm-sdk path --root``, also from the
+    ``devel`` extra, reports the correct root:
+
+    .. code-block:: shell
+
+        export ROCM_PATH="$(rocm-sdk path --root)"
+
+    Published ROCm container recipes commonly set ``ROCM_PATH`` to the *core* root,
+    which is correct for your ML framework but leaves Ray unable to enumerate GPUs. If
+    you adapt such an image for the Simulation Runtime, override ``ROCM_PATH`` for Ray.
 
 *************************************
  Set ``HIP_VISIBLE_DEVICES`` for Ray
@@ -273,24 +307,52 @@ exported, silently leaving Ray's original import failure in place:
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
             [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
             _n=0
-        elif [[ "$ROCR_VISIBLE_DEVICES" =~ (^,|,,|,$) ]] || [ -n "$(printf '%s\n' \
-            "${ROCR_VISIBLE_DEVICES//,/$'\n'}" | sort | uniq -d)" ]; then
+        elif [[ "$ROCR_VISIBLE_DEVICES" =~ (^,|,,|,$) ]]; then
             # A leading, trailing, or doubled separator (e.g. `,0`, `0,`, or
             # `0,,1`) leaves an empty field that a plain comma count would
-            # read as a listed device, and a duplicated entry (e.g. `0,0`)
-            # makes the plain comma count below overstate how many distinct
-            # devices ROCR_VISIBLE_DEVICES actually exposes -- `0,0` is one
-            # device, not two -- so deriving `_n` from it would size both the
-            # HIP_VISIBLE_DEVICES synthesis and the ordinal-bounds check below
-            # off a wrong count. Leave `_n` unset instead, handled the same
-            # "bound unknown" way as ROCR_VISIBLE_DEVICES itself being unset.
+            # read as a listed device. Leave `_n` unset instead, handled the
+            # same "bound unknown" way as ROCR_VISIBLE_DEVICES itself being
+            # unset.
             echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has a" \
-                 "leading, trailing, or doubled comma, or a duplicated" \
-                 "entry -- the number of devices it exposes cannot be" \
-                 "derived from it. Fix ROCR_VISIBLE_DEVICES itself and" \
-                 "re-run this snippet." >&2
+                 "leading, trailing, or doubled comma -- the number of" \
+                 "devices it exposes cannot be derived from it. Fix" \
+                 "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
         else
-            _n=$(($(tr -cd ',' <<<"$ROCR_VISIBLE_DEVICES" | wc -c) + 1))
+            IFS=',' read -ra _rocr_ids <<<"$ROCR_VISIBLE_DEVICES"
+            _rocr_norm=()
+            for _id in "${_rocr_ids[@]}"; do
+                if [[ "$_id" =~ ^[0-9]+$ ]]; then
+                    # ROCr treats `0` and `00` as the same ordinal, but they
+                    # are two distinct strings to a raw-string comparison --
+                    # normalize before checking for duplicates, the same way
+                    # the HIP_VISIBLE_DEVICES validation below does.
+                    _trimmed_id="${_id#"${_id%%[!0]*}"}"
+                    [ -z "$_trimmed_id" ] && _trimmed_id=0
+                    _rocr_norm+=("$_trimmed_id")
+                else
+                    _rocr_norm+=("$_id")
+                fi
+            done
+            _rocr_dup=$(printf '%s\n' "${_rocr_norm[@]}" | sort | uniq -d)
+            if [ -n "$_rocr_dup" ]; then
+                # A duplicated entry (e.g. `0,0`, or `0,00` once normalized)
+                # makes a plain comma count overstate how many distinct
+                # devices ROCR_VISIBLE_DEVICES actually exposes -- `0,0` is
+                # one device, not two -- so deriving `_n` from it would size
+                # both the HIP_VISIBLE_DEVICES synthesis and the
+                # ordinal-bounds check below off a wrong count, and would
+                # under-count ROCr's own filtering: only one distinct GPU
+                # remains, yet Ray would still advertise a second,
+                # no-ordinal-backed slot. Leave `_n` unset instead.
+                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                     "repeats ordinal(s) $_rocr_dup once leading zeros are" \
+                     "normalized -- the number of distinct devices it" \
+                     "exposes cannot be derived from it. Fix" \
+                     "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+            else
+                _n=${#_rocr_ids[@]}
+            fi
+            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
