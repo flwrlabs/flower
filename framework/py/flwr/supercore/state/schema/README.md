@@ -12,6 +12,7 @@
 erDiagram
   agent {
     BIGINT agent_id PK
+    CHAR(32) default_space_id FK "nullable"
     VARCHAR app_spec
     TIMESTAMP created_at
     TEXT description "nullable"
@@ -23,13 +24,14 @@ erDiagram
 
   automation {
     INTEGER automation_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP created_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
     TIMESTAMP next_run_at
     INTEGER remaining_runs "nullable"
-    BIGINT series_id
+    BIGINT series_id "nullable"
     BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
@@ -252,6 +254,7 @@ erDiagram
     TEXT content
     TIMESTAMP created_at
     VARCHAR flwr_aid "nullable"
+    BOOLEAN hidden
   }
 
   space_participant {
@@ -331,6 +334,8 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  space ||--o{ agent : default_space_id
+  agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
   agent ||--o{ connector_oauth_session : agent_id
