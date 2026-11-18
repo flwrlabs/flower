@@ -19,14 +19,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from flwr.app import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Message,
-    MetricRecord,
-    RecordDict,
-)
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.supercore.privacy_accounting import (
     GaussianPrivacyEvent,
     NeighboringRelation,
