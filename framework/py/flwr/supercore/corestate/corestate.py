@@ -245,7 +245,8 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> Agent | None:
         """Create an agent and its initial Space atomically.
 
-        The untitled Space contains the agent and its owning account.
+        The untitled Space contains the agent and its owning account, and is
+        recorded as the agent's default Space.
 
         Parameters
         ----------

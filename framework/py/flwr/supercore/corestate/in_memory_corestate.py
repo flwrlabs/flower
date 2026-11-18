@@ -188,6 +188,7 @@ class InMemoryCoreState(
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.agent_default_space_store: dict[int, UUID] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -608,27 +609,46 @@ class InMemoryCoreState(
             return None
         with self.lock_space_store, self.lock_agent_store:
             created_at = now().isoformat()
-            agent = Agent(
-                id=self.agent_id_counter + 1,
-                config=config,
-                created_at=created_at,
-                updated_at=created_at,
-            )
-            event_id = self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
-            self.agent_store.setdefault(flwr_aid, {})[agent.id] = agent
+            space_id = uuid4()
+            if space_id in self.space_store:
+                raise ValueError("Space ID already exists")
+            agent_id = self.agent_id_counter + 1
+            feed = self.user_event_store.setdefault(flwr_aid, [])
+            feed_start = len(feed)
             try:
-                self.create_space(
-                    participants=[
+                # Create the Space first so the agent can record it as its default.
+                space = Space(id=str(space_id), created_at=created_at)
+                self.space_store[space_id] = space
+                self.space_message_store[space_id] = []
+                agent = Agent(
+                    id=agent_id,
+                    config=config,
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+                self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
+                self.agent_default_space_store[agent_id] = space_id
+                space.participants.extend(
+                    [
                         SpaceParticipant(flwr_aid=flwr_aid),
-                        SpaceParticipant(agent_id=agent.id),
+                        SpaceParticipant(agent_id=agent_id),
                     ]
                 )
+                # Emit events after membership is complete, preserving their order.
+                self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
+                self.store_event(
+                    EventType.SPACE_CREATED, space, [flwr_aid], space_id=space_id
+                )
             except Exception:
-                del self.agent_store[flwr_aid][agent.id]
-                self.user_event_store[flwr_aid].remove(event_id)
-                del self.event_store[event_id]
+                for event_id in feed[feed_start:]:
+                    del self.event_store[event_id]
+                del feed[feed_start:]
+                self.agent_store.get(flwr_aid, {}).pop(agent_id, None)
+                self.agent_default_space_store.pop(agent_id, None)
+                self.space_store.pop(space_id, None)
+                self.space_message_store.pop(space_id, None)
                 raise
-            self.agent_id_counter = agent.id
+            self.agent_id_counter = agent_id
             return agent
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
