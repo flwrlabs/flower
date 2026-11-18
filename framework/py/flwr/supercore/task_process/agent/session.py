@@ -298,7 +298,7 @@ class RuntimeAgentConnectors(AgentConnectors):
     def __init__(self, agent_runtime: AgentRuntime) -> None:
         self._agent_runtime = agent_runtime
 
-    def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
+    def tools(self, names: Sequence[str], refresh: bool = False) -> list[JSONObject]:
         """Return schemas, optionally refreshing the runtime discovery cache."""
         return [
             tool
@@ -346,12 +346,14 @@ class AgentRuntime:
         self._task_id = task_id
         self._start_run_request = start_run_request
         self._events = events
-        self._discovered_tools: dict[str, list[JSONObject]] = {}
-        self._discovery_locks: defaultdict[str, Lock] = defaultdict(Lock)
+        self._discovered_tools: dict[tuple[str, int | None], list[JSONObject]] = {}
+        self._discovery_locks: defaultdict[tuple[str, int | None], Lock] = defaultdict(
+            Lock
+        )
         self._discovery_lock = Lock()
 
     def get_connector_tools(
-        self, connector_ref: str, *, refresh: bool = False
+        self, connector_ref: str, refresh: bool = False, connector_id: int | None = None
     ) -> list[JSONObject]:
         """Return static tools plus a copied, run-scoped dynamic catalog."""
         tools = get_connector_tools(connector_ref)
@@ -359,7 +361,9 @@ class AgentRuntime:
             return tools
         try:
             discovered = deepcopy(
-                self._discover_connector_tools(connector_ref, refresh=refresh)
+                self._discover_connector_tools(
+                    connector_ref, refresh=refresh, connector_id=connector_id
+                )
             )
         except HTTPStatusError as exc:
             error = FlowerError.from_json(exc.response.text)
@@ -384,23 +388,27 @@ class AgentRuntime:
         return tools + discovered
 
     def _discover_connector_tools(
-        self, connector_ref: str, *, refresh: bool = False
+        self, connector_ref: str, refresh: bool = False, connector_id: int | None = None
     ) -> list[JSONObject]:
         """Cache tool metadata and serialize discovery only within each connector."""
+        key = (connector_ref, connector_id)
         with self._discovery_lock:
-            lock = self._discovery_locks[connector_ref]
+            lock = self._discovery_locks[key]
         with lock:
             if refresh:
-                self._discovered_tools.pop(connector_ref, None)
-            if connector_ref in self._discovered_tools:
-                return self._discovered_tools[connector_ref]
+                self._discovered_tools.pop(key, None)
+            if key in self._discovered_tools:
+                return self._discovered_tools[key]
             operation = get_connector_discovery_tool(connector_ref)
             if operation is None:
                 raise ValueError(
                     f"Connector '{connector_ref}' has no discovery source."
                 )
             result = self.create_connector_response(
-                name=operation, call_id=uuid4().hex, arguments={}
+                name=operation,
+                call_id=uuid4().hex,
+                arguments={},
+                connector_id=connector_id,
             )
             if not isinstance(result, list) or not all(
                 isinstance(tool, dict) for tool in result
@@ -427,17 +435,23 @@ class AgentRuntime:
                         f"Connector '{connector_ref}' returned invalid tool names."
                     )
                 names.add(name.lower())
-            self._discovered_tools[connector_ref] = tools
+            self._discovered_tools[key] = tools
             return tools
 
     def create_connector_response(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
     ) -> JSONValue:
         """Create one connector response."""
         name = name.strip().lower()
         connector_ref = get_connector_ref(name)
         if is_dynamic_connector_tool(name):
-            catalog = self._discover_connector_tools(connector_ref)
+            catalog = self._discover_connector_tools(
+                connector_ref, connector_id=connector_id
+            )
             tool = next(
                 (tool for tool in catalog if cast(str, tool["name"]).lower() == name),
                 None,
@@ -446,7 +460,11 @@ class AgentRuntime:
                 raise ValueError(f"Unsupported discovered tool '{name}'.")
             name = cast(str, tool["name"])
         create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
+            CreateTaskRequest(
+                type=TaskType.CONNECTOR,
+                connector_ref=connector_ref,
+                connector_id=connector_id,
+            )
         )
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")
@@ -470,15 +488,20 @@ class AgentRuntime:
 
         return response_payload["output"]
 
-    def call_connector_with_events(
-        self, *, name: str, call_id: str, arguments: JSONObject
+    def call_connector_with_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
+        event_name: str | None = None,
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
         name = name.strip().lower()
         function_call: JSONObject = {
             "type": "function_call",
             "call_id": call_id,
-            "name": name,
+            "name": event_name or name,
             "arguments": strict_json_dumps(arguments, compact=True),
         }
         self.push_run_events([function_call])
@@ -488,6 +511,7 @@ class AgentRuntime:
                 name=name,
                 call_id=call_id,
                 arguments=arguments,
+                connector_id=connector_id,
             )
         except Exception:  # pylint: disable=broad-exception-caught
             error_output: JSONObject = {

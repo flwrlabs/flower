@@ -136,6 +136,7 @@ def test_connector_requires_exactly_one_existing_owner(
     """Accept one owner and require agent owners to reference an existing agent."""
     table = FlwrBase.metadata.tables[table_name]
     agent_table = FlwrBase.metadata.tables["agent"]
+    space_table = FlwrBase.metadata.tables["space"]
     timestamp = datetime.now(UTC)
     values: dict[str, object] = {
         "federation_id": federation_id,
@@ -157,6 +158,7 @@ def test_connector_requires_exactly_one_existing_owner(
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        space_table.create(conn)
         agent_table.create(conn)
         table.create(conn)
         conn.execute(
