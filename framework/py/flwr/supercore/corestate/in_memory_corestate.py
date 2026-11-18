@@ -625,6 +625,7 @@ class InMemoryCoreState(
                     config=config,
                     created_at=created_at,
                     updated_at=created_at,
+                    default_space_id=str(space_id),
                 )
                 self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
                 self.agent_default_space_store[agent_id] = space_id
