@@ -270,6 +270,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return an agent owned by the account, or None if it does not exist."""
 
     @abstractmethod
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID, or None if unavailable."""
+
+    @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order.
 
