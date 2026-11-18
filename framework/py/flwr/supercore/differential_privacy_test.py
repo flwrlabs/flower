@@ -18,6 +18,8 @@
 import numpy as np
 import pytest
 
+from flwr.compat.common.typing import NDArrays
+
 from .differential_privacy import (
     CLIENTS_DISCREPANCY_WARNING,
     KEY_CLIPPING_NORM,
@@ -226,7 +228,7 @@ def test_non_floating_arrays_raise_error() -> None:
     # Prepare: float weights update and an integer buffer (like num_batches_tracked)
     float_array = np.array([3.0, 4.0], dtype=np.float32)  # norm is 5.0
     int_array = np.array([10], dtype=np.int64)
-    updates = [float_array, int_array]
+    updates: NDArrays = [float_array, int_array]
 
     # Clipping and noise addition reject integer buffers with a clear error
     # instead of silently leaving them outside the DP guarantee
