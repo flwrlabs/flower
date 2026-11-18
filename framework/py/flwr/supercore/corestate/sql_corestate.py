@@ -2717,9 +2717,7 @@ def _agent_from_model(model: AgentModel) -> Agent:
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
-        default_space_id=(
-            str(model.default_space_id) if model.default_space_id is not None else ""
-        ),
+        default_space_id=str(model.default_space_id),
     )
 
 
