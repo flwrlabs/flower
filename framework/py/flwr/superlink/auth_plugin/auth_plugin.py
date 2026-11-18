@@ -26,28 +26,28 @@ from flwr.supercore.auth.typing import (
 
 
 class ControlAuthnPlugin(ABC):
-    """Await authentication I/O independently of synchronous Control handlers."""
+    """Authenticate Control requests through the synchronous plugin contract."""
 
     @abstractmethod
     def __init__(self) -> None:
         """Abstract constructor."""
 
     @abstractmethod
-    async def get_login_details(self) -> AccountAuthLoginDetails | None:
+    def get_login_details(self) -> AccountAuthLoginDetails | None:
         """Get the login details."""
 
     @abstractmethod
-    async def validate_tokens_in_metadata(
+    def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[bool, AuthenticatedUser | None]:
         """Validate authentication tokens in the provided metadata."""
 
     @abstractmethod
-    async def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
+    def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
 
     @abstractmethod
-    async def refresh_tokens(
+    def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""

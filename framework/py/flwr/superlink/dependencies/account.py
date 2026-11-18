@@ -40,7 +40,7 @@ class AccountAccessDependency:
     def __init__(self, authn_plugin: ControlAuthnPlugin) -> None:
         self.authn_plugin = authn_plugin
 
-    async def __call__(
+    def __call__(
         self,
         request: Request,
     ) -> AuthenticatedUser:
@@ -58,9 +58,7 @@ class AccountAccessDependency:
                 raise BearerAuthenticationError()
             metadata = [(ACCESS_TOKEN_KEY, access_token)]
 
-        valid_token, account = await self.authn_plugin.validate_tokens_in_metadata(
-            metadata
-        )
+        valid_token, account = self.authn_plugin.validate_tokens_in_metadata(metadata)
         if not valid_token:
             raise BearerAuthenticationError()
 
