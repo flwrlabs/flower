@@ -27,6 +27,12 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
 
+@pytest.fixture
+def anyio_backend() -> str:
+    """Run async authentication tests with the application event loop backend."""
+    return "asyncio"
+
+
 def _make_request(
     authorization_headers: tuple[str, ...] = ("Bearer access-token",),
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
@@ -57,7 +63,8 @@ def _make_app_request(app: FastAPI) -> Request:
 
 
 @pytest.mark.parametrize("scheme", ["Bearer", "bearer", "BEARER"])
-def test_account_access_dependency_returns_authenticated_account(
+@pytest.mark.anyio
+async def test_account_access_dependency_returns_authenticated_account(
     scheme: str,
 ) -> None:
     """AccountAccessDependency should return the account when tokens are valid."""
@@ -72,25 +79,28 @@ def test_account_access_dependency_returns_authenticated_account(
             (REFRESH_TOKEN_KEY.encode(), b"legacy-refresh-token"),
         ),
     )
-    result = AccountAccessDependency(authn_plugin)(request)
+    result = await AccountAccessDependency(authn_plugin)(request)
 
     assert result is account
-    authn_plugin.validate_tokens_in_metadata.assert_called_once_with(
+    authn_plugin.validate_tokens_in_metadata.assert_awaited_once_with(
         [(ACCESS_TOKEN_KEY, "access-token")]
     )
     authn_plugin.refresh_tokens.assert_not_called()
 
 
-def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> None:
+@pytest.mark.anyio
+async def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> (
+    None
+):
     """The authentication plugin can accept requests without credentials."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
     account = AuthenticatedUser(user_id="aid", handle="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
-    result = AccountAccessDependency(authn_plugin)(_make_request(()))
+    result = await AccountAccessDependency(authn_plugin)(_make_request(()))
 
     assert result is account
-    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
+    authn_plugin.validate_tokens_in_metadata.assert_awaited_once_with([])
 
 
 @pytest.mark.parametrize(
@@ -102,14 +112,17 @@ def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> N
         ("Bearer first-token", "Bearer second-token"),
     ],
 )
-def test_account_access_dependency_rejects_invalid_authorization_header(
+@pytest.mark.anyio
+async def test_account_access_dependency_rejects_invalid_authorization_header(
     authorization_headers: tuple[str, ...],
 ) -> None:
     """AccountAccessDependency should reject malformed or duplicate credentials."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
+        await AccountAccessDependency(authn_plugin)(
+            _make_request(authorization_headers)
+        )
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"
@@ -118,7 +131,10 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
     authn_plugin.refresh_tokens.assert_not_called()
 
 
-def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> None:
+@pytest.mark.anyio
+async def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> (
+    None
+):
     """Legacy Control metadata headers are not an HTTP authentication contract."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
@@ -131,12 +147,12 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
     )
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(request)
+        await AccountAccessDependency(authn_plugin)(request)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"
     assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
-    authn_plugin.validate_tokens_in_metadata.assert_called_once_with([])
+    authn_plugin.validate_tokens_in_metadata.assert_awaited_once_with([])
     authn_plugin.refresh_tokens.assert_not_called()
 
 
@@ -147,7 +163,8 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
         (True, None),
     ],
 )
-def test_account_access_dependency_rejects_unauthenticated_requests(
+@pytest.mark.anyio
+async def test_account_access_dependency_rejects_unauthenticated_requests(
     valid_token: bool,
     account: AuthenticatedUser | None,
 ) -> None:
@@ -156,7 +173,7 @@ def test_account_access_dependency_rejects_unauthenticated_requests(
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_token, account)
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
-        AccountAccessDependency(authn_plugin)(_make_request())
+        await AccountAccessDependency(authn_plugin)(_make_request())
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Not authenticated"

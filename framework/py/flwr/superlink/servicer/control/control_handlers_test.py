@@ -94,7 +94,7 @@ from .control_handlers import (
 _ACCOUNT = AuthenticatedUser(user_id="alice", handle="Alice")
 
 
-class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
+class TestControlHandlers(unittest.IsolatedAsyncioTestCase):  # pylint: disable=R0904
     """Test Control API handlers."""
 
     def setUp(self) -> None:
@@ -361,7 +361,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
             self.assertEqual(error.exception.code, ApiErrorCode.RUN_SERIES_ID_NOT_FOUND)
 
-    def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
+    async def test_refresh_auth_tokens_returns_rotated_tokens(self) -> None:
         """Return both tokens produced by the authentication plugin."""
         authn_plugin = Mock(spec=ControlAuthnPlugin)
         authn_plugin.refresh_tokens.return_value = (
@@ -372,23 +372,23 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             self.account,
         )
 
-        response = refresh_auth_tokens(
+        response = await refresh_auth_tokens(
             RefreshAuthTokensRequest(refresh_token="old-refresh-token"),
             authn_plugin,
         )
 
         self.assertEqual(response.access_token, "new-access-token")
         self.assertEqual(response.refresh_token, "new-refresh-token")
-        authn_plugin.refresh_tokens.assert_called_once_with(
+        authn_plugin.refresh_tokens.assert_awaited_once_with(
             [(REFRESH_TOKEN_KEY, "old-refresh-token")]
         )
 
-    def test_refresh_auth_tokens_rejects_missing_token(self) -> None:
+    async def test_refresh_auth_tokens_rejects_missing_token(self) -> None:
         """Reject an empty refresh token before invoking the plugin."""
         authn_plugin = Mock(spec=ControlAuthnPlugin)
 
         with self.assertRaises(FlowerError) as exc_context:
-            refresh_auth_tokens(RefreshAuthTokensRequest(), authn_plugin)
+            await refresh_auth_tokens(RefreshAuthTokensRequest(), authn_plugin)
 
         self.assertEqual(
             exc_context.exception.code,
@@ -396,7 +396,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
         authn_plugin.refresh_tokens.assert_not_called()
 
-    def test_refresh_auth_tokens_rejects_invalid_plugin_results(self) -> None:
+    async def test_refresh_auth_tokens_rejects_invalid_plugin_results(self) -> None:
         """Reject incomplete or malformed tokens and missing account information."""
         valid_tokens: list[tuple[str, str | bytes]] = [
             (ACCESS_TOKEN_KEY, "new-access-token"),
@@ -431,7 +431,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 authn_plugin.refresh_tokens.return_value = (tokens, account)
 
                 with self.assertRaises(FlowerError) as exc_context:
-                    refresh_auth_tokens(
+                    await refresh_auth_tokens(
                         RefreshAuthTokensRequest(refresh_token="secret-refresh-token"),
                         authn_plugin,
                     )
@@ -442,10 +442,12 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 )
                 self.assertNotIn("secret-refresh-token", str(exc_context.exception))
 
-    def test_refresh_auth_tokens_requires_authentication_plugin(self) -> None:
+    async def test_refresh_auth_tokens_requires_authentication_plugin(self) -> None:
         """Return the established error when authentication is unavailable."""
         with self.assertRaises(FlowerError) as exc_context:
-            refresh_auth_tokens(RefreshAuthTokensRequest(refresh_token="token"), None)
+            await refresh_auth_tokens(
+                RefreshAuthTokensRequest(refresh_token="token"), None
+            )
 
         self.assertEqual(exc_context.exception.code, ApiErrorCode.NO_ACCOUNT_AUTH)
 

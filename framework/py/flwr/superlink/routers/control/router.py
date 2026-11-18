@@ -406,30 +406,30 @@ def stop_automation(
 
 
 @router.post("/get-login-details")
-def get_login_details(
+async def get_login_details(
     request: Annotated[GetLoginDetailsRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
 ) -> GetLoginDetailsResponse:
     """Get login details."""
-    return control_handlers.get_login_details(request, authn_plugin)
+    return await control_handlers.get_login_details(request, authn_plugin)
 
 
 @router.post("/get-auth-tokens")
-def get_auth_tokens(
+async def get_auth_tokens(
     request: Annotated[GetAuthTokensRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
 ) -> GetAuthTokensResponse:
     """Get authentication tokens."""
-    return control_handlers.get_auth_tokens(request, authn_plugin)
+    return await control_handlers.get_auth_tokens(request, authn_plugin)
 
 
 @router.post("/refresh-auth-tokens")
-def refresh_auth_tokens(
+async def refresh_auth_tokens(
     request: Annotated[RefreshAuthTokensRequest, Depends(get_protobuf_request)],
     authn_plugin: AuthnPluginDependency,
 ) -> RefreshAuthTokensResponse:
     """Refresh authentication tokens."""
-    return control_handlers.refresh_auth_tokens(request, authn_plugin)
+    return await control_handlers.refresh_auth_tokens(request, authn_plugin)
 
 
 @router.post("/list-connectors")

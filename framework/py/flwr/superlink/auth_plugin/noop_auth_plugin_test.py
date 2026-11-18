@@ -22,38 +22,47 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from .noop_auth_plugin import NoOpControlAuthnPlugin
 
 
-def test_get_auth_tokens_reports_disabled_authentication() -> None:
+@pytest.fixture
+def anyio_backend() -> str:
+    """Run async authentication tests with the application event loop backend."""
+    return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_get_auth_tokens_reports_disabled_authentication() -> None:
     """Return a structured error when token polling is unsupported."""
     plugin = NoOpControlAuthnPlugin()
 
     with pytest.raises(FlowerError) as exc_info:
-        plugin.get_auth_tokens("device-code")
+        await plugin.get_auth_tokens("device-code")
 
     assert exc_info.value.code == ApiErrorCode.NO_ACCOUNT_AUTH
 
 
-def test_validate_tokens_returns_fresh_account_info() -> None:
+@pytest.mark.anyio
+async def test_validate_tokens_returns_fresh_account_info() -> None:
     """Return isolated account information for every validation."""
     plugin = NoOpControlAuthnPlugin()
 
-    _, first = plugin.validate_tokens_in_metadata([])
+    _, first = await plugin.validate_tokens_in_metadata([])
     assert first is not None
 
-    _, second = plugin.validate_tokens_in_metadata([])
+    _, second = await plugin.validate_tokens_in_metadata([])
     assert second is not None
     assert second is not first
     assert second.user_id == NOOP_FLWR_AID
     assert second.handle == NOOP_ACCOUNT_NAME
 
 
-def test_refresh_tokens_returns_fresh_account_info() -> None:
+@pytest.mark.anyio
+async def test_refresh_tokens_returns_fresh_account_info() -> None:
     """Return isolated account information for every token refresh."""
     plugin = NoOpControlAuthnPlugin()
 
-    _, first = plugin.refresh_tokens([])
+    _, first = await plugin.refresh_tokens([])
     assert first is not None
 
-    _, second = plugin.refresh_tokens([])
+    _, second = await plugin.refresh_tokens([])
     assert second is not None
     assert second is not first
     assert second.user_id == NOOP_FLWR_AID

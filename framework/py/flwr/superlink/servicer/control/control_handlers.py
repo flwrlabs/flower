@@ -1683,7 +1683,7 @@ def stop_run(
     return StopRunResponse(success=state.stop_run(run_id))
 
 
-def get_login_details(
+async def get_login_details(
     request: GetLoginDetailsRequest, authn_plugin: ControlAuthnPlugin | None
 ) -> GetLoginDetailsResponse:
     """Start login."""
@@ -1695,7 +1695,7 @@ def get_login_details(
         )
 
     # Get login details
-    details = authn_plugin.get_login_details()
+    details = await authn_plugin.get_login_details()
 
     # Return empty response if details is None
     if details is None:
@@ -1710,7 +1710,7 @@ def get_login_details(
     )
 
 
-def get_auth_tokens(
+async def get_auth_tokens(
     request: GetAuthTokensRequest, authn_plugin: ControlAuthnPlugin | None
 ) -> GetAuthTokensResponse:
     """Get auth token."""
@@ -1721,7 +1721,7 @@ def get_auth_tokens(
         )
 
     # Get auth tokens
-    credentials = authn_plugin.get_auth_tokens(request.device_code)
+    credentials = await authn_plugin.get_auth_tokens(request.device_code)
 
     # Return empty response if credentials is None
     if credentials is None:
@@ -1733,7 +1733,7 @@ def get_auth_tokens(
     )
 
 
-def refresh_auth_tokens(
+async def refresh_auth_tokens(
     request: RefreshAuthTokensRequest, authn_plugin: ControlAuthnPlugin | None
 ) -> RefreshAuthTokensResponse:
     """Refresh account authentication tokens."""
@@ -1749,7 +1749,7 @@ def refresh_auth_tokens(
             "Refresh token is missing.",
         )
 
-    tokens, account = authn_plugin.refresh_tokens(
+    tokens, account = await authn_plugin.refresh_tokens(
         [(REFRESH_TOKEN_KEY, request.refresh_token)]
     )
     access_token = get_metadata_str(tokens, ACCESS_TOKEN_KEY)

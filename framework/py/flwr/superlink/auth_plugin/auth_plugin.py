@@ -33,21 +33,21 @@ class ControlAuthnPlugin(ABC):
         """Abstract constructor."""
 
     @abstractmethod
-    def get_login_details(self) -> AccountAuthLoginDetails | None:
+    async def get_login_details(self) -> AccountAuthLoginDetails | None:
         """Get the login details."""
 
     @abstractmethod
-    def validate_tokens_in_metadata(
+    async def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[bool, AuthenticatedUser | None]:
         """Validate authentication tokens in the provided metadata."""
 
     @abstractmethod
-    def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
+    async def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
 
     @abstractmethod
-    def refresh_tokens(
+    async def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""

@@ -42,7 +42,7 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
     def __init__(self) -> None:
         pass
 
-    def get_login_details(self) -> AccountAuthLoginDetails | None:
+    async def get_login_details(self) -> AccountAuthLoginDetails | None:
         """Get the login details."""
         # This allows the `flwr login` command to load the NoOp plugin accordingly,
         # which then raises a LoginError when attempting to login.
@@ -54,20 +54,20 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
             interval=0,
         )
 
-    def validate_tokens_in_metadata(
+    async def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[bool, AuthenticatedUser | None]:
         """Return valid for no-op plugin."""
         return True, _create_noop_user()
 
-    def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
+    async def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
         raise FlowerError(
             ApiErrorCode.NO_ACCOUNT_AUTH,
             "Account authentication is not enabled on this SuperLink.",
         )
 
-    def refresh_tokens(
+    async def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""
