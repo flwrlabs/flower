@@ -185,11 +185,12 @@ def test_integer_buffer_in_updates_raises_clear_error() -> None:
         num_sampled_clients=2,
     )
 
-    # Initial model with float weights and an integer tracking buffer
+    # Initial model with float weights and a scalar integer tracking buffer
+    # (`num_batches_tracked` is a scalar in BatchNorm)
     arrays = ArrayRecord(
         {
             "weights": Array(np.array([1.0, 2.0], dtype=np.float32)),
-            "num_batches_tracked": Array(np.array([10], dtype=np.int64)),
+            "num_batches_tracked": Array(np.array(10, dtype=np.int64)),
         }
     )
 
@@ -201,7 +202,7 @@ def test_integer_buffer_in_updates_raises_clear_error() -> None:
             "arrays": ArrayRecord(
                 {
                     "weights": Array(np.array([1.5, 2.5], dtype=np.float32)),
-                    "num_batches_tracked": Array(np.array([15], dtype=np.int64)),
+                    "num_batches_tracked": Array(np.array(15, dtype=np.int64)),
                 }
             ),
             "metrics": MetricRecord({"num-examples": 1.0}),
@@ -215,7 +216,7 @@ def test_integer_buffer_in_updates_raises_clear_error() -> None:
             "arrays": ArrayRecord(
                 {
                     "weights": Array(np.array([2.5, 3.5], dtype=np.float32)),
-                    "num_batches_tracked": Array(np.array([15], dtype=np.int64)),
+                    "num_batches_tracked": Array(np.array(15, dtype=np.int64)),
                 }
             ),
             "metrics": MetricRecord({"num-examples": 1.0}),

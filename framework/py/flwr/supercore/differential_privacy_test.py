@@ -247,6 +247,20 @@ def test_non_floating_arrays_raise_error() -> None:
     )
 
 
+def test_scalar_integer_buffer_raises_error() -> None:
+    """Test that scalar integer buffers (BatchNorm's actual shape) raise an error."""
+    # BatchNorm's `num_batches_tracked` is a scalar integer buffer
+    scalar_buffer = np.array(10, dtype=np.int64)
+    float_array = np.array([3.0, 4.0], dtype=np.float32)
+
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        clip_inputs_inplace([float_array, scalar_buffer], clipping_norm=2.5)
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        adaptive_clip_inputs_inplace([float_array, scalar_buffer], clipping_norm=2.5)
+    with pytest.raises(ValueError, match="floating-point dtype"):
+        add_gaussian_noise_inplace([float_array, scalar_buffer], std_dev=0.5)
+
+
 def test_zero_norm_update_returns_gracefully() -> None:
     """Test zero norm does not cause ZeroDivisionError during clipping."""
     # Zero float updates (no parameter change)
