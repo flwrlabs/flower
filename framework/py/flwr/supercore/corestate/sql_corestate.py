@@ -734,7 +734,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return None
         created_at = now()
         with self.session() as session:
-            # Insert the Space first so the agent can reference it as its default.
+            # Flush Space first; a single flush inserts Agent first on SQLite.
             space_model = SpaceModel(id=uuid4(), title="", created_at=created_at)
             session.add(space_model)
             session.flush()
