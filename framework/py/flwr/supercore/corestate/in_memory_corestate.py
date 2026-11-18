@@ -656,6 +656,13 @@ class InMemoryCoreState(
         with self.lock_agent_store:
             return self.agent_store.get(flwr_aid, {}).get(agent_id)
 
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID."""
+        with self.lock_agent_store:
+            if agent_id not in self.agent_store.get(flwr_aid, {}):
+                return None
+            return self.agent_default_space_store.get(agent_id)
+
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
         if not flwr_aid:
