@@ -22,6 +22,7 @@ from collections.abc import Callable, Sequence
 
 from flwr.app import Context
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.supercore.typing import JSONObject
 
 # OpenResponses item types and streaming events used for run summaries.
@@ -192,6 +193,86 @@ class AgentSpace(ABC):
         """Publish a message and return a function_call_output item."""
 
 
+class AgentFiles(ABC):
+    """Persistent files owned by the authenticated agent."""
+
+    @abstractmethod
+    def get(self, key: str) -> File | None:
+        """Return the current file content and metadata.
+
+        Parameters
+        ----------
+        key : str
+            File key within the agent's scope.
+
+        Returns
+        -------
+        File | None
+            Content and metadata, or None if absent or deleted.
+        """
+
+    @abstractmethod
+    def put(
+        self, key: str, data: bytes, *, expected_revision: int | None = None
+    ) -> int:
+        """Create or update a file, preserving its previous revisions.
+
+        Parameters
+        ----------
+        key : str
+            Non-empty, non-whitespace file key, preserved unchanged.
+        data : bytes
+            File content to store.
+        expected_revision : int | None (default: None)
+            None means create-only and fails if a live file exists. Otherwise,
+            the current live revision must match for the update to succeed.
+
+        Returns
+        -------
+        int
+            The new revision ID.
+        """
+
+    @abstractmethod
+    def list(
+        self,
+        *,
+        prefix: str = "",
+        start_after: str = "",
+        limit: int | None = None,
+    ) -> tuple[list[FileMetadata], str]:
+        """List live file metadata in lexicographic key order.
+
+        Parameters
+        ----------
+        prefix : str (default: "")
+            Include only keys starting with this prefix.
+        start_after : str (default: "")
+            Exclusive key cursor; empty starts from the beginning.
+        limit : int | None (default: None)
+            Maximum number of entries. None returns all matches; zero returns
+            an empty page.
+
+        Returns
+        -------
+        tuple[list[FileMetadata], str]
+            Metadata and the next cursor, which is empty when no more remain.
+        """
+
+    @abstractmethod
+    def delete(self, key: str, *, expected_revision: int) -> None:
+        """Delete a file from the current view, retaining its history.
+
+        Parameters
+        ----------
+        key : str
+            File key within the agent's scope.
+        expected_revision : int
+            Must match the current live revision; missing or deleted files
+            also cause a revision conflict.
+        """
+
+
 class AgentSession(ABC):
     """Abstract base class for AgentApp runtime capabilities."""
 
@@ -219,6 +300,11 @@ class AgentSession(ABC):
     @abstractmethod
     def grid(self) -> AgentGrid:
         """Model-facing federation Grid API."""
+
+    @property
+    @abstractmethod
+    def files(self) -> AgentFiles:
+        """Persistent file API."""
 
     @property
     def space(self) -> AgentSpace | None:
