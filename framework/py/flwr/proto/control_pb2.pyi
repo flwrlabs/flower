@@ -74,9 +74,13 @@ class Agent(google.protobuf.message.Message):
     CONFIG_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
+    CONFIG_VERSION_FIELD_NUMBER: builtins.int
+    REVISION_FIELD_NUMBER: builtins.int
     id: builtins.int
     created_at: builtins.str
     updated_at: builtins.str
+    config_version: builtins.int
+    revision: builtins.int
     @property
     def config(self) -> global___AgentConfig: ...
     def __init__(
@@ -86,9 +90,11 @@ class Agent(google.protobuf.message.Message):
         config: global___AgentConfig | None = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
+        config_version: builtins.int = ...,
+        revision: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["config", b"config", "created_at", b"created_at", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "config_version", b"config_version", "created_at", b"created_at", "id", b"id", "revision", b"revision", "updated_at", b"updated_at"]) -> None: ...
 
 global___Agent = Agent
 

@@ -31,6 +31,7 @@ from uuid import UUID
 
 import pytest
 from parameterized import parameterized
+from sqlalchemy import update as sql_update
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
@@ -77,6 +78,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
+from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -93,6 +95,8 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.superlink.federation import NoOpFederationManager
@@ -242,6 +246,7 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
     )
     assert run_id
     assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    assert state.get_run_info(run_ids=[run_id])[0].agent_config_version == 1
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
@@ -251,6 +256,58 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
     )
 
     assert response.agent == agent
+
+
+def test_agent_task_input_keeps_accepted_configuration(tmp_path: Path) -> None:
+    """An updated agent cannot change the configuration of an accepted run."""
+    state = SqlLinkState(
+        str(tmp_path / "state.db"),
+        NoOpFederationManager(),
+        ObjectStoreFactory().store(),
+    )
+    state.initialize()
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Original", app_spec="@publisher/app")
+    )
+    assert agent is not None
+    fab_hash = state.store_fab(Fab("", b"agentapp-fab", {}))
+    run_id = state.create_run(
+        "publisher/app",
+        "1.0",
+        fab_hash,
+        {},
+        None,
+        None,
+        None,
+        TaskType.AGENT_APP,
+        space_id=UUID(state.get_spaces("alice")[0].id),
+        agent_id=agent.id,
+    )
+    assert run_id
+    with state.session() as session:
+        session.add(
+            AgentConfigModel(
+                agent_id=agent.id,
+                version=2,
+                name="Updated",
+                app_spec="@publisher/other-app",
+                created_at=datetime.now(UTC),
+            )
+        )
+        session.execute(
+            sql_update(AgentModel)
+            .where(AgentModel.agent_id == agent.id)
+            .values(config_version=2, revision=2)
+        )
+    acquired = core_runtime_handlers.acquire_task(
+        AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
+    )
+    response = runtime_handlers.pull_task_input(
+        PullTaskInputRequest(), state, acquired.task
+    )
+    assert response.agent.config == agent.config
+    assert response.agent.config_version == 1
+    assert response.run.agent_config_version == 1
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

@@ -611,6 +611,8 @@ class InMemoryCoreState(
             agent = Agent(
                 id=self.agent_id_counter + 1,
                 config=config,
+                config_version=1,
+                revision=1,
                 created_at=created_at,
                 updated_at=created_at,
             )
@@ -631,10 +633,15 @@ class InMemoryCoreState(
             self.agent_id_counter = agent.id
             return agent
 
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, config_version: int | None = None
+    ) -> Agent | None:
+        """Return an owned agent with its current or specified configuration version."""
         with self.lock_agent_store:
-            return self.agent_store.get(flwr_aid, {}).get(agent_id)
+            agent = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if agent is None or config_version not in (None, agent.config_version):
+                return None
+            return agent
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""

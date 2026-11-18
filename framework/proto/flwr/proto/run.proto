@@ -44,6 +44,8 @@ message Run {
   optional string space_id = 20;
   // Present when the server binds the run to an executing agent.
   optional uint64 agent_id = 21;
+  // Agent configuration pinned when the run is accepted.
+  optional uint64 agent_config_version = 22;
 }
 
 message RunStatus {

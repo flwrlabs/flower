@@ -40,6 +40,8 @@ message Agent {
   AgentConfig config = 2;
   string created_at = 3;
   string updated_at = 4;
+  uint64 config_version = 5;
+  uint64 revision = 6;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }

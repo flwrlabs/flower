@@ -955,6 +955,7 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         series_id=run.series_id or 0,
         space_id=run.space_id,
         agent_id=run.agent_id,
+        agent_config_version=run.agent_config_version,
     )
 
 

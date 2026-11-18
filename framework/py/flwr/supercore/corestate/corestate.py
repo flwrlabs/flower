@@ -265,8 +265,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account, or None if it does not exist."""
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, config_version: int | None = None
+    ) -> Agent | None:
+        """Return an owned agent with its current or specified configuration version."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:

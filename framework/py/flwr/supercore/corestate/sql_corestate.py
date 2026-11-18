@@ -767,15 +767,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return agent
 
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, config_version: int | None = None
+    ) -> Agent | None:
+        """Return an owned agent with its current or specified configuration version."""
+        version = (
+            AgentModel.config_version if config_version is None else config_version
+        )
         with self.session() as session:
             row = session.execute(
                 select(AgentModel, AgentConfigModel)
                 .join(
                     AgentConfigModel,
                     (AgentConfigModel.agent_id == AgentModel.agent_id)
-                    & (AgentConfigModel.version == AgentModel.config_version),
+                    & (AgentConfigModel.version == version),
                 )
                 .where(
                     AgentModel.flwr_aid == flwr_aid,
@@ -2706,6 +2711,8 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
             description=config.description,
             app_spec=config.app_spec,
         ),
+        config_version=config.version,
+        revision=model.revision,
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
     )

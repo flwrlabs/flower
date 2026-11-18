@@ -383,6 +383,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self.lock_space_store,
             self.lock_agent_store,
         ):
+            agent_config_version = None
             if space_id is not None and space_id not in self.space_store:
                 return 0
             if space_id is not None and agent_id is not None:
@@ -399,6 +400,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     for owner, agents in self.agent_store.items()
                     if agent_id in agents
                 )
+                agent_config_version = agent.config_version
                 app_id, version = parse_app_spec(agent.config.app_spec)
                 if app_id != f"@{fab_id}" or (version and version != fab_version):
                     return 0
@@ -452,6 +454,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
                     agent_id=agent_id,
+                    agent_config_version=agent_config_version,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,

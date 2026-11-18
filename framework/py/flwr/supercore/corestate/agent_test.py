@@ -68,11 +68,15 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert first is not None and other is not None and second is not None
     assert 0 < first.id < other.id < second.id
     assert first.config == config
+    assert first.config_version == first.revision == 1
     assert other.config == minimal_config
     assert first.created_at and first.updated_at == first.created_at
     assert state.list_agents("alice") == [first, second]
     assert state.list_agents("bob") == [other]
     assert state.get_agent("alice", first.id) == first
+    assert state.get_agent("alice", first.id, config_version=1) == first
+    assert state.get_agent("alice", first.id, config_version=2) is None
+    assert state.get_agent("bob", first.id, config_version=1) is None
     assert state.get_agent("bob", first.id) is None
     assert state.get_agent("alice", other.id) is None
     assert state.list_agents("unknown") == []
@@ -105,11 +109,11 @@ def test_sql_agent_retains_previous_configuration(state: CoreState) -> None:
     current = state.get_agent("alice", original.id)
     assert current is not None
     assert current.config.name == "Updated"
-    with state.session() as session:
-        previous = session.get(AgentConfigModel, (original.id, 1))
-        assert previous is not None
-        assert previous.name == original.config.name
-        assert previous.app_spec == original.config.app_spec
+    assert current.config_version == current.revision == 2
+    previous = state.get_agent("alice", original.id, config_version=1)
+    assert previous is not None
+    assert previous.config == original.config
+    assert previous.config_version == 1
     assert state.list_agents("alice") == [current]
 
 

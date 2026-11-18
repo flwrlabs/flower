@@ -661,6 +661,8 @@ def run_to_proto(run: Run) -> ProtoRun:
         proto.space_id = str(run.space_id)
     if run.agent_id is not None:
         proto.agent_id = run.agent_id
+    if run.agent_config_version is not None:
+        proto.agent_config_version = run.agent_config_version
     return proto
 
 
@@ -690,6 +692,11 @@ def run_from_proto(run_proto: ProtoRun) -> Run:
         account_name=run_proto.account_name,
         space_id=(UUID(run_proto.space_id) if run_proto.HasField("space_id") else None),
         agent_id=(run_proto.agent_id if run_proto.HasField("agent_id") else None),
+        agent_config_version=(
+            run_proto.agent_config_version
+            if run_proto.HasField("agent_config_version")
+            else None
+        ),
     )
     return run
 
