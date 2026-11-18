@@ -36399,7 +36399,7 @@ msgstr ""
 msgid ""
 ":py:obj:`get_connections "
 "<flwr.agentapp.AgentConnectors.get_connections>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.get_connections:1 of
@@ -36411,7 +36411,7 @@ msgstr ""
 msgid ""
 ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\[\\, "
 "refresh\\]\\)"
-msgstr ":py:obj:`pop <flwr.common.MetricsRecord.pop>`\\ \\(k\\[\\,d\\]\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
@@ -36542,7 +36542,7 @@ msgstr "返回类型"
 #: ../../source/ref-api/flwr.agentapp.AgentConnectors.rst
 #, fuzzy
 msgid "Raises"
-msgstr "类别"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.get_connections:7 of
 msgid "If the session does not support agent-owned connections."
@@ -36781,7 +36781,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`identity <flwr.agentapp.AgentSession.identity>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.identity:1 of

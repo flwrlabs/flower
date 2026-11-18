@@ -42759,7 +42759,7 @@ msgstr ""
 msgid ""
 ":py:obj:`get_connections "
 "<flwr.agentapp.AgentConnectors.get_connections>`\\ \\(\\)"
-msgstr ":py:obj:`keys <flwr.app.ConfigRecord.keys>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.get_connections:1 of
@@ -42772,8 +42772,6 @@ msgid ""
 ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ \\(names\\[\\, "
 "refresh\\]\\)"
 msgstr ""
-":py:obj:`ServerApp <flwr.serverapp.ServerApp>`\\ \\(\\[server\\, "
-"config\\, strategy\\, ...\\]\\)"
 
 #: flwr.agentapp.base.AgentConnectors.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentConnectors.tools:1 of
@@ -43138,7 +43136,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`identity <flwr.agentapp.AgentSession.identity>`\\"
-msgstr ":py:obj:`state <flwr.app.Context.state>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.identity:1 of
