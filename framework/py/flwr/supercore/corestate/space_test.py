@@ -73,14 +73,14 @@ def test_create_and_list_spaces(state: CoreState) -> None:
     )
 
 
-def test_latest_user_prompt(state: CoreState) -> None:
+def test_latest_user_message(state: CoreState) -> None:
     """Summarize each space's newest user message without consuming history."""
     agent = state.create_agent(
         "alice", AgentConfig(name="Agent", app_spec="@flower/research")
     )
     assert agent is not None
     personal = state.get_spaces("alice")[0]
-    assert personal.latest_user_prompt == ""
+    assert personal.latest_user_message == ""
     alice = SpaceParticipant(flwr_aid="alice")
     bob = SpaceParticipant(flwr_aid="bob")
     author = SpaceParticipant(agent_id=agent.id)
@@ -96,9 +96,9 @@ def test_latest_user_prompt(state: CoreState) -> None:
     state.create_space_message(UUID(other.id), alice, "Other space")
     expected = {personal.id: "", shared.id: prompt, other.id: "Other space"}
     assert {
-        space.id: space.latest_user_prompt for space in state.get_spaces("alice")
+        space.id: space.latest_user_message for space in state.get_spaces("alice")
     } == expected
-    assert previous.latest_user_prompt == "First prompt"
+    assert previous.latest_user_message == "First prompt"
     assert state.get_space_messages(space_id, alice, unread_only=True) == [
         first,
         latest,

@@ -172,7 +172,7 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
-    space.latest_user_prompt = message.content
+    space.latest_user_message = message.content
     listed = client.post(
         "/v1/control/list-spaces",
         content=ListSpacesRequest().SerializeToString(),
@@ -1358,7 +1358,7 @@ def test_bootstrap_uses_authenticated_account(
     snapshot = BootstrapResponse.FromString(response.content)
     assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.spaces[0].latest_user_prompt == "Latest prompt"
+    assert snapshot.spaces[0].latest_user_message == "Latest prompt"
     assert snapshot.cursor == 3
 
 

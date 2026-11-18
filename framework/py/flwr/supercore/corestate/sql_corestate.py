@@ -1395,9 +1395,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces with their latest user prompt, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
-        latest_user_prompt = (
+        latest_user_message = (
             select(SpaceMessageModel.content)
             .where(
                 SpaceMessageModel.space_id == SpaceModel.id,
@@ -1411,7 +1411,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         query = (
             select(
                 SpaceModel,
-                latest_user_prompt,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1431,7 +1431,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
-                    spaces[model.id].latest_user_prompt = prompt or ""
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)

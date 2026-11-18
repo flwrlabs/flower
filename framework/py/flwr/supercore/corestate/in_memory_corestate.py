@@ -1144,7 +1144,7 @@ class InMemoryCoreState(
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces with their latest user prompt, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipant(flwr_aid=flwr_aid)
         with self.lock_space_store:
             spaces = []
@@ -1153,7 +1153,7 @@ class InMemoryCoreState(
                     continue
                 result = Space()
                 result.CopyFrom(space)
-                result.latest_user_prompt = next(
+                result.latest_user_message = next(
                     (
                         message.content
                         for message in reversed(self.space_message_store[space_id])
