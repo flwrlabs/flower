@@ -1059,7 +1059,7 @@ def test_list_runs_returns_runs_from_linkstate(
     linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
     run.flwr_aid = _ACCOUNT.user_id
-    linkstate.get_run_info.return_value = [run]
+    linkstate.get_run.return_value = [run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
@@ -1079,7 +1079,7 @@ def test_list_runs_returns_runs_from_linkstate(
     assert set(proto_response.run_dict) == {7}
     assert proto_response.run_dict[7].account_name == _ACCOUNT.handle
     assert datetime.fromisoformat(proto_response.now)
-    assert linkstate.get_run_info.call_args_list == [
+    assert linkstate.get_run.call_args_list == [
         call(
             flwr_aids=[_ACCOUNT.user_id],
             federation_ids=[NOOP_FEDERATION_ID, None],
@@ -1098,7 +1098,7 @@ def test_list_runs_cleans_finished_runs_on_page() -> None:
     page_run = Run.create_empty(7)
     page_run.flwr_aid = _ACCOUNT.user_id
     page_run.status.status = Status.FINISHED
-    linkstate.get_run_info.return_value = [page_run]
+    linkstate.get_run.return_value = [page_run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -1120,7 +1120,7 @@ def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     """Control HTTP rejects invalid access tokens without refreshing them."""
     linkstate = Mock(spec=LinkState)
     authn_plugin = Mock(spec=ControlAuthnPlugin)
-    linkstate.get_run_info.return_value = []
+    linkstate.get_run.return_value = []
     app = _create_app(authn_plugin=authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
@@ -1267,7 +1267,7 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
 def test_stream_logs_returns_missing_run_error_before_streaming() -> None:
     """Return a JSON error instead of opening a stream for an unknown run."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = []
+    linkstate.get_run.return_value = []
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -1296,7 +1296,7 @@ def test_pull_artifacts_returns_provider_url() -> None:
     run.federation_id = NOOP_FEDERATION_ID
     run.flwr_aid = _ACCOUNT.user_id
     run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-    linkstate.get_run_info.return_value = [run]
+    linkstate.get_run.return_value = [run]
     artifact_provider = Mock(spec=ArtifactProvider)
     artifact_provider.get_url.return_value = "https://artifacts.example/run-7.zip"
     app = _create_app()
@@ -1323,7 +1323,7 @@ def test_pull_artifacts_returns_provider_url() -> None:
 def test_stream_run_events_returns_missing_run_error_before_streaming() -> None:
     """Return a JSON error instead of opening an event stream for an unknown run."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = []
+    linkstate.get_run.return_value = []
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
