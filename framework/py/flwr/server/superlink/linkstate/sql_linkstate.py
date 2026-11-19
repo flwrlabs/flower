@@ -95,13 +95,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
 
-    def _get_run_space_id(self, run_id: int) -> UUID | None:
-        """Return the run's Space without advancing its task lifecycle."""
-        with self.session() as session:
-            return session.scalar(
-                select(RunModel.space_id).where(RunModel.run_id == run_id)
-            )
-
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
         with self.session() as session:
@@ -530,6 +523,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         task_id=task_id,
                         type=primary_task_type,
                         run_id=run_id,
+                        space_id=space_id,
                         fab_hash=fab_hash,
                         model_ref=None,
                         connector_ref=None,

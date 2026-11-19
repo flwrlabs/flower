@@ -194,6 +194,56 @@ class TestAlembicRun(unittest.TestCase):
 
         self.assertEqual(normalize(actual), normalize(expected))
 
+    def test_task_space_id_migration(self) -> None:
+        """Backfill primary and child tasks and preserve tasks through downgrade."""
+        engine = self.create_engine()
+        self.addCleanup(engine.dispose)
+        self.upgrade_to_revision(engine, "3fb31831d5eb")
+        config = build_alembic_config(engine)
+        space = "00000000000000000000000000000001"
+        with engine.connect() as conn:
+            config.attributes["connection"] = conn
+            conn.execute(text("PRAGMA foreign_keys = ON"))
+            conn.execute(
+                text(
+                    "INSERT INTO space (id, created_at, title) "
+                    "VALUES (:space, CURRENT_TIMESTAMP, '')"
+                ),
+                {"space": space},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO run (run_id, primary_task_id, space_id) "
+                    "VALUES (1, 1, :space), (2, 3, NULL)"
+                ),
+                {"space": space},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO task (task_id, run_id, type, pending_at) VALUES "
+                    "(1, 1, 'agentapp', CURRENT_TIMESTAMP), "
+                    "(2, 1, 'model', CURRENT_TIMESTAMP), "
+                    "(3, 2, 'serverapp', CURRENT_TIMESTAMP)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO task_event (task_id, run_id, timestamp, event, data) "
+                    "VALUES (1, 1, CURRENT_TIMESTAMP, 'test', '{}')"
+                )
+            )
+            conn.commit()
+            command.upgrade(config, "head")
+            self.assertEqual(
+                conn.execute(text("SELECT space_id FROM task ORDER BY task_id")).all(),
+                [(space,), (space,), (None,)],
+            )
+            conn.commit()
+            command.downgrade(config, "3fb31831d5eb")
+            self.assertEqual(conn.scalar(text("SELECT COUNT(*) FROM task")), 3)
+            self.assertEqual(conn.scalar(text("SELECT COUNT(*) FROM task_event")), 1)
+            self.assertEqual(conn.execute(text("PRAGMA foreign_key_check")).all(), [])
+
     def test_require_agent_default_space_id(self) -> None:
         """Remove only agents missing a default Space and their foreign-key rows."""
         engine = self.create_engine()

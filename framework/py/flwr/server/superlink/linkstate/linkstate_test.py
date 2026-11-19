@@ -68,7 +68,7 @@ from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
@@ -514,6 +514,11 @@ class StateTest(CoreStateTest):
         assert created["type"] == "run.created"
         assert created["payload"]["run_id"] == str(run_id)
         assert created["payload"]["primary_task_id"] == str(task_id)
+        assert all(event["payload"]["space_id"] == space.id for event in events)
+        assert all(
+            Task.FromString(task.SerializeToString()).space_id == space.id
+            for task in state.get_tasks(run_ids=[run_id])
+        )
         assert [
             (
                 event["type"],
@@ -841,6 +846,7 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+        self.assertEqual(tasks[0].space_id, "")
 
     def test_create_run_binds_connectors(self) -> None:
         """Creating a run should atomically persist its connector allowlist."""

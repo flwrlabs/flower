@@ -277,6 +277,7 @@ erDiagram
     TIMESTAMP pending_at
     BIGINT run_id
     TIMESTAMP running_at "nullable"
+    CHAR(32) space_id "nullable"
     TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK

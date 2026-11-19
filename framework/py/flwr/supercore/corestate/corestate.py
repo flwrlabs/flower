@@ -114,15 +114,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             A sequence of Run objects representing runs matching the specified filters.
         """
 
-    @abstractmethod
-    def _get_run_space_id(self, run_id: int) -> UUID | None:
-        """Return a run's locally stored Space ID without expiring tasks."""
-
     def _store_task_lifecycle_event(self, event_type: str, task: Task) -> None:
         """Store a task snapshot for participants of its Space."""
-        space_id = self._get_run_space_id(task.run_id)
-        if space_id is not None:
-            self.store_event(event_type, task, space_id=space_id)
+        if task.space_id:
+            self.store_event(event_type, task, space_id=UUID(task.space_id))
 
     @property
     @abstractmethod

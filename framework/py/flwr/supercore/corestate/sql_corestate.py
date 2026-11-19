@@ -2118,6 +2118,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
             literal(run_id, type_=TaskModel.run_id.type),
+            select(TaskModel.space_id)
+            .where(TaskModel.run_id == run_id, TaskModel.space_id.is_not(None))
+            .limit(1)
+            .scalar_subquery(),
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
@@ -2141,6 +2145,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     TaskModel.task_id,
                     TaskModel.type,
                     TaskModel.run_id,
+                    TaskModel.space_id,
                     TaskModel.fab_hash,
                     TaskModel.model_ref,
                     TaskModel.connector_ref,
@@ -2851,6 +2856,7 @@ def task_from_model(model: TaskModel) -> Task:
         task_id=model.task_id,
         type=model.type,
         run_id=model.run_id,
+        space_id=str(model.space_id) if model.space_id is not None else "",
         pending_at=timestamp_to_iso(model.pending_at),
         starting_at=timestamp_to_iso(model.starting_at),
         running_at=timestamp_to_iso(model.running_at),

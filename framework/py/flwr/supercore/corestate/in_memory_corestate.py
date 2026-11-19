@@ -1703,6 +1703,14 @@ class InMemoryCoreState(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
+                space_id=next(
+                    (
+                        task.space_id
+                        for task in self.task_store.values()
+                        if task.run_id == run_id and task.space_id
+                    ),
+                    "",
+                ),
                 status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
                 pending_at=now().isoformat(),
                 fab_hash=fab_hash,
