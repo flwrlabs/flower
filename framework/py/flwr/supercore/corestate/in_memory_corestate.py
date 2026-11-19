@@ -1171,14 +1171,24 @@ class InMemoryCoreState(
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipant(flwr_aid=flwr_aid)
         with self.lock_space_store:
-            spaces = [
-                space
-                for space in self.space_store.values()
-                if viewer in space.participants
-            ]
+            spaces = []
+            for space_id, space in self.space_store.items():
+                if viewer not in space.participants:
+                    continue
+                result = Space()
+                result.CopyFrom(space)
+                result.latest_user_message = next(
+                    (
+                        message.content
+                        for message in reversed(self.space_message_store[space_id])
+                        if message.author.HasField("flwr_aid")
+                    ),
+                    "",
+                )
+                spaces.append(result)
             spaces.sort(key=lambda item: item.created_at, reverse=True)
             return spaces
 
