@@ -261,6 +261,16 @@ files: both contain no comma, so the comma-counting branch would otherwise read 
 one as one listed GPU and export ``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and
 schedule onto a device ROCr never actually exposed.
 
+The snippet also exports ``ROCR_VISIBLE_DEVICES`` itself, in case it was only a plain
+shell variable rather than an exported one -- for example a setup script that assigned
+it without ``export``, then was merely sourced into the current shell. Left
+un-exported, a child process such as the one ``flwr run`` launches would inherit no
+ROCr filter at all, while the ``HIP_VISIBLE_DEVICES`` this snippet synthesizes still
+assumes that filter applied, so the child indexes into the unfiltered physical device
+set instead of the ROCr-renumbered one and ends up on the wrong GPU. This mirrors the
+export ``HIP_VISIBLE_DEVICES`` itself receives further below when it was already set
+but not exported.
+
 When ``HIP_VISIBLE_DEVICES`` is already set, do not simply trust it, either: validate
 that every value it names is actually an ordinal ROCr's filtering leaves available,
 rather than assuming any existing nonempty value is already expressed correctly. A
@@ -304,6 +314,15 @@ exported, silently leaving Ray's original import failure in place:
 
     unset _n
     if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
+        # ROCR_VISIBLE_DEVICES may only be a plain shell variable, not an
+        # exported one (e.g. a setup script assigned it without `export`,
+        # then was merely sourced) -- a child process would then inherit no
+        # ROCr filter at all, while HIP_VISIBLE_DEVICES is still derived
+        # below as if that filter applied, pointing the child at the wrong
+        # physical device. Export it unconditionally, before using its value
+        # for anything below, since every branch here relies on the child
+        # process seeing the same mask this derivation is based on.
+        export ROCR_VISIBLE_DEVICES
         if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
             [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
             _n=0
@@ -739,31 +758,37 @@ what else it can detect about device access:
   this as inconclusive rather than a permissions problem, and does not suggest the
   group/container fix -- check this process's open-file limit and the kernel/``dmesg``
   log for driver errors instead.
-- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node is accessible at all,
-  Flower reports that render-node gap instead -- again stating that ``ROCM_PATH`` will
-  not help, since ROCm needs both device nodes. Fix render-node access the same way as
-  ``/dev/kfd`` access above.
-- If ``/dev/kfd`` is accessible but opening the render node fails for a reason other
-  than permissions, Flower likewise reports this as inconclusive rather than a
-  permissions problem -- check this process's open-file limit and the kernel/``dmesg``
-  log the same way as the ``/dev/kfd`` case above.
-- If ``/dev/kfd`` and a render node are both accessible, but that render node is not
-  AMD-backed -- for example a hybrid host or container exposing an integrated Intel
-  GPU's ``renderD128`` while the AMD device's own render node is missing or
-  permission-denied -- Flower reports that vendor mismatch instead, again stating that
-  ``ROCM_PATH`` will not help. Fix render-node pass-through/permissions so that an
-  AMD-backed node specifically (identified by its sysfs PCI vendor ID) is accessible,
-  not just any render node.
-- If ``/dev/kfd`` and a render node are both accessible, but this host cannot determine
-  that render node's PCI vendor ID at all -- sysfs is missing or unreadable, as in some
-  restricted containers -- Flower reports the vendor as undetermined rather than
-  guessing either way, and does not name ``ROCM_PATH`` as the fix, since the node is not
-  confirmed AMD-backed. Check the node's vendor manually (``cat
+- If ``/dev/kfd`` is accessible, Flower determines each ``/dev/dri/renderD*`` node's PCI
+  vendor from sysfs first, independent of whether that node itself can be opened -- a
+  hybrid host or container can expose an unrelated, non-AMD node (e.g. an integrated
+  Intel GPU's ``renderD128``) in any access state alongside an AMD-backed node that fails
+  to open, and only the AMD-backed node's state is actually relevant. If an AMD-backed
+  render node is permission-denied, Flower reports that render-node gap -- again stating
+  that ``ROCM_PATH`` will not help, since ROCm needs both device nodes. Fix render-node
+  access the same way as ``/dev/kfd`` access above.
+- If the AMD-backed render node instead fails to open for a reason other than
+  permissions, Flower likewise reports this as inconclusive rather than a permissions
+  problem -- check this process's open-file limit and the kernel/``dmesg`` log the same
+  way as the ``/dev/kfd`` case above. If one AMD-backed node is permission-denied while
+  another fails inconclusively, Flower reports both outcomes together rather than
+  letting one mask the other, since fixing only one would not necessarily restore GPU
+  discovery.
+- If every render node found is confirmed not AMD-backed -- for example a hybrid host or
+  container exposing only an integrated Intel GPU's ``renderD128``, in any access
+  state -- Flower reports that vendor mismatch instead, again stating that ``ROCM_PATH``
+  will not help. Fix render-node pass-through/permissions so that an AMD-backed node
+  specifically (identified by its sysfs PCI vendor ID) is accessible, not just any
+  render node.
+- If no render node is confirmed AMD-backed, but this host cannot determine at least one
+  node's PCI vendor ID at all -- sysfs is missing or unreadable, as in some restricted
+  containers -- Flower reports the vendor as undetermined rather than guessing either
+  way, and does not name ``ROCM_PATH`` as the fix, since the node is not confirmed
+  AMD-backed. Check the node's vendor manually (``cat
   /sys/class/drm/<node>/device/vendor``, expecting ``0x1002`` for AMD) before assuming
   ``ROCM_PATH`` is the issue -- it is not if this node turns out not to be AMD's.
-- Only when both ``/dev/kfd`` and an AMD-backed render node are accessible does Flower
-  name the ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at the
-  ROCm SMI library`_.
+- Only when ``/dev/kfd`` is accessible and an AMD-backed render node actually opens does
+  Flower name the ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at
+  the ROCm SMI library`_.
 
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
@@ -785,11 +810,16 @@ the driver's own ``/dev/kfd``/render-node state cannot diagnose a different mach
   share a device namespace just from the endpoint address: a loopback literal
   (``ray://127.0.0.1:10001``) or a hostname/LAN address that happens to resolve back to
   this host can still be an SSH port forward or a sidecar sharing only the network
-  namespace, with the server's ``/dev`` elsewhere. In that ambiguous case Flower logs a
-  warning naming the endpoint and still runs the six checks above against this host, on
-  the chance the connection is genuinely co-located; only once the endpoint resolves to
-  an address confirmed *not* to be this host does Flower skip the checks outright and
-  point you at the remote node instead.
+  namespace, with the server's ``/dev`` elsewhere -- and the absence of a local match
+  does not prove the opposite either, since a NAT-hairpinned or VIP address can resolve
+  to this same host while never itself binding to a local interface. Because neither
+  outcome can be confirmed from the endpoint alone, Flower always treats a Ray Client
+  connection as ambiguous rather than attempting -- and risking -- a remoteness
+  determination: it logs a warning naming the endpoint and unconditionally runs the
+  seven checks above against this host, on the chance the connection is genuinely
+  co-located. There is no confirmed-remote case that skips the checks outright; if the
+  Ray Client server does turn out to run elsewhere, this warning's instructions do not
+  apply, and device access must be checked on that actual server host instead.
 
 CPU or GPU capacity is too small for even one client
 ----------------------------------------------------
