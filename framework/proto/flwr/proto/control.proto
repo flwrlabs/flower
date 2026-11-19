@@ -44,6 +44,7 @@ message Agent {
   AgentConfig config = 2;
   string created_at = 3;
   string updated_at = 4;
+  string default_space_id = 5;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }
