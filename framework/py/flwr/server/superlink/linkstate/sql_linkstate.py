@@ -600,6 +600,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -621,6 +622,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not run_ids:
                 return []
             stmt = stmt.where(RunModel.run_id.in_(run_ids))
+
+        if space_ids is not None:
+            stmt = stmt.where(RunModel.space_id.in_(space_ids))
 
         # Filter by statuses
         if statuses is not None:
@@ -668,10 +672,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             stmt = stmt.limit(limit)
 
         with self.session() as session:
-            rows = session.execute(stmt).all()
             return [
                 _run_from_models(run_model, task_model)
-                for run_model, task_model in rows
+                for run_model, task_model in session.execute(stmt)
             ]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:

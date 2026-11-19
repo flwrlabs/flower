@@ -50,8 +50,16 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import AgentConfig, StartRunRequest  # pylint: disable=E0611
+from flwr.common.serde import (
+    message_from_proto,
+    message_to_proto,
+    user_config_from_proto,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
+    BootstrapResponse,
+    StartRunRequest,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -558,6 +566,39 @@ class StateTest(CoreStateTest):
         assert child[-1].payload["finished_at"] == primary[-1].payload["finished_at"]
         assert state.get_user_events("bob") == []
 
+    def test_bootstrap_active_runs(self) -> None:
+        """Bootstrap includes visible active agent runs and omits finished runs."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        space_id = UUID(state.get_spaces("alice")[0].id)
+        run_id = state.create_run(
+            "publisher/app",
+            "1.0",
+            state.store_fab(Fab("", b"fab", {})),
+            {"test_key": "test_value"},
+            None,
+            None,
+            None,
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
+        snapshot = state.get_bootstrap("alice")
+        assert BootstrapResponse.FromString(snapshot.SerializeToString()) == snapshot
+        (run,) = snapshot.active_runs
+        assert run.run_id == run_id
+        assert run.agent_id == agent.id
+        assert run.space_id == str(space_id)
+        assert run.status.status == Status.PENDING
+        assert user_config_from_proto(run.override_config) == {"test_key": "test_value"}
+        state.create_space(participants=[SpaceParticipant(flwr_aid="bob")])
+        assert state.get_bootstrap("bob").active_runs == []
+        assert state.stop_run(run_id)
+        assert state.get_bootstrap("alice").active_runs == []
+
     def test_create_space_run(self) -> None:
         """Create a Space AgentApp run without federation or series resources."""
         state = self.state_factory()
@@ -916,6 +957,7 @@ class StateTest(CoreStateTest):
         """Distinguish unrestricted, empty, Space-only, and mixed filters."""
         state = self.state_factory()
         federation_run_id = create_dummy_run(state)
+        space_id = UUID(state.create_space(participants=[]).id)
         space_run_id = state.create_run(
             "flwr/test",
             "1.0",
@@ -925,24 +967,30 @@ class StateTest(CoreStateTest):
             None,
             "account",
             TaskType.AGENT_APP,
-            space_id=UUID(state.create_space(participants=[]).id),
+            space_id=space_id,
             user_prompt="Hello",
         )
 
-        cases: list[tuple[list[str | None] | None, set[int]]] = [
-            (None, {federation_run_id, space_run_id}),
-            ([], set()),
-            ([None], {space_run_id}),
-            ([NOOP_FEDERATION_ID], {federation_run_id}),
-            ([NOOP_FEDERATION_ID, None], {federation_run_id, space_run_id}),
+        cases: list[tuple[dict[str, Any], set[int]]] = [
+            ({}, {federation_run_id, space_run_id}),
+            ({"federation_ids": []}, set()),
+            ({"federation_ids": [None]}, {space_run_id}),
+            ({"federation_ids": [NOOP_FEDERATION_ID]}, {federation_run_id}),
+            (
+                {"federation_ids": [NOOP_FEDERATION_ID, None]},
+                {federation_run_id, space_run_id},
+            ),
+            ({"space_ids": [space_id]}, {space_run_id}),
+            ({"space_ids": []}, set()),
+            (
+                {"space_ids": [space_id], "federation_ids": [NOOP_FEDERATION_ID]},
+                set(),
+            ),
         ]
-        for federation_ids, expected in cases:
-            with self.subTest(federation_ids=federation_ids):
+        for filters, expected in cases:
+            with self.subTest(filters=str(filters)):
                 self.assertSetEqual(
-                    {
-                        run.run_id
-                        for run in state.get_run(federation_ids=federation_ids)
-                    },
+                    {run.run_id for run in state.get_run(**filters)},
                     expected,
                 )
 

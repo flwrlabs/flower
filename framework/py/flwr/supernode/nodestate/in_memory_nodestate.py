@@ -93,6 +93,7 @@ class InMemoryNodeState(
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -111,6 +112,8 @@ class InMemoryNodeState(
                     for run_id in set(run_ids)
                     if run_id in self.run_store
                 ]
+            if space_ids is not None:
+                runs = [run for run in runs if run.space_id in space_ids]
             if statuses is not None:
                 runs = [run for run in runs if run.status.status in statuses]
             if flwr_aids is not None:

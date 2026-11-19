@@ -118,13 +118,15 @@ message ListRunsResponse {
   string now = 2;
 }
 
-// Agents and Spaces only. Message history is fetched through GetSpaceMessages.
+// Agents, Spaces and active runs. Message history is fetched through
+// GetSpaceMessages.
 message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;
   repeated Space spaces = 2;
   // Feed head from the same snapshot as agents and spaces.
   uint64 cursor = 3;
+  repeated Run active_runs = 4;
 }
 
 message Event {
