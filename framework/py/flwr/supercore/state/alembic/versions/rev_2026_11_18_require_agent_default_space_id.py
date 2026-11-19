@@ -15,7 +15,7 @@
 """Require agent default Space ID.
 
 Revision ID: 3fb31831d5eb
-Revises: 0d0ae5ae64ef
+Revises: 0969435b9ca6
 Create Date: 2026-11-18 16:57:14.110463
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "3fb31831d5eb"
-down_revision: str | Sequence[str] | None = "0d0ae5ae64ef"
+down_revision: str | Sequence[str] | None = "0969435b9ca6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
