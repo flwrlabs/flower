@@ -37,7 +37,7 @@ For macOS
 For Ubuntu
 ----------
 
-Ensure you system (Ubuntu 22.04+) is up-to-date, and you have all necessary packages:
+Ensure your system (Ubuntu 22.04+) is up-to-date, and you have all necessary packages:
 
 ::
 
