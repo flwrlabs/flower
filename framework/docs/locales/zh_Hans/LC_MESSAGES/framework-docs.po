@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.44.0.md:2
 #, fuzzy
 msgid "v1.44.0 (2026-11-18)"
-msgstr "v1.4.0 (2023-04-21)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -118,11 +118,6 @@ msgid ""
 "`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng "
 "Pan`, `Javier`, `Taner Topal`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -206,9 +201,6 @@ msgid ""
 "[#8487](https://github.com/flwrlabs/flower/pull/8487), "
 "[#8490](https://github.com/flwrlabs/flower/pull/8490))"
 msgstr ""
-"**更新代码示例** ([#1291](https://github.com/adap/flower/pull/1291), "
-"[#1286](https://github.com/adap/flower/pull/1286), "
-"[#1282](https://github.com/adap/flower/pull/1282))"
 
 #: ../../source/changelog/v1.44.0.md:18
 msgid ""
@@ -244,13 +236,6 @@ msgid ""
 "[#8556](https://github.com/flwrlabs/flower/pull/8556), "
 "[#8558](https://github.com/flwrlabs/flower/pull/8558))"
 msgstr ""
-"**引入（试验性）REST API** ([#1594](https://github.com/adap/flower/pull/1594), "
-"[#1690](https://github.com/adap/flower/pull/1690), "
-"[#1695](https://github.com/adap/flower/pull/1695), "
-"[#1712](https://github.com/adap/flower/pull/1712), "
-"[#1802](https://github.com/adap/flower/pull/1802), "
-"[#1770](https://github.com/adap/flower/pull/1770), "
-"[#1733](https://github.com/adap/flower/pull/1733))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -36234,7 +36219,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentFiles <flwr.agentapp.AgentFiles>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles:1 of
@@ -36793,14 +36778,14 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentFiles.rst:2
 #, fuzzy
 msgid "AgentFiles"
-msgstr "构建文档"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
 msgid ""
 ":py:obj:`delete <flwr.agentapp.AgentFiles.delete>`\\ \\(key\\, \\*\\, "
 "expected\\_revision\\)"
-msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
@@ -36810,13 +36795,13 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`get <flwr.agentapp.AgentFiles.get>`\\ \\(key\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.get:1 of
 #, fuzzy
 msgid "Return the current file content and metadata."
-msgstr "当前（全局）模型参数。"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
@@ -36824,8 +36809,6 @@ msgid ""
 ":py:obj:`list <flwr.agentapp.AgentFiles.list>`\\ \\(\\*\\[\\, prefix\\, "
 "start\\_after\\, limit\\]\\)"
 msgstr ""
-":py:obj:`ClientApp <flwr.client.ClientApp>`\\ \\(\\[client\\_fn\\, "
-"mods\\]\\)"
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.list:1 of
@@ -36883,7 +36866,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.put:5 of
 #, fuzzy
 msgid "File content to store."
-msgstr "评估客户端的反应。"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.put:7 of
 msgid ""
@@ -37007,7 +36990,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`files <flwr.agentapp.AgentSession.files>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.files:1 of

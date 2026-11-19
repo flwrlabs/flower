@@ -32175,7 +32175,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentFiles.rst:2
 #, fuzzy
 msgid "AgentFiles"
-msgstr "Argumento de compilação"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 msgid ""

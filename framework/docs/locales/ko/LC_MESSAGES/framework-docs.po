@@ -32589,7 +32589,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentFiles <flwr.agentapp.AgentFiles>`\\ \\(\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles:1 of
@@ -33143,14 +33143,14 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.AgentFiles.rst:2
 #, fuzzy
 msgid "AgentFiles"
-msgstr "빌드 전달인자"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
 msgid ""
 ":py:obj:`delete <flwr.agentapp.AgentFiles.delete>`\\ \\(key\\, \\*\\, "
 "expected\\_revision\\)"
-msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
@@ -33160,13 +33160,13 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`get <flwr.agentapp.AgentFiles.get>`\\ \\(key\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.get:1 of
 #, fuzzy
 msgid "Return the current file content and metadata."
-msgstr "현재(전역) 모델 매개변수입니다."
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
@@ -33174,8 +33174,6 @@ msgid ""
 ":py:obj:`list <flwr.agentapp.AgentFiles.list>`\\ \\(\\*\\[\\, prefix\\, "
 "start\\_after\\, limit\\]\\)"
 msgstr ""
-":py:obj:`ClientApp <flwr.client.ClientApp>`\\ \\(\\[client\\_fn\\, "
-"mods\\]\\)"
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.list:1 of
@@ -33233,7 +33231,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.put:5 of
 #, fuzzy
 msgid "File content to store."
-msgstr "이 메시지의 내용입니다."
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.put:7 of
 msgid ""
@@ -33356,7 +33354,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`files <flwr.agentapp.AgentSession.files>`\\"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.files:1 of

@@ -120,8 +120,6 @@ msgid ""
 "`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng "
 "Pan`, `Javier`, `Taner Topal`"
 msgstr ""
-"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Heng Pan`, "
-"`Javier`, `Taner Topal` <!---TOKEN_v1.26.1-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -205,10 +203,6 @@ msgid ""
 "[#8487](https://github.com/flwrlabs/flower/pull/8487), "
 "[#8490](https://github.com/flwrlabs/flower/pull/8490))"
 msgstr ""
-"**Updated Examples** "
-"([#4895](https://github.com/flwrlabs/flower/pull/4895), "
-"[#4158](https://github.com/flwrlabs/flower/pull/4158), "
-"[#4879](https://github.com/flwrlabs/flower/pull/4879))"
 
 #: ../../source/changelog/v1.44.0.md:18
 msgid ""
@@ -244,25 +238,6 @@ msgid ""
 "[#8556](https://github.com/flwrlabs/flower/pull/8556), "
 "[#8558](https://github.com/flwrlabs/flower/pull/8558))"
 msgstr ""
-"**General improvements** "
-"([#4631](https://github.com/flwrlabs/flower/pull/4631), "
-"[#4660](https://github.com/flwrlabs/flower/pull/4660), "
-"[#4599](https://github.com/flwrlabs/flower/pull/4599), "
-"[#4672](https://github.com/flwrlabs/flower/pull/4672), "
-"[#4705](https://github.com/flwrlabs/flower/pull/4705), "
-"[#4688](https://github.com/flwrlabs/flower/pull/4688), "
-"[#4691](https://github.com/flwrlabs/flower/pull/4691), "
-"[#4706](https://github.com/flwrlabs/flower/pull/4706), "
-"[#4709](https://github.com/flwrlabs/flower/pull/4709), "
-"[#4623](https://github.com/flwrlabs/flower/pull/4623), "
-"[#4697](https://github.com/flwrlabs/flower/pull/4697), "
-"[#4597](https://github.com/flwrlabs/flower/pull/4597), "
-"[#4721](https://github.com/flwrlabs/flower/pull/4721), "
-"[#4730](https://github.com/flwrlabs/flower/pull/4730), "
-"[#4720](https://github.com/flwrlabs/flower/pull/4720), "
-"[#4747](https://github.com/flwrlabs/flower/pull/4747), "
-"[#4716](https://github.com/flwrlabs/flower/pull/4716), "
-"[#4752](https://github.com/flwrlabs/flower/pull/4752))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -42610,7 +42585,7 @@ msgstr ""
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`AgentFiles <flwr.agentapp.AgentFiles>`\\ \\(\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles:1 of
@@ -43165,8 +43140,6 @@ msgid ""
 ":py:obj:`delete <flwr.agentapp.AgentFiles.delete>`\\ \\(key\\, \\*\\, "
 "expected\\_revision\\)"
 msgstr ""
-":py:obj:`evaluate <flwr.clientapp.ClientApp.evaluate>`\\ \\(\\[action\\, "
-"mods\\]\\)"
 
 #: flwr.agentapp.base.AgentFiles.delete:1
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
@@ -43176,13 +43149,13 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`get <flwr.agentapp.AgentFiles.get>`\\ \\(key\\)"
-msgstr ":py:obj:`lifespan <flwr.clientapp.ClientApp.lifespan>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.get:1 of
 #, fuzzy
 msgid "Return the current file content and metadata."
-msgstr "``arrays``: Les paramètres du modèle global actuels"
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1 of
 #, fuzzy
@@ -43190,8 +43163,6 @@ msgid ""
 ":py:obj:`list <flwr.agentapp.AgentFiles.list>`\\ \\(\\*\\[\\, prefix\\, "
 "start\\_after\\, limit\\]\\)"
 msgstr ""
-":py:obj:`ClientApp <flwr.clientapp.ClientApp>`\\ \\(\\[client\\_fn\\, "
-"mods\\]\\)"
 
 #: flwr.agentapp.base.AgentFiles.delete:1:<autosummary>:1
 #: flwr.agentapp.base.AgentFiles.list:1 of
@@ -43249,7 +43220,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentFiles.put:5 of
 #, fuzzy
 msgid "File content to store."
-msgstr "Le contenu de ce message."
+msgstr ""
 
 #: flwr.agentapp.base.AgentFiles.put:7 of
 msgid ""
@@ -43372,7 +43343,7 @@ msgstr ""
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`files <flwr.agentapp.AgentSession.files>`\\"
-msgstr ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
+msgstr ""
 
 #: flwr.agentapp.AgentSession.connectors:1:<autosummary>:1
 #: flwr.agentapp.AgentSession.files:1 of
