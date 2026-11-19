@@ -163,15 +163,6 @@ def test_space_routes(
     assert response.status_code == 200
     space = CreateSpaceResponse.FromString(response.content).space
     assert list(space.participants) == [caller, agent_participant]
-    listed = client.post(
-        "/v1/control/list-spaces",
-        content=ListSpacesRequest().SerializeToString(),
-    )
-    assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
-        space,
-        personal,
-    ]
     response = client.post(
         "/v1/control/send-space-message",
         content=SendSpaceMessageRequest(
@@ -181,6 +172,16 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
+    space.latest_user_message = message.content
+    listed = client.post(
+        "/v1/control/list-spaces",
+        content=ListSpacesRequest().SerializeToString(),
+    )
+    assert listed.status_code == 200
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
+        space,
+        personal,
+    ]
     history = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
@@ -1362,11 +1363,15 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
 def test_bootstrap_uses_authenticated_account(
     space_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Return the caller's Agents, Spaces, and cursor without message history."""
+    """Return the caller's Agents, Space summaries, and cursor."""
     client, state = space_client
     config = AgentConfig(name="Agent", app_spec="@test/app")
     state.create_agent(_ACCOUNT.flwr_aid, config)
     state.create_agent("other-account", config)
+    space = state.get_spaces(_ACCOUNT.flwr_aid)[0]
+    state.create_space_message(
+        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid), "Latest prompt"
+    )
     response = client.post(
         "/v1/control/bootstrap",
         content=BootstrapRequest().SerializeToString(),
@@ -1376,7 +1381,8 @@ def test_bootstrap_uses_authenticated_account(
     snapshot = BootstrapResponse.FromString(response.content)
     assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.cursor == 2
+    assert snapshot.spaces[0].latest_user_message == "Latest prompt"
+    assert snapshot.cursor == 3
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
