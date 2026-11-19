@@ -49,7 +49,11 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import message_from_proto, message_to_proto
+from flwr.common.serde import (
+    message_from_proto,
+    message_to_proto,
+    user_config_from_proto,
+)
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     BootstrapResponse,
@@ -494,7 +498,7 @@ class StateTest(CoreStateTest):
             "publisher/app",
             "1.0",
             state.store_fab(Fab("", b"fab", {})),
-            {"private": "secret"},
+            {"test_key": "test_value"},
             None,
             None,
             None,
@@ -509,7 +513,7 @@ class StateTest(CoreStateTest):
         assert run.agent_id == agent.id
         assert run.space_id == str(space_id)
         assert run.status.status == Status.PENDING
-        assert not run.override_config
+        assert user_config_from_proto(run.override_config) == {"test_key": "test_value"}
         state.create_space(participants=[SpaceParticipant(flwr_aid="bob")])
         assert state.get_bootstrap("bob").active_runs == []
         assert state.stop_run(run_id)
@@ -873,6 +877,7 @@ class StateTest(CoreStateTest):
         """Distinguish unrestricted, empty, Space-only, and mixed filters."""
         state = self.state_factory()
         federation_run_id = create_dummy_run(state)
+        space_id = UUID(state.create_space(participants=[]).id)
         space_run_id = state.create_run(
             "flwr/test",
             "1.0",
@@ -882,24 +887,30 @@ class StateTest(CoreStateTest):
             None,
             "account",
             TaskType.AGENT_APP,
-            space_id=UUID(state.create_space(participants=[]).id),
+            space_id=space_id,
             user_prompt="Hello",
         )
 
-        cases: list[tuple[list[str | None] | None, set[int]]] = [
-            (None, {federation_run_id, space_run_id}),
-            ([], set()),
-            ([None], {space_run_id}),
-            ([NOOP_FEDERATION_ID], {federation_run_id}),
-            ([NOOP_FEDERATION_ID, None], {federation_run_id, space_run_id}),
+        cases: list[tuple[dict[str, Any], set[int]]] = [
+            ({}, {federation_run_id, space_run_id}),
+            ({"federation_ids": []}, set()),
+            ({"federation_ids": [None]}, {space_run_id}),
+            ({"federation_ids": [NOOP_FEDERATION_ID]}, {federation_run_id}),
+            (
+                {"federation_ids": [NOOP_FEDERATION_ID, None]},
+                {federation_run_id, space_run_id},
+            ),
+            ({"space_ids": [space_id]}, {space_run_id}),
+            ({"space_ids": []}, set()),
+            (
+                {"space_ids": [space_id], "federation_ids": [NOOP_FEDERATION_ID]},
+                set(),
+            ),
         ]
-        for federation_ids, expected in cases:
-            with self.subTest(federation_ids=federation_ids):
+        for filters, expected in cases:
+            with self.subTest(filters=filters):
                 self.assertSetEqual(
-                    {
-                        run.run_id
-                        for run in state.get_run(federation_ids=federation_ids)
-                    },
+                    {run.run_id for run in state.get_run(**filters)},
                     expected,
                 )
 

@@ -55,7 +55,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
+from flwr.common.serde import recorddict_from_proto, recorddict_to_proto, run_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -160,7 +160,6 @@ from .utils import (
     context_from_bytes,
     context_to_bytes,
     generate_rand_int_from_bytes,
-    run_activity_to_proto,
     timestamp_to_iso,
     validate_event_cursor,
     validate_message_metadata,
@@ -823,22 +822,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         agents = self.list_agents(flwr_aid)
         spaces = self.get_spaces(flwr_aid)
-        space_ids = {UUID(space.id) for space in spaces}
-        runs = (
-            self.get_run(
-                federation_ids=[None],
-                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
-            )
-            if spaces
-            else []
-        )
         return BootstrapResponse(
             agents=agents,
             spaces=spaces,
             active_runs=[
-                run_activity_to_proto(run)
-                for run in runs
-                if run.space_id in space_ids and run.agent_id is not None
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
             ],
             cursor=head or 0,
         )

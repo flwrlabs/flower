@@ -40,6 +40,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
     AgentConfig,
@@ -83,7 +84,6 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
-    run_activity_to_proto,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -679,22 +679,16 @@ class InMemoryCoreState(
             head = len(self.user_event_store.get(flwr_aid, []))
         agents = self.list_agents(flwr_aid)
         spaces = self.get_spaces(flwr_aid)
-        space_ids = {UUID(space.id) for space in spaces}
-        runs = (
-            self.get_run(
-                federation_ids=[None],
-                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
-            )
-            if spaces
-            else []
-        )
         return BootstrapResponse(
             agents=agents,
             spaces=spaces,
             active_runs=[
-                run_activity_to_proto(run)
-                for run in runs
-                if run.space_id in space_ids and run.agent_id is not None
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
             ],
             cursor=head,
         )
