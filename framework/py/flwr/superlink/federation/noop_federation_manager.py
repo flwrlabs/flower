@@ -114,7 +114,7 @@ class NoOpFederationManager(FederationManager):
         if federation_id != NOOP_FEDERATION_ID:
             raise ValueError(f"Federation '{federation_id}' does not exist.")
 
-        runs = list(self.linkstate.get_run_info(flwr_aids=[NOOP_FLWR_AID]))
+        runs = list(self.linkstate.get_run(flwr_aids=[NOOP_FLWR_AID]))
         nodes = list(self.linkstate.get_node_info(owner_aids=[NOOP_FLWR_AID]))
         only_account = Account(id=NOOP_FLWR_AID, name=NOOP_ACCOUNT_NAME)
         return Federation(

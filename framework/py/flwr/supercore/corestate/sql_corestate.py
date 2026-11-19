@@ -745,6 +745,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
+                avatar=config.avatar,
+                color=config.color,
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 default_space_id=space_model.id,
@@ -828,13 +830,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun,
-        recipients: Sequence[str],
+        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         with self.session() as session:
+            if recipients is None:
+                if space_id is None:
+                    raise ValueError("Provide recipients or a space_id")
+                recipients = session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                ).all()
             session.execute(
                 insert(EventModel).values(
                     event_id=event_id,
@@ -1428,11 +1439,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
+        latest_user_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.flwr_aid.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1447,9 +1470,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, member_flwr_aid, member_agent_id in session.execute(query):
+            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+                query
+            ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
@@ -1495,17 +1521,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if model is None:
                 return None
             message = _space_message_from_model(model)
-            recipients = list(
-                session.scalars(
-                    select(SpaceParticipantTable.c.flwr_aid).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.flwr_aid.is_not(None),
-                    )
-                )
-            )
-            self.store_event(
-                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
-            )
+            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
@@ -2123,13 +2139,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 ],
                 task_values,
             )
-            .returning(TaskModel.task_id)
+            .returning(TaskModel)
         )
 
         with self.session() as session:
             try:
-                if session.scalar(insert_stmt) is None:
+                task = session.scalar(insert_stmt)
+                if task is None:
                     return None
+                self._store_task_lifecycle_event(
+                    EventType.TASK_CREATED, task_from_model(task)
+                )
                 return task_id
             except IntegrityError:
                 return None
@@ -2257,7 +2277,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
             with self.session() as session:
-                claimed_task_id = session.scalar(
+                task = session.scalar(
                     update(TaskModel)
                     .where(
                         TaskModel.task_id == task_id,
@@ -2269,12 +2289,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         active_until=active_until,
                         starting_at=claimed_at,
                     )
-                    .returning(TaskModel.task_id)
+                    .returning(TaskModel)
                 )
-            if claimed_task_id is None:
-                return None
-
-            return token
+                if task is None:
+                    return None
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(task)
+                )
+                return token
         except IntegrityError:
             # Rare failure: generated token already exists (duplicate)
             return None
@@ -2291,16 +2313,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
             # Activation is a strict STARTING -> RUNNING transition.
-            activated_task_id = session.scalar(
+            task = session.scalar(
                 update(TaskModel)
                 .where(
                     TaskModel.task_id == task_id,
                     _task_status_filter(Status.STARTING),
                 )
                 .values(running_at=activated_at, active_until=active_until)
-                .returning(TaskModel.task_id)
+                .returning(TaskModel)
             )
-        return activated_task_id is not None
+            if task is None:
+                return False
+            self._store_task_lifecycle_event(
+                EventType.TASK_UPDATED, task_from_model(task)
+            )
+            return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -2319,16 +2346,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if sub_status == SubStatus.COMPLETED:
                 query = query.where(TaskModel.running_at.is_not(None))
 
-            finished_task_id = session.scalar(
+            task = session.scalar(
                 query.values(
                     finished_at=now(),
                     sub_status=sub_status,
                     details=details,
                     active_until=None,
                     token=None,
-                ).returning(TaskModel.task_id)
+                ).returning(TaskModel)
             )
-            return finished_task_id is not None
+            if task is None:
+                return False
+            self._store_task_lifecycle_event(
+                EventType.TASK_UPDATED, task_from_model(task)
+            )
+            return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
@@ -2611,7 +2643,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expired_at = now()
         with self.session() as session:
             # Claims that never reached RUNNING are retryable launch failures.
-            session.execute(
+            pending_tasks = session.scalars(
                 update(TaskModel)
                 .where(
                     TaskModel.token.is_not(None),
@@ -2625,7 +2657,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     sub_status="",
                     details="",
                 )
-            )
+                .returning(TaskModel)
+            ).all()
 
             # Expired running task claims are terminal failures and lose their token.
             expired_tasks = [
@@ -2647,7 +2680,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
-            # Commit expiry and its lifecycle events together.
+            for model in pending_tasks:
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(model)
+                )
+            for task in expired_tasks:
+                self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
             if expired_tasks:
                 self._on_task_tokens_expired(expired_tasks)
 
@@ -2715,10 +2753,13 @@ def _agent_from_model(model: AgentModel) -> Agent:
             name=model.name,
             title=model.title,
             description=model.description,
+            avatar=model.avatar,
+            color=model.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+        default_space_id=str(model.default_space_id),
     )
 
 

@@ -122,7 +122,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
@@ -156,7 +156,7 @@ router = APIRouter(
 )
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
-AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+AccountDependency = Annotated[AuthenticatedUser, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 ProtobufStreamContextDependency = Annotated[
     ProtobufStreamContext, Depends(get_protobuf_stream_context)

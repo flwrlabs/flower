@@ -51,6 +51,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -63,6 +64,61 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_node_id(self) -> int:
         """Return the ID of the node owning this CoreState."""
+
+    @abstractmethod
+    def get_run(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+        skip: int = 0,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of run status values to filter by.
+        flwr_aids : Optional[Sequence[str]] (default: None)
+            Sequence of Flower Account IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
+
+        Returns
+        -------
+        Sequence[Run]
+            A sequence of Run objects representing runs matching the specified filters.
+        """
+
+    @abstractmethod
+    def _get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return a run's locally stored Space ID without expiring tasks."""
+
+    def _store_task_lifecycle_event(self, event_type: str, task: Task) -> None:
+        """Store a task snapshot for participants of its Space."""
+        space_id = self._get_run_space_id(task.run_id)
+        if space_id is not None:
+            self.store_event(event_type, task, space_id=space_id)
 
     @property
     @abstractmethod
@@ -300,11 +356,14 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun,
-        recipients: Sequence[str],
+        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Store a shared event and its ordered deliveries, returning its UUID.
+
+        When recipients are omitted, space_id is required and all current user
+        participants receive the event. An empty sequence creates no deliveries.
 
         Each call creates a new event with a generated UUID and creation timestamp.
         SQL callers can use an enclosing session to commit application changes
@@ -759,7 +818,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """List spaces the user participates in."""
+        """List participating spaces with their latest user message, newest first."""
 
     @abstractmethod
     def create_space_message(
