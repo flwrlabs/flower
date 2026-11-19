@@ -288,7 +288,7 @@ def test_kfd_accessible_but_no_usable_render_node_reports_render_node(
     output = caplog.text
     assert "python -c 'import amdsmi'" not in output
     assert "cannot open it" not in output
-    assert "no accessible `/dev/dri/renderD*` node" in output
+    assert "no `/dev/dri/renderD*` node was found at all" in output
     assert "render" in output
 
 
