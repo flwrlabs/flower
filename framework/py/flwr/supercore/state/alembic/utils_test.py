@@ -198,7 +198,7 @@ class TestAlembicRun(unittest.TestCase):
         """Remove only agents missing a default Space and their foreign-key rows."""
         engine = self.create_engine()
         self.addCleanup(engine.dispose)
-        self.upgrade_to_revision(engine, "0d0ae5ae64ef")
+        self.upgrade_to_revision(engine, "0969435b9ca6")
         config = build_alembic_config(engine)
         space = "00000000000000000000000000000001"
         children = {
@@ -272,7 +272,7 @@ class TestAlembicRun(unittest.TestCase):
                 conn.execute(text("UPDATE agent SET default_space_id = NULL"))
             conn.commit()
 
-            command.downgrade(config, "0d0ae5ae64ef")
+            command.downgrade(config, "0969435b9ca6")
             conn.execute(text("UPDATE agent SET default_space_id = NULL"))
             conn.commit()
             self.assertEqual(
