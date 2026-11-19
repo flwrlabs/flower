@@ -744,6 +744,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
+                avatar=config.avatar,
+                color=config.color,
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 default_space_id=space_model.id,
@@ -1427,11 +1429,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
+        latest_user_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.flwr_aid.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1446,9 +1460,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, member_flwr_aid, member_agent_id in session.execute(query):
+            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+                query
+            ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
@@ -2713,6 +2730,8 @@ def _agent_from_model(model: AgentModel) -> Agent:
             name=model.name,
             title=model.title,
             description=model.description,
+            avatar=model.avatar,
+            color=model.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),

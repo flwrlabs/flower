@@ -45,10 +45,16 @@ class AgentConfig(google.protobuf.message.Message):
     DESCRIPTION_FIELD_NUMBER: builtins.int
     TITLE_FIELD_NUMBER: builtins.int
     APP_SPEC_FIELD_NUMBER: builtins.int
+    AVATAR_FIELD_NUMBER: builtins.int
+    COLOR_FIELD_NUMBER: builtins.int
     name: builtins.str
     description: builtins.str
     title: builtins.str
     app_spec: builtins.str
+    avatar: builtins.str
+    """Frontend preset avatar identifier."""
+    color: builtins.str
+    """Frontend color identifier."""
     def __init__(
         self,
         *,
@@ -56,9 +62,11 @@ class AgentConfig(google.protobuf.message.Message):
         description: builtins.str | None = ...,
         title: builtins.str | None = ...,
         app_spec: builtins.str = ...,
+        avatar: builtins.str = ...,
+        color: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_description", b"_description", "_title", b"_title", "description", b"description", "title", b"title"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_description", b"_description", "_title", b"_title", "app_spec", b"app_spec", "description", b"description", "name", b"name", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_description", b"_description", "_title", b"_title", "app_spec", b"app_spec", "avatar", b"avatar", "color", b"color", "description", b"description", "name", b"name", "title", b"title"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_description", b"_description"]) -> typing.Literal["description"] | None: ...
     @typing.overload
