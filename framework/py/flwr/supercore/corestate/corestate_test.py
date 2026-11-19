@@ -2662,6 +2662,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         snapshot = state.get_bootstrap("alice")
         self.assertEqual(list(snapshot.agents), [agent])
         self.assertEqual(list(snapshot.spaces), list(state.get_spaces("alice")))
+        self.assertEqual(list(snapshot.active_runs), [])
         self.assertEqual(snapshot.cursor, 2)
         self.assertEqual(state.get_bootstrap("bob").cursor, 0)
         alice = SpaceParticipant(flwr_aid="alice")

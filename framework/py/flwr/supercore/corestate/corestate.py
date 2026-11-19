@@ -69,6 +69,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -80,6 +81,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Retrieve information about runs based on the specified filters.
 
         - If a filter is set to None, it is ignored.
+        - An empty filter sequence matches no runs.
         - If multiple filters are provided, they are combined using AND logic.
         - Within each filter, provided values are combined using OR logic.
 
@@ -87,6 +89,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         run_ids : Optional[Sequence[int]] (default: None)
             Sequence of run IDs to filter by.
+        space_ids : Optional[Sequence[UUID]] (default: None)
+            Sequence of Space IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)

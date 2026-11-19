@@ -40,6 +40,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
     AgentConfig,
@@ -676,9 +677,19 @@ class InMemoryCoreState(
         """Read the feed cursor before fetching visible state."""
         with self.lock_space_store:
             head = len(self.user_event_store.get(flwr_aid, []))
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=[
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
+            ],
             cursor=head,
         )
 
