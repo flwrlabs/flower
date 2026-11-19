@@ -1,0 +1,135 @@
+name: Flower Discuss Monitor
+
+on:
+  schedule:
+    - cron: '0 9 */2 * *'  # Every second day at 09:00 UTC
+  workflow_dispatch:       # Allow manual trigger
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - name: Run Flower Discuss monitoring
+        run: |
+          pip install requests
+
+          python3 - <<EOF
+          import requests
+          from datetime import datetime, timezone
+          import os
+
+          # === CONFIG ===
+          DISCOURSE_BASE_URL = "https://discuss.flower.ai"
+          SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+
+          # === SETTINGS ===
+          CATEGORY_ID = 5  # 'In Discussion'
+          STALE_THRESHOLD_DAYS = 14
+          EXTERNAL_REPLY_THRESHOLD_DAYS = 7
+          ARCHIVE_THRESHOLD_DAYS = 30
+          NEW_TOPIC_DAYS = 2
+
+          def is_flower_maintainer(username):
+              return username in {
+                  "williamlm", "javier", "mohammad", "charles", "julian", "robert",
+                  "daniel", "danny", "pan-h", "chongshenng", "taner", "flower", "stephane", "ruth92",
+                  "danielnata", "dimitris", "yan-gao", "sasi.murakonda",
+              }
+
+          def get_topics_in_category(category_id):
+              url = f"{DISCOURSE_BASE_URL}/c/{category_id}/l/latest.json"
+              r = requests.get(url)
+              r.raise_for_status()
+              return r.json().get("topic_list", {}).get("topics", [])
+
+          def get_topic_details(topic_id):
+              url = f"{DISCOURSE_BASE_URL}/t/{topic_id}.json"
+              r = requests.get(url)
+              r.raise_for_status()
+              return r.json()
+
+          def send_slack_notification(text):
+              if not SLACK_WEBHOOK_URL:
+                  print("[WARN] SLACK_WEBHOOK_URL not set")
+                  return
+              payload = {"text": text}
+              r = requests.post(SLACK_WEBHOOK_URL, json=payload)
+              r.raise_for_status()
+
+          def summarize_topics(topics, heading):
+              if not topics:
+                  return None
+              header = f"{'Title':<45} {'Last Post':<20} {'Author':<15}\n" + "-"*80
+              lines = [
+                  f"{t['title'][:42]:<45} {t['last_posted_at']:<20} {t['last_poster_username']:<15}"
+                  for t in topics
+              ]
+              return f"*{heading}*\n```{header}\n" + "\n".join(lines) + "\n```"
+
+          def compute_topic_workflows():
+              print("[INFO] Checking topics in 'In Discussion'...")
+
+              topics = get_topics_in_category(CATEGORY_ID)
+
+              stale_topics = []
+              external_waiting = []
+              new_topics = []
+              now = datetime.now(timezone.utc)
+
+              for topic in topics:
+                  topic_id = topic["id"]
+                  details = get_topic_details(topic_id)
+                  posts = details.get("post_stream", {}).get("posts", [])
+
+                  if not posts:
+                      continue
+
+                  first_post = posts[0]
+                  last_post = posts[-1]
+                  last_username = last_post["username"]
+                  last_time = datetime.strptime(last_post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                  first_time = datetime.strptime(first_post["created_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                  age_days = (now - last_time).days
+                  topic_age = (now - first_time).days
+
+                  if len(posts) == 1 and topic_age <= NEW_TOPIC_DAYS:
+                      new_topics.append({
+                          "title": details["title"],
+                          "last_posted_at": last_post["created_at"][:16],
+                          "last_poster_username": last_username,
+                      })
+
+                  if not is_flower_maintainer(last_username) and EXTERNAL_REPLY_THRESHOLD_DAYS < age_days <= ARCHIVE_THRESHOLD_DAYS:
+                      external_waiting.append({
+                          "title": details["title"],
+                          "last_posted_at": last_post["created_at"][:16],
+                          "last_poster_username": last_username,
+                      })
+
+                  if STALE_THRESHOLD_DAYS < age_days <= ARCHIVE_THRESHOLD_DAYS:
+                      stale_topics.append({
+                          "title": details["title"],
+                          "last_posted_at": last_post["created_at"][:16],
+                          "last_poster_username": last_username,
+                      })
+
+              print(f"[INFO] New topics (last 2 days): {len(new_topics)}")
+              print(f"[INFO] External wait topics: {len(external_waiting)}")
+              print(f"[INFO] Stale topics: {len(stale_topics)}")
+
+              for group, label in [
+                  (new_topics, "New topics (created in last 2 days with no replies)"),
+                  (external_waiting, "Topics awaiting maintainer response (>7 days, <30 days)"),
+                  (stale_topics, "Topics with no activity in last 14 days (<30 days old)")
+              ]:
+                  msg = summarize_topics(group, label)
+                  if msg:
+                      send_slack_notification(msg)
+
+          if __name__ == "__main__":
+              compute_topic_workflows()
+          EOF
