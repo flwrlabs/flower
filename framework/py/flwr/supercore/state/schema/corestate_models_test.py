@@ -20,9 +20,16 @@ from uuid import UUID
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from flwr.supercore.state.schema.corestate_models import FlwrBase, Task, TaskLogsTable
+from flwr.supercore.state.schema.corestate_models import (
+    Event,
+    FlwrBase,
+    Task,
+    TaskLogsTable,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
+from flwr.supercore.typing import JSONObject
 
 CORESTATE_TABLE_NAMES = {
     "nonce_store",
@@ -71,16 +78,108 @@ def test_task_mapper_uses_task_id_as_identity_key() -> None:
     assert [column.name for column in Task.__mapper__.primary_key] == ["task_id"]
 
 
+def test_event_payload_round_trips_nested_json() -> None:
+    """Map and persist recursive JSON values through the Event ORM model."""
+    payload: JSONObject = {
+        "nested": {"values": [None, True, 42, 1.5, "text", {"items": []}]},
+    }
+    engine = create_engine("sqlite:///:memory:")
+    FlwrBase.metadata.tables["events"].create(engine)
+    event_id = UUID(int=1)
+
+    with Session(engine) as session:
+        session.add(
+            Event(
+                event_id=event_id,
+                type="test",
+                payload=payload,
+                created_at=datetime.now(UTC),
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        event = session.get(Event, event_id)
+        assert event is not None
+        assert event.payload == payload
+
+
 def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() -> None:
     """Ensure connectors use an ID without provider-level uniqueness."""
     table = FlwrBase.metadata.tables["connector"]
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
-    for column_name in ("federation_id", "created_at", "created_by"):
+    for column_name in ("created_at", "created_by"):
         assert table.c[column_name].nullable is False
-    for column_name in ("deleted_at", "deleted_by"):
+    for column_name in ("federation_id", "agent_id", "deleted_at", "deleted_by"):
         assert table.c[column_name].nullable is True
+
+
+@pytest.mark.parametrize("table_name", ["connector", "connector_oauth_session"])
+@pytest.mark.parametrize(
+    ("federation_id", "agent_id", "error"),
+    [
+        ("@user/fed", None, None),
+        (None, 1, None),
+        (None, None, "CHECK constraint failed"),
+        ("@user/fed", 1, "CHECK constraint failed"),
+        (None, 2, "FOREIGN KEY constraint failed"),
+    ],
+)
+def test_connector_requires_exactly_one_existing_owner(
+    table_name: str,
+    federation_id: str | None,
+    agent_id: int | None,
+    error: str | None,
+) -> None:
+    """Accept one owner and require agent owners to reference an existing agent."""
+    table = FlwrBase.metadata.tables[table_name]
+    agent_table = FlwrBase.metadata.tables["agent"]
+    space_table = FlwrBase.metadata.tables["space"]
+    timestamp = datetime.now(UTC)
+    values: dict[str, object] = {
+        "federation_id": federation_id,
+        "agent_id": agent_id,
+        "connector_ref": "slack",
+        "created_at": timestamp,
+    }
+    if table_name == "connector":
+        values.update(credentials_json="{}", config_json="{}", created_by="user")
+    else:
+        values.update(
+            oauth_session_id="session",
+            flwr_aid="user",
+            state="state",
+            redirect_uri="http://localhost/callback",
+            expires_at=timestamp,
+        )
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        space_table.create(conn)
+        agent_table.create(conn)
+        table.create(conn)
+        conn.execute(
+            space_table.insert().values(id=UUID(int=1), created_at=timestamp, title="")
+        )
+        conn.execute(
+            agent_table.insert().values(
+                agent_id=1,
+                name="Agent",
+                app_spec="@user/app",
+                flwr_aid="user",
+                default_space_id=UUID(int=1),
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+        )
+        if error is None:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match=error):
+                conn.execute(table.insert().values(**values))
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:

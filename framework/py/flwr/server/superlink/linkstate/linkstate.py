@@ -17,17 +17,17 @@
 
 import abc
 from collections.abc import Collection, Sequence
-from typing import Literal
 from uuid import UUID
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
-from flwr.supercore.run import Run, RunStatus
+from flwr.supercore.run import RunStatus
 from flwr.superlink.federation import FederationManager
 
 from .utils import create_run_context
@@ -59,7 +59,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         run_ids = sorted({message.metadata.run_id for message in messages})
         runs = {
             run.run_id: run
-            for run in self.get_run_info(run_ids=run_ids)
+            for run in self.get_run(run_ids=run_ids)
             if run.status.status in (Status.PENDING, Status.STARTING, Status.RUNNING)
         }
 
@@ -293,7 +293,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_config : SimulationConfig | None
             Optional resolved federation configuration for the run.
         flwr_aid : str | None
-            Flower Account ID of the creator.
+            Flower Account ID of the creator. Agent-bound Space runs use the
+            executing agent's owner.
         primary_task_type : str
             The type of the primary task to create for the run.
         series_id : int | None (default: None)
@@ -315,62 +316,37 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Space for an AgentApp run with a fresh context. Cannot be combined
             with federation configuration, a series, or federation connectors.
         agent_id : int | None (default: None)
-            Executing agent assigned by the server for a Space run. The agent
-            must participate in the Space; otherwise creation returns 0.
+            Executing agent assigned by the server for a Space run. Creation
+            returns 0 unless the agent participates, has no open Run, and its
+            app matches the resolved FAB. The FAB must already be stored.
 
         Returns
         -------
         int
-            The run ID of the newly created run.
+            The new run ID, or 0 if creation fails or the agent is ineligible.
 
         Notes
         -----
         This method will not verify if the account has permission to create
-        a run in the federation or space. Invalid scope combinations raise ValueError.
+        a run in the federation or space. Invalid scope combinations or missing
+        FABs for agent-bound runs raise ValueError.
         """
 
     @abc.abstractmethod
-    def get_run_info(  # pylint: disable=too-many-arguments
-        self,
-        *,
-        run_ids: Sequence[int] | None = None,
-        statuses: Sequence[str] | None = None,
-        flwr_aids: Sequence[str] | None = None,
-        federation_ids: Sequence[str] | None = None,
-        order_by: Literal["pending_at"] | None = None,
-        ascending: bool = True,
-        limit: int | None = None,
-        skip: int = 0,
-    ) -> Sequence[Run]:
-        """Retrieve information about runs based on the specified filters.
-
-        - If a filter is set to None, it is ignored.
-        - If multiple filters are provided, they are combined using AND logic.
-        - Within each filter, provided values are combined using OR logic.
+    def get_agent_run_candidates(
+        self, *, limit: int | None = None
+    ) -> Sequence[tuple[UUID, Agent]]:
+        """Find participating agents with unread messages and no open Run.
 
         Parameters
         ----------
-        run_ids : Optional[Sequence[int]] (default: None)
-            Sequence of run IDs to filter by.
-        statuses : Optional[Sequence[str]] (default: None)
-            Sequence of run status values to filter by.
-        flwr_aids : Optional[Sequence[str]] (default: None)
-            Sequence of Flower Account IDs to filter by.
-        federation_ids : Optional[Sequence[str]] (default: None)
-            Sequence of federation IDs to filter by.
-        order_by : Optional[Literal["pending_at"]] (default: None)
-            Field used to order the result.
-        ascending : bool (default: True)
-            Whether sorting should be in ascending order.
-        limit : Optional[int] (default: None)
-            Maximum number of runs to return. If `None`, no limit is applied.
-        skip : int (default: 0)
-            Number of matching runs to skip before applying the limit.
+        limit : int | None (default: None)
+            Maximum number of Space/agent pairs to return; None returns all.
 
         Returns
         -------
-        Sequence[Run]
-            A sequence of Run objects representing runs matching the specified filters.
+        Sequence[tuple[UUID, Agent]]
+            Eligible Space IDs and agents. This does not advance read cursors.
         """
 
     @abc.abstractmethod

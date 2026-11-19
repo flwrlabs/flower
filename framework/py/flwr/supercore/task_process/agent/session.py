@@ -31,13 +31,20 @@ from uuid import uuid4
 from google.protobuf.json_format import ParseDict
 from httpx import HTTPStatusError
 
-from flwr.agentapp import AgentConnectors, AgentEvents, AgentGrid, AgentSession
+from flwr.agentapp import (
+    AgentConnectors,
+    AgentEvents,
+    AgentFiles,
+    AgentGrid,
+    AgentSession,
+    AgentSpace,
+)
 from flwr.app import Message
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
 
 # pylint: disable=E0611
-from flwr.proto.control_pb2 import StartAutomationRequest, StartRunRequest
+from flwr.proto.control_pb2 import Agent, StartAutomationRequest, StartRunRequest
 from flwr.proto.runseries_pb2 import CompactedContext
 from flwr.proto.runtime_pb2 import (
     CreateTaskRequest,
@@ -125,7 +132,7 @@ class RuntimeAgentEvents(AgentEvents):
     def get_compacted_contexts(
         self, *, limit: int = 1, before_context_id: int | None = None
     ) -> list[JSONObject]:
-        """Get summaries from the current run series."""
+        """Get summaries for the agent."""
         response = self._stub.GetCompactedContexts(
             GetCompactedContextsRequest(
                 limit=limit, before_context_id=before_context_id
@@ -134,7 +141,7 @@ class RuntimeAgentEvents(AgentEvents):
         return [
             {
                 "id": context.id,
-                "series_id": context.series_id,
+                "agent_id": context.agent_id,
                 "through_event_id": context.through_event_id,
                 "text": context.text,
                 "created_at": context.created_at,
@@ -146,7 +153,7 @@ class RuntimeAgentEvents(AgentEvents):
     def put_compacted_context(
         self, *, through_event_id: int, text: str, token_count: int
     ) -> None:
-        """Store a summary in the current run series."""
+        """Store a summary for the agent."""
         self._stub.PutCompactedContext(
             PutCompactedContextRequest(
                 context=CompactedContext(
@@ -230,17 +237,29 @@ class RuntimeAgentEvents(AgentEvents):
 class RuntimeAgentSession(AgentSession):
     """AgentSession bound to one AgentApp task."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         prompt: str,
         connectors: AgentConnectors,
         events: AgentEvents,
         grid: AgentGrid,
+        *,
+        files: AgentFiles,
+        space: AgentSpace | None = None,
+        identity: Agent | None = None,
     ) -> None:
         self._prompt = prompt
         self._connectors = connectors
         self._events = events
         self._grid = grid
+        self._files = files
+        self._space = space
+        self._identity = identity
+
+    @property
+    def identity(self) -> Agent | None:
+        """Return the stored identity of this agent, when available."""
+        return self._identity
 
     @property
     def prompt(self) -> str:
@@ -262,6 +281,16 @@ class RuntimeAgentSession(AgentSession):
         """Model-facing federation Grid API."""
         return self._grid
 
+    @property
+    def files(self) -> AgentFiles:
+        """Return the agent's persistent file API."""
+        return self._files
+
+    @property
+    def space(self) -> AgentSpace | None:
+        """Space messaging API, or None when unavailable for this session."""
+        return self._space
+
 
 class RuntimeAgentConnectors(AgentConnectors):
     """AgentConnectors implementation for model tools."""
@@ -269,7 +298,7 @@ class RuntimeAgentConnectors(AgentConnectors):
     def __init__(self, agent_runtime: AgentRuntime) -> None:
         self._agent_runtime = agent_runtime
 
-    def tools(self, names: Sequence[str], *, refresh: bool = False) -> list[JSONObject]:
+    def tools(self, names: Sequence[str], refresh: bool = False) -> list[JSONObject]:
         """Return schemas, optionally refreshing the runtime discovery cache."""
         return [
             tool
@@ -309,7 +338,7 @@ class AgentRuntime:
         stub: RuntimeHttpClient,
         run_id: int,
         task_id: int,
-        start_run_request: StartRunRequest,
+        start_run_request: StartRunRequest | None = None,
         events: AgentEvents,
     ) -> None:
         self._stub = stub
@@ -317,12 +346,14 @@ class AgentRuntime:
         self._task_id = task_id
         self._start_run_request = start_run_request
         self._events = events
-        self._discovered_tools: dict[str, list[JSONObject]] = {}
-        self._discovery_locks: defaultdict[str, Lock] = defaultdict(Lock)
+        self._discovered_tools: dict[tuple[str, int | None], list[JSONObject]] = {}
+        self._discovery_locks: defaultdict[tuple[str, int | None], Lock] = defaultdict(
+            Lock
+        )
         self._discovery_lock = Lock()
 
     def get_connector_tools(
-        self, connector_ref: str, *, refresh: bool = False
+        self, connector_ref: str, refresh: bool = False, connector_id: int | None = None
     ) -> list[JSONObject]:
         """Return static tools plus a copied, run-scoped dynamic catalog."""
         tools = get_connector_tools(connector_ref)
@@ -330,7 +361,9 @@ class AgentRuntime:
             return tools
         try:
             discovered = deepcopy(
-                self._discover_connector_tools(connector_ref, refresh=refresh)
+                self._discover_connector_tools(
+                    connector_ref, refresh=refresh, connector_id=connector_id
+                )
             )
         except HTTPStatusError as exc:
             error = FlowerError.from_json(exc.response.text)
@@ -355,23 +388,27 @@ class AgentRuntime:
         return tools + discovered
 
     def _discover_connector_tools(
-        self, connector_ref: str, *, refresh: bool = False
+        self, connector_ref: str, refresh: bool = False, connector_id: int | None = None
     ) -> list[JSONObject]:
         """Cache tool metadata and serialize discovery only within each connector."""
+        key = (connector_ref, connector_id)
         with self._discovery_lock:
-            lock = self._discovery_locks[connector_ref]
+            lock = self._discovery_locks[key]
         with lock:
             if refresh:
-                self._discovered_tools.pop(connector_ref, None)
-            if connector_ref in self._discovered_tools:
-                return self._discovered_tools[connector_ref]
+                self._discovered_tools.pop(key, None)
+            if key in self._discovered_tools:
+                return self._discovered_tools[key]
             operation = get_connector_discovery_tool(connector_ref)
             if operation is None:
                 raise ValueError(
                     f"Connector '{connector_ref}' has no discovery source."
                 )
             result = self.create_connector_response(
-                name=operation, call_id=uuid4().hex, arguments={}
+                name=operation,
+                call_id=uuid4().hex,
+                arguments={},
+                connector_id=connector_id,
             )
             if not isinstance(result, list) or not all(
                 isinstance(tool, dict) for tool in result
@@ -398,17 +435,23 @@ class AgentRuntime:
                         f"Connector '{connector_ref}' returned invalid tool names."
                     )
                 names.add(name.lower())
-            self._discovered_tools[connector_ref] = tools
+            self._discovered_tools[key] = tools
             return tools
 
     def create_connector_response(
-        self, *, name: str, call_id: str, arguments: JSONObject
+        self,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
     ) -> JSONValue:
         """Create one connector response."""
         name = name.strip().lower()
         connector_ref = get_connector_ref(name)
         if is_dynamic_connector_tool(name):
-            catalog = self._discover_connector_tools(connector_ref)
+            catalog = self._discover_connector_tools(
+                connector_ref, connector_id=connector_id
+            )
             tool = next(
                 (tool for tool in catalog if cast(str, tool["name"]).lower() == name),
                 None,
@@ -417,7 +460,11 @@ class AgentRuntime:
                 raise ValueError(f"Unsupported discovered tool '{name}'.")
             name = cast(str, tool["name"])
         create_res = self._stub.CreateTask(
-            CreateTaskRequest(type=TaskType.CONNECTOR, connector_ref=connector_ref)
+            CreateTaskRequest(
+                type=TaskType.CONNECTOR,
+                connector_ref=connector_ref,
+                connector_id=connector_id,
+            )
         )
         if not create_res.HasField("task_id"):
             raise RuntimeError("Connector task could not be created.")
@@ -441,15 +488,20 @@ class AgentRuntime:
 
         return response_payload["output"]
 
-    def call_connector_with_events(
-        self, *, name: str, call_id: str, arguments: JSONObject
+    def call_connector_with_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        name: str,
+        call_id: str,
+        arguments: JSONObject,
+        connector_id: int | None = None,
+        event_name: str | None = None,
     ) -> JSONObject:
         """Call a connector and emit/persist its activity events."""
         name = name.strip().lower()
         function_call: JSONObject = {
             "type": "function_call",
             "call_id": call_id,
-            "name": name,
+            "name": event_name or name,
             "arguments": strict_json_dumps(arguments, compact=True),
         }
         self.push_run_events([function_call])
@@ -459,6 +511,7 @@ class AgentRuntime:
                 name=name,
                 call_id=call_id,
                 arguments=arguments,
+                connector_id=connector_id,
             )
         except Exception:  # pylint: disable=broad-exception-caught
             error_output: JSONObject = {
@@ -490,6 +543,8 @@ class AgentRuntime:
         self, *, call_id: str, arguments: JSONObject
     ) -> JSONObject:
         """Create an automation and emit/persist its activity events."""
+        if self._start_run_request is None:
+            raise NotImplementedError("Automations are unavailable in this session.")
         function_call: JSONObject = {
             "type": "function_call",
             "call_id": call_id,

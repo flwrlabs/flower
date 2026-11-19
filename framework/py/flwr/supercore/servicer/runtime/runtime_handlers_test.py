@@ -19,11 +19,14 @@ import unittest
 from logging import ERROR
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
+import pytest
 from fastapi import status
 
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_to_proto
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -33,23 +36,183 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
     GetCompactedContextsRequest,
+    GetFileRequest,
+    ListFilesRequest,
     PullTaskMessageRequest,
     PushTaskEventsRequest,
     PushTaskEventsResponse,
     PushTaskMessageRequest,
     PutCompactedContextRequest,
+    PutFileRequest,
     RecordTaskUsageRequest,
     SendTaskHeartbeatRequest,
 )
+from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceMessagesRequest,
+    SendSpaceMessageRequest,
+)
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
+from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 from . import runtime_handlers
+
+
+@pytest.mark.parametrize("expected_revision", [None, 0, 7])
+@pytest.mark.parametrize("key", ["file", " file ", "", " \t\n"])
+def test_put_file(expected_revision: int | None, key: str) -> None:
+    """Reject blank keys and preserve valid keys and revision preconditions."""
+    state = Mock()
+    state.put_file.return_value = 8
+    request = PutFileRequest(key=key, data=b"", expected_revision=expected_revision)
+    if key in ("", " \t\n"):
+        with pytest.raises(FlowerError) as caught:
+            runtime_handlers.put_file(request, state, 456)
+        assert caught.value.code == ApiErrorCode.RUNTIME_INVALID_FILE_KEY
+        assert (
+            API_ERROR_MAP[caught.value.code].http_status_code
+            == status.HTTP_400_BAD_REQUEST
+        )
+        state.put_file.assert_not_called()
+        return
+
+    response = runtime_handlers.put_file(request, state, 456)
+
+    assert response.revision == 8
+    state.put_file.assert_called_once_with(
+        scope="agent-456",
+        key=key,
+        data=b"",
+        expected_revision=expected_revision,
+    )
+
+
+@pytest.mark.parametrize(
+    "file", [None, File(metadata=FileMetadata(key="file", revision=7), data=b"data")]
+)
+def test_get_file(file: File | None) -> None:
+    """Return the agent's current file, or leave the response field absent."""
+    state = Mock()
+    state.get_file.return_value = file
+    response = runtime_handlers.get_file(GetFileRequest(key="file"), state, 456)
+
+    state.get_file.assert_called_once_with(scope="agent-456", key="file")
+    assert response.HasField("file") == (file is not None)
+    if file is not None:
+        assert response.file == file
+
+
+@pytest.mark.parametrize(
+    ("limit", "keys", "expected_keys", "next_start_after"),
+    [
+        (None, ["a", "b", "c"], ["a", "b", "c"], ""),
+        (0, [], [], ""),
+        (1, [], [], ""),
+        (1, ["a"], ["a"], ""),
+        (1, ["a", "b"], ["a"], "a"),
+        (2, ["a"], ["a"], ""),
+        (2, ["a", "b"], ["a", "b"], ""),
+        (2, ["a", "b", "c"], ["a", "b"], "b"),
+        (2**32 - 1, ["a"], ["a"], ""),
+    ],
+)
+def test_list_files(
+    limit: int | None,
+    keys: list[str],
+    expected_keys: list[str],
+    next_start_after: str,
+) -> None:
+    """Forward filters and return a cursor only when another page exists."""
+    state = Mock()
+    files = [FileMetadata(key=key, revision=7, size_bytes=8) for key in keys]
+    state.list_files.return_value = files
+    response = runtime_handlers.list_files(
+        ListFilesRequest(prefix="prefix/", start_after="previous", limit=limit),
+        state,
+        456,
+    )
+
+    state.list_files.assert_called_once_with(
+        scope="agent-456",
+        prefix="prefix/",
+        start_after="previous",
+        limit=limit + 1 if limit else limit,
+    )
+    assert [file.key for file in response.files] == expected_keys
+    assert list(response.files) == files[:limit]
+    assert response.next_start_after == next_start_after
+
+
+def test_delete_file() -> None:
+    """Delete the agent's file using the supplied revision precondition."""
+    state = Mock()
+    response = runtime_handlers.delete_file(
+        DeleteFileRequest(key="file", expected_revision=7),
+        state,
+        456,
+    )
+
+    state.delete_file.assert_called_once_with(
+        scope="agent-456", key="file", expected_revision=7
+    )
+    assert not response.ListFields()
+
+
+@pytest.mark.parametrize("operation", ["put_file", "delete_file"])
+def test_file_revision_conflict(operation: str) -> None:
+    """Propagate CoreState's revision conflicts without changing the error."""
+    state = Mock()
+    error = FlowerError(ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT, "Conflict")
+    getattr(state, operation).side_effect = error
+    request = (
+        PutFileRequest(key="file", data=b"data", expected_revision=7)
+        if operation == "put_file"
+        else DeleteFileRequest(key="file", expected_revision=7)
+    )
+
+    with pytest.raises(FlowerError) as caught:
+        getattr(runtime_handlers, operation)(request, state, 456)
+
+    assert caught.value is error
+
+
+@pytest.mark.parametrize("read", [False, True])
+@pytest.mark.parametrize(
+    "task,agent_id",
+    [
+        (Task(task_id=1, run_id=123, type=TaskType.CONNECTOR), 42),
+        (Task(task_id=2, run_id=123, type=TaskType.AGENT_APP), 42),
+        (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
+    ],
+)
+def test_space_messages_require_bound_primary_agent(
+    task: Task, agent_id: int | None, read: bool
+) -> None:
+    """Reading and publishing require the Run's bound primary AgentApp task."""
+    state = Mock(spec=CoreState)
+    run = Run.create_empty(123)
+    run.space_id = UUID("12345678-1234-5678-1234-567812345678")
+    run.agent_id = agent_id
+    run.primary_task_id = 1
+    with pytest.raises(FlowerError) as error:
+        if read:
+            runtime_handlers.get_space_messages(
+                GetSpaceMessagesRequest(), state, task, run
+            )
+        else:
+            runtime_handlers.send_space_message(
+                SendSpaceMessageRequest(content="No"), state, task, run
+            )
+    assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
+    state.get_space_messages.assert_not_called()
+    state.create_space_message.assert_not_called()
 
 
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
@@ -58,12 +221,13 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
     def setUp(self) -> None:
         """Set up test fixture."""
         self.state = Mock()
+        self.auth_run = Run.create_empty(run_id=123)
         self.state.get_tasks.return_value = []
 
     def test_get_compacted_contexts(self) -> None:
         """Apply the default limit and reject zero."""
         context = CompactedContext(
-            id=1, series_id=42, through_event_id=9, text="Summary"
+            id=1, agent_id=42, through_event_id=9, text="Summary"
         )
         self.state.get_compacted_contexts.return_value = [context]
 
@@ -85,10 +249,10 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_put_compacted_context(self) -> None:
-        """Store only a valid summary for the authenticated series."""
+        """Store only a valid summary for the authenticated agent."""
         request = PutCompactedContextRequest(
             context=CompactedContext(
-                series_id=42, through_event_id=9, text="Summary", token_count=123
+                agent_id=42, through_event_id=9, text="Summary", token_count=123
             )
         )
 
@@ -99,7 +263,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             42, 9, "Summary", 123
         )
 
-        request.context.series_id = 43
+        request.context.agent_id = 43
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.put_compacted_context(request, self.state, 42)
         self.assertEqual(
@@ -142,6 +306,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.AGENT_APP),
+            self.auth_run,
         )
 
     def test_acquire_task_returns_empty_when_queue_is_empty(self) -> None:
@@ -224,6 +389,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
             request,
             self.state,
             Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+            self.auth_run,
         )
 
         # Assert
@@ -253,6 +419,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                     request,
                     self.state,
                     Mock(task_id=789, run_id=123, type=requesting_task_type),
+                    self.auth_run,
                 )
 
                 # Assert
@@ -273,7 +440,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Resolve a run-bound connector without requiring an OAuth application."""
         self.state.get_run_connector_ids.return_value = [42]
         self.state.get_connector_by_id.return_value = SimpleNamespace(
-            connector_ref="notion"
+            connector_id=42, connector_ref="notion", agent_id=None
         )
         self.state.create_task.return_value = 456
 
@@ -344,6 +511,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
                 self.state,
                 Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                self.auth_run,
             )
 
         # Assert
@@ -382,6 +550,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                         request,
                         self.state,
                         Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
+                        self.auth_run,
                     )
 
                 self.assertEqual(
@@ -406,6 +575,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 request,
                 self.state,
                 Mock(run_id=123, type=TaskType.SERVER_APP),
+                self.auth_run,
             )
 
         # Assert
@@ -624,6 +794,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                         ),
                         self.state,
                         Mock(run_id=123, type=requesting_task_type),
+                        self.auth_run,
                     )
 
                 # Assert

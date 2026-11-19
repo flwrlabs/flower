@@ -29,6 +29,14 @@ from flwr.supercore.utils import strict_json_loads
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
 
 
+def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:
+    """Reject cursors outside the committed feed and invalid page sizes."""
+    if not 0 <= after_seq <= head:
+        raise ValueError("after_seq must be between zero and the feed head")
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+
 def generate_rand_int_from_bytes(
     num_bytes: int, exclude: set[int] | None = None
 ) -> int:

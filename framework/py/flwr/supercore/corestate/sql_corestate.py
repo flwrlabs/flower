@@ -24,6 +24,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
 from sqlalchemy import (
     MetaData,
     and_,
@@ -61,7 +62,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AgentConfig,
     AppInfo,
     Automation,
+    BootstrapResponse,
+    Event,
     StartRunRequest,
+    StreamEventsResponse,
 )
 from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
@@ -89,6 +93,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
+    EventType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -103,6 +108,7 @@ from flwr.supercore.state.schema.corestate_models import Connector as ConnectorM
 from flwr.supercore.state.schema.corestate_models import (
     ConnectorOAuthSession as ConnectorOAuthSessionModel,
 )
+from flwr.supercore.state.schema.corestate_models import Event as EventModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
 from flwr.supercore.state.schema.corestate_models import (
     FederationApp as FederationAppModel,
@@ -140,6 +146,10 @@ from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventM
 from flwr.supercore.state.schema.corestate_models import TaskLogsTable
 from flwr.supercore.state.schema.corestate_models import TaskMessage as TaskMessageModel
 from flwr.supercore.state.schema.corestate_models import TaskUsage as TaskUsageModel
+from flwr.supercore.state.schema.corestate_models import UserEvent as UserEventModel
+from flwr.supercore.state.schema.corestate_models import (
+    UserEventFeed as UserEventFeedModel,
+)
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
@@ -151,6 +161,7 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
     validate_task_message,
@@ -722,26 +733,72 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         ):
             return None
         created_at = now()
-        model = AgentModel(
-            name=config.name,
-            title=config.title if config.HasField("title") else None,
-            description=config.description if config.HasField("description") else None,
-            app_spec=config.app_spec,
-            flwr_aid=flwr_aid,
-            created_at=created_at,
-            updated_at=created_at,
-        )
         with self.session() as session:
+            # Insert the Space first so the agent can reference it as its default.
+            space_model = SpaceModel(id=uuid4(), title="", created_at=created_at)
+            session.add(space_model)
+            session.flush()
+            model = AgentModel(
+                name=config.name,
+                title=config.title if config.HasField("title") else None,
+                description=(
+                    config.description if config.HasField("description") else None
+                ),
+                avatar=config.avatar,
+                color=config.color,
+                app_spec=config.app_spec,
+                flwr_aid=flwr_aid,
+                default_space_id=space_model.id,
+                created_at=created_at,
+                updated_at=created_at,
+            )
             session.add(model)
             session.flush()
             agent = _agent_from_model(model)
-            self.create_space(
-                participants=[
-                    SpaceParticipant(flwr_aid=flwr_aid),
-                    SpaceParticipant(agent_id=agent.id),
-                ]
+            participants = [
+                SpaceParticipant(flwr_aid=flwr_aid),
+                SpaceParticipant(agent_id=agent.id),
+            ]
+            session.execute(
+                insert(SpaceParticipantTable),
+                [
+                    {
+                        "space_id": space_model.id,
+                        "flwr_aid": participant.flwr_aid or None,
+                        "agent_id": participant.agent_id or None,
+                    }
+                    for participant in participants
+                ],
+            )
+            # Emit events after membership is complete, preserving their order.
+            self.store_event(EventType.AGENT_CREATED, agent, [flwr_aid])
+            space = _space_from_model(space_model)
+            space.participants.extend(participants)
+            self.store_event(
+                EventType.SPACE_CREATED, space, [flwr_aid], space_id=space_model.id
             )
             return agent
+
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an agent owned by the account."""
+        with self.session() as session:
+            model = session.scalar(
+                select(AgentModel).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
+            return _agent_from_model(model) if model is not None else None
+
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID."""
+        with self.session() as session:
+            return session.scalar(
+                select(AgentModel.default_space_id).where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+            )
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
@@ -754,6 +811,87 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             return [_agent_from_model(model) for model in session.scalars(stmt)]
+
+    def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
+        """Read the feed cursor before fetching visible state."""
+        with self.session() as session:
+            head = session.scalar(
+                select(UserEventFeedModel.last_seq).where(
+                    UserEventFeedModel.user_id == flwr_aid
+                )
+            )
+        return BootstrapResponse(
+            agents=self.list_agents(flwr_aid),
+            spaces=self.get_spaces(flwr_aid),
+            cursor=head or 0,
+        )
+
+    def store_event(
+        self,
+        event_type: str,
+        payload: Agent | Space | SpaceMessage,
+        recipients: Sequence[str],
+        space_id: UUID | None = None,
+    ) -> UUID:
+        """Create an event and its deliveries, returning its UUID."""
+        event_id = uuid4()
+        with self.session() as session:
+            session.execute(
+                insert(EventModel).values(
+                    event_id=event_id,
+                    type=event_type,
+                    space_id=space_id,
+                    payload=MessageToDict(payload, preserving_proto_field_name=True),
+                    created_at=now(),
+                )
+            )
+            for user_id in sorted(set(recipients)):
+                seq = session.execute(
+                    self.dialect_insert(UserEventFeedModel)
+                    .values(user_id=user_id, last_seq=1)
+                    .on_conflict_do_update(
+                        index_elements=[UserEventFeedModel.user_id],
+                        set_={"last_seq": UserEventFeedModel.last_seq + 1},
+                    )
+                    .returning(UserEventFeedModel.last_seq)
+                ).scalar_one()
+                session.execute(
+                    insert(UserEventModel).values(
+                        user_id=user_id, seq=seq, event_id=event_id
+                    )
+                )
+        return event_id
+
+    def get_user_events(
+        self, flwr_aid: str, after_seq: int = 0, *, limit: int = 100
+    ) -> Sequence[StreamEventsResponse]:
+        """Read a non-consuming page with access filtering before pagination."""
+        accessible = exists().where(
+            SpaceParticipantTable.c.space_id == EventModel.space_id,
+            SpaceParticipantTable.c.flwr_aid == flwr_aid,
+        )
+        with self.session() as session:
+            feed = session.get(UserEventFeedModel, flwr_aid, populate_existing=True)
+            head = feed.last_seq if feed else 0
+            validate_event_cursor(after_seq, head, limit)
+            query = (
+                select(UserEventModel.seq, EventModel)
+                .join(EventModel, EventModel.event_id == UserEventModel.event_id)
+                .where(
+                    UserEventModel.user_id == flwr_aid,
+                    UserEventModel.seq > after_seq,
+                    or_(EventModel.space_id.is_(None), accessible),
+                )
+                .order_by(UserEventModel.seq)
+                .limit(limit)
+            )
+            results = [
+                StreamEventsResponse(seq=seq, event=_event_from_model(model))
+                for seq, model in session.execute(query)
+            ]
+            if not results and head > after_seq:
+                results.append(StreamEventsResponse(seq=head))
+            return results
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
@@ -1010,19 +1148,27 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
+        agent_id: int | None = None,
     ) -> int | None:
-        """Create a connector for a federation."""
-        if not federation_id or not connector_ref or not created_by:
+        """Create a connector owned by a federation or an existing agent."""
+        if not connector_ref or not created_by:
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+        ):
             return None
         stmt = (
             insert(ConnectorModel)
             .values(
                 federation_id=federation_id,
+                agent_id=agent_id,
                 connector_ref=connector_ref,
                 credentials_json=credentials_json,
                 config_json=config_json,
@@ -1032,6 +1178,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+                return None
             return session.scalar(stmt)
 
     def get_connectors_by_ref(
@@ -1058,6 +1206,16 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if row is None:
                 return None
             return _connector_from_model(row)
+
+    def get_agent_connectors(self, agent_id: int) -> Sequence[ConnectorRecord]:
+        """List an agent's connectors in ascending connector ID order."""
+        if agent_id <= 0:
+            return []
+        stmt = select(ConnectorModel).where(ConnectorModel.agent_id == agent_id)
+        stmt = stmt.execution_options(populate_existing=True)
+        with self.session() as session:
+            rows = session.scalars(stmt.order_by(ConnectorModel.connector_id)).all()
+            return [_connector_from_model(row) for row in rows]
 
     def update_connector_credentials(
         self,
@@ -1086,15 +1244,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return credentials_json
 
-    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
-        """Delete a federation's connector if it exists."""
-        if not federation_id or connector_id <= 0:
+    def delete_connector(
+        self,
+        federation_id: str | None,
+        connector_id: int,
+        agent_id: int | None = None,
+    ) -> bool:
+        """Delete a connector belonging to the specified federation or agent."""
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
+            or connector_id <= 0
+        ):
             return False
         with self.session() as session:
             deleted_connector_id = session.scalar(
                 delete(ConnectorModel)
                 .where(
                     ConnectorModel.federation_id == federation_id,
+                    ConnectorModel.agent_id == agent_id,
                     ConnectorModel.connector_id == connector_id,
                 )
                 .returning(ConnectorModel.connector_id)
@@ -1131,20 +1300,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
         expires_at: datetime,
+        agent_id: int | None = None,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session."""
         if (
             not oauth_session_id
             or not flwr_aid
-            or not federation_id
             or not connector_ref
             or expires_at.utcoffset() is None
+        ):
+            return None
+        if (
+            (federation_id is None) == (agent_id is None)
+            or federation_id == ""
+            or (agent_id is not None and agent_id <= 0)
         ):
             return None
         expires_at = expires_at.astimezone(UTC)
@@ -1153,6 +1328,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             oauth_session_id=oauth_session_id,
             flwr_aid=flwr_aid,
             federation_id=federation_id,
+            agent_id=agent_id,
             connector_ref=connector_ref,
             state=state,
             redirect_uri=redirect_uri,
@@ -1163,6 +1339,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as db_session:
+                if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+                    return None
                 db_session.add(model)
                 db_session.flush()
                 return _connector_oauth_session_from_model(model)
@@ -1240,16 +1418,34 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                 space = _space_from_model(model)
                 space.participants.extend(members)
+                self.store_event(
+                    EventType.SPACE_CREATED,
+                    space,
+                    [member.flwr_aid for member in members if member.flwr_aid],
+                    space_id=model.id,
+                )
                 return space
         except IntegrityError as exc:
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
+        latest_user_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.flwr_aid.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1264,9 +1460,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, member_flwr_aid, member_agent_id in session.execute(query):
+            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+                query
+            ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
@@ -1309,26 +1508,48 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(SpaceMessageModel)
             ).one_or_none()
-            return None if model is None else _space_message_from_model(model)
+            if model is None:
+                return None
+            message = _space_message_from_model(model)
+            recipients = list(
+                session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                )
+            )
+            self.store_event(
+                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
+            )
+            return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
-        flwr_aid: str,
+        participant: SpaceParticipant,
         *,
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceMessage] | None:
-        """Return a participating user's history page in ascending ID order."""
+        """Read messages and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
             raise ValueError("after_id must be less than before_id")
-        forward = after_id is not None
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
         message_conditions = [
             SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
         ]
+        if unread_only:
+            message_conditions.append(
+                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
+            )
         # Larger protobuf uint64 bounds include every supported BIGINT message ID.
         if before_id is not None and before_id <= 2**63 - 1:
             message_conditions.append(SpaceMessageModel.id < before_id)
@@ -1340,10 +1561,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .outerjoin(SpaceMessageModel, and_(*message_conditions))
             .where(
                 SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c.flwr_aid == flwr_aid,
+                SpaceParticipantTable.c[field] == identity,
             )
             .order_by(
-                SpaceMessageModel.id.asc() if forward else SpaceMessageModel.id.desc()
+                SpaceMessageModel.id.asc()
+                if unread_only or after_id is not None
+                else SpaceMessageModel.id.desc()
             )
             .limit(limit)
         )
@@ -1356,7 +1579,22 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 for model in models
                 if model is not None
             ]
-            return messages if forward else list(reversed(messages))
+            if messages:
+                read_through = max(message.id for message in messages)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_message_id < read_through,
+                    )
+                    .values(read_through_message_id=read_through)
+                )
+            return (
+                messages
+                if unread_only or after_id is not None
+                else list(reversed(messages))
+            )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -1448,13 +1686,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return context_from_bytes(row.context)
 
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         query = select(CompactedContextModel).where(
-            CompactedContextModel.series_id == series_id
+            CompactedContextModel.agent_id == agent_id
         )
         # Autoincremented context IDs cannot exceed the signed BIGINT range.
         if before_context_id is not None:
@@ -1467,7 +1705,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
@@ -1476,7 +1714,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             self.dialect_insert(CompactedContextModel)
             .values(
-                series_id=series_id,
+                agent_id=agent_id,
                 through_event_id=through_event_id,
                 text=text,
                 token_count=token_count,
@@ -1484,7 +1722,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             .on_conflict_do_nothing(
                 index_elements=[
-                    CompactedContextModel.series_id,
+                    CompactedContextModel.agent_id,
                     CompactedContextModel.through_event_id,
                 ]
             )
@@ -1579,15 +1817,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_automation(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
     ) -> Automation:
         """Store an automation and return its metadata."""
+        if not (
+            (agent_id is not None and federation_id is None and series_id is None)
+            or (
+                agent_id is None and federation_id is not None and series_id is not None
+            )
+        ):
+            raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+            raise ValueError("Agent not found.")
+
         current = now()
         stmt = (
             insert(AutomationModel)
@@ -1602,6 +1851,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 next_run_at=datetime.fromisoformat(next_run_at),
                 fixed_interval=fixed_interval,
                 remaining_runs=max_runs,
+                agent_id=agent_id,
                 stopped_at=None,
             )
             .returning(AutomationModel)
@@ -2458,6 +2708,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return session.scalar(stmt) is not None
 
 
+def _event_from_model(model: EventModel) -> Event:
+    """Convert a journal row without losing protobuf JSON's integer strings."""
+    event = Event(
+        event_id=str(model.event_id),
+        type=model.type,
+        created_at=model.created_at.astimezone(UTC).isoformat(),
+    )
+    event.payload.update(model.payload)
+    event.payload.SetInParent()
+    if model.space_id is not None:
+        event.space_id = str(model.space_id)
+    return event
+
+
 def _agent_from_model(model: AgentModel) -> Agent:
     """Convert an agent ORM model to its protobuf message."""
     return Agent(
@@ -2466,10 +2730,13 @@ def _agent_from_model(model: AgentModel) -> Agent:
             name=model.name,
             title=model.title,
             description=model.description,
+            avatar=model.avatar,
+            color=model.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+        default_space_id=str(model.default_space_id),
     )
 
 
@@ -2488,6 +2755,7 @@ def _connector_oauth_session_from_model(
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         expires_at=_timestamp_to_iso_assuming_utc(model.expires_at),
         completed_at=_timestamp_to_iso_assuming_utc(model.completed_at) or None,
+        agent_id=model.agent_id,
     )
 
 
@@ -2499,6 +2767,7 @@ def _connector_from_model(model: ConnectorModel) -> ConnectorRecord:
         connector_ref=model.connector_ref,
         credentials_json=model.credentials_json,
         config_json=model.config_json,
+        agent_id=model.agent_id,
     )
 
 
@@ -2585,6 +2854,7 @@ def _space_message_from_model(
         author=author,
         created_at=model.created_at.isoformat(),
         content=model.content,
+        hidden=model.hidden,
     )
 
 
@@ -2603,7 +2873,7 @@ def _compacted_context_from_model(model: CompactedContextModel) -> CompactedCont
     """Convert a compacted context model to its proto representation."""
     return CompactedContext(
         id=model.id,
-        series_id=model.series_id,
+        agent_id=model.agent_id,
         through_event_id=model.through_event_id,
         text=model.text,
         token_count=model.token_count,
@@ -2639,9 +2909,10 @@ def _automation_from_model(model: AutomationModel) -> Automation:
     return Automation(
         automation_id=model.automation_id,
         status=model.status,
-        federation=model.federation_id,
-        series_id=model.series_id,
+        federation=model.federation_id or "",
+        series_id=model.series_id or 0,
         flwr_aid=model.flwr_aid,
+        agent_id=model.agent_id,
         created_at=timestamp_to_iso(model.created_at),
         updated_at=timestamp_to_iso(model.updated_at),
         next_run_at=timestamp_to_iso(model.next_run_at),

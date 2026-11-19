@@ -12,7 +12,10 @@
 erDiagram
   agent {
     BIGINT agent_id PK
+    CHAR(32) default_space_id FK
     VARCHAR app_spec
+    VARCHAR avatar
+    VARCHAR color
     TIMESTAMP created_at
     TEXT description "nullable"
     VARCHAR flwr_aid
@@ -23,13 +26,14 @@ erDiagram
 
   automation {
     INTEGER automation_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP created_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
     TIMESTAMP next_run_at
     INTEGER remaining_runs "nullable"
-    BIGINT series_id
+    BIGINT series_id "nullable"
     BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
@@ -38,8 +42,8 @@ erDiagram
 
   compacted_contexts {
     BIGINT id PK
+    BIGINT agent_id FK
     TIMESTAMP created_at
-    BIGINT series_id
     TEXT text
     BIGINT through_event_id
     BIGINT token_count
@@ -47,6 +51,7 @@ erDiagram
 
   connector {
     INTEGER connector_id PK
+    BIGINT agent_id FK "nullable"
     VARCHAR config_json
     VARCHAR connector_ref
     TIMESTAMP created_at
@@ -54,16 +59,17 @@ erDiagram
     VARCHAR credentials_json
     TIMESTAMP deleted_at "nullable"
     VARCHAR deleted_by "nullable"
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
   }
 
   connector_oauth_session {
     VARCHAR oauth_session_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP completed_at "nullable"
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri
@@ -250,13 +256,14 @@ erDiagram
     TEXT content
     TIMESTAMP created_at
     VARCHAR flwr_aid "nullable"
+    BOOLEAN hidden
   }
 
   space_participant {
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
-    BIGINT seen_through_message_id
+    BIGINT read_through_message_id
   }
 
   task {
@@ -329,6 +336,11 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  space ||--o{ agent : default_space_id
+  agent ||--o{ automation : agent_id
+  agent ||--o{ compacted_contexts : agent_id
+  agent ||--o{ connector : agent_id
+  agent ||--o{ connector_oauth_session : agent_id
   space ||--o{ events : space_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id

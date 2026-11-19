@@ -30,6 +30,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ArchiveFederationResponse,
     BeginConnectorOAuthRequest,
     BeginConnectorOAuthResponse,
+    BootstrapRequest,
+    BootstrapResponse,
     CompleteConnectorOAuthRequest,
     CompleteConnectorOAuthResponse,
     ConfigureSimulationFederationRequest,
@@ -98,6 +100,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopAutomationResponse,
     StopRunRequest,
     StopRunResponse,
+    StreamEventsRequest,
+    StreamEventsResponse,
     StreamLogsRequest,
     StreamLogsResponse,
     StreamRunEventsRequest,
@@ -118,7 +122,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
@@ -152,7 +156,7 @@ router = APIRouter(
 )
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
-AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+AccountDependency = Annotated[AuthenticatedUser, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 ProtobufStreamContextDependency = Annotated[
     ProtobufStreamContext, Depends(get_protobuf_stream_context)
@@ -160,6 +164,29 @@ ProtobufStreamContextDependency = Annotated[
 ArtifactProviderDependency = Annotated[
     ArtifactProvider | None, Depends(get_artifact_provider)
 ]
+
+
+@router.post("/bootstrap")
+def bootstrap(
+    _request: Annotated[BootstrapRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> BootstrapResponse:
+    """Read the caller's feed cursor followed by its Agents and Spaces."""
+    return control_handlers.bootstrap(account, linkstate)
+
+
+@router.post("/stream-events")
+def stream_events(
+    request: Annotated[StreamEventsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+    stream_context: ProtobufStreamContextDependency,
+) -> Iterator[StreamEventsResponse]:
+    """Replay and stream application events for the authenticated account."""
+    return control_handlers.stream_events(
+        request, account, linkstate, stream_context.is_active
+    )
 
 
 @router.post("/create-agent")

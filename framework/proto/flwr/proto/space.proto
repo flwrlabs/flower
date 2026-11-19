@@ -29,6 +29,7 @@ message Space {
   string title = 2;
   string created_at = 3;
   repeated SpaceParticipant participants = 4;
+  string latest_user_message = 5;
 }
 
 message CreateSpaceRequest { repeated SpaceParticipant participants = 1; }
@@ -43,18 +44,22 @@ message SpaceMessage {
   SpaceParticipant author = 3;
   string created_at = 4;
   string content = 5;
+  bool hidden = 6;
 }
 
+// Selects the newest page by default. All reads advance the caller's read
+// cursor.
 message GetSpaceMessagesRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
   string space_id = 1;
-  // Exclusive upper ID bound. Absent selects the newest page unless after_id is
-  // set.
+  // Exclusive upper ID bound.
   optional uint64 before_id = 2;
   // Absent uses the server's default page size.
   optional uint32 limit = 3;
   // Runtime only: exclusive lower bound, selecting the earliest matching page.
   optional uint64 after_id = 4;
+  // Return only messages after the caller's read cursor, oldest first.
+  bool unread_only = 5;
 }
 message GetSpaceMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.

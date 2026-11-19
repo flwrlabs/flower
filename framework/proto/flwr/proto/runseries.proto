@@ -31,7 +31,7 @@ message RunSeries {
 
 message CompactedContext {
   uint64 id = 1;
-  uint64 series_id = 2;
+  uint64 agent_id = 2;
   uint64 through_event_id = 3;
   string text = 4;
   string created_at = 5;

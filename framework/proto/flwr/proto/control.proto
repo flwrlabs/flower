@@ -34,12 +34,17 @@ message AgentConfig {
   optional string description = 2;
   optional string title = 3;
   string app_spec = 4;
+  // Frontend preset avatar identifier.
+  string avatar = 5;
+  // Frontend color identifier.
+  string color = 6;
 }
 message Agent {
   uint64 id = 1;
   AgentConfig config = 2;
   string created_at = 3;
   string updated_at = 4;
+  string default_space_id = 5;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }
@@ -87,6 +92,7 @@ message Automation {
   optional uint64 fixed_interval = 9;
   optional uint32 remaining_runs = 10;
   optional string stopped_at = 11;
+  optional uint64 agent_id = 12;
 }
 message ListAutomationsRequest { string federation = 1; }
 message ListAutomationsResponse { repeated Automation automations = 1; }
@@ -129,17 +135,16 @@ message Event {
   string created_at = 5;
 }
 
-// POST /v1/control/stream-events. Accept: text/event-stream selects standard
-// SSE with protobuf JSON data; otherwise use the binary protobuf stream
-// framing. Resume from Bootstrap.cursor or the last consumed seq. Task events
-// use their existing separate stream. The event journal is append-only;
-// replay cursors do not expire.
+// POST /v1/control/stream-events uses binary protobuf stream framing.
+// Resume from Bootstrap.cursor or the last consumed seq. Task events use their
+// existing separate stream. The event journal is append-only; replay cursors
+// do not expire.
 message StreamEventsRequest {
-  // Exclusive user-feed cursor. Falls back to Last-Event-ID when absent.
+  // Exclusive user-feed cursor. Defaults to zero when absent.
   optional uint64 after_seq = 1;
 }
 message StreamEventsResponse {
-  // Position in the authenticated user's feed, also used as the SSE id.
+  // Position in the authenticated user's feed.
   uint64 seq = 1;
   Event event = 2;
 }
@@ -183,7 +188,11 @@ message RefreshAuthTokensResponse {
   string refresh_token = 2;
 }
 
-message ListConnectorsRequest { string federation = 1; }
+message ListConnectorsRequest {
+  string federation = 1;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 2;
+}
 message Connector {
   string connector_ref = 1;
   string display_name = 2;
@@ -197,6 +206,8 @@ message DisconnectConnectorRequest {
   string connector_ref = 1;
   uint64 connector_id = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message DisconnectConnectorResponse {}
 
@@ -204,6 +215,8 @@ message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;

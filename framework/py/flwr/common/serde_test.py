@@ -130,6 +130,7 @@ def test_agent_messages_proto_roundtrip() -> None:
         config=config,
         created_at="2026-10-29T08:00:00Z",
         updated_at="2026-10-29T09:00:00Z",
+        default_space_id="a513879f-6f39-4e53-9515-f7d5d36865ab",
     )
     create_response = CreateAgentResponse(agent=agent)
     list_response = ListAgentsResponse(agents=[agent])

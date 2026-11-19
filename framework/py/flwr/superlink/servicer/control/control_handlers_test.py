@@ -14,12 +14,16 @@
 # ==============================================================================
 """Tests for Control API handler functions."""
 
+# pylint: disable=too-many-lines
 
 import hashlib
 import unittest
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import Mock, call, patch
+from uuid import UUID
+
+import pytest
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -30,6 +34,7 @@ from flwr.common.constant import (
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AddAppRequest,
     AddAppResponse,
+    AgentConfig,
     AppInfo,
     ListAppAssociationsRequest,
     ListAppsRequest,
@@ -43,13 +48,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationRequest,
     StartRunRequest,
     StopAutomationRequest,
+    StreamEventsRequest,
+    StreamEventsResponse,
     UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -65,6 +73,7 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.extensions import RESULT_DELIVERY_CHANNEL_CHAT
 from flwr.superlink.federation import NoOpFederationManager
 
+from . import control_handlers
 from .control_handlers import (
     add_app,
     list_app_associations,
@@ -72,13 +81,17 @@ from .control_handlers import (
     list_automations,
     list_run_series_events,
     list_runs,
+    process_pending_agent_runs,
     refresh_auth_tokens,
     remove_app,
     start_automation,
     start_run,
     stop_automation,
+    stream_events,
     update_run_series_description,
 )
+
+_ACCOUNT = AuthenticatedUser(user_id="alice", handle="Alice")
 
 
 class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
@@ -91,38 +104,112 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             NoOpFederationManager(),
             Mock(),
         ).state()
-        self.account = AccountInfo(
-            flwr_aid=NOOP_FLWR_AID,
-            account_name=NOOP_ACCOUNT_NAME,
+        self.account = AuthenticatedUser(
+            user_id=NOOP_FLWR_AID,
+            handle=NOOP_ACCOUNT_NAME,
         )
 
-    def _create_dummy_run(self) -> int:
+    def _create_dummy_run(self, federation_id: str = NOOP_FEDERATION_ID) -> int:
         """Create a run owned by the test account."""
         return self.state.create_run(
             "flwr/demo",
             "v0.0.1",
             "hash123",
             {},
-            NOOP_FEDERATION_ID,
+            federation_id,
             None,
-            self.account.flwr_aid,
+            self.account.user_id,
             TaskType.SERVER_APP,
         )
 
+    def test_process_pending_agent_runs(self) -> None:
+        """Resolve an AgentApp and create one Run for an unread user message."""
+        agent = self.state.create_agent(
+            self.account.user_id,
+            AgentConfig(name="Agent", app_spec="@publisher/app"),
+        )
+        assert agent is not None
+        space_id = UUID(self.state.get_spaces(self.account.user_id)[0].id)
+        self.state.create_space_message(
+            space_id, SpaceParticipant(flwr_aid=self.account.user_id), "User message"
+        )
+        config = {
+            "project": {"name": "app", "version": "1.0"},
+            "tool": {
+                "flwr": {
+                    "app": {
+                        "publisher": "publisher",
+                        "components": {"agentapp": "app:app"},
+                    }
+                }
+            },
+        }
+        with (
+            patch.object(
+                control_handlers, "_get_remote_fab", return_value=(b"fab", {}, None)
+            ) as resolve,
+            patch.object(control_handlers, "get_fab_config", return_value=config),
+        ):
+            process_pending_agent_runs(self.state)
+            process_pending_agent_runs(self.state)
+        resolve.assert_called_once_with(agent.config.app_spec)
+        runs = self.state.get_run()
+        assert len(runs) == 1 and runs[0].agent_id == agent.id
+
     def test_list_runs_defaults_to_twenty(self) -> None:
-        """Apply the default page size in the shared Control handler."""
+        """Apply default pagination to an empty page without a caller handle."""
         state = Mock(spec=LinkState)
-        state.get_run_info.return_value = []
+        state.federation_manager = NoOpFederationManager()
+        state.get_run.return_value = []
 
-        list_runs(ListRunsRequest(), self.account, state)
+        account = AuthenticatedUser(user_id=self.account.user_id)
+        response = list_runs(ListRunsRequest(), account, state)
 
-        state.get_run_info.assert_called_once_with(
-            flwr_aids=[self.account.flwr_aid],
+        self.assertFalse(response.run_dict)
+
+        state.get_run.assert_called_once_with(
+            flwr_aids=[self.account.user_id],
+            federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
             limit=20,
             skip=0,
         )
+
+    def test_list_runs_filters_membership_and_retains_owned_space_runs(self) -> None:
+        """Filter federation access before paging while retaining owned Space runs."""
+        federation_run_id = self._create_dummy_run()
+        space_id = UUID(self.state.create_space(participants=[]).id)
+        space_run_ids = [
+            self.state.create_run(
+                "flwr/demo",
+                "v0.0.1",
+                "hash123",
+                {},
+                None,
+                None,
+                flwr_aid,
+                TaskType.AGENT_APP,
+                space_id=space_id,
+                user_prompt="Hello",
+            )
+            for flwr_aid in [self.account.user_id, "other-account"]
+        ]
+        owned_space_run_id = space_run_ids[0]
+        self._create_dummy_run("@owner/inaccessible")
+
+        # Scope selection and caller ownership apply before ordering and pagination.
+        response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id, owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
+        response = list_runs(ListRunsRequest(limit=1, skip=1), self.account, self.state)
+        assert set(response.run_dict) == {federation_run_id}
+        with patch.object(
+            self.state.federation_manager, "get_federations", return_value=[]
+        ):
+            response = list_runs(ListRunsRequest(), self.account, self.state)
+        assert set(response.run_dict) == {owned_space_run_id}
 
     def _create_dummy_run_series(
         self, series_id: int, run_ids: list[int] | None = None
@@ -141,7 +228,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Return primary-task events from every run in the series."""
         run_ids = [self._create_dummy_run() for _ in range(2)]
         primary_task_ids = [
-            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            cast(int, self.state.get_run(run_ids=[run_id])[0].primary_task_id)
             for run_id in run_ids
         ]
         child_task_id = self.state.create_task(
@@ -183,10 +270,10 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual([event.task_id for event in response.events], primary_task_ids)
-        runs = self.state.get_run_info(run_ids=run_ids)
+        runs = self.state.get_run(run_ids=run_ids)
         notify_result_delivered.assert_has_calls(
             [
-                call(run, self.account.flwr_aid, RESULT_DELIVERY_CHANNEL_CHAT)
+                call(run, self.account.user_id, RESULT_DELIVERY_CHANNEL_CHAT)
                 for run in runs
             ],
             any_order=True,
@@ -319,7 +406,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             (REFRESH_TOKEN_KEY, "new-refresh-token"),
         ]
         invalid_results: list[
-            tuple[list[tuple[str, str | bytes]] | None, AccountInfo | None]
+            tuple[list[tuple[str, str | bytes]] | None, AuthenticatedUser | None]
         ] = [
             (None, None),
             (valid_tokens, None),
@@ -365,6 +452,19 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(exc_context.exception.code, ApiErrorCode.NO_ACCOUNT_AUTH)
 
+    def test_start_run_requires_resolved_handle_before_creating_state(self) -> None:
+        """A provider username cannot substitute for a local account namespace."""
+        state = Mock(spec=LinkState)
+        user = AuthenticatedUser(user_id="aid", provider_username="provider-name")
+
+        with self.assertRaises(FlowerError) as error:
+            start_run(StartRunRequest(), user, state)
+
+        self.assertEqual(
+            error.exception.code, ApiErrorCode.ACCOUNT_AUTHENTICATION_FAILED
+        )
+        state.create_run.assert_not_called()
+
     def test_start_run_reuses_fab_by_hash(self) -> None:
         """Test StartRun reuses a stored FAB by hash."""
         fab_content = b"stored FAB"
@@ -374,7 +474,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         with (
@@ -395,7 +495,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             response = start_run(request, self.account, self.state)
 
         mock_store_app.assert_not_called()
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
         self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
         tasks = self.state.get_tasks()
@@ -414,7 +514,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             NOOP_FEDERATION_ID,
             "@flwr/demo",
             TaskType.SERVER_APP,
-            self.account.flwr_aid,
+            self.account.user_id,
             is_hub_app=True,
         )
         request = StartRunRequest(app_spec="@flwr/demo", federation=NOOP_FEDERATION_ID)
@@ -442,7 +542,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         get_remote_fab.assert_not_called()
         thread.return_value.start.assert_called_once()
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
     def test_start_run_persists_user_prompt_instruction(self) -> None:
@@ -485,7 +585,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             response = start_run(request, self.account, self.state)
 
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
         series = self.state.get_run_series(series_ids=[run.series_id])[0]
         tasks = self.state.get_tasks()
@@ -536,7 +636,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 error.exception.code,
                 ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
             )
-        self.assertEqual(self.state.get_run_info(), [])
+        self.assertEqual(self.state.get_run(), [])
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
@@ -547,7 +647,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         with (
@@ -575,7 +675,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 source="web_ui",
             )
 
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         notify_run_started.assert_called_once()
         notified_run, source = notify_run_started.call_args.args
         self.assertEqual(notified_run.run_id, run.run_id)
@@ -615,7 +715,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.SERVER_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         response = list_apps(
@@ -648,7 +748,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 federation_id=federation_id,
                 app_id="@flwr/demo",
                 app_type=TaskType.SERVER_APP,
-                added_by=self.account.flwr_aid,
+                added_by=self.account.user_id,
             )
 
         with (
@@ -702,7 +802,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id=FLOWER_AGENT_APP_ID,
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
         )
 
         response = list_apps(
@@ -723,7 +823,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/demo",
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
             is_hub_app=True,
         )
 
@@ -887,7 +987,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             federation_id=NOOP_FEDERATION_ID,
             app_id="@flwr/agent",
             app_type=TaskType.AGENT_APP,
-            added_by=self.account.flwr_aid,
+            added_by=self.account.user_id,
             is_hub_app=True,
         )
         request = StartAutomationRequest(
@@ -947,7 +1047,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.account.flwr_aid,
+            flwr_aid=self.account.user_id,
             start_run_request=StartRunRequest(series_id=1),
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
@@ -972,7 +1072,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Prepare
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
-            flwr_aid=self.account.flwr_aid,
+            flwr_aid=self.account.user_id,
             start_run_request=StartRunRequest(series_id=1),
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
@@ -996,3 +1096,53 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [item.automation_id for item in stopped],
             [automation.automation_id],
         )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(None, 0.1), ("0.5", 0.5), ("0.01", 0.01), ("60", 60.0)]
+)
+def test_stream_replays_pages_polls_and_stops_on_disconnect(
+    monkeypatch: pytest.MonkeyPatch, value: str | None, expected: float
+) -> None:
+    """Forward events and cursor markers, then poll from the last delivered seq."""
+    monkeypatch.delenv("FLWR_USER_EVENTS_STREAM_INTERVAL", raising=False)
+    if value is not None:
+        monkeypatch.setenv("FLWR_USER_EVENTS_STREAM_INTERVAL", value)
+    state = Mock(spec=LinkState)
+    entries = [StreamEventsResponse(seq=seq) for seq in range(1, 5)]
+    entries[0].event.type = "agent.created"
+    entries[-1].event.type = "message.created"
+    state.get_user_events.side_effect = [entries[:2], entries[2:3], [], [], entries[3:]]
+    active = Mock(return_value=True)
+    stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, active)
+    with patch(
+        "flwr.superlink.servicer.control.control_handlers.time.sleep",
+        side_effect=lambda _: monkeypatch.setenv(
+            "FLWR_USER_EVENTS_STREAM_INTERVAL", "invalid"
+        ),
+    ) as sleep:
+        assert [next(stream) for _ in entries] == entries
+        active.return_value = False
+        assert not list(stream)
+    assert sleep.call_args_list == [call(expected), call(expected)]
+    assert state.get_user_events.call_args_list == [
+        call("alice", after_seq=0),
+        call("alice", after_seq=2),
+        call("alice", after_seq=3),
+        call("alice", after_seq=3),
+        call("alice", after_seq=3),
+    ]
+
+
+@pytest.mark.parametrize(
+    "value", ["", "invalid", "0", "-1", "0.009", "60.1", "nan", "inf", "-inf"]
+)
+def test_stream_events_rejects_invalid_poll_interval(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """Reject invalid intervals before querying the feed or starting a stream."""
+    monkeypatch.setenv("FLWR_USER_EVENTS_STREAM_INTERVAL", value)
+    state = Mock(spec=LinkState)
+    with pytest.raises(ValueError, match="FLWR_USER_EVENTS_STREAM_INTERVAL"):
+        stream_events(StreamEventsRequest(), _ACCOUNT, state, lambda: True)
+    state.get_user_events.assert_not_called()

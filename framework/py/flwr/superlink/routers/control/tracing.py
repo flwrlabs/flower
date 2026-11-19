@@ -19,13 +19,13 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.tracing import TraceSpan, trace_span
 from flwr.superlink.dependencies.account import get_account
 
 
 async def trace_run_creation(
-    request: Request, _account: Annotated[AccountInfo, Depends(get_account)]
+    request: Request, _account: Annotated[AuthenticatedUser, Depends(get_account)]
 ) -> AsyncIterator[TraceSpan]:
     """Continue the incoming context only after account authorization."""
     with trace_span(

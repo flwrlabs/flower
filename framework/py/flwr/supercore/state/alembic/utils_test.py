@@ -38,6 +38,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.engine import URL, Connection, Engine
+from sqlalchemy.exc import IntegrityError
 
 from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
@@ -192,6 +193,145 @@ class TestAlembicRun(unittest.TestCase):
             return timestamp.split(".", maxsplit=1)[0]
 
         self.assertEqual(normalize(actual), normalize(expected))
+
+    def test_require_agent_default_space_id(self) -> None:
+        """Remove only agents missing a default Space and their foreign-key rows."""
+        engine = self.create_engine()
+        self.addCleanup(engine.dispose)
+        self.upgrade_to_revision(engine, "0969435b9ca6")
+        config = build_alembic_config(engine)
+        space = "00000000000000000000000000000001"
+        children = {
+            "automation": (
+                "flwr_aid, status, created_at, updated_at, next_run_at",
+                "flwr_aid, 'active', created_at, updated_at, created_at",
+            ),
+            "compacted_contexts": (
+                "through_event_id, text, token_count, created_at",
+                "1, 'summary', 1, created_at",
+            ),
+            "connector": (
+                "connector_ref, credentials_json, config_json, created_at, created_by",
+                "'ref', '{}', '{}', created_at, flwr_aid",
+            ),
+            "connector_oauth_session": (
+                "oauth_session_id, flwr_aid, connector_ref, state, redirect_uri, "
+                "created_at, expires_at",
+                "name, flwr_aid, 'ref', 'state', 'uri', created_at, updated_at",
+            ),
+            "run": ("run_id, primary_task_id", "agent_id, 1"),
+            "space_message": (
+                "space_id, created_at, content",
+                ":space, created_at, name",
+            ),
+            "space_participant": ("space_id", ":space"),
+        }
+        with engine.connect() as conn:
+            config.attributes["connection"] = conn
+            conn.execute(text("PRAGMA foreign_keys = ON"))
+            conn.execute(
+                text(
+                    "INSERT INTO space (id, created_at, title) "
+                    "VALUES (:space, CURRENT_TIMESTAMP, '')"
+                ),
+                {"space": space},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO agent (agent_id, default_space_id, name, app_spec, "
+                    "flwr_aid, created_at, updated_at) VALUES "
+                    "(:id, :space, :name, 'app', 'alice', CURRENT_TIMESTAMP, "
+                    "CURRENT_TIMESTAMP)"
+                ),
+                [
+                    {"id": 1, "space": space, "name": "kept"},
+                    {"id": 2, "space": None, "name": "removed"},
+                ],
+            )
+            for table, (columns, values) in children.items():
+                conn.execute(
+                    text(
+                        f"INSERT INTO {table} (agent_id, {columns}) "
+                        f"SELECT agent_id, {values} FROM agent"
+                    ),
+                    {"space": space},
+                )
+            conn.commit()
+
+            command.upgrade(config, "3fb31831d5eb")
+            for table in ("agent", *children):
+                self.assertEqual(
+                    conn.execute(text(f"SELECT agent_id FROM {table}")).scalars().all(),
+                    [1],
+                    table,
+                )
+            self.assertEqual(
+                conn.scalar(text("SELECT default_space_id FROM agent")), space
+            )
+            with self.assertRaises(IntegrityError), conn.begin_nested():
+                conn.execute(text("UPDATE agent SET default_space_id = NULL"))
+            conn.commit()
+
+            command.downgrade(config, "0969435b9ca6")
+            conn.execute(text("UPDATE agent SET default_space_id = NULL"))
+            conn.commit()
+            self.assertEqual(
+                conn.execute(text("SELECT agent_id FROM agent")).scalars().all(), [1]
+            )
+            self.assertEqual(conn.scalar(text("PRAGMA foreign_keys")), 1)
+            self.assertEqual(conn.execute(text("PRAGMA foreign_key_check")).all(), [])
+
+    def test_participant_cursor_rename_preserves_values(self) -> None:
+        """Preserve cursor positions and defaults across upgrade and downgrade."""
+        engine = self.create_engine("participant_cursor.db")
+        try:
+            self.upgrade_to_revision(engine, "6aa3c50bb2cd")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO space (id, created_at, title) "
+                        "VALUES ('00000000000000000000000000000001', "
+                        "'2026-11-11T00:00:00+00:00', '')"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO space_participant "
+                        "(space_id, flwr_aid, seen_through_message_id) "
+                        "VALUES ('00000000000000000000000000000001', 'alice', 42)"
+                    )
+                )
+            self.upgrade_to_revision(engine, "6cbf924cf5ec")
+            with engine.begin() as connection:
+                self.assertEqual(
+                    connection.scalar(
+                        text("SELECT read_through_message_id FROM space_participant")
+                    ),
+                    42,
+                )
+                connection.execute(
+                    text("UPDATE space_participant SET read_through_message_id = 99")
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO space_participant (space_id, flwr_aid) "
+                        "VALUES ('00000000000000000000000000000001', 'bob')"
+                    )
+                )
+            self.downgrade_to_revision(engine, "6aa3c50bb2cd")
+            with engine.connect() as connection:
+                positions = connection.execute(
+                    text(
+                        "SELECT flwr_aid, seen_through_message_id "
+                        "FROM space_participant"
+                    )
+                ).all()
+                self.assertEqual(
+                    {row[0]: row[1] for row in positions},
+                    {"alice": 99, "bob": 0},
+                )
+        finally:
+            engine.dispose()
 
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""

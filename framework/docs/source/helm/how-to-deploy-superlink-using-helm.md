@@ -57,10 +57,15 @@ in seconds and must be finite and between 0.01 and 60, inclusive. Invalid values
 fail when the event stream starts. The setting is read once per stream, before
 polling begins. Restart SuperLink after changing its environment.
 
+The `StreamEvents` user-event stream uses `FLWR_USER_EVENTS_STREAM_INTERVAL`
+with a default of 0.1 seconds and the same limits.
+
 ```yaml
 superlink:
   env:
     - name: FLWR_RUN_EVENTS_STREAM_INTERVAL
+      value: "0.1"
+    - name: FLWR_USER_EVENTS_STREAM_INTERVAL
       value: "0.1"
 ```
 
