@@ -269,6 +269,19 @@ def test_sparse_and_dense_early_dropout(
     _assert_correct(result, n=n, expected_contributors=set(range(n)) - {1})
 
 
+def test_mixed_setup_and_post_share_dropout(monkeypatch) -> None:
+    """Exclude never-generated shares while retaining a later dropped owner."""
+    result = _run_round(monkeypatch, n=5, k=5, t=3, down={1: 0, 2: 2})
+    _assert_correct(result, n=5, expected_contributors={0, 3, 4})
+    assert result[1] == {0, 2, 3, 4}
+    for request in result[4]:
+        dead = set(
+            request.content.config_records[RECORD_KEY_CONFIGS][Key.DEAD_NODE_ID_LIST]
+        )
+        assert 1 not in dead
+        assert 2 in dead
+
+
 def test_healthy_round_unchanged(monkeypatch) -> None:
     result = _run_round(monkeypatch, n=4, k=4, t=3, down={})
     _assert_correct(result, n=4, expected_contributors=set(range(4)))
