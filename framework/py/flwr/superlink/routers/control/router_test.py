@@ -498,6 +498,29 @@ def test_agent_creation_rejects_invalid_requests(
             "list_connectors",
         ),
         (
+            "/v1/control/list-connectors",
+            ListConnectorsRequest(agent_id=1),
+            ListConnectorsResponse.FromString,
+            ListConnectorsResponse(),
+            "list_connectors",
+        ),
+        (
+            "/v1/control/disconnect-connector",
+            DisconnectConnectorRequest(agent_id=1, connector_id=7),
+            DisconnectConnectorResponse.FromString,
+            DisconnectConnectorResponse(),
+            "disconnect_connector",
+        ),
+        (
+            "/v1/control/begin-connector-oauth",
+            BeginConnectorOAuthRequest(
+                agent_id=1, connector_ref="slack", redirect_uri="https://example.test"
+            ),
+            BeginConnectorOAuthResponse.FromString,
+            BeginConnectorOAuthResponse(oauth_session_id="agent-session"),
+            "begin_connector_oauth",
+        ),
+        (
             "/v1/control/disconnect-connector",
             DisconnectConnectorRequest(
                 connector_ref="google-drive", federation=CONNECTOR_FEDERATION_ID

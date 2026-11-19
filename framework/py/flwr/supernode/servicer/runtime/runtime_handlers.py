@@ -41,6 +41,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
     GetConnectorRequest,
@@ -51,6 +53,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -74,7 +78,15 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supernode.nodestate import NodeState
+
+
+def _get_agent_id(state: NodeState, task: Task) -> int:
+    """Resolve the authenticated task's agent ID for file scoping."""
+    return core_runtime_handlers.require_agent_id(
+        state.get_run(task.run_id), task.run_id
+    )
 
 
 def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:
@@ -382,6 +394,36 @@ def start_automation(
     raise FlowerError(
         ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         "Only AgentApp and ServerApp tasks can create automations.",
+    )
+
+
+def create_task(
+    request: CreateTaskRequest, state: NodeState, task: Task
+) -> CreateTaskResponse:
+    """Create a child task without access to stored connector credentials."""
+    run = state.get_run(task.run_id)
+    if run is None:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found in NodeState."
+        )
+    if request.type == TaskType.CONNECTOR and (
+        request.HasField("connector_id")
+        or not connector_registry.has_builtin_connector(request.connector_ref)
+    ):
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
+            "Stored connections are only available on SuperLink.",
+        )
+    return core_runtime_handlers.create_task(request, state, task, run)
+
+
+def list_agent_connectors(
+    request: ListAgentConnectorsRequest, state: NodeState, task: Task
+) -> ListAgentConnectorsResponse:
+    """Reject connection discovery outside the agent's SuperLink."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Agent connectors are only available on SuperLink.",
     )
 
 

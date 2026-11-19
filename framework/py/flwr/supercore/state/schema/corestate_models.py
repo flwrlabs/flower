@@ -238,6 +238,10 @@ class Agent(FlwrBase):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     app_spec: Mapped[str] = mapped_column(String, nullable=False)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
+    # Each agent has an immutable default Space shared exclusively with its creator.
+    default_space_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
@@ -309,6 +313,9 @@ class SpaceMessage(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
 
 class SeriesContext(FlwrBase):
@@ -378,14 +385,14 @@ class Automation(FlwrBase):
     automation_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True, nullable=False
     )
-    federation_id: Mapped[str] = mapped_column(String, nullable=False)
+    federation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
     agent_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("agent.agent_id", name="fk_automation_agent_id"),
         nullable=True,
     )
-    series_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    series_id: Mapped[int | None] = mapped_column(UInt64(), nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False)
     start_run_request: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

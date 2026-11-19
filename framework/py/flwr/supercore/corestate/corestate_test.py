@@ -1549,6 +1549,54 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(automation.federation, "@me/fed-b")
         self.assertFalse(automation.HasField("agent_id"))
 
+    def test_store_automation_persists_agent_id(self) -> None:
+        """Store the agent ID in both state implementations."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "aid-a", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+
+        automation = state.store_automation(
+            flwr_aid="aid-a",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=now().isoformat(),
+            max_runs=1,
+            agent_id=agent.id,
+        )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+
+        self.assertEqual(automation.agent_id, agent.id)
+        self.assertEqual(stored.agent_id, agent.id)
+        self.assertEqual((stored.federation, stored.series_id), ("", 0))
+
+    def test_store_automation_requires_one_owner(self) -> None:
+        """Reject missing, partial, or mixed automation ownership."""
+        state = self.state_factory()
+        invalid_owners = [
+            (None, None, None),
+            ("@me/fed-a", None, None),
+            (None, 123, None),
+            ("@me/fed-a", None, 456),
+            (None, 123, 456),
+            ("@me/fed-a", 123, 456),
+        ]
+        for federation_id, series_id, agent_id in invalid_owners:
+            with self.subTest(
+                federation_id=federation_id, series_id=series_id, agent_id=agent_id
+            ):
+                with self.assertRaisesRegex(ValueError, "Provide agent_id"):
+                    state.store_automation(
+                        federation_id=federation_id,
+                        flwr_aid="aid-a",
+                        start_run_request=StartRunRequest(user_prompt="Do work"),
+                        series_id=series_id,
+                        next_run_at=now().isoformat(),
+                        agent_id=agent_id,
+                    )
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
@@ -2665,9 +2713,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_user_events("alice", limit=1), page)
 
     def test_user_event_agent_creation_failure(self) -> None:
-        """Roll back the Agent and its event if initial Space creation fails."""
+        """Roll back the Agent, Space, and events if their creation fails."""
         state = self.state_factory()
-        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+        original_store_event = state.store_event
+
+        def fail_space_event(event_type: str, *args: Any, **kwargs: Any) -> UUID:
+            if event_type == EventType.SPACE_CREATED:
+                raise ValueError("failed")
+            return original_store_event(event_type, *args, **kwargs)
+
+        with patch.object(state, "store_event", side_effect=fail_space_event):
             with self.assertRaises(ValueError):
                 state.create_agent(
                     "alice", AgentConfig(name="Agent", app_spec="@test/app")
