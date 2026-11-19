@@ -18,7 +18,7 @@ from fastapi import Request
 from fastapi.security.utils import get_authorization_scheme_param
 
 from flwr.common.constant import ACCESS_TOKEN_KEY
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
@@ -31,7 +31,9 @@ class AccountAccessDependency:
         get_account = AccountAccessDependency(authn_plugin)
 
         @router.get("/")
-        def endpoint(account: Annotated[AccountInfo, Depends(get_account)]) -> None:
+        def endpoint(
+            account: Annotated[AuthenticatedUser, Depends(get_account)]
+        ) -> None:
             ...
     """
 
@@ -41,7 +43,7 @@ class AccountAccessDependency:
     def __call__(
         self,
         request: Request,
-    ) -> AccountInfo:
+    ) -> AuthenticatedUser:
         """Return the authenticated account for a request."""
         authorization_headers = request.headers.getlist("authorization")
         if len(authorization_headers) > 1:
@@ -62,7 +64,7 @@ class AccountAccessDependency:
 
         return self._require_account(account)
 
-    def _require_account(self, account: AccountInfo | None) -> AccountInfo:
+    def _require_account(self, account: AuthenticatedUser | None) -> AuthenticatedUser:
         """Require account information from the authentication plugin."""
         if account is None:
             raise BearerAuthenticationError()
@@ -71,14 +73,14 @@ class AccountAccessDependency:
 
 def get_account(
     request: Request,
-) -> AccountInfo:
+) -> AuthenticatedUser:
     """Return the account authenticated by the Control API middleware.
 
     Control routes authenticate requests before dependency resolution and store
     the resulting account on the request state.
     """
     account = getattr(request.state, "account", None)
-    if not isinstance(account, AccountInfo):
+    if not isinstance(account, AuthenticatedUser):
         raise FlowerError(
             ApiErrorCode.ACCOUNT_AUTHENTICATION_NOT_INITIALIZED,
             "SuperLink account authentication is not initialized: expected an "
