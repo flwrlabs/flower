@@ -1,0 +1,56 @@
+---
+# this is the config that will be loaded as default by main.py
+# Please follow the provided structure (this will ensuring all baseline follow
+# a similar configuration structure and hence be easy to customise)
+
+num_clients: 20 # total number of clients
+num_epochs: 5 # number of local epochs
+batch_size: 50
+num_rounds: 200
+clients_per_round: 20
+learning_rate: 0.02
+weight_decay: 5e-4
+momentum: 0.5
+lamda: 1.0 # it can be >= 0
+
+client_resources:
+  num_cpus: 2
+  num_gpus: 0.1
+
+gen_client_fn:
+  _target_: fedpac.client.gen_fedavg_client_fn
+  model: ${model}
+
+server_device: cpu
+
+fit_config:
+  drop_client: false 
+
+
+dataset_config:
+  name: "cifar10"
+  iid: false
+  balance: true
+  power_law: false
+  s: 0.2
+
+model:
+  _target_: fedpac.models.CIFARNet
+  num_classes: 10
+
+strategy:
+  _target_: fedpac.strategy.FedAvgWithRandomSampling
+  fraction_fit: 1
+  fraction_evaluate: 1
+  min_fit_clients: ${clients_per_round}
+  min_available_clients: ${clients_per_round}
+  min_evaluate_clients: 0
+  on_fit_config_fn:
+    _target_: fedpac.utils.get_on_fit_fedavg_config
+    config: ${fit_config}
+  evaluate_metrics_aggregation_fn:
+    _target_: fedpac.strategy.metrics_average
+    _partial_: true # we dont' want this function to be evaluated when instantiating the strategy, we treat it as a partial and evaluate it when the strategy actuallly calls the function (in aggregate_evaluate())
+
+
+
