@@ -231,6 +231,9 @@ class EventType(StrEnum):
     AGENT_CREATED = "agent.created"
     SPACE_CREATED = "space.created"
     MESSAGE_CREATED = "message.created"
+    RUN_CREATED = "run.created"
+    TASK_CREATED = "task.created"
+    TASK_UPDATED = "task.updated"
 
 
 class AutomationStatus(StrEnum):
