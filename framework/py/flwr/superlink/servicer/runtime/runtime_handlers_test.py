@@ -264,7 +264,7 @@ def test_agent_task_input_includes_latest_identity(
             session.execute(
                 sql_update(AgentModel)
                 .where(AgentModel.agent_id == agent.id)
-                .values(config_version=2, revision=2)
+                .values(config_version=2)
             )
         agent.config.name = "Updated Research"
         agent.config.title = "Updated title"

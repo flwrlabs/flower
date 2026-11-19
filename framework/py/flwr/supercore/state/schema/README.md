@@ -17,7 +17,6 @@ erDiagram
     VARCHAR app_spec
     TIMESTAMP created_at
     VARCHAR flwr_aid
-    BIGINT revision
     TIMESTAMP updated_at
   }
 

@@ -743,7 +743,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 config_version=1,
-                revision=1,
                 default_space_id=space_model.id,
                 created_at=created_at,
                 updated_at=created_at,

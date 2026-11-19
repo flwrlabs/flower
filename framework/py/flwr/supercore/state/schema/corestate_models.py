@@ -230,7 +230,6 @@ class Agent(FlwrBase):
             initially="DEFERRED",
         ),
         CheckConstraint("config_version > 0", name="ck_agent_config_version"),
-        CheckConstraint("revision > 0", name="ck_agent_revision"),
         Index("idx_agent_flwr_aid", "flwr_aid"),
         {"sqlite_autoincrement": True},
     )
@@ -244,7 +243,6 @@ class Agent(FlwrBase):
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
     app_spec: Mapped[str] = mapped_column(String, nullable=False)
     config_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
     # Each agent has an immutable default Space shared exclusively with its creator.
     default_space_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=True

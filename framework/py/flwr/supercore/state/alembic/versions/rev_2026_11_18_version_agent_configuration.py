@@ -69,7 +69,6 @@ def upgrade() -> None:
         batch_op.add_column(
             sa.Column("config_version", sa.BigInteger(), nullable=False)
         )
-        batch_op.add_column(sa.Column("revision", sa.BigInteger(), nullable=False))
         batch_op.create_foreign_key(
             "fk_agent_config_version",
             "agent_config",
@@ -81,7 +80,6 @@ def upgrade() -> None:
         batch_op.create_check_constraint(
             "ck_agent_config_version", "config_version > 0"
         )
-        batch_op.create_check_constraint("ck_agent_revision", "revision > 0")
         batch_op.drop_column("description")
         batch_op.drop_column("title")
         batch_op.drop_column("name")
@@ -109,9 +107,7 @@ def downgrade() -> None:
     with op.batch_alter_table("agent", schema=None) as batch_op:
         batch_op.alter_column("name", existing_type=sa.String(), nullable=False)
         batch_op.drop_constraint("ck_agent_config_version", type_="check")
-        batch_op.drop_constraint("ck_agent_revision", type_="check")
         batch_op.drop_constraint("fk_agent_config_version", type_="foreignkey")
-        batch_op.drop_column("revision")
         batch_op.drop_column("config_version")
 
     op.drop_table("agent_config")

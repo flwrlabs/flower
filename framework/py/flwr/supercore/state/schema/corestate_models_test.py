@@ -170,7 +170,6 @@ def test_connector_requires_exactly_one_existing_owner(
                 flwr_aid="user",
                 app_spec="@user/app",
                 config_version=1,
-                revision=1,
                 created_at=timestamp,
                 updated_at=timestamp,
             )
