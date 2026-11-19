@@ -1369,9 +1369,9 @@ def test_bootstrap_uses_authenticated_account(
     config = AgentConfig(name="Agent", app_spec="@test/app")
     state.create_agent(_ACCOUNT.user_id, config)
     state.create_agent("other-account", config)
-    space = state.get_spaces(_ACCOUNT.flwr_aid)[0]
+    space = state.get_spaces(_ACCOUNT.user_id)[0]
     state.create_space_message(
-        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid), "Latest prompt"
+        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.user_id), "Latest prompt"
     )
     response = client.post(
         "/v1/control/bootstrap",
