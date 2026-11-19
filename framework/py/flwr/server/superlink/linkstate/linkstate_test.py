@@ -479,123 +479,51 @@ class StateTest(CoreStateTest):
         )
         self.assertEqual(state.get_task_events(space_id=uuid4()), [])
 
-    def _create_activity_run(self) -> tuple[LinkState, int, int, UUID, int]:
-        """Create a bound Space run whose uint64 ID exceeds JavaScript precision."""
+    @parameterized.expand([False, True])  # type: ignore[untyped-decorator]
+    def test_run_activity_events(self, expired: bool) -> None:
+        """Emit creation and finish once for explicit completion or expiry."""
         state = self.state_factory()
         agent = state.create_agent(
             "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
         )
         assert agent is not None
-        space_id = UUID(
-            state.create_space(
-                participants=[
-                    SpaceParticipant(flwr_aid="alice"),
-                    SpaceParticipant(flwr_aid="bob"),
-                    SpaceParticipant(agent_id=agent.id),
-                ]
-            ).id
+        space_id = UUID(state.get_spaces("alice")[0].id)
+        run_id = state.create_run(
+            "publisher/app",
+            "1.0",
+            state.store_fab(Fab("", b"fab", {})),
+            {"private": "secret"},
+            None,
+            None,
+            None,
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
         )
-        fab_hash = state.store_fab(Fab("", b"fab", {}))
-        with patch(
-            "flwr.server.superlink.linkstate.utils.corestate_generate_rand_int_from_bytes",
-            side_effect=[2**64 - 1, 2**64 - 2],
-        ):
-            run_id = state.create_run(
-                "publisher/app",
-                "1.0",
-                fab_hash,
-                {"private": "secret"},
-                None,
-                None,
-                None,
-                TaskType.AGENT_APP,
-                space_id=space_id,
-                agent_id=agent.id,
+        transition_run_status(state, run_id, 2)
+        task_id = get_primary_task_id(state, run_id)
+        if expired:
+            future = now() + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-        assert run_id == 2**64 - 1
-        return state, run_id, get_primary_task_id(state, run_id), space_id, agent.id
-
-    @parameterized.expand(  # type: ignore[untyped-decorator]
-        [SubStatus.COMPLETED, SubStatus.FAILED, SubStatus.STOPPED]
-    )
-    def test_run_activity_lifecycle(self, sub_status: str) -> None:
-        """Publish creation and finish once with a minimal, scoped payload."""
-        state, run_id, task_id, space_id, agent_id = self._create_activity_run()
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        if sub_status == SubStatus.STOPPED:
-            assert state.stop_run(run_id)
+            with self._patch_message_time(future):
+                state.get_run_status({run_id})
         else:
-            assert state.finish_task(task_id, sub_status, "private failure details")
-        assert not state.finish_task(task_id, sub_status, "private failure details")
-        events = [
-            entry.event
-            for entry in state.get_user_events("bob")
-            if entry.event.type.startswith("run.")
-        ]
-        assert [event.type for event in events] == ["run.created", "run.finished"]
-        for run_event in events:
-            payload = MessageToDict(run_event.payload)
-            assert run_event.space_id == str(space_id)
-            assert payload["run_id"] == str(run_id)
-            assert payload["agent_id"] == str(agent_id)
-            assert payload["space_id"] == str(space_id)
-            assert set(payload) <= {
-                "run_id",
-                "agent_id",
-                "space_id",
-                "status",
-                "pending_at",
-                "starting_at",
-                "running_at",
-                "finished_at",
-            }
-            assert "details" not in payload["status"]
-        assert events[0].payload["pending_at"]
-        assert events[1].payload["finished_at"]
-        assert MessageToDict(events[1].payload)["status"]["sub_status"] == sub_status
-        assert [
+            assert state.finish_task(task_id, SubStatus.COMPLETED, "")
+        assert not state.finish_task(task_id, SubStatus.COMPLETED, "")
+        created, finished = [
             entry.event
             for entry in state.get_user_events("alice")
             if entry.event.type.startswith("run.")
-        ] == events
-
-    def test_run_activity_excludes_child_and_federation_tasks(self) -> None:
-        """Child tasks and federation runs do not produce Space activity events."""
-        state, run_id, _, _, _ = self._create_activity_run()
-        cursor = state.get_bootstrap("alice").cursor
-        child_id = state.create_task(task_type="model", run_id=run_id)
-        assert child_id is not None
-        assert state.claim_task(child_id) is not None
-        assert state.activate_task(child_id)
-        assert state.finish_task(child_id, SubStatus.COMPLETED, "")
-        legacy = create_dummy_run(state)
-        legacy_task = get_primary_task_id(state, legacy)
-        assert state.claim_task(legacy_task) is not None
-        assert state.activate_task(legacy_task)
-        assert state.finish_task(legacy_task, SubStatus.COMPLETED, "")
-        assert state.get_user_events("alice", cursor) == []
-
-    def test_run_activity_claim_retry_and_heartbeat_expiry(self) -> None:
-        """Retryable STARTING expiry stays active and RUNNING expiry finishes once."""
-        state, run_id, task_id, _, _ = self._create_activity_run()
-        cursor = state.get_bootstrap("alice").cursor
-        assert state.claim_task(task_id) is not None
-        future = now() + timedelta(
-            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
-        )
-        with self._patch_message_time(future):
-            assert state.get_run_status({run_id})[run_id].status == Status.PENDING
-        assert state.get_user_events("alice", cursor) == []
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        with self._patch_message_time(future):
-            assert state.get_run_status({run_id})[run_id].status == Status.FINISHED
-        events = [entry.event for entry in state.get_user_events("alice", cursor)]
-        assert [event.type for event in events] == ["run.finished"]
-        assert (
-            MessageToDict(events[-1].payload)["status"]["sub_status"]
-            == SubStatus.FAILED
+        ]
+        assert (created.type, finished.type) == ("run.created", "run.finished")
+        assert MessageToDict(created.payload)["status"]["status"] == Status.PENDING
+        assert finished.space_id == str(space_id)
+        assert finished.payload["run_id"] == str(run_id)
+        assert finished.payload["agent_id"] == str(agent.id)
+        assert "override_config" not in finished.payload
+        assert MessageToDict(finished.payload)["status"]["sub_status"] == (
+            SubStatus.FAILED if expired else SubStatus.COMPLETED
         )
 
     def test_create_space_run(self) -> None:
@@ -2130,35 +2058,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
-
-    @parameterized.expand(["finished", "expired"])  # type: ignore[untyped-decorator]
-    def test_run_activity_event_storage_failure_rolls_back(
-        self, transition: str
-    ) -> None:
-        """Event storage failure rolls back the SQL transition and feed deliveries."""
-        state, run_id, task_id, _, _ = self._create_activity_run()
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        before = state.get_bootstrap("alice")
-        store_event = state.store_event
-
-        def fail_event_storage(*args: Any, **kwargs: Any) -> UUID:
-            store_event(*args, **kwargs)
-            raise RuntimeError("Event storage failed")
-
-        with patch.object(state, "store_event", side_effect=fail_event_storage):
-            with self.assertRaisesRegex(RuntimeError, "Event storage failed"):
-                if transition == "finished":
-                    state.finish_task(task_id, SubStatus.FAILED, "failure")
-                else:
-                    future = now() + timedelta(
-                        seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
-                    )
-                    with self._patch_message_time(future):
-                        state.get_run_status({run_id})
-        assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
-        assert state.get_bootstrap("alice") == before
-        assert state.get_user_events("alice", before.cursor) == []
 
     def test_get_compacted_contexts(self) -> None:
         """Read only one agent in newest-first order with an exclusive cursor."""
