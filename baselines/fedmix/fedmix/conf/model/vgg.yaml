@@ -1,0 +1,2 @@
+_target_: fedmix.models.CustomVGG
+num_classes: 10
