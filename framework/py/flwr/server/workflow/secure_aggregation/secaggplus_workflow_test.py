@@ -88,11 +88,17 @@ class _ServerState:
         }
 
 
+class _History:
+    def add_metrics_distributed_fit(self, **kwargs) -> None:
+        pass
+
+
 class _ServerContext:
     def __init__(self, strategy: _Strategy, count: int) -> None:
         self.strategy = strategy
         self.client_manager = _ClientManager(count)
         self.state = _ServerState()
+        self.history = _History()
 
 
 class _Grid:
