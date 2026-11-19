@@ -758,8 +758,16 @@ what else it can detect about device access:
   this as inconclusive rather than a permissions problem, and does not suggest the
   group/container fix -- check this process's open-file limit and the kernel/``dmesg``
   log for driver errors instead.
-- If ``/dev/kfd`` is accessible, Flower determines each ``/dev/dri/renderD*`` node's PCI
-  vendor from sysfs first, independent of whether that node itself can be opened -- a
+- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node was found at all, Flower
+  reports that ROCm reaches the GPU through both device nodes, so fixing ``ROCM_PATH``
+  will not help here either. Unlike the permission-denied case above, this is not a
+  group-membership issue -- there is no node for ``--group-add render`` to grant access
+  to -- so check that the device is passed through at all (for example a container
+  started with ``--device=/dev/kfd`` but without ``--device=/dev/dri``), and that the
+  host's ``amdgpu`` driver actually created a render node (``ls /dev/dri``).
+- If ``/dev/kfd`` is accessible and at least one render node was found, Flower determines
+  each ``/dev/dri/renderD*`` node's PCI vendor from sysfs first, independent of whether
+  that node itself can be opened -- a
   hybrid host or container can expose an unrelated, non-AMD node (e.g. an integrated
   Intel GPU's ``renderD128``) in any access state alongside an AMD-backed node that fails
   to open, and only the AMD-backed node's state is actually relevant. If an AMD-backed
@@ -793,7 +801,7 @@ what else it can detect about device access:
 Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
 situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
 
-The seven checks above assume this driver process shares the cluster node's device
+The eight checks above assume this driver process shares the cluster node's device
 namespace; Flower qualifies or skips them whenever that assumption does not hold, since
 the driver's own ``/dev/kfd``/render-node state cannot diagnose a different machine:
 
@@ -816,7 +824,7 @@ the driver's own ``/dev/kfd``/render-node state cannot diagnose a different mach
   outcome can be confirmed from the endpoint alone, Flower always treats a Ray Client
   connection as ambiguous rather than attempting -- and risking -- a remoteness
   determination: it logs a warning naming the endpoint and unconditionally runs the
-  seven checks above against this host, on the chance the connection is genuinely
+  eight checks above against this host, on the chance the connection is genuinely
   co-located. There is no confirmed-remote case that skips the checks outright; if the
   Ray Client server does turn out to run elsewhere, this warning's instructions do not
   apply, and device access must be checked on that actual server host instead.

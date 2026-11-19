@@ -341,13 +341,14 @@ def _log_kfd_diagnostics() -> None:
             "all. ROCm reaches the GPU through both `/dev/kfd` and a "
             "render node, so fixing `amdsmi`/ROCM_PATH will not help "
             "here -- Ray and the ML framework will both keep reporting "
-            "zero GPUs until the render node itself is present and "
-            "accessible. This is usually the same permissions issue as "
-            "missing `/dev/kfd` access, just affecting the other "
-            "device node: the current user is likely missing from the "
-            "`render` group that owns it, or a container was started "
-            "with `--device=/dev/kfd` but without `--device=/dev/dri "
-            "--group-add render`.",
+            "zero GPUs until the render node itself exists. Unlike a "
+            "permission-denied node, this is not a group-membership "
+            "issue -- there is no node for `--group-add render` to "
+            "grant access to. Check that the device is passed through "
+            "at all (e.g. a container started with `--device=/dev/kfd` "
+            "but without `--device=/dev/dri`), and that the host's "
+            "`amdgpu` driver has actually created a render node "
+            "(`ls /dev/dri`).",
         )
 
 
