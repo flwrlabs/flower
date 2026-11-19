@@ -830,12 +830,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         event_type: str,
         payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         with self.session() as session:
+            if recipients is None:
+                if space_id is None:
+                    raise ValueError("Provide recipients or a space_id")
+                recipients = session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                ).all()
             session.execute(
                 insert(EventModel).values(
                     event_id=event_id,
@@ -1511,17 +1520,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if model is None:
                 return None
             message = _space_message_from_model(model)
-            recipients = list(
-                session.scalars(
-                    select(SpaceParticipantTable.c.flwr_aid).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.flwr_aid.is_not(None),
-                    )
-                )
-            )
-            self.store_event(
-                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
-            )
+            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments

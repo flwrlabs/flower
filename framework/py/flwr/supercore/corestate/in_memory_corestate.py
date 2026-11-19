@@ -687,7 +687,7 @@ class InMemoryCoreState(
         self,
         event_type: str,
         payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Create an event and its deliveries, returning its UUID."""
@@ -702,6 +702,14 @@ class InMemoryCoreState(
         with self.lock_space_store:
             if space_id is not None and space_id not in self.space_store:
                 raise ValueError("Event Space does not exist")
+            if recipients is None:
+                if space_id is None:
+                    raise ValueError("Provide recipients or a space_id")
+                recipients = [
+                    p.flwr_aid
+                    for p in self.space_store[space_id].participants
+                    if p.flwr_aid
+                ]
             self.event_store[event_id] = event
             for user_id in sorted(set(recipients)):
                 self.user_event_store.setdefault(user_id, []).append(event_id)
@@ -1209,12 +1217,7 @@ class InMemoryCoreState(
                 created_at=now().isoformat(),
                 content=content,
             )
-            self.store_event(
-                EventType.MESSAGE_CREATED,
-                message,
-                [p.flwr_aid for p in space.participants if p.flwr_aid],
-                space_id=space_id,
-            )
+            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             self.space_message_id_counter = message.id
             self.space_message_store[space_id].append(message)
             return message

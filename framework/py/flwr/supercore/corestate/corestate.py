@@ -300,10 +300,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         event_type: str,
         payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Store a shared event and its ordered deliveries, returning its UUID.
+
+        When recipients are omitted, space_id is required and all current user
+        participants receive the event. An empty sequence creates no deliveries.
 
         Each call creates a new event with a generated UUID and creation timestamp.
         SQL callers can use an enclosing session to commit application changes
