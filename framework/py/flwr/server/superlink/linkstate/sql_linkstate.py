@@ -140,7 +140,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         # Check if the run exists
-        runs = self.get_run_info(run_ids=[run_id])
+        runs = self.get_run(run_ids=[run_id])
         if not runs:
             return False
 
@@ -571,7 +571,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
             ]
 
-    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
+    def get_run(  # pylint: disable=too-many-arguments, too-many-branches
         self,
         *,
         run_ids: Sequence[int] | None = None,

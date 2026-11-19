@@ -39,21 +39,6 @@ class NodeState(CoreState):
         """
 
     @abstractmethod
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve a run by its ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run to retrieve.
-
-        Returns
-        -------
-        Optional[Run]
-            The `Run` instance if found, otherwise None.
-        """
-
-    @abstractmethod
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID.
 

@@ -562,7 +562,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual(error.exception.code, expected_code)
-        self.assertEqual(list(self.state.get_run_info()), [])
+        self.assertEqual(list(self.state.get_run()), [])
 
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
@@ -588,7 +588,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         """Test StartRun links the run to an existing run series."""
         fab_content = b"test FAB content with series ID"
         initial_run_id = self._create_dummy_run(self.aid)
-        series_id = self.state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        series_id = self.state.get_run(run_ids=[initial_run_id])[0].series_id
         shared_state = RecordDict({"shared": ConfigRecord({"value": "kept"})})
         initial_context = Context(
             run_id=initial_run_id,
@@ -620,7 +620,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 source="unknown",
             )
 
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         run_context = self.state.get_run_series_context(series_id)
 
         self.assertEqual(response.series_id, series_id)
@@ -667,7 +667,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 source="unknown",
             )
 
-        runs = self.state.get_run_info(run_ids=[response.run_id])
+        runs = self.state.get_run(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
         apps = self.state.list_apps(NOOP_FEDERATION_ID)
 
@@ -790,7 +790,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 self.state,
                 source="unknown",
             )
-        runs = self.state.get_run_info(run_ids=[response.run_id])
+        runs = self.state.get_run(run_ids=[response.run_id])
         run_info = runs[0] if runs else None
 
         # Assert
@@ -1518,7 +1518,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
             )
 
         # Archiving should reuse the same stop-run cleanup path as StopRun.
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         self.assertEqual(run.status, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
         self.store.delete_objects_in_run.assert_called_once_with(run_id)
         self.assertIsInstance(response, ArchiveFederationResponse)
@@ -1550,7 +1550,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
                 request, get_current_account_info(), self.state
             )
 
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         self.assertEqual(run.status, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
         self.store.delete_objects_in_run.assert_called_once_with(run_id)
         self.assertIsInstance(response, RemoveAccountFromFederationResponse)
@@ -1735,19 +1735,19 @@ class TestControlHandlersAuth(unittest.TestCase):
         request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
         ctx = self.make_context()
         ctx.is_active.return_value = True
-        mock_get_run_info = Mock()
+        mock_get_run = Mock()
         mock_run = Mock(
             federation_id=NOOP_FEDERATION_ID,
             primary_task_id=456,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
-        mock_get_run_info.return_value = [mock_run]
+        mock_get_run.return_value = [mock_run]
         mock_get_task_log = Mock(return_value=("log1", 1.0))
 
         # Execute & Assert
         with (
             patch.object(self.state, "get_task_log", new=mock_get_task_log),
-            patch.object(self.state, "get_run_info", new=mock_get_run_info),
+            patch.object(self.state, "get_run", new=mock_get_run),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
@@ -1764,7 +1764,7 @@ class TestControlHandlersAuth(unittest.TestCase):
                 request, get_current_account_info(), self.state, ctx.is_active
             )
             msgs = list(gen)
-            mock_get_run_info.assert_called_with(run_ids=[run_id])
+            mock_get_run.assert_called_with(run_ids=[run_id])
             mock_get_task_log.assert_called_once_with(456, 1e-06)
             notify_result_delivered.assert_called_once_with(
                 mock_run, "user-123", RESULT_DELIVERY_CHANNEL_LOGS
@@ -1786,7 +1786,7 @@ class TestControlHandlersAuth(unittest.TestCase):
         )
 
         with (
-            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(self.state, "get_run", return_value=[mock_run]),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
@@ -1828,7 +1828,7 @@ class TestControlHandlersAuth(unittest.TestCase):
 
         # Execute
         with (
-            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(self.state, "get_run", return_value=[mock_run]),
             patch.object(self.state, "get_task_events", new=mock_get_task_events),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
@@ -1874,7 +1874,7 @@ class TestControlHandlersAuth(unittest.TestCase):
         )
 
         with (
-            patch.object(self.state, "get_run_info", return_value=[mock_run]),
+            patch.object(self.state, "get_run", return_value=[mock_run]),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
             ),
@@ -1930,7 +1930,7 @@ class TestControlHandlersAuth(unittest.TestCase):
                 request, get_current_account_info(), self.state
             )
             self.assertTrue(response.success)
-            runs = self.state.get_run_info(run_ids=[run_id])
+            runs = self.state.get_run(run_ids=[run_id])
             run = runs[0] if runs else None
             self.assertEqual(cast(Run, run).status.status, Status.FINISHED)
             self.assertEqual(cast(Run, run).status.sub_status, SubStatus.STOPPED)
@@ -2137,7 +2137,7 @@ def test_stream_run_events_poll_interval(
         monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
     run = Mock(primary_task_id=123, status=RunStatus(Status.RUNNING, "", ""))
     state = Mock()
-    state.get_run_info.return_value = [run]
+    state.get_run.return_value = [run]
     state.get_task_events.return_value = []
     with patch(
         "flwr.superlink.servicer.control.control_handlers.time.sleep",
@@ -2165,7 +2165,7 @@ def test_stream_run_events_rejects_invalid_poll_interval(
     """Reject invalid intervals before returning the event generator."""
     monkeypatch.setenv("FLWR_RUN_EVENTS_STREAM_INTERVAL", value)
     state = Mock()
-    state.get_run_info.return_value = [Mock()]
+    state.get_run.return_value = [Mock()]
     with pytest.raises(ValueError, match="FLWR_RUN_EVENTS_STREAM_INTERVAL"):
         control_handlers.stream_run_events(
             StreamRunEventsRequest(run_id=789), Mock(), state
