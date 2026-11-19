@@ -744,6 +744,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
+                avatar=config.avatar,
+                color=config.color,
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 default_space_id=space_model.id,
@@ -2728,6 +2730,8 @@ def _agent_from_model(model: AgentModel) -> Agent:
             name=model.name,
             title=model.title,
             description=model.description,
+            avatar=model.avatar,
+            color=model.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),

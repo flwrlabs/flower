@@ -34,6 +34,10 @@ message AgentConfig {
   optional string description = 2;
   optional string title = 3;
   string app_spec = 4;
+  // Frontend preset avatar identifier.
+  string avatar = 5;
+  // Frontend color identifier.
+  string color = 6;
 }
 message Agent {
   uint64 id = 1;
