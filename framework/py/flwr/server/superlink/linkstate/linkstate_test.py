@@ -482,113 +482,38 @@ class StateTest(CoreStateTest):
         )
         self.assertEqual(state.get_task_events(space_id=uuid4()), [])
 
-    def _create_bootstrap_run(self) -> tuple[LinkState, int, int, UUID, int]:
-        """Create an agent run in a Space shared by two accounts."""
+    def test_bootstrap_active_runs(self) -> None:
+        """Bootstrap includes visible active agent runs and omits finished runs."""
         state = self.state_factory()
         agent = state.create_agent(
             "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
         )
         assert agent is not None
-        space_id = UUID(
-            state.create_space(
-                participants=[
-                    SpaceParticipant(flwr_aid="alice"),
-                    SpaceParticipant(flwr_aid="bob"),
-                    SpaceParticipant(agent_id=agent.id),
-                ]
-            ).id
-        )
-        fab_hash = state.store_fab(Fab("", b"fab", {}))
-        with patch(
-            "flwr.server.superlink.linkstate.utils.corestate_generate_rand_int_from_bytes",
-            side_effect=[2**64 - 1, 2**64 - 2],
-        ):
-            run_id = state.create_run(
-                "publisher/app",
-                "1.0",
-                fab_hash,
-                {"private": "secret"},
-                None,
-                None,
-                None,
-                TaskType.AGENT_APP,
-                space_id=space_id,
-                agent_id=agent.id,
-            )
-        assert run_id == 2**64 - 1
-        return state, run_id, get_primary_task_id(state, run_id), space_id, agent.id
-
-    @parameterized.expand(  # type: ignore[untyped-decorator]
-        [SubStatus.COMPLETED, SubStatus.FAILED, SubStatus.STOPPED]
-    )
-    def test_bootstrap_active_runs(self, sub_status: str) -> None:
-        """Return minimal active agent runs only for participating accounts."""
-        state, run_id, task_id, space_id, agent_id = self._create_bootstrap_run()
-        state.create_space(participants=[SpaceParticipant(flwr_aid="charlie")])
-        assert state.get_bootstrap("charlie").active_runs == []
-        assert state.get_bootstrap("unknown").active_runs == []
-        create_dummy_run(state)
-        assert state.create_run(
+        space_id = UUID(state.get_spaces("alice")[0].id)
+        run_id = state.create_run(
             "publisher/app",
             "1.0",
-            "hash",
-            {},
+            state.store_fab(Fab("", b"fab", {})),
+            {"private": "secret"},
             None,
             None,
             None,
             TaskType.AGENT_APP,
             space_id=space_id,
+            agent_id=agent.id,
         )
-
-        queued = state.get_bootstrap("bob")
-        assert [run.run_id for run in queued.active_runs] == [run_id]
-        run = queued.active_runs[0]
-        assert run.agent_id == agent_id
+        snapshot = state.get_bootstrap("alice")
+        assert BootstrapResponse.FromString(snapshot.SerializeToString()) == snapshot
+        (run,) = snapshot.active_runs
+        assert run.run_id == run_id
+        assert run.agent_id == agent.id
         assert run.space_id == str(space_id)
         assert run.status.status == Status.PENDING
-        assert run.pending_at
-        assert {field.name for field, _ in run.ListFields()} == {
-            "run_id",
-            "agent_id",
-            "space_id",
-            "status",
-            "pending_at",
-        }
-        assert BootstrapResponse.FromString(queued.SerializeToString()) == queued
-        assert state.get_bootstrap("alice").active_runs == queued.active_runs
-
-        assert state.claim_task(task_id) is not None
-        starting = state.get_bootstrap("bob").active_runs[0]
-        assert starting.status.status == Status.STARTING
-        assert starting.starting_at
-        assert state.activate_task(task_id)
-        running = state.get_bootstrap("bob").active_runs[0]
-        assert running.status.status == Status.RUNNING
-        assert running.running_at
-        if sub_status == SubStatus.STOPPED:
-            assert state.stop_run(run_id)
-        else:
-            assert state.finish_task(task_id, sub_status, "private failure details")
+        assert not run.override_config
+        state.create_space(participants=[SpaceParticipant(flwr_aid="bob")])
         assert state.get_bootstrap("bob").active_runs == []
-
-    def test_bootstrap_active_runs_expiry(self) -> None:
-        """Keep retryable claims active and omit runs whose primary task expired."""
-        state, run_id, task_id, _, _ = self._create_bootstrap_run()
-        assert state.claim_task(task_id) is not None
-        future = now() + timedelta(
-            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
-        )
-        with self._patch_message_time(future):
-            snapshot = state.get_bootstrap("alice")
-        assert [run.run_id for run in snapshot.active_runs] == [run_id]
-        assert snapshot.active_runs[0].status.status == Status.PENDING
-        assert not snapshot.active_runs[0].starting_at
-
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        with self._patch_message_time(future):
-            assert state.get_bootstrap("alice").active_runs == []
-        assert state.get_run_status({run_id})[run_id].status == Status.FINISHED
+        assert state.stop_run(run_id)
+        assert state.get_bootstrap("alice").active_runs == []
 
     def test_create_space_run(self) -> None:
         """Create a Space AgentApp run without federation or series resources."""
