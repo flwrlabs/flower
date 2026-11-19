@@ -53,6 +53,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -696,7 +697,7 @@ class InMemoryCoreState(
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
+        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1711,6 +1712,7 @@ class InMemoryCoreState(
             )
 
             self.task_store[task_id] = task
+            self._store_task_lifecycle_event(EventType.TASK_CREATED, task)
             return task_id
 
     def get_tasks(  # pylint: disable=too-many-arguments
@@ -1846,6 +1848,7 @@ class InMemoryCoreState(
                 active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
+            self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
             return token
 
     def activate_task(self, task_id: int) -> bool:
@@ -1869,6 +1872,7 @@ class InMemoryCoreState(
                 record.active_until = activated_at + timedelta(
                     seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
                 )
+            self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
             return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
@@ -1902,6 +1906,7 @@ class InMemoryCoreState(
             # Revoke any existing task token now that the task is finished.
             if (record := self.task_token_store.pop(task_id, None)) is not None:
                 self.task_token_to_task_id.pop(record.token, None)
+            self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -2116,6 +2121,7 @@ class InMemoryCoreState(
         """
         current = now()
         expired_tasks: list[Task] = []
+        pending_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 task = self.task_store.get(task_id)
@@ -2124,6 +2130,7 @@ class InMemoryCoreState(
                     task.status.CopyFrom(
                         TaskStatus(status=Status.PENDING, sub_status="", details="")
                     )
+                    pending_tasks.append(task)
                 elif task and task.status.status == Status.RUNNING:
                     task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
@@ -2139,6 +2146,8 @@ class InMemoryCoreState(
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
+        for task in pending_tasks + expired_tasks:
+            self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
 

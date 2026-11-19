@@ -132,6 +132,14 @@ class InMemoryNodeState(
                 )
             return runs[skip : skip + limit if limit is not None else None]
 
+    def _get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return the run's Space only when it is stored locally."""
+        with self.lock_run_store, self.lock_space_store:
+            run = self.run_store.get(run_id)
+            if run is not None and run.space_id in self.space_store:
+                return run.space_id
+            return None
+
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of locally stored runs in the given Space."""
         with self.lock_run_store:
