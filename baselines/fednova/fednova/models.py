@@ -179,7 +179,7 @@ def test(model, test_loader, device, *args) -> Tuple[float, Dict[str, float]]:
     if len(args) > 1:
         # load the model parameters
         params_dict = zip(model.state_dict().keys(), args[1])
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         model.load_state_dict(state_dict)
 
     model = model.to(device)
