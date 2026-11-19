@@ -150,9 +150,10 @@ class _Grid:
 
 def _run_round(monkeypatch, *, n: int, k: int, t: int, down: dict[int, int]):
     """Run real Flower server stages and client cryptographic logic in-process."""
-    TaskIdentity.run_id = 1
-    TaskIdentity.node_id = 0
-    TaskIdentity.task_id = 0
+    # Restore the prior process-wide identity after each parametrized test.
+    monkeypatch.setattr(TaskIdentity, "_run_id", 1)
+    monkeypatch.setattr(TaskIdentity, "_node_id", 0)
+    monkeypatch.setattr(TaskIdentity, "_task_id", 0)
 
     np.random.seed(74)
     monkeypatch.setattr(
