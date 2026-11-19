@@ -162,11 +162,15 @@ def test_connector_requires_exactly_one_existing_owner(
         agent_table.create(conn)
         table.create(conn)
         conn.execute(
+            space_table.insert().values(id=UUID(int=1), created_at=timestamp, title="")
+        )
+        conn.execute(
             agent_table.insert().values(
                 agent_id=1,
                 name="Agent",
                 app_spec="@user/app",
                 flwr_aid="user",
+                default_space_id=UUID(int=1),
                 created_at=timestamp,
                 updated_at=timestamp,
             )
