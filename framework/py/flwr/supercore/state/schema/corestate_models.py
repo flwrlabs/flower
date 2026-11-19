@@ -244,8 +244,8 @@ class Agent(FlwrBase):
     app_spec: Mapped[str] = mapped_column(String, nullable=False)
     config_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
     # Each agent has an immutable default Space shared exclusively with its creator.
-    default_space_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=True
+    default_space_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("space.id", name="fk_agent_default_space_id"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
@@ -266,6 +266,12 @@ class AgentConfig(FlwrBase):
     name: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    avatar: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
+    color: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 

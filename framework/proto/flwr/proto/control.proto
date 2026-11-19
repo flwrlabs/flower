@@ -34,12 +34,17 @@ message AgentConfig {
   optional string description = 2;
   optional string title = 3;
   string app_spec = 4;
+  // Frontend preset avatar identifier.
+  string avatar = 5;
+  // Frontend color identifier.
+  string color = 6;
 }
 message Agent {
   uint64 id = 1;
   AgentConfig config = 2;
   string created_at = 3;
   string updated_at = 4;
+  string default_space_id = 5;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }
@@ -113,13 +118,15 @@ message ListRunsResponse {
   string now = 2;
 }
 
-// Agents and Spaces only. Message history is fetched through GetSpaceMessages.
+// Agents, Spaces and active runs. Message history is fetched through
+// GetSpaceMessages.
 message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;
   repeated Space spaces = 2;
   // Feed head from the same snapshot as agents and spaces.
   uint64 cursor = 3;
+  repeated Run active_runs = 4;
 }
 
 message Event {

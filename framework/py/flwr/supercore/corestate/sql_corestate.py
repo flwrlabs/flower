@@ -55,7 +55,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
+from flwr.common.serde import recorddict_from_proto, recorddict_to_proto, run_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -757,6 +757,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
+                avatar=config.avatar,
+                color=config.color,
                 created_at=created_at,
             )
             session.add(snapshot)
@@ -838,9 +840,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     UserEventFeedModel.user_id == flwr_aid
                 )
             )
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=[
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
+            ],
             cursor=head or 0,
         )
 
@@ -848,12 +860,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         event_type: str,
         payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         with self.session() as session:
+            if recipients is None:
+                if space_id is None:
+                    raise ValueError("Provide recipients or a space_id")
+                recipients = session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                ).all()
             session.execute(
                 insert(EventModel).values(
                     event_id=event_id,
@@ -1447,11 +1468,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
+        latest_user_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.flwr_aid.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1466,9 +1499,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, member_flwr_aid, member_agent_id in session.execute(query):
+            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+                query
+            ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
@@ -1514,17 +1550,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if model is None:
                 return None
             message = _space_message_from_model(model)
-            recipients = list(
-                session.scalars(
-                    select(SpaceParticipantTable.c.flwr_aid).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.flwr_aid.is_not(None),
-                    )
-                )
-            )
-            self.store_event(
-                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
-            )
+            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
@@ -2733,10 +2759,13 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
             name=config.name,
             title=config.title,
             description=config.description,
+            avatar=config.avatar,
+            color=config.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+        default_space_id=str(model.default_space_id),
     )
 
 

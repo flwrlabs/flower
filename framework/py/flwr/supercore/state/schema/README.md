@@ -13,7 +13,7 @@ erDiagram
   agent {
     BIGINT agent_id PK,FK
     BIGINT config_version FK
-    CHAR(32) default_space_id FK "nullable"
+    CHAR(32) default_space_id FK
     VARCHAR app_spec
     TIMESTAMP created_at
     VARCHAR flwr_aid
@@ -23,6 +23,8 @@ erDiagram
   agent_config {
     BIGINT agent_id PK,FK
     BIGINT version PK
+    VARCHAR avatar
+    VARCHAR color
     TIMESTAMP created_at
     TEXT description "nullable"
     VARCHAR name

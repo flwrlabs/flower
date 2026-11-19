@@ -121,7 +121,7 @@ def test_get_details_with_valid_federation() -> None:
     )
 
     # Configure mocks
-    mock_linkstate.get_run_info.return_value = [mock_run_1, mock_run_2]
+    mock_linkstate.get_run.return_value = [mock_run_1, mock_run_2]
     mock_linkstate.get_node_info.return_value = [mock_node_1, mock_node_2]
 
     # Execute
@@ -168,7 +168,7 @@ def test_get_details_with_no_runs() -> None:
     manager.linkstate = mock_linkstate
 
     # Configure mocks for empty runs
-    mock_linkstate.get_run_info.return_value = []
+    mock_linkstate.get_run.return_value = []
     mock_linkstate.get_node_info.return_value = []
 
     # Execute
@@ -289,7 +289,7 @@ def test_simulation_runtime_flag_is_reflected() -> None:
     """Test simulation flag is reflected by NoOpFederationManager responses."""
     manager = NoOpFederationManager(simulation=True)
     mock_linkstate = Mock()
-    mock_linkstate.get_run_info.return_value = []
+    mock_linkstate.get_run.return_value = []
     mock_linkstate.get_node_info.return_value = []
     manager.linkstate = mock_linkstate
 

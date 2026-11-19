@@ -15,7 +15,7 @@
 """Version agent configuration.
 
 Revision ID: 8989c696c5bb
-Revises: 0d0ae5ae64ef
+Revises: 3fb31831d5eb
 Create Date: 2026-11-18 11:15:36.306673
 """
 from collections.abc import Sequence
@@ -29,7 +29,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "8989c696c5bb"
-down_revision: str | Sequence[str] | None = "0d0ae5ae64ef"
+down_revision: str | Sequence[str] | None = "3fb31831d5eb"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -57,6 +57,8 @@ def upgrade() -> None:
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("title", sa.String(), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("avatar", sa.String(), server_default=sa.text("''"), nullable=False),
+        sa.Column("color", sa.String(), server_default=sa.text("''"), nullable=False),
         sa.Column("created_at", UTCDateTime(), nullable=False),
         sa.CheckConstraint("version > 0", name="ck_agent_config_version_number"),
         sa.ForeignKeyConstraint(
@@ -83,6 +85,8 @@ def upgrade() -> None:
         batch_op.drop_column("description")
         batch_op.drop_column("title")
         batch_op.drop_column("name")
+        batch_op.drop_column("avatar")
+        batch_op.drop_column("color")
 
     # ### end Alembic commands ###
 
@@ -94,9 +98,19 @@ def downgrade() -> None:
         batch_op.add_column(sa.Column("name", sa.VARCHAR(), nullable=True))
         batch_op.add_column(sa.Column("title", sa.VARCHAR(), nullable=True))
         batch_op.add_column(sa.Column("description", sa.TEXT(), nullable=True))
+        batch_op.add_column(
+            sa.Column(
+                "avatar", sa.String(), server_default=sa.text("''"), nullable=False
+            )
+        )
+        batch_op.add_column(
+            sa.Column(
+                "color", sa.String(), server_default=sa.text("''"), nullable=False
+            )
+        )
 
     # Restore only the current configuration when reverting to mutable storage.
-    for column in ("name", "title", "description"):
+    for column in ("name", "title", "description", "avatar", "color"):
         op.execute(
             sa.text(
                 f"UPDATE agent SET {column} = (SELECT {column} FROM agent_config "
