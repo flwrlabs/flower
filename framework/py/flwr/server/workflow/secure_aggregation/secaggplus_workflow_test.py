@@ -60,18 +60,13 @@ class _Strategy:
         self.aggregate: np.ndarray | None = None
 
     def configure_fit(self, server_round, parameters, client_manager):
-        return [
-            (_Proxy(node_id), FitIns(parameters, {}))
-            for node_id in self.node_ids
-        ]
+        return [(_Proxy(node_id), FitIns(parameters, {})) for node_id in self.node_ids]
 
     def aggregate_fit(self, server_round, results, failures):
         if not results:
             return None, {}
         arrays = parameters_to_ndarrays(results[0][1].parameters)
-        self.aggregate = np.concatenate(
-            [np.asarray(array).ravel() for array in arrays]
-        )
+        self.aggregate = np.concatenate([np.asarray(array).ravel() for array in arrays])
         return results[0][1].parameters, {}
 
 
@@ -200,10 +195,19 @@ def _run_round(monkeypatch, *, n: int, k: int, t: int, down: dict[int, int]):
             requests = list(grid.last_requests)
         if not results[name]:
             break
-    return results, shares, contributors, strategy.aggregate, requests, grid, workflow, state
+    return (
+        results,
+        shares,
+        contributors,
+        strategy.aggregate,
+        requests,
+        grid,
+        workflow,
+        state,
+    )
 
 
-def _assert_correct(result, *, n: int, expected_contributors: set[int]):
+def _assert_correct(result, *, expected_contributors: set[int]):
     stages, owners, contributors, aggregate, requests, grid, workflow, state = result
     assert stages == {
         "setup": True,
@@ -236,7 +240,7 @@ def test_dropout_before_share_ownership_is_ignored_at_unmask(
 ) -> None:
     """Setup or share-key departure must not create nonexistent recovery shares."""
     result = _run_round(monkeypatch, n=4, k=4, t=3, down={1: stage})
-    _assert_correct(result, n=4, expected_contributors={0, 2, 3})
+    _assert_correct(result, expected_contributors={0, 2, 3})
     assert result[1] == {0, 2, 3}
     assert all(
         not request.content.config_records[RECORD_KEY_CONFIGS][Key.DEAD_NODE_ID_LIST]
@@ -251,7 +255,7 @@ def test_post_share_dropout_preserves_reconstructable_owner(
     """A dropped contributor's existing key shares remain needed."""
     n, k, t = topology
     result = _run_round(monkeypatch, n=n, k=k, t=t, down={1: 2})
-    _assert_correct(result, n=n, expected_contributors=set(range(n)) - {1})
+    _assert_correct(result, expected_contributors=set(range(n)) - {1})
     assert result[1] == set(range(n))
     assert any(
         1 in request.content.config_records[RECORD_KEY_CONFIGS][Key.DEAD_NODE_ID_LIST]
@@ -264,15 +268,16 @@ def test_post_share_dropout_preserves_reconstructable_owner(
 def test_sparse_and_dense_early_dropout(
     monkeypatch, topology: tuple[int, int, int], stage: int
 ) -> None:
+    """A pre-share dropout must be ignored for dense and sparse rings."""
     n, k, t = topology
     result = _run_round(monkeypatch, n=n, k=k, t=t, down={1: stage})
-    _assert_correct(result, n=n, expected_contributors=set(range(n)) - {1})
+    _assert_correct(result, expected_contributors=set(range(n)) - {1})
 
 
 def test_mixed_setup_and_post_share_dropout(monkeypatch) -> None:
     """Exclude never-generated shares while retaining a later dropped owner."""
     result = _run_round(monkeypatch, n=5, k=5, t=3, down={1: 0, 2: 2})
-    _assert_correct(result, n=5, expected_contributors={0, 3, 4})
+    _assert_correct(result, expected_contributors={0, 3, 4})
     assert result[1] == {0, 2, 3, 4}
     for request in result[4]:
         dead = set(
@@ -283,17 +288,20 @@ def test_mixed_setup_and_post_share_dropout(monkeypatch) -> None:
 
 
 def test_healthy_round_unchanged(monkeypatch) -> None:
+    """A fully responsive cohort must aggregate as before."""
     result = _run_round(monkeypatch, n=4, k=4, t=3, down={})
-    _assert_correct(result, n=4, expected_contributors=set(range(4)))
+    _assert_correct(result, expected_contributors=set(range(4)))
 
 
 def test_insufficient_setup_responses_halt(monkeypatch) -> None:
+    """Insufficient setup survivors must cause a clean halt."""
     result = _run_round(monkeypatch, n=4, k=4, t=3, down={1: 0, 2: 0})
     assert result[0] == {"setup": False}
     assert result[3] is None
 
 
 def test_insufficient_unmask_responses_halt(monkeypatch) -> None:
+    """Insufficient unmask share holders must fail closed."""
     result = _run_round(monkeypatch, n=4, k=4, t=3, down={1: 3, 2: 3})
     assert result[0]["collect_masked_vectors"] is True
     assert result[0]["unmask"] is False
