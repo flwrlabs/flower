@@ -744,6 +744,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 description=(
                     config.description if config.HasField("description") else None
                 ),
+                avatar=config.avatar,
+                color=config.color,
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 default_space_id=space_model.id,
