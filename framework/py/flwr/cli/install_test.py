@@ -15,6 +15,7 @@
 """Tests for Flower command line interface `install` command."""
 
 
+import hashlib
 import io
 import zipfile
 from pathlib import Path
@@ -23,7 +24,7 @@ import click
 import pytest
 
 from .archive_utils import safe_extract_zip
-from .install import install_from_fab
+from .install import _verify_hashes, install_from_fab
 
 
 def _zip_bytes(entries: list[tuple[str, bytes]]) -> bytes:
@@ -76,3 +77,30 @@ def test_install_from_fab_rejects_zip_slip(tmp_path: Path) -> None:
 
     with pytest.raises(click.ClickException, match="Unsafe path in FAB archive"):
         _ = install_from_fab(fab_bytes, install_dir=tmp_path, skip_prompt=True)
+
+
+def _manifest_line(path: str, content: bytes) -> str:
+    """Build a CONTENT manifest line: "path,sha256,size_bits"."""
+    return f"{path},{hashlib.sha256(content).hexdigest()},{len(content) * 8}"
+
+
+def test_verify_hashes_accepts_commas_in_file_names(tmp_path: Path) -> None:
+    """Hash verification should handle file names containing commas."""
+    name = "data,v2.json"
+    content = b'{"round": 1}'
+    (tmp_path / name).write_bytes(content)
+
+    assert _verify_hashes(_manifest_line(name, content), tmp_path)
+
+
+def test_verify_hashes_rejects_modified_content(tmp_path: Path) -> None:
+    """A hash mismatch should be detected even when the name has a comma."""
+    name = "data,v2.json"
+    (tmp_path / name).write_bytes(b"tampered")
+
+    assert not _verify_hashes(_manifest_line(name, b'{"round": 1}'), tmp_path)
+
+
+def test_verify_hashes_rejects_missing_file(tmp_path: Path) -> None:
+    """A manifest entry without a matching file should not verify."""
+    assert not _verify_hashes(_manifest_line("absent,v2.json", b"x"), tmp_path)
