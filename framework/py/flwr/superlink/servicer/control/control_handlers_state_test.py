@@ -21,6 +21,7 @@ import json
 import os
 import unittest
 from contextvars import ContextVar
+from dataclasses import replace
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
@@ -79,7 +80,7 @@ from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import (
     DEFAULT_FEDERATION_SIMULATION,
     FLWR_IN_MEMORY_DB_NAME,
@@ -101,7 +102,6 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.extensions import (
     RESULT_DELIVERY_CHANNEL_CHAT,
     RESULT_DELIVERY_CHANNEL_LOGS,
@@ -163,10 +163,10 @@ class _OAuthFlow:
         return {"access_token": "access-secret"}, {"workspace": "flower"}
 
 
-shared_account_info: ContextVar[AccountInfo] = ContextVar("test_account_info")
+shared_account_info: ContextVar[AuthenticatedUser] = ContextVar("test_account_info")
 
 
-def get_current_account_info() -> AccountInfo:
+def get_current_account_info() -> AuthenticatedUser:
     """Return the account used by this handler integration test."""
     return shared_account_info.get()
 
@@ -198,11 +198,11 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         self.state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, federation_manager, objectstore_factory
         )
-        authn_plugin = NoOpControlAuthnPlugin()
-        account_info = authn_plugin.validate_tokens_in_metadata([])[1]
-        assert account_info is not None
+        account_info = AuthenticatedUser(
+            user_id=NOOP_FLWR_AID, handle=NOOP_ACCOUNT_NAME
+        )
         self.account_info = account_info
-        self.aid: str = account_info.flwr_aid
+        self.aid: str = account_info.user_id
         shared_account_info.set(account_info)
         self.state = self.state_factory.state()
         noop_federation_manager.linkstate = self.state
@@ -566,7 +566,8 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
 
     def test_start_run_defaults_to_account_simulation_federation(self) -> None:
         """Test StartRun uses the account default simulation federation."""
-        self.account_info.account_name = "test_account"
+        self.account_info = replace(self.account_info, handle="test_account")
+        shared_account_info.set(self.account_info)
         expected_federation_id = f"@test_account/{DEFAULT_FEDERATION_SIMULATION}"
         federation_manager = Mock(exists=Mock(side_effect=RuntimeError))
         self.state_factory.federation_manager = federation_manager
@@ -1166,7 +1167,7 @@ class TestControlHandlersState(unittest.TestCase):  # pylint: disable=R0904
         # Execute
         with patch(
             f"{__name__}.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=flwr_aid_retrieving),
+            return_value=AuthenticatedUser(user_id=flwr_aid_retrieving),
         ):
             res: ListNodesResponse = control_handlers.list_nodes(
                 ListNodesRequest(), get_current_account_info(), self.state
@@ -1566,8 +1567,8 @@ class TestControlHandlersInvitations(unittest.TestCase):
         self.state.federation_manager = Mock()
         self.get_current_account_info_patcher = patch(
             f"{__name__}.get_current_account_info",
-            return_value=SimpleNamespace(
-                flwr_aid=self.flwr_aid, account_name=self.account_name
+            return_value=AuthenticatedUser(
+                user_id=self.flwr_aid, handle=self.account_name
             ),
         )
         self.get_current_account_info_patcher.start()
@@ -1716,7 +1717,7 @@ class TestControlHandlersAuth(unittest.TestCase):
         with (
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
@@ -1752,7 +1753,7 @@ class TestControlHandlersAuth(unittest.TestCase):
             ),
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers"
@@ -1791,7 +1792,7 @@ class TestControlHandlersAuth(unittest.TestCase):
             ),
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
         ):
             msgs = list(
@@ -1834,7 +1835,7 @@ class TestControlHandlersAuth(unittest.TestCase):
             ),
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
             patch(
                 "flwr.superlink.servicer.control.control_handlers"
@@ -1879,7 +1880,7 @@ class TestControlHandlersAuth(unittest.TestCase):
             ),
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
         ):
             msgs = list(
@@ -1899,7 +1900,7 @@ class TestControlHandlersAuth(unittest.TestCase):
         with (
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=False
@@ -1919,7 +1920,7 @@ class TestControlHandlersAuth(unittest.TestCase):
         with (
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
+                return_value=AuthenticatedUser(user_id="user-123"),
             ),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
@@ -1942,8 +1943,8 @@ class TestControlHandlersAuth(unittest.TestCase):
         with (
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(
-                    flwr_aid="user-123", account_name="test-account"
+                return_value=AuthenticatedUser(
+                    user_id="user-123", handle="test-account"
                 ),
             ),
             patch.object(
@@ -1964,8 +1965,8 @@ class TestControlHandlersAuth(unittest.TestCase):
         with (
             patch(
                 f"{__name__}.get_current_account_info",
-                return_value=SimpleNamespace(
-                    flwr_aid="user-123", account_name="test-account"
+                return_value=AuthenticatedUser(
+                    user_id="user-123", handle="test-account"
                 ),
             ),
             patch.object(
@@ -1992,10 +1993,10 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
-        authn_plugin = NoOpControlAuthnPlugin()
-        account_info = authn_plugin.validate_tokens_in_metadata([])[1]
-        assert account_info is not None
-        self.aid: str = account_info.flwr_aid
+        account_info = AuthenticatedUser(
+            user_id=NOOP_FLWR_AID, handle=NOOP_ACCOUNT_NAME
+        )
+        self.aid: str = account_info.user_id
         shared_account_info.set(account_info)
         self.state = self.state_factory.state()
 

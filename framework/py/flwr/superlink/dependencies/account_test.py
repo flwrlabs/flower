@@ -20,8 +20,9 @@ import pytest
 from fastapi import FastAPI, Request
 
 from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.error import ApiErrorCode, BearerAuthenticationError, FlowerError
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .account import AccountAccessDependency, get_account, get_authn_plugin
 
@@ -56,10 +57,12 @@ def _make_app_request(app: FastAPI) -> Request:
 
 
 @pytest.mark.parametrize("scheme", ["Bearer", "bearer", "BEARER"])
-def test_account_access_dependency_returns_authenticated_account(scheme: str) -> None:
+def test_account_access_dependency_returns_authenticated_account(
+    scheme: str,
+) -> None:
     """AccountAccessDependency should return the account when tokens are valid."""
-    authn_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
+    account = AuthenticatedUser(user_id="aid", handle="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
     request = _make_request(
@@ -80,8 +83,8 @@ def test_account_access_dependency_returns_authenticated_account(scheme: str) ->
 
 def test_account_access_dependency_allows_plugin_to_accept_missing_header() -> None:
     """The authentication plugin can accept requests without credentials."""
-    authn_plugin = Mock()
-    account = AccountInfo(flwr_aid="aid", account_name="account")
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
+    account = AuthenticatedUser(user_id="aid", handle="account")
     authn_plugin.validate_tokens_in_metadata.return_value = (True, account)
 
     result = AccountAccessDependency(authn_plugin)(_make_request(()))
@@ -103,7 +106,7 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
     authorization_headers: tuple[str, ...],
 ) -> None:
     """AccountAccessDependency should reject malformed or duplicate credentials."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
         AccountAccessDependency(authn_plugin)(_make_request(authorization_headers))
@@ -117,7 +120,7 @@ def test_account_access_dependency_rejects_invalid_authorization_header(
 
 def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> None:
     """Legacy Control metadata headers are not an HTTP authentication contract."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     request = _make_request(
         (),
@@ -146,10 +149,10 @@ def test_account_access_dependency_rejects_legacy_headers_without_bearer() -> No
 )
 def test_account_access_dependency_rejects_unauthenticated_requests(
     valid_token: bool,
-    account: AccountInfo | None,
+    account: AuthenticatedUser | None,
 ) -> None:
     """AccountAccessDependency should reject absent or incomplete authentication."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (valid_token, account)
 
     with pytest.raises(BearerAuthenticationError) as exc_info:
@@ -178,7 +181,7 @@ def test_get_account_raises_when_authentication_middleware_did_not_run() -> None
 def test_get_authn_plugin_returns_configured_plugin() -> None:
     """Return the authentication plugin owned by the account dependency."""
     app = FastAPI()
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     app.state.account_access_dep = AccountAccessDependency(authn_plugin)
 
     assert get_authn_plugin(_make_app_request(app)) is authn_plugin

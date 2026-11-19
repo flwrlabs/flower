@@ -21,18 +21,18 @@ from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID, AuthnType
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
 from .auth_plugin import ControlAuthnPlugin
 
 
-def _create_noop_account_info() -> AccountInfo:
-    """Create account information without sharing mutable state between calls."""
-    return AccountInfo(
-        flwr_aid=NOOP_FLWR_AID,
-        account_name=NOOP_ACCOUNT_NAME,
+def _create_noop_user() -> AuthenticatedUser:
+    """Create the identity for explicitly unauthenticated Control operation."""
+    return AuthenticatedUser(
+        user_id=NOOP_FLWR_AID,
+        handle=NOOP_ACCOUNT_NAME,
     )
 
 
@@ -56,9 +56,9 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
 
     def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[bool, AccountInfo | None]:
+    ) -> tuple[bool, AuthenticatedUser | None]:
         """Return valid for no-op plugin."""
-        return True, _create_noop_account_info()
+        return True, _create_noop_user()
 
     def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
         """Get authentication tokens."""
@@ -69,6 +69,6 @@ class NoOpControlAuthnPlugin(ControlAuthnPlugin):
 
     def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AccountInfo | None]:
+    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""
-        return metadata, _create_noop_account_info()
+        return metadata, _create_noop_user()
