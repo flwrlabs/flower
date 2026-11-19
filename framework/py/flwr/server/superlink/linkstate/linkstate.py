@@ -27,6 +27,7 @@ from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.supercore.constant import EventType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
@@ -36,6 +37,32 @@ from .utils import create_run_context
 
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
+
+    def _finalize_runs(
+        self,
+        run_primary_pairs: list[tuple[int, int]],
+        *,
+        child_sub_status: str,
+        child_details: str,
+    ) -> None:
+        """Apply run-level effects for newly finished primary tasks.
+
+        Callers hold the task lock or transaction across the primary transition,
+        child cleanup and event storage.
+        """
+        self._finish_run_tasks(run_primary_pairs, child_sub_status, child_details)
+        for run_id, _ in run_primary_pairs:
+            self._store_run_event(EventType.RUN_FINISHED, run_id)
+
+    @abc.abstractmethod
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish remaining tasks after their primary tasks have finished."""
+
+    @abc.abstractmethod
+    def _store_run_event(self, event_type: str, run_id: int) -> None:
+        """Store a bound Space run's event in the current lock or transaction."""
 
     def get_node_id(self) -> int:
         """Return the SuperLink node ID."""

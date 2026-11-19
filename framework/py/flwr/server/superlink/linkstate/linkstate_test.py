@@ -501,6 +501,9 @@ class StateTest(CoreStateTest):
             agent_id=agent.id,
         )
         transition_run_status(state, run_id, 2)
+        child_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert child_id is not None
+        assert state.finish_task(child_id, SubStatus.STOPPED, "")
         task_id = get_primary_task_id(state, run_id)
         if expired:
             future = now() + timedelta(
