@@ -2713,9 +2713,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_user_events("alice", limit=1), page)
 
     def test_user_event_agent_creation_failure(self) -> None:
-        """Roll back the Agent and its event if initial Space creation fails."""
+        """Roll back the Agent, Space, and events if their creation fails."""
         state = self.state_factory()
-        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+        original_store_event = state.store_event
+
+        def fail_space_event(event_type: str, *args: Any, **kwargs: Any) -> UUID:
+            if event_type == EventType.SPACE_CREATED:
+                raise ValueError("failed")
+            return original_store_event(event_type, *args, **kwargs)
+
+        with patch.object(state, "store_event", side_effect=fail_space_event):
             with self.assertRaises(ValueError):
                 state.create_agent(
                     "alice", AgentConfig(name="Agent", app_spec="@test/app")

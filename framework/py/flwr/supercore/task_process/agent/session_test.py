@@ -20,7 +20,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 
-from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentSpace
+from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentFiles, AgentSpace
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -29,21 +29,29 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StartAutomationResponse,
     StartRunRequest,
 )
+from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     CreateTaskResponse,
+    DeleteFileRequest,
     GetCompactedContextsRequest,
     GetCompactedContextsResponse,
+    GetFileRequest,
+    GetFileResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
     PullTaskInputResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
     PushTaskEventsRequest,
     PutCompactedContextRequest,
+    PutFileRequest,
+    PutFileResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceMessagesRequest,
@@ -65,6 +73,7 @@ from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TO
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
+from .files import RuntimeAgentFiles
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
@@ -108,16 +117,19 @@ def test_emit_event_pushes_task_event() -> None:
 
 def test_runtime_agent_session_exposes_prompt() -> None:
     """Expose the initial prompt without additional runtime calls."""
+    files = RuntimeAgentFiles(Mock())
     session = RuntimeAgentSession(
         prompt="Initial prompt",
         connectors=Mock(),
         events=Mock(),
         grid=Mock(),
+        files=files,
     )
 
     assert session.prompt == "Initial prompt"
     assert session.identity is None
     assert session.space is None
+    assert session.files is files
 
 
 def test_space_session_exposes_agent_identity() -> None:
@@ -134,6 +146,88 @@ def test_space_session_exposes_agent_identity() -> None:
     assert agent.identity == identity
     assert agent.identity is not None
     assert agent.identity.config.description == "Cite sources."
+    assert isinstance(agent.files, AgentFiles)
+
+
+@pytest.mark.parametrize("data", [None, b"", b"memory"])
+def test_runtime_files_get(data: bytes | None) -> None:
+    """Distinguish missing files from empty files and retain revision metadata."""
+    client = Mock()
+    file = (
+        File(metadata=FileMetadata(key="memory.md", revision=7), data=data)
+        if data is not None
+        else None
+    )
+    client.GetFile.return_value = GetFileResponse(file=file)
+    agent = create_space_session(
+        Mock(_runtime_client=client), Mock(), PullTaskInputResponse()
+    )
+
+    assert agent.files.get("memory.md") == file
+    client.GetFile.assert_called_once_with(GetFileRequest(key="memory.md"))
+
+
+@pytest.mark.parametrize("revision", [None, 0, 7])
+def test_runtime_files_put(revision: int | None) -> None:
+    """Preserve create-only and explicit revision preconditions, including zero."""
+    client = Mock()
+    client.PutFile.return_value = PutFileResponse(revision=8)
+
+    assert (
+        RuntimeAgentFiles(client).put("memory.md", b"", expected_revision=revision) == 8
+    )
+    client.PutFile.assert_called_once_with(
+        PutFileRequest(key="memory.md", data=b"", expected_revision=revision)
+    )
+    assert client.PutFile.call_args.args[0].HasField("expected_revision") == (
+        revision is not None
+    )
+
+
+@pytest.mark.parametrize("limit", [None, 0, 2])
+def test_runtime_files_list_and_delete(limit: int | None) -> None:
+    """Keep pagination metadata and require the caller's revision for deletion."""
+    client = Mock()
+    metadata = FileMetadata(key="notes/a", revision=7, size_bytes=4)
+    client.ListFiles.return_value = ListFilesResponse(
+        files=[metadata], next_start_after="notes/a"
+    )
+    files = RuntimeAgentFiles(client)
+
+    assert files.list(prefix="notes/", start_after="notes/0", limit=limit) == (
+        [metadata],
+        "notes/a",
+    )
+    client.ListFiles.assert_called_once_with(
+        ListFilesRequest(prefix="notes/", start_after="notes/0", limit=limit)
+    )
+    files.delete(metadata.key, expected_revision=metadata.revision)
+    client.DeleteFile.assert_called_once_with(
+        DeleteFileRequest(key="notes/a", expected_revision=7)
+    )
+
+
+@pytest.mark.parametrize("operation", ["put", "delete"])
+def test_runtime_files_propagate_conflicts(operation: str) -> None:
+    """Leave conflict handling to the AgentApp without retrying the write."""
+    client = Mock()
+    error = httpx.HTTPStatusError(
+        "Revision conflict",
+        request=httpx.Request("POST", "http://runtime"),
+        response=httpx.Response(409),
+    )
+    rpc = client.PutFile if operation == "put" else client.DeleteFile
+    rpc.side_effect = error
+    files = RuntimeAgentFiles(client)
+
+    with pytest.raises(httpx.HTTPStatusError) as caught:
+        if operation == "put":
+            files.put("memory.md", b"updated", expected_revision=7)
+        else:
+            files.delete("memory.md", expected_revision=7)
+
+    assert caught.value is error
+    assert rpc.call_count == 1
 
 
 def test_space_session_reads_messages() -> None:
