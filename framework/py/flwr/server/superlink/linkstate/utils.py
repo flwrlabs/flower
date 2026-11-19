@@ -22,8 +22,6 @@ from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, Reco
 from flwr.app.message import make_message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
-from flwr.proto.run_pb2 import RunStatus as ProtoRunStatus  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -34,7 +32,6 @@ from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
 from flwr.supercore.date import now
-from flwr.supercore.run import Run
 
 
 def validate_run_scope(  # pylint: disable=too-many-arguments
@@ -101,19 +98,3 @@ def generate_rand_int_from_bytes(
 ) -> int:
     """Generate a random unsigned integer from `num_bytes` bytes."""
     return corestate_generate_rand_int_from_bytes(num_bytes, exclude)
-
-
-def run_activity_to_proto(run: Run) -> ProtoRun:
-    """Project only the identifiers, status and timestamps needed for run activity."""
-    return ProtoRun(
-        run_id=run.run_id,
-        agent_id=run.agent_id,
-        space_id=str(run.space_id) if run.space_id is not None else None,
-        pending_at=run.pending_at,
-        starting_at=run.starting_at,
-        running_at=run.running_at,
-        finished_at=run.finished_at,
-        status=ProtoRunStatus(
-            status=run.status.status, sub_status=run.status.sub_status
-        ),
-    )

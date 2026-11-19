@@ -153,21 +153,21 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             process_pending_agent_runs(self.state)
             process_pending_agent_runs(self.state)
         resolve.assert_called_once_with(agent.config.app_spec)
-        runs = self.state.get_run_info()
+        runs = self.state.get_run()
         assert len(runs) == 1 and runs[0].agent_id == agent.id
 
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply default pagination to an empty page without a caller handle."""
         state = Mock(spec=LinkState)
         state.federation_manager = NoOpFederationManager()
-        state.get_run_info.return_value = []
+        state.get_run.return_value = []
 
         account = AuthenticatedUser(user_id=self.account.user_id)
         response = list_runs(ListRunsRequest(), account, state)
 
         self.assertFalse(response.run_dict)
 
-        state.get_run_info.assert_called_once_with(
+        state.get_run.assert_called_once_with(
             flwr_aids=[self.account.user_id],
             federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
@@ -228,7 +228,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Return primary-task events from every run in the series."""
         run_ids = [self._create_dummy_run() for _ in range(2)]
         primary_task_ids = [
-            cast(int, self.state.get_run_info(run_ids=[run_id])[0].primary_task_id)
+            cast(int, self.state.get_run(run_ids=[run_id])[0].primary_task_id)
             for run_id in run_ids
         ]
         child_task_id = self.state.create_task(
@@ -270,7 +270,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             )
 
         self.assertEqual([event.task_id for event in response.events], primary_task_ids)
-        runs = self.state.get_run_info(run_ids=run_ids)
+        runs = self.state.get_run(run_ids=run_ids)
         notify_result_delivered.assert_has_calls(
             [
                 call(run, self.account.user_id, RESULT_DELIVERY_CHANNEL_CHAT)
@@ -495,7 +495,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             response = start_run(request, self.account, self.state)
 
         mock_store_app.assert_not_called()
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
         self.assertEqual(run.primary_task_type, TaskType.SERVER_APP)
         tasks = self.state.get_tasks()
@@ -542,7 +542,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
 
         get_remote_fab.assert_not_called()
         thread.return_value.start.assert_called_once()
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         self.assertEqual(run.fab_hash, fab_hash)
 
     def test_start_run_persists_user_prompt_instruction(self) -> None:
@@ -585,7 +585,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             response = start_run(request, self.account, self.state)
 
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         app = self.state.list_apps(NOOP_FEDERATION_ID)[0]
         series = self.state.get_run_series(series_ids=[run.series_id])[0]
         tasks = self.state.get_tasks()
@@ -636,7 +636,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 error.exception.code,
                 ApiErrorCode.AGENTAPP_USER_PROMPT_REQUIRED,
             )
-        self.assertEqual(self.state.get_run_info(), [])
+        self.assertEqual(self.state.get_run(), [])
 
     def test_start_run_notifies_extension_after_persisting_run(self) -> None:
         """Notify the optional extension with the persisted run snapshot."""
@@ -675,7 +675,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
                 source="web_ui",
             )
 
-        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run = self.state.get_run(run_ids=[response.run_id])[0]
         notify_run_started.assert_called_once()
         notified_run, source = notify_run_started.call_args.args
         self.assertEqual(notified_run.run_id, run.run_id)

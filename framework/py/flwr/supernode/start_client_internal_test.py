@@ -163,9 +163,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Prepare
         self._prepare_for_pull_and_store_message()
         fab_hash = "abc123"
-        self.mock_state.get_run.return_value = Mock(
-            fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP
-        )
+        self.mock_state.get_run.return_value = [
+            Mock(fab_hash=fab_hash, primary_task_type=TaskType.SERVER_APP)
+        ]
         self.mock_state.create_task.return_value = 123
 
         # Execute
@@ -201,7 +201,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that message processing stops if task creation fails."""
         self._prepare_for_pull_and_store_message()
         fab_hash = "abc123"
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.get_run.return_value = [Mock(fab_hash=fab_hash)]
         self.mock_state.create_task.return_value = None
 
         res = _pull_and_store_message(
@@ -235,7 +235,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         fab_hash = "abc123"
         task_id = 123
         message_id = self.mock_receive.return_value[0].metadata.message_id
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
+        self.mock_state.get_run.return_value = [Mock(fab_hash=fab_hash)]
         self.mock_state.create_task.return_value = task_id
         if pull_fails:
             self.mock_pull_object.side_effect = RuntimeError("pull error")
@@ -300,7 +300,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that a message of an unknown run ID is pulled and stored."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = None  # Mock None return
+        self.mock_state.get_run.return_value = []
 
         # Prepare: Mock get_run and get_fab functions
         fab = Fab(
@@ -378,7 +378,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that trusted-entity verification fails closed without metadata."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = None
+        self.mock_state.get_run.return_value = []
 
         fab = Fab(
             hash_str="abc123",
@@ -432,7 +432,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that trusted-entity verification rejects invalid FAB signatures."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = None
+        self.mock_state.get_run.return_value = []
 
         fab = Fab(
             hash_str="abc123",

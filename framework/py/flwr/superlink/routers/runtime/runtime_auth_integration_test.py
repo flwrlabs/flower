@@ -135,7 +135,7 @@ def _create_running_task(
         agent_id=agent_id,
     )
     assert run_id
-    task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
+    task_id = state.get_run(run_ids=[run_id])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -237,7 +237,7 @@ def test_get_space_events_reads_only_authenticated_space(
         )
         for current_space_id in (space_id, other_space_id)
     ]
-    task_id = state.get_run_info(run_ids=[run_ids[0]])[0].primary_task_id
+    task_id = state.get_run(run_ids=[run_ids[0]])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None

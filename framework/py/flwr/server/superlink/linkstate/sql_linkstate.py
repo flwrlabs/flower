@@ -42,7 +42,6 @@ from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import NodeStatus, TaskType
@@ -74,7 +73,6 @@ from .linkstate import LinkState
 from .utils import (
     create_user_prompt_message,
     generate_rand_int_from_bytes,
-    run_activity_to_proto,
     validate_run_scope,
 )
 
@@ -91,24 +89,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
-
-    def _get_active_runs(self, space_ids: set[UUID]) -> Sequence[ProtoRun]:
-        """Read active agent runs scoped to the snapshot's visible Spaces."""
-        if not space_ids:
-            return []
-        with self.session() as session:
-            self._cleanup_expired_task_tokens()
-            rows = session.execute(
-                select(RunModel, TaskModel)
-                .join(TaskModel, TaskModel.task_id == RunModel.primary_task_id)
-                .where(
-                    RunModel.space_id.in_(space_ids),
-                    RunModel.agent_id.is_not(None),
-                    TaskModel.finished_at.is_(None),
-                )
-                .execution_options(populate_existing=True)
-            )
-            return [run_activity_to_proto(_run_from_models(*row)) for row in rows]
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
@@ -160,7 +140,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         # Check if the run exists
-        runs = self.get_run_info(run_ids=[run_id])
+        runs = self.get_run(run_ids=[run_id])
         if not runs:
             return False
 
@@ -591,7 +571,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
             ]
 
-    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
+    def get_run(  # pylint: disable=too-many-arguments, too-many-branches
         self,
         *,
         run_ids: Sequence[int] | None = None,

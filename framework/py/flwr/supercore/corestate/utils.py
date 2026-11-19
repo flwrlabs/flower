@@ -22,11 +22,30 @@ from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
+from flwr.proto.run_pb2 import RunStatus as ProtoRunStatus  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.run import Run
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
+
+
+def run_activity_to_proto(run: Run) -> ProtoRun:
+    """Project only the identifiers, status and timestamps needed for run activity."""
+    return ProtoRun(
+        run_id=run.run_id,
+        agent_id=run.agent_id,
+        space_id=str(run.space_id) if run.space_id is not None else None,
+        pending_at=run.pending_at,
+        starting_at=run.starting_at,
+        running_at=run.running_at,
+        finished_at=run.finished_at,
+        status=ProtoRunStatus(
+            status=run.status.status, sub_status=run.status.sub_status
+        ),
+    )
 
 
 def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:

@@ -12,7 +12,7 @@
 erDiagram
   agent {
     BIGINT agent_id PK
-    CHAR(32) default_space_id FK "nullable"
+    CHAR(32) default_space_id FK
     VARCHAR app_spec
     VARCHAR avatar
     VARCHAR color

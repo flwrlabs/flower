@@ -160,6 +160,7 @@ from .utils import (
     context_from_bytes,
     context_to_bytes,
     generate_rand_int_from_bytes,
+    run_activity_to_proto,
     timestamp_to_iso,
     validate_event_cursor,
     validate_message_metadata,
@@ -822,10 +823,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         agents = self.list_agents(flwr_aid)
         spaces = self.get_spaces(flwr_aid)
+        space_ids = {UUID(space.id) for space in spaces}
+        runs = (
+            self.get_run(
+                federation_ids=[None],
+                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+            )
+            if spaces
+            else []
+        )
         return BootstrapResponse(
             agents=agents,
             spaces=spaces,
-            active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
+            active_runs=[
+                run_activity_to_proto(run)
+                for run in runs
+                if run.space_id in space_ids and run.agent_id is not None
+            ],
             cursor=head or 0,
         )
 
@@ -2739,6 +2753,7 @@ def _agent_from_model(model: AgentModel) -> Agent:
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+        default_space_id=str(model.default_space_id),
     )
 
 
