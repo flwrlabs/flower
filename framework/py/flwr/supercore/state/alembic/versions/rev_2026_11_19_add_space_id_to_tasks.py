@@ -45,19 +45,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove task Space IDs."""
-    bind = op.get_bind()
-    if bind.dialect.name != "sqlite":
-        op.drop_column("task", "space_id")
-        return
-
-    # Defer child-table checks while SQLite rebuilds the task table.
-    with bind.begin_nested():
-        enforce_fks = bind.scalar(sa.text("PRAGMA foreign_keys"))
-        if enforce_fks:
-            op.execute("PRAGMA defer_foreign_keys = ON")
-        with op.batch_alter_table("task", schema=None) as batch_op:
-            batch_op.drop_column("space_id")
-        if enforce_fks:
-            if bind.execute(sa.text("PRAGMA foreign_key_check")).first():
-                raise RuntimeError("Foreign key violation after rebuilding task")
-            op.execute("PRAGMA defer_foreign_keys = OFF")
+    op.drop_column("task", "space_id")
