@@ -541,7 +541,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                             return candidates
             return candidates
 
-    def get_run_info(
+    def get_run(
         self,
         *,
         run_ids: Sequence[int] | None = None,

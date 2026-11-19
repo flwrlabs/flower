@@ -65,18 +65,48 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return the ID of the node owning this CoreState."""
 
     @abstractmethod
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve a run by its ID.
+    def get_run(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+        skip: int = 0,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
 
         Parameters
         ----------
-        run_id : int
-            The ID of the run to retrieve.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of run status values to filter by.
+        flwr_aids : Optional[Sequence[str]] (default: None)
+            Sequence of Flower Account IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
 
         Returns
         -------
-        Run | None
-            The run if found, otherwise None.
+        Sequence[Run]
+            A sequence of Run objects representing runs matching the specified filters.
         """
 
     @property

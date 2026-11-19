@@ -241,7 +241,7 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
         agent_id=agent.id,
     )
     assert run_id
-    assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    assert state.get_run(run_ids=[run_id])[0].flwr_aid == "alice"
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
@@ -313,8 +313,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     state = Mock(spec=LinkState)
     current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
     series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
-    state.get_run.return_value = current_run
-    state.get_run_info.return_value = series_runs
+    state.get_run.side_effect = [[current_run], series_runs]
     state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
     expected_event = TaskEvent(
         id=11,
@@ -349,6 +348,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     )
 
     state.get_task_events.reset_mock()
+    state.get_run.side_effect = [[current_run], series_runs]
     runtime_handlers.get_run_series_events(
         GetRunSeriesEventsRequest(after_event_id=10, last_n=0),
         state,
@@ -367,7 +367,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     """Read only events from the authenticated task's Space."""
     state = Mock(spec=LinkState)
     space_id = UUID("12345678-1234-5678-1234-567812345678")
-    state.get_run.return_value = Mock(space_id=space_id)
+    state.get_run.return_value = [Mock(space_id=space_id)]
     expected_event = TaskEvent(id=11, run_id=123, event="message", data="{}")
     state.get_task_events.return_value = [expected_event]
     request = GetSpaceEventsRequest(
@@ -380,7 +380,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
 
     assert response == GetSpaceEventsResponse(events=[expected_event])
-    state.get_run.assert_called_once_with(123)
+    state.get_run.assert_called_once_with(run_ids=[123])
     state.get_task_events.assert_called_once_with(
         space_id=space_id,
         event_types=["message"],
@@ -393,7 +393,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
 def test_get_space_events_rejects_non_space_run() -> None:
     """A federation task cannot use the Space event endpoint."""
     state = Mock(spec=LinkState)
-    state.get_run.return_value = Mock(space_id=None)
+    state.get_run.return_value = [Mock(space_id=None)]
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.get_space_events(
@@ -407,7 +407,7 @@ def test_get_space_events_rejects_non_space_run() -> None:
 def test_get_space_events_rejects_unknown_run() -> None:
     """Reject requests whose authenticated run no longer exists."""
     state = Mock(spec=LinkState)
-    state.get_run.return_value = None
+    state.get_run.return_value = []
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.get_space_events(
@@ -421,9 +421,9 @@ def test_get_space_events_rejects_unknown_run() -> None:
 def test_get_compacted_contexts_uses_authenticated_agent() -> None:
     """Summary requests use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run.return_value = Mock(
-        series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1
-    )
+    state.get_run.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     state.get_compacted_contexts.return_value = []
     task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
@@ -437,9 +437,9 @@ def test_get_compacted_contexts_uses_authenticated_agent() -> None:
 def test_put_compacted_context_uses_authenticated_agent() -> None:
     """Summary writes use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run.return_value = Mock(
-        series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1
-    )
+    state.get_run.return_value = [
+        Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
+    ]
     request = PutCompactedContextRequest(
         context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
     )
@@ -458,9 +458,9 @@ def test_compacted_contexts_require_primary_agent(
 ) -> None:
     """Only the bound primary AgentApp task can access compacted contexts."""
     state = Mock(spec=LinkState)
-    state.get_run.return_value = Mock(
-        agent_id=agent_id, space_id=UUID(int=1), primary_task_id=1
-    )
+    state.get_run.return_value = [
+        Mock(agent_id=agent_id, space_id=UUID(int=1), primary_task_id=1)
+    ]
     task = Task(task_id=task_id, run_id=123, type=TaskType.AGENT_APP)
 
     with pytest.raises(FlowerError) as error:
@@ -507,7 +507,7 @@ def _create_shared_runtime(
         "",
         TaskType.SERVER_APP,
     )
-    run = state_0.get_run_info(run_ids=[run_id])[0]
+    run = state_0.get_run(run_ids=[run_id])[0]
     state_0.set_run_series_context(
         run.series_id,
         Context(
@@ -579,9 +579,9 @@ class TestGetConnector(unittest.TestCase):
             connector_ref="example",
             run_id=123,
         )
-        self.state.get_run.return_value = Mock(
-            federation_id="@bob/fed-a", agent_id=None
-        )
+        self.state.get_run.return_value = [
+            Mock(federation_id="@bob/fed-a", agent_id=None)
+        ]
         self.state.get_run_connector_ids.return_value = [42]
         self.connector = Mock(
             connector_id=42,
@@ -718,7 +718,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         self._auth_task = self.state.get_tasks(task_ids=[auth_task_id])[0]
 
     def _primary_task_id(self, run_id: int) -> int:
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         assert run.primary_task_id is not None
         return run.primary_task_id
 
@@ -733,7 +733,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_acquire_task_processes_due_automations(self) -> None:
         """A SuperExec poll should create and claim a due automation's task."""
-        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        series_id = self.state.get_run(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
             flwr_aid=NOOP_FLWR_AID,
@@ -768,7 +768,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             )
 
         self.assertTrue(response.token)
-        run = self.state.get_run_info(run_ids=[response.task.run_id])[0]
+        run = self.state.get_run(run_ids=[response.task.run_id])[0]
         self.assertEqual(run.series_id, automation.series_id)
         completed = self.state.list_automations(
             automation_ids=[automation.automation_id],
@@ -884,13 +884,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert
         assert isinstance(response, PushTaskOutputResponse)
-        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        run = self.state.get_run(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
     def test_push_task_output_stores_run_series_context(self) -> None:
         """PushTaskOutput should persist context in the authenticated run series."""
         # Prepare
-        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        run = self.state.get_run(run_ids=[self._auth_run_id])[0]
         request_context = Context(
             run_id=123,
             node_id=SUPERLINK_NODE_ID,
@@ -1298,7 +1298,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert self.state.claim_task(task_id) is not None
 
         # Set run series context as if it was persisted by an earlier run.
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         context = Context(
             123,
             SUPERLINK_NODE_ID,

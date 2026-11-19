@@ -100,7 +100,7 @@ def _create_run(state: LinkState, transitions: int = 2, fab_hash: str = "") -> i
         flwr_aid="",
         primary_task_type=TaskType.SERVER_APP,
     )
-    run = state.get_run_info(run_ids=[run_id])[0]
+    run = state.get_run(run_ids=[run_id])[0]
     assert run.primary_task_id is not None
     task_id = run.primary_task_id
     if transitions > 0:
@@ -360,7 +360,7 @@ def test_object_transfer_and_traffic(state: LinkState) -> None:
     fetched = pull_object(request, state)
     assert fetched.object_found and fetched.object_available
     assert fetched.object_content == content
-    run = state.get_run_info(run_ids=[run_id])[0]
+    run = state.get_run(run_ids=[run_id])[0]
     assert run.bytes_recv == len(content)
     assert run.bytes_sent == len(content)
 

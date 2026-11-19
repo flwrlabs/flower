@@ -68,11 +68,11 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_get_compacted_contexts_uses_authenticated_agent(self) -> None:
         """Summary requests derive the agent from the authenticated run."""
-        self.state.get_run.return_value = Run.create_empty(run_id=123)
-        self.state.get_run.return_value.series_id = 456
-        self.state.get_run.return_value.space_id = UUID(int=1)
-        self.state.get_run.return_value.agent_id = 789
-        self.state.get_run.return_value.primary_task_id = 1
+        self.state.get_run.return_value = [Run.create_empty(run_id=123)]
+        self.state.get_run.return_value[0].series_id = 456
+        self.state.get_run.return_value[0].space_id = UUID(int=1)
+        self.state.get_run.return_value[0].agent_id = 789
+        self.state.get_run.return_value[0].primary_task_id = 1
         self.state.get_compacted_contexts.return_value = []
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
@@ -86,11 +86,11 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_put_compacted_context_uses_authenticated_agent(self) -> None:
         """Summary writes derive the agent from the authenticated run."""
-        self.state.get_run.return_value = Run.create_empty(run_id=123)
-        self.state.get_run.return_value.series_id = 456
-        self.state.get_run.return_value.space_id = UUID(int=1)
-        self.state.get_run.return_value.agent_id = 789
-        self.state.get_run.return_value.primary_task_id = 1
+        self.state.get_run.return_value = [Run.create_empty(run_id=123)]
+        self.state.get_run.return_value[0].series_id = 456
+        self.state.get_run.return_value[0].space_id = UUID(int=1)
+        self.state.get_run.return_value[0].agent_id = 789
+        self.state.get_run.return_value[0].primary_task_id = 1
         request = PutCompactedContextRequest(
             context=CompactedContext(
                 through_event_id=9, text="Summary", token_count=123
@@ -109,9 +109,9 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_compacted_contexts_require_agent_id(self) -> None:
         """A run without an agent cannot access compacted contexts."""
-        self.state.get_run.return_value = Run.create_empty(run_id=123)
-        self.state.get_run.return_value.space_id = UUID(int=1)
-        self.state.get_run.return_value.primary_task_id = 1
+        self.state.get_run.return_value = [Run.create_empty(run_id=123)]
+        self.state.get_run.return_value[0].space_id = UUID(int=1)
+        self.state.get_run.return_value[0].primary_task_id = 1
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         with self.assertRaises(FlowerError) as error:
@@ -150,7 +150,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
         fab = Fab("fab-hash", b"fab-content", {"sig": "value"})
         task = Task(task_id=123, run_id=run.run_id)
-        self.state.get_run.return_value = run
+        self.state.get_run.return_value = [run]
         self.state.get_run_series_context.return_value = app_context
         self.state.get_fab.return_value = fab
         self.state.activate_task.return_value = True
@@ -199,7 +199,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         run.fab_hash = "fab-hash"
         run.series_id = 777
         task = Task(task_id=123, run_id=run.run_id)
-        self.state.get_run.return_value = run if run_exists else None
+        self.state.get_run.return_value = [run] if run_exists else []
         self.state.get_run_series_context.return_value = (
             Mock() if context_exists else None
         )
@@ -230,7 +230,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             context=context_to_proto(app_context), sub_status=SubStatus.COMPLETED
         )
         self.state.finish_task.return_value = True
-        self.state.get_run.return_value = run
+        self.state.get_run.return_value = [run]
 
         response = runtime_handlers.push_task_output(request, self.state, task)
 
@@ -375,7 +375,9 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             )
         ]
         runs = {10: current_run, 11: same_series_run, 12: other_series_run}
-        self.state.get_run.side_effect = runs.get
+        self.state.get_run.side_effect = lambda *, run_ids: [
+            runs[run_id] for run_id in run_ids if run_id in runs
+        ]
         self.state.get_tasks.return_value = tasks
         self.state.get_task_events.return_value = expected_events
 
@@ -414,7 +416,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_get_run_series_events_rejects_unknown_run(self) -> None:
         """GetRunSeriesEvents should reject an unknown authenticated run."""
-        self.state.get_run.return_value = None
+        self.state.get_run.return_value = []
 
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_run_series_events(
@@ -430,7 +432,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         space_id = UUID("12345678-1234-5678-1234-567812345678")
         run = Run.create_empty(run_id=10)
         run.space_id = space_id
-        self.state.get_run.return_value = run
+        self.state.get_run.return_value = [run]
         event = TaskEvent(id=11, run_id=10, event="message", data="{}")
         self.state.get_task_events.return_value = [event]
         request = GetSpaceEventsRequest(
@@ -442,7 +444,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
 
         self.assertEqual(response, GetSpaceEventsResponse(events=[event]))
-        self.state.get_run.assert_called_once_with(10)
+        self.state.get_run.assert_called_once_with(run_ids=[10])
         self.state.get_task_events.assert_called_once_with(
             space_id=space_id,
             event_types=["message"],
@@ -453,7 +455,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_get_space_events_rejects_non_space_run(self) -> None:
         """A federation task cannot read Space events."""
-        self.state.get_run.return_value = Run.create_empty(run_id=10)
+        self.state.get_run.return_value = [Run.create_empty(run_id=10)]
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
@@ -466,7 +468,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
 
     def test_get_space_events_rejects_unknown_run(self) -> None:
         """An unknown authenticated run cannot read Space events."""
-        self.state.get_run.return_value = None
+        self.state.get_run.return_value = []
         with self.assertRaises(FlowerError) as error:
             runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
