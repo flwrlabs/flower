@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from fastapi import Request
 from google.protobuf.message import Message as ProtoMessage
 
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.event_log.typing import LogEntry
 
 
@@ -36,7 +36,7 @@ class EventLogWriterPlugin(ABC):
         self,
         request: ProtoMessage,
         context: Request,
-        account_info: AccountInfo | None,
+        account_info: AuthenticatedUser | None,
         method_name: str,
     ) -> LogEntry:
         """Compose pre-event log entry from the provided request and context."""
@@ -46,7 +46,7 @@ class EventLogWriterPlugin(ABC):
         self,
         request: ProtoMessage,
         context: Request,
-        account_info: AccountInfo | None,
+        account_info: AuthenticatedUser | None,
         method_name: str,
         response: ProtoMessage | BaseException | None,
     ) -> LogEntry:
