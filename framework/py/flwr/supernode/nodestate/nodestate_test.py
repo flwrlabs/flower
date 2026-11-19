@@ -17,10 +17,13 @@
 
 import hashlib
 from datetime import timedelta
+from typing import Any
 from unittest.mock import patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from flwr.common.constant import SUPERLINK_NODE_ID
+from parameterized import parameterized
+
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
@@ -96,10 +99,51 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.state.store_run(run)
 
         # Execute
-        retrieved = self.state.get_run(61016)
+        retrieved = self.state.get_run(run_ids=[61016])
 
         # Assert
-        self.assertEqual(retrieved, run)
+        self.assertEqual(retrieved, [run])
+
+    @parameterized.expand(  # type: ignore[untyped-decorator]
+        [
+            ({}, [1, 2, 3]),
+            ({"run_ids": [1, 3, 3]}, [1, 3]),
+            ({"run_ids": []}, []),
+            ({"space_ids": [UUID(int=1)]}, [3]),
+            ({"space_ids": []}, []),
+            ({"space_ids": [UUID(int=1)], "flwr_aids": ["bob"]}, []),
+            ({"statuses": [Status.RUNNING]}, [2, 3]),
+            ({"statuses": []}, []),
+            ({"flwr_aids": ["alice"]}, [1, 3]),
+            ({"flwr_aids": []}, []),
+            ({"federation_ids": ["@alice/fed"]}, [1, 2]),
+            ({"federation_ids": [None]}, [3]),
+            ({"federation_ids": ["@alice/fed", None]}, [1, 2, 3]),
+            ({"federation_ids": []}, []),
+            ({"statuses": [Status.RUNNING], "flwr_aids": ["alice"]}, [3]),
+            ({"ascending": False, "skip": 1, "limit": 1}, [2]),
+            ({"skip": 1}, [2, 3]),
+            ({"limit": 0}, []),
+        ]
+    )
+    def test_get_run_filters(
+        self, filters: dict[str, Any], expected: list[int]
+    ) -> None:
+        """Apply the shared run filters and pagination to locally stored runs."""
+        for run_id, owner, federation, status in (
+            (1, "alice", "@alice/fed", Status.PENDING),
+            (2, "bob", "@alice/fed", Status.RUNNING),
+            (3, "alice", "", Status.RUNNING),
+        ):
+            run = Run.create_empty(run_id)
+            run.flwr_aid = owner
+            run.federation_id = federation
+            run.space_id = None if federation else UUID(int=1)
+            run.status.status = status
+            run.pending_at = f"2026-01-01T00:00:0{run_id}+00:00"
+            self.state.store_run(run)
+        runs = self.state.get_run(order_by="pending_at", **filters)
+        self.assertEqual([run.run_id for run in runs], expected)
 
     def test_get_task_events_filters_by_local_space(self) -> None:
         """Read only local events from runs assigned to the requested Space."""

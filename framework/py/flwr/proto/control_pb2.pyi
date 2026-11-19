@@ -82,9 +82,11 @@ class Agent(google.protobuf.message.Message):
     CONFIG_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
+    DEFAULT_SPACE_ID_FIELD_NUMBER: builtins.int
     id: builtins.int
     created_at: builtins.str
     updated_at: builtins.str
+    default_space_id: builtins.str
     @property
     def config(self) -> global___AgentConfig: ...
     def __init__(
@@ -94,9 +96,10 @@ class Agent(google.protobuf.message.Message):
         config: global___AgentConfig | None = ...,
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
+        default_space_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["config", b"config", "created_at", b"created_at", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "created_at", b"created_at", "default_space_id", b"default_space_id", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
 
 global___Agent = Agent
 
@@ -525,7 +528,9 @@ global___ListRunsResponse = ListRunsResponse
 
 @typing.final
 class BootstrapRequest(google.protobuf.message.Message):
-    """Agents and Spaces only. Message history is fetched through GetSpaceMessages."""
+    """Agents, Spaces and active runs. Message history is fetched through
+    GetSpaceMessages.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -542,20 +547,24 @@ class BootstrapResponse(google.protobuf.message.Message):
     AGENTS_FIELD_NUMBER: builtins.int
     SPACES_FIELD_NUMBER: builtins.int
     CURSOR_FIELD_NUMBER: builtins.int
+    ACTIVE_RUNS_FIELD_NUMBER: builtins.int
     cursor: builtins.int
     """Feed head from the same snapshot as agents and spaces."""
     @property
     def agents(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Agent]: ...
     @property
     def spaces(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.space_pb2.Space]: ...
+    @property
+    def active_runs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.run_pb2.Run]: ...
     def __init__(
         self,
         *,
         agents: collections.abc.Iterable[global___Agent] | None = ...,
         spaces: collections.abc.Iterable[flwr.proto.space_pb2.Space] | None = ...,
         cursor: builtins.int = ...,
+        active_runs: collections.abc.Iterable[flwr.proto.run_pb2.Run] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["agents", b"agents", "cursor", b"cursor", "spaces", b"spaces"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["active_runs", b"active_runs", "agents", b"agents", "cursor", b"cursor", "spaces", b"spaces"]) -> None: ...
 
 global___BootstrapResponse = BootstrapResponse
 

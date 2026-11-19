@@ -40,6 +40,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
     AgentConfig,
@@ -188,7 +189,6 @@ class InMemoryCoreState(
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
-        self.agent_default_space_store: dict[int, UUID] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -625,9 +625,9 @@ class InMemoryCoreState(
                     config=config,
                     created_at=created_at,
                     updated_at=created_at,
+                    default_space_id=str(space_id),
                 )
                 self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
-                self.agent_default_space_store[agent_id] = space_id
                 space.participants.extend(
                     [
                         SpaceParticipant(flwr_aid=flwr_aid),
@@ -644,7 +644,6 @@ class InMemoryCoreState(
                     del self.event_store[event_id]
                 del feed[feed_start:]
                 self.agent_store.get(flwr_aid, {}).pop(agent_id, None)
-                self.agent_default_space_store.pop(agent_id, None)
                 self.space_store.pop(space_id, None)
                 self.space_message_store.pop(space_id, None)
                 raise
@@ -659,9 +658,10 @@ class InMemoryCoreState(
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
         with self.lock_agent_store:
-            if agent_id not in self.agent_store.get(flwr_aid, {}):
+            agent = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if agent is None or not agent.default_space_id:
                 return None
-            return self.agent_default_space_store.get(agent_id)
+            return UUID(agent.default_space_id)
 
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
         """List an account's agents in ascending agent ID order."""
@@ -677,9 +677,19 @@ class InMemoryCoreState(
         """Read the feed cursor before fetching visible state."""
         with self.lock_space_store:
             head = len(self.user_event_store.get(flwr_aid, []))
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=[
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
+            ],
             cursor=head,
         )
 
