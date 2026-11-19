@@ -926,7 +926,7 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
             )
 
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         series_id = run.series_id
         if series_description and series_id:
             start_title_generation(state, series_id, user_prompt)
@@ -963,7 +963,7 @@ def stream_logs(
 ) -> Generator[StreamLogsResponse, None, None]:
     """Stream logs for a run."""
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    runs = state.get_run(run_ids=[run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
@@ -1005,7 +1005,7 @@ def _stream_logs(
         # Wait for and continue to yield more log responses only if the
         # run isn't completed yet. If the run is finished, the entire log
         # is returned at this point and the server ends the stream.
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         if run.status.status == Status.FINISHED:
             state.cleanup_run(run_id)
             break
@@ -1021,7 +1021,7 @@ def stream_run_events(
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    runs = state.get_run(run_ids=[run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
@@ -1096,7 +1096,7 @@ def _stream_run_events(  # pylint: disable=too-many-arguments,too-many-positiona
 
         # Refresh status after yielding. If streaming this batch raced with
         # run completion, continue immediately and fetch one final batch.
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         if run.status.status == Status.FINISHED:
             continue
 
@@ -1400,7 +1400,7 @@ def list_runs(
         federation_ids.append(None)  # Space runs have no federation.
         limit = request.limit if request.HasField("limit") else 20
         skip = request.skip if request.HasField("skip") else 0
-        runs = state.get_run_info(
+        runs = state.get_run(
             flwr_aids=[flwr_aid],
             federation_ids=federation_ids,
             order_by="pending_at",
@@ -1412,7 +1412,7 @@ def list_runs(
     else:
         # Retrieve run ID and run
         run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
+        runs = state.get_run(run_ids=[run_id])
 
         # Exit if `run_id` not found
         if not runs:
@@ -1585,7 +1585,7 @@ def get_run_series(
     # and should never be None.
     series_context = state.get_run_series_context(request.series_id)
     run_series = series_matches[0]
-    runs = [run_to_proto(run) for run in state.get_run_info(run_ids=run_series.run_ids)]
+    runs = [run_to_proto(run) for run in state.get_run(run_ids=run_series.run_ids)]
     response = GetRunSeriesResponse(
         series=_with_last_run_statuses(state, [run_series])[0],
         context=context_to_proto(series_context) if series_context else None,
@@ -1644,7 +1644,7 @@ def list_run_series_events(
         )
 
     run_ids = series_matches[0].run_ids
-    runs = state.get_run_info(run_ids=run_ids)
+    runs = state.get_run(run_ids=run_ids)
     for run in runs:
         extensions.notify_result_delivered(
             run, account.user_id, extensions.RESULT_DELIVERY_CHANNEL_CHAT
@@ -1660,7 +1660,7 @@ def stop_run(
     """Stop a given run ID."""
     # Retrieve run ID and run
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    runs = state.get_run(run_ids=[run_id])
 
     # Exit if `run_id` not found
     if not runs:
@@ -1785,7 +1785,7 @@ def pull_artifacts(
 
     # Retrieve run ID and run
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    runs = state.get_run(run_ids=[run_id])
 
     # Exit if `run_id` not found
     if not runs:
@@ -2175,7 +2175,7 @@ def archive_federation(
         flwr_aid=account.user_id,
         federation_id=request.federation_name,
     )
-    for run in state.get_run_info(federation_ids=[request.federation_name]):
+    for run in state.get_run(federation_ids=[request.federation_name]):
         if run.status.status != Status.FINISHED:
             state.stop_run(run.run_id)
 
@@ -2240,7 +2240,7 @@ def remove_account_from_federation(
     )
     # Get runs from account that was removed
     # and stop them.
-    for run in state.get_run_info(
+    for run in state.get_run(
         federation_ids=[request.federation_name],
         flwr_aids=[removed_flwr_aid],
         statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],

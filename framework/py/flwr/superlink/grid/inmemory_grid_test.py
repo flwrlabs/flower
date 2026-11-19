@@ -111,7 +111,7 @@ class TestInMemoryGrid(unittest.TestCase):
             bytes_recv=0,
             clientapp_runtime=0.0,
         )
-        self.state.get_run_info.return_value = [self.mock_run]
+        self.state.get_run.return_value = [self.mock_run]
         state_factory = MagicMock(state=lambda: self.state)
         self.grid = InMemoryGrid(state_factory=state_factory)
         self.grid.set_run(self.mock_run)
@@ -141,7 +141,7 @@ class TestInMemoryGrid(unittest.TestCase):
 
     def test_set_run_rejects_missing_run(self) -> None:
         """Test `set_run` rejects runs that are not registered in state."""
-        self.state.get_run_info.return_value = []
+        self.state.get_run.return_value = []
         with self.assertRaises(RuntimeError):
             self.grid.set_run(self.mock_run)
 
@@ -274,7 +274,7 @@ class TestInMemoryGrid(unittest.TestCase):
                     "", "", "", {}, NOOP_FEDERATION_ID, None, "", TaskType.SERVER_APP
                 )
                 self.grid = InMemoryGrid(state_factory)
-                runs = state.get_run_info(run_ids=[run_id])
+                runs = state.get_run(run_ids=[run_id])
                 self.assertEqual(len(runs), 1)
                 self.grid.set_run(runs[0])
                 msg_ids, node_id = push_messages(self.grid, self.num_nodes)
