@@ -96,6 +96,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
 from flwr.superlink.grid import HttpGrid
 
+from .files import RuntimeAgentFiles
 from .grid import RuntimeAgentGrid
 from .session import (
     AgentRuntime,
@@ -392,6 +393,7 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
             connectors=RuntimeAgentConnectors(agent_runtime),
             events=self._agent_events,
             grid=agent_grid,
+            files=RuntimeAgentFiles(grid._runtime_client),
         )
 
     def _prepare_task_app(

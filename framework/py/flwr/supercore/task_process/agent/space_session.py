@@ -36,6 +36,7 @@ from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 from flwr.superlink.grid import HttpGrid
 
+from .files import RuntimeAgentFiles
 from .session import (
     AgentRuntime,
     RuntimeAgentConnectors,
@@ -226,6 +227,7 @@ def create_space_session(
         connectors=_SpaceAgentConnectors(runtime, stub),
         events=events,
         grid=_SpaceAgentGrid(),
+        files=RuntimeAgentFiles(stub),
         space=RuntimeAgentSpace(stub, events),
         identity=task_input.agent if task_input.HasField("agent") else None,
     )

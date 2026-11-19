@@ -20,6 +20,7 @@ from .agent_app import LoadAgentAppError as LoadAgentAppError
 from .base import RUN_SUMMARY_EVENT_TYPES as RUN_SUMMARY_EVENT_TYPES
 from .base import AgentConnectors as AgentConnectors
 from .base import AgentEvents as AgentEvents
+from .base import AgentFiles as AgentFiles
 from .base import AgentGrid as AgentGrid
 from .base import AgentSession as AgentSession
 from .base import AgentSpace as AgentSpace
@@ -28,6 +29,7 @@ __all__ = [
     "AgentApp",
     "AgentConnectors",
     "AgentEvents",
+    "AgentFiles",
     "AgentGrid",
     "AgentSession",
     "AgentSpace",
