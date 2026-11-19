@@ -38,13 +38,12 @@ def test_validate_tokens_returns_fresh_account_info() -> None:
 
     _, first = plugin.validate_tokens_in_metadata([])
     assert first is not None
-    first.account_name = "modified"
 
     _, second = plugin.validate_tokens_in_metadata([])
     assert second is not None
     assert second is not first
-    assert second.flwr_aid == NOOP_FLWR_AID
-    assert second.account_name == NOOP_ACCOUNT_NAME
+    assert second.user_id == NOOP_FLWR_AID
+    assert second.handle == NOOP_ACCOUNT_NAME
 
 
 def test_refresh_tokens_returns_fresh_account_info() -> None:
@@ -53,10 +52,9 @@ def test_refresh_tokens_returns_fresh_account_info() -> None:
 
     _, first = plugin.refresh_tokens([])
     assert first is not None
-    first.account_name = "modified"
 
     _, second = plugin.refresh_tokens([])
     assert second is not None
     assert second is not first
-    assert second.flwr_aid == NOOP_FLWR_AID
-    assert second.account_name == NOOP_ACCOUNT_NAME
+    assert second.user_id == NOOP_FLWR_AID
+    assert second.handle == NOOP_ACCOUNT_NAME

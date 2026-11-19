@@ -91,7 +91,7 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
 from flwr.supercore.error import ApiErrorCode, http_error_translator
@@ -108,6 +108,7 @@ from flwr.supercore.protobuf.translation import (
 )
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.artifact_provider import ArtifactProvider
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.federation import NoOpFederationManager
@@ -117,7 +118,7 @@ from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
 
-_ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+_ACCOUNT = AuthenticatedUser(user_id=NOOP_FLWR_AID, handle="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
@@ -147,12 +148,12 @@ def test_space_routes(
     """Create, list, send, and read with authenticated caller membership."""
     client, state = space_client
     agent = state.create_agent(
-        flwr_aid=_ACCOUNT.flwr_aid,
+        flwr_aid=_ACCOUNT.user_id,
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
-    personal = state.get_spaces(_ACCOUNT.flwr_aid)[0]
-    caller = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    personal = state.get_spaces(_ACCOUNT.user_id)[0]
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
     agent_participant = SpaceParticipant(agent_id=agent.id)
     response = client.post(
         "/v1/control/create-space",
@@ -163,15 +164,6 @@ def test_space_routes(
     assert response.status_code == 200
     space = CreateSpaceResponse.FromString(response.content).space
     assert list(space.participants) == [caller, agent_participant]
-    listed = client.post(
-        "/v1/control/list-spaces",
-        content=ListSpacesRequest().SerializeToString(),
-    )
-    assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
-        space,
-        personal,
-    ]
     response = client.post(
         "/v1/control/send-space-message",
         content=SendSpaceMessageRequest(
@@ -181,6 +173,16 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
+    space.latest_user_message = message.content
+    listed = client.post(
+        "/v1/control/list-spaces",
+        content=ListSpacesRequest().SerializeToString(),
+    )
+    assert listed.status_code == 200
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
+        space,
+        personal,
+    ]
     history = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
@@ -206,7 +208,7 @@ def test_create_space_rejects_invalid_participants(
     )
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
-    assert not state.get_spaces(_ACCOUNT.flwr_aid)
+    assert not state.get_spaces(_ACCOUNT.user_id)
 
 
 def test_create_space_rejects_other_users_agent(
@@ -227,7 +229,7 @@ def test_create_space_rejects_other_users_agent(
     )
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
-    assert not state.get_spaces(_ACCOUNT.flwr_aid)
+    assert not state.get_spaces(_ACCOUNT.user_id)
 
 
 @pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
@@ -237,10 +239,10 @@ def test_space_history_pagination(
     """Apply the HTTP request's cursor, page size, and unread filter."""
     client, state = space_client
     space = state.create_space(
-        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.user_id)]
     )
     space_id = UUID(space.id)
-    author = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    author = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
     messages = [state.create_space_message(space_id, author, str(i)) for i in range(3)]
     last = messages[-1]
     assert last is not None
@@ -311,7 +313,7 @@ def test_invalid_space_request(
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
     """Create a minimal app containing the Control API stack."""
-    authn_plugin = authn_plugin or Mock()
+    authn_plugin = authn_plugin or Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin)
@@ -401,11 +403,11 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert agent.id > 0
     assert agent.config == config
     assert agent.created_at and agent.updated_at == agent.created_at
-    assert state.list_agents(_ACCOUNT.flwr_aid) == [agent]
-    spaces = state.get_spaces(_ACCOUNT.flwr_aid)
+    assert state.list_agents(_ACCOUNT.user_id) == [agent]
+    spaces = state.get_spaces(_ACCOUNT.user_id)
     assert len(spaces) == 1
     assert len(spaces[0].participants) == 2
-    assert SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid) in spaces[0].participants
+    assert SpaceParticipant(flwr_aid=_ACCOUNT.user_id) in spaces[0].participants
     assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
     response = client.post(
@@ -656,7 +658,7 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
     expected_metadata: list[tuple[str, str]],
 ) -> None:
     """Require an access token without attempting a refresh-token flow."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     app = _create_app(authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
@@ -681,7 +683,7 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
 
 def test_get_login_details_does_not_require_bearer_authentication() -> None:
     """Return login details without validating an access token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.get_login_details.return_value = AccountAuthLoginDetails(
         authn_type="oidc",
@@ -713,7 +715,7 @@ def test_get_login_details_does_not_require_bearer_authentication() -> None:
 
 def test_get_auth_tokens_preserves_polling_semantics() -> None:
     """Return an empty response while pending and tokens after authorization."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.get_auth_tokens.side_effect = [
         None,
@@ -754,7 +756,7 @@ def test_get_auth_tokens_preserves_polling_semantics() -> None:
 
 def test_refresh_auth_tokens_does_not_require_bearer_authentication() -> None:
     """Exchange a refresh token without first validating an access token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.refresh_tokens.return_value = (
         [
@@ -788,7 +790,7 @@ def test_refresh_auth_tokens_does_not_require_bearer_authentication() -> None:
 
 def test_refresh_auth_tokens_returns_sanitized_authentication_error() -> None:
     """Return the established JSON error without exposing the refresh token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.refresh_tokens.return_value = (None, None)
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -1051,7 +1053,7 @@ def test_list_runs_returns_runs_from_linkstate(
     linkstate = Mock(spec=LinkState)
     linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
-    run.flwr_aid = _ACCOUNT.flwr_aid
+    run.flwr_aid = _ACCOUNT.user_id
     linkstate.get_run_info.return_value = [run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
@@ -1070,11 +1072,11 @@ def test_list_runs_returns_runs_from_linkstate(
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert set(proto_response.run_dict) == {7}
-    assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
+    assert proto_response.run_dict[7].account_name == _ACCOUNT.handle
     assert datetime.fromisoformat(proto_response.now)
     assert linkstate.get_run_info.call_args_list == [
         call(
-            flwr_aids=[_ACCOUNT.flwr_aid],
+            flwr_aids=[_ACCOUNT.user_id],
             federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
@@ -1089,7 +1091,7 @@ def test_list_runs_cleans_finished_runs_on_page() -> None:
     linkstate = Mock(spec=LinkState)
     linkstate.federation_manager = NoOpFederationManager()
     page_run = Run.create_empty(7)
-    page_run.flwr_aid = _ACCOUNT.flwr_aid
+    page_run.flwr_aid = _ACCOUNT.user_id
     page_run.status.status = Status.FINISHED
     linkstate.get_run_info.return_value = [page_run]
     app = _create_app()
@@ -1112,7 +1114,7 @@ def test_list_runs_cleans_finished_runs_on_page() -> None:
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     """Control HTTP rejects invalid access tokens without refreshing them."""
     linkstate = Mock(spec=LinkState)
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     linkstate.get_run_info.return_value = []
     app = _create_app(authn_plugin=authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
@@ -1192,7 +1194,7 @@ def test_stream_logs_returns_framed_protobuf_responses() -> None:
 
     def stream(
         request: StreamLogsRequest,
-        account: AccountInfo,
+        account: AuthenticatedUser,
         state: LinkState,
         is_active: Callable[[], bool],
     ) -> object:
@@ -1287,7 +1289,7 @@ def test_pull_artifacts_returns_provider_url() -> None:
     linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
     run.federation_id = NOOP_FEDERATION_ID
-    run.flwr_aid = _ACCOUNT.flwr_aid
+    run.flwr_aid = _ACCOUNT.user_id
     run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
     linkstate.get_run_info.return_value = [run]
     artifact_provider = Mock(spec=ArtifactProvider)
@@ -1362,11 +1364,15 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
 def test_bootstrap_uses_authenticated_account(
     space_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Return the caller's Agents, Spaces, and cursor without message history."""
+    """Return the caller's Agents, Space summaries, and cursor."""
     client, state = space_client
     config = AgentConfig(name="Agent", app_spec="@test/app")
-    state.create_agent(_ACCOUNT.flwr_aid, config)
+    state.create_agent(_ACCOUNT.user_id, config)
     state.create_agent("other-account", config)
+    space = state.get_spaces(_ACCOUNT.user_id)[0]
+    state.create_space_message(
+        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.user_id), "Latest prompt"
+    )
     response = client.post(
         "/v1/control/bootstrap",
         content=BootstrapRequest().SerializeToString(),
@@ -1374,9 +1380,10 @@ def test_bootstrap_uses_authenticated_account(
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     snapshot = BootstrapResponse.FromString(response.content)
-    assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
+    assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.cursor == 2
+    assert snapshot.spaces[0].latest_user_message == "Latest prompt"
+    assert snapshot.cursor == 3
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
@@ -1432,7 +1439,7 @@ def test_invalid_user_cursor_returns_error_before_streaming(
 @pytest.mark.parametrize("endpoint", ["bootstrap", "stream-events"])
 def test_user_event_routes_require_authentication(endpoint: str) -> None:
     """Authenticate both routes before serving account state or starting a stream."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     app = _create_app(authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     response = TestClient(app).post(
