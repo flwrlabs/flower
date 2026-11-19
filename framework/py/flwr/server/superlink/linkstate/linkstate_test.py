@@ -908,7 +908,7 @@ class StateTest(CoreStateTest):
             ),
         ]
         for filters, expected in cases:
-            with self.subTest(filters=filters):
+            with self.subTest(filters=str(filters)):
                 self.assertSetEqual(
                     {run.run_id for run in state.get_run(**filters)},
                     expected,
