@@ -245,7 +245,8 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> Agent | None:
         """Create an agent and its initial Space atomically.
 
-        The untitled Space contains the agent and its owning account.
+        The untitled Space contains the agent and its owning account, and is
+        recorded as the agent's default Space.
 
         Parameters
         ----------
@@ -267,6 +268,10 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account, or None if it does not exist."""
+
+    @abstractmethod
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return the owned agent's default Space ID, or None if unavailable."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
