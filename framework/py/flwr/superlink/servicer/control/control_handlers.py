@@ -926,7 +926,8 @@ def start_run(  # pylint: disable=too-many-branches,too-many-locals,too-many-sta
                 f"fab_hash={fab.hash_str}, primary_task_type={primary_task_type}.",
             )
 
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_id)
+        assert run is not None
         series_id = run.series_id
         if series_description and series_id:
             start_title_generation(state, series_id, user_prompt)
@@ -963,13 +964,12 @@ def stream_logs(
 ) -> Generator[StreamLogsResponse, None, None]:
     """Stream logs for a run."""
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
-    if not runs:
+    run = state.get_run(run_id)
+    if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
             f"Run {run_id} not found while streaming logs.",
         )
-    run = runs[0]
     task_id = cast(int, run.primary_task_id)
 
     _validate_federation_membership_in_request(
@@ -1005,7 +1005,8 @@ def _stream_logs(
         # Wait for and continue to yield more log responses only if the
         # run isn't completed yet. If the run is finished, the entire log
         # is returned at this point and the server ends the stream.
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_id)
+        assert run is not None
         if run.status.status == Status.FINISHED:
             state.cleanup_run(run_id)
             break
@@ -1021,14 +1022,12 @@ def stream_run_events(
 ) -> Generator[StreamRunEventsResponse, None, None]:
     """Stream task events for a run."""
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
-    if not runs:
+    run = state.get_run(run_id)
+    if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
             f"Run {run_id} not found while streaming run events.",
         )
-    run = runs[0]
-
     _validate_federation_membership_in_request(
         state, account.user_id, run.federation_id
     )
@@ -1096,7 +1095,9 @@ def _stream_run_events(  # pylint: disable=too-many-arguments,too-many-positiona
 
         # Refresh status after yielding. If streaming this batch raced with
         # run completion, continue immediately and fetch one final batch.
-        run = state.get_run_info(run_ids=[run_id])[0]
+        refreshed_run = state.get_run(run_id)
+        assert refreshed_run is not None
+        run = refreshed_run
         if run.status.status == Status.FINISHED:
             continue
 
@@ -1412,10 +1413,10 @@ def list_runs(
     else:
         # Retrieve run ID and run
         run_id = request.run_id
-        runs = state.get_run_info(run_ids=[run_id])
+        run = state.get_run(run_id)
 
         # Exit if `run_id` not found
-        if not runs:
+        if run is None:
             raise FlowerError(
                 ApiErrorCode.RUN_ID_NOT_FOUND,
                 f"Run {run_id} not found while listing runs for {flwr_aid}.",
@@ -1423,9 +1424,8 @@ def list_runs(
 
         # Check if requester is a member of the federation
         # that the run belongs to
-        _validate_federation_membership_in_request(
-            state, flwr_aid, runs[0].federation_id
-        )
+        _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
+        runs = [run]
 
     # Only caller-owned results need the authenticated user's local handle.
     run_owner_ids = {run.flwr_aid for run in runs}
@@ -1660,16 +1660,14 @@ def stop_run(
     """Stop a given run ID."""
     # Retrieve run ID and run
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    run = state.get_run(run_id)
 
     # Exit if `run_id` not found
-    if not runs:
+    if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
             f"Run {run_id} not found while stopping run.",
         )
-    run = runs[0]
-
     flwr_aid = account.user_id
     _validate_federation_membership_in_request(state, flwr_aid, run.federation_id)
 
@@ -1785,16 +1783,14 @@ def pull_artifacts(
 
     # Retrieve run ID and run
     run_id = request.run_id
-    runs = state.get_run_info(run_ids=[run_id])
+    run = state.get_run(run_id)
 
     # Exit if `run_id` not found
-    if not runs:
+    if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND,
             f"Run {run_id} not found while pulling artifacts.",
         )
-    run = runs[0]
-
     # Exit if the run is not finished yet
     if run.status.status != Status.FINISHED:
         raise FlowerError(

@@ -125,6 +125,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             sorted((msg.metadata for msg in expected), key=attrgetter("message_id")),
         )
 
+    def test_get_unknown_run(self) -> None:
+        """Return None for an unknown run on every state implementation."""
+        self.assertIsNone(self.state_factory().get_run(2**64 - 1))
+
     def test_get_file_and_list_files_when_absent(self) -> None:
         """An empty scope has no file content or metadata."""
         state = self.state_factory()

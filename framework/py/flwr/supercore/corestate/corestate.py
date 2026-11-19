@@ -50,6 +50,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..constant import AutomationStatus
@@ -62,6 +63,21 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_node_id(self) -> int:
         """Return the ID of the node owning this CoreState."""
+
+    @abstractmethod
+    def get_run(self, run_id: int) -> Run | None:
+        """Retrieve a run by its ID.
+
+        Parameters
+        ----------
+        run_id : int
+            The ID of the run to retrieve.
+
+        Returns
+        -------
+        Run | None
+            The run if found, otherwise None.
+        """
 
     @property
     @abstractmethod

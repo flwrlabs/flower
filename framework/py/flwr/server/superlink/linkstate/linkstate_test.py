@@ -750,7 +750,8 @@ class StateTest(CoreStateTest):
 
         # Assert
         tasks = state.get_tasks(run_ids=[run_id])
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_id)
+        assert run is not None
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)

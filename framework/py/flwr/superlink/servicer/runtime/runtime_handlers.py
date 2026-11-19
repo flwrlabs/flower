@@ -105,7 +105,7 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get events from all runs in the authenticated task's series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
-    run = state.get_run_info(run_ids=[task.run_id])[0]
+    run = _get_task_run(state, task)
     series = state.get_run_series(series_ids=[run.series_id])[0]
     series_runs = state.get_run_info(run_ids=series.run_ids)
     primary_task_ids = [
@@ -131,12 +131,7 @@ def get_space_events(
     task: Task,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    space_id = runs[0].space_id
+    space_id = _get_task_run(state, task).space_id
     if space_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
@@ -147,12 +142,12 @@ def get_space_events(
 
 def _get_task_run(state: LinkState, task: Task) -> Run:
     """Resolve the authenticated task's Run."""
-    runs = state.get_run_info(run_ids=[task.run_id])
-    if not runs:
+    run = state.get_run(task.run_id)
+    if run is None:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
-    return runs[0]
+    return run
 
 
 def get_space_messages(
@@ -197,9 +192,8 @@ def put_compacted_context(
 
 def _get_agent_id(state: LinkState, task: Task) -> int:
     """Resolve the authenticated task's agent ID for file scoping."""
-    runs = state.get_run_info(run_ids=[task.run_id])
     return core_runtime_handlers.require_agent_id(
-        runs[0] if runs else None, task.run_id
+        state.get_run(task.run_id), task.run_id
     )
 
 
@@ -362,8 +356,7 @@ def get_connector(
             "Connector credentials are not available to this task.",
         )
 
-    runs = state.get_run_info(run_ids=[task.run_id])
-    run = runs[0] if runs else None
+    run = state.get_run(task.run_id)
     if run is None:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
 
@@ -424,8 +417,7 @@ def pull_task_input(
     log(DEBUG, "Runtime.PullTaskInput")
     run_id = task.run_id
 
-    runs = state.get_run_info(run_ids=[run_id])
-    run = runs[0] if runs else None
+    run = state.get_run(run_id)
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
     agent = (
         state.get_agent(run.flwr_aid, run.agent_id)
@@ -474,8 +466,7 @@ def push_task_output(
     ):
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
         if request.HasField("context"):
-            runs = state.get_run_info(run_ids=[run_id])
-            run = runs[0] if runs else None
+            run = state.get_run(run_id)
             if run and run.series_id and run.primary_task_id == task.task_id:
                 state.set_run_series_context(
                     run.series_id, context_from_proto(request.context)
@@ -497,7 +488,7 @@ def start_automation(
             "Only AgentApp and ServerApp tasks can create automations.",
         )
 
-    run = state.get_run_info(run_ids=[task.run_id])[0]
+    run = _get_task_run(state, task)
     if not run.federation_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,

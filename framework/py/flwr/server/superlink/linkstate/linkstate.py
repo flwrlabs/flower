@@ -41,6 +41,11 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """Return the SuperLink node ID."""
         return SUPERLINK_NODE_ID
 
+    def get_run(self, run_id: int) -> Run | None:
+        """Retrieve a run by its ID."""
+        runs = self.get_run_info(run_ids=[run_id])
+        return runs[0] if runs else None
+
     @property
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:

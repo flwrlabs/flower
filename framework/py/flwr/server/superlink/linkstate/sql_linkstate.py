@@ -140,12 +140,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         # Check if the run exists
-        runs = self.get_run_info(run_ids=[run_id])
-        if not runs:
+        run = self.get_run(run_id)
+        if run is None:
             return False
 
         # Stop the run's primary task, which will cascade to stop all its tasks
-        primary_task_id = cast(int, runs[0].primary_task_id)
+        primary_task_id = cast(int, run.primary_task_id)
         if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
             return False
 
