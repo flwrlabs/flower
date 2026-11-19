@@ -16,8 +16,6 @@
 #include "client.h"
 #include "serde.h"
 
-std::tuple<flwr::proto::ClientMessage, int, bool>
-handle(flwr_local::Client *client, flwr::proto::ServerMessage server_msg);
-
-std::tuple<flwr::proto::TaskRes, int, bool>
-handle_task(flwr_local::Client *client, const flwr::proto::TaskIns &task_ins);
+// Returns (reply_message, sleep_duration, keep_going)
+std::tuple<flwr_local::Message, int, bool>
+handle_message(flwr_local::Client *client, const flwr_local::Message &message);
