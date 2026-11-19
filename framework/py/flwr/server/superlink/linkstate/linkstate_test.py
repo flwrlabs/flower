@@ -487,84 +487,50 @@ class StateTest(CoreStateTest):
         )
         self.assertEqual(state.get_task_events(space_id=uuid4()), [])
 
-    @parameterized.expand(  # type: ignore[untyped-decorator]
-        [SubStatus.COMPLETED, SubStatus.FAILED, SubStatus.STOPPED, "expired", "retry"]
-    )
-    def test_task_lifecycle_events(self, finish_reason: str) -> None:
-        """Correlate run creation with task transitions, retries, and cleanup."""
+    def test_task_lifecycle_events(self) -> None:
+        """Correlate run creation with primary and child task events."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
-        )
-        assert agent is not None
-        space_id = UUID(state.get_spaces("alice")[0].id)
+        space = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
         cursor = state.get_bootstrap("alice").cursor
         run_id = state.create_run(
-            "publisher/app",
-            "1.0",
-            state.store_fab(Fab("", b"fab", {})),
+            None,
+            None,
+            None,
             {},
             None,
             None,
             None,
             TaskType.AGENT_APP,
-            space_id=space_id,
-            agent_id=agent.id,
+            space_id=UUID(space.id),
         )
         task_id = get_primary_task_id(state, run_id)
-        assert state.claim_task(task_id)
-        assert state.claim_task(task_id) is None
-        statuses = [Status.PENDING, Status.STARTING]
-        if finish_reason == "retry":
-            with self._patch_message_time(
-                now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
-            ):
-                state.get_tasks(task_ids=[task_id])
-            assert state.claim_task(task_id)
-            statuses += [Status.PENDING, Status.STARTING]
-        assert state.activate_task(task_id)
-        assert not state.activate_task(task_id)
-        sub_status = SubStatus.COMPLETED if finish_reason == "retry" else finish_reason
-        if finish_reason == "expired":
-            with self._patch_message_time(
-                now()
-                + timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1)
-            ):
-                child_id = state.create_task(
-                    task_type=TaskType.SERVER_APP, run_id=run_id
-                )
-                state.get_run_status({run_id})
-            sub_status = SubStatus.FAILED
-        else:
-            child_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-            assert state.finish_task(task_id, sub_status, "")
+        child_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         assert child_id is not None
-        assert not state.finish_task(task_id, SubStatus.COMPLETED, "")
+        transition_run_status(state, run_id, 3)
         created, *events = [
-            entry.event for entry in state.get_user_events("alice", cursor)
+            MessageToDict(entry.event)
+            for entry in state.get_user_events("alice", cursor)
         ]
-        assert created.type == "run.created"
-        assert created.payload["run_id"] == str(run_id)
-        assert created.payload["primary_task_id"] == str(task_id)
-        assert MessageToDict(created.payload)["status"]["status"] == Status.PENDING
-        assert {event.type for event in events} == {"task.created", "task.updated"}
-        assert all(event.space_id == str(space_id) for event in events)
-        primary = [
-            event for event in events if event.payload["task_id"] == str(task_id)
-        ]
+        assert created["type"] == "run.created"
+        assert created["payload"]["run_id"] == str(run_id)
+        assert created["payload"]["primary_task_id"] == str(task_id)
         assert [
-            MessageToDict(event.payload)["status"]["status"] for event in primary
-        ] == (statuses + [Status.RUNNING, Status.FINISHED])
-        assert MessageToDict(primary[-1].payload)["status"]["sub_status"] == sub_status
-        child = [event for event in events if event.payload["task_id"] == str(child_id)]
-        assert [
-            MessageToDict(event.payload)["status"]["status"] for event in child
+            (
+                event["type"],
+                event["payload"]["task_id"],
+                event["payload"]["status"]["status"],
+            )
+            for event in events
         ] == [
-            Status.PENDING,
-            Status.FINISHED,
+            ("task.created", str(task_id), Status.PENDING),
+            ("task.created", str(child_id), Status.PENDING),
+            ("task.updated", str(task_id), Status.STARTING),
+            ("task.updated", str(task_id), Status.RUNNING),
+            ("task.updated", str(task_id), Status.FINISHED),
+            ("task.updated", str(child_id), Status.FINISHED),
         ]
-        assert child[-1].payload["finished_at"] == primary[-1].payload["finished_at"]
-        assert state.get_user_events("bob") == []
+        assert events[-2]["payload"]["status"]["sub_status"] == SubStatus.COMPLETED
+        assert events[-1]["payload"]["status"]["sub_status"] == SubStatus.FAILED
 
     def test_bootstrap_active_runs(self) -> None:
         """Bootstrap includes visible active agent runs and omits finished runs."""

@@ -688,27 +688,27 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
-        with self.lock_task_store:
-            if not super().finish_task(task_id, sub_status, details):
-                return False
-            if not self._is_primary_task(task_id):
-                return True
-
-            task = self.task_store[task_id]
-            if sub_status == SubStatus.STOPPED:
-                child_sub_status = SubStatus.STOPPED
-                child_details = "Task stopped because the run was stopped"
-            else:
-                child_sub_status = SubStatus.FAILED
-                child_details = "Task failed because the run finished"
-            self._finish_run_tasks(
-                [(task.run_id, task_id)],
-                sub_status=child_sub_status,
-                details=child_details,
-            )
-            if self.run_ids[task.run_id].space_id is None:
+        result = super().finish_task(task_id, sub_status, details)
+        if result and self._is_primary_task(task_id):
+            with self.lock_task_store:
+                task = self.task_store.get(task_id)
+                if task is not None:
+                    # Stop all tasks of the run when the run is stopped
+                    if sub_status == SubStatus.STOPPED:
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
+                    # Otherwise, fail all tasks of the run
+                    else:
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
+                        [(task.run_id, task_id)],
+                        sub_status=finish_sub_status,
+                        details=finish_details,
+                    )
+            if self.run_ids[self.task_store[task_id].run_id].space_id is None:
                 self.federation_manager.report_run_usage()
-            return True
+        return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Fail unfinished tasks for runs whose primary task expired and report usage.

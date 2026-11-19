@@ -756,32 +756,33 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
-        with self.session() as session:
-            if not super().finish_task(task_id, sub_status, details):
-                return False
-            run = session.execute(
-                select(RunModel.run_id, RunModel.space_id).where(
-                    RunModel.primary_task_id == task_id
+        result = super().finish_task(task_id, sub_status, details)
+        if result:
+            # Check whether this task is referenced as a run's primary task
+            with self.session() as session:
+                run = session.execute(
+                    select(RunModel.run_id, RunModel.space_id).where(
+                        RunModel.primary_task_id == task_id
+                    )
+                ).first()
+            if run is not None:
+                run_id, space_id = run
+                # Stop all tasks of the run when the run is stopped
+                if sub_status == SubStatus.STOPPED:
+                    finish_sub_status = SubStatus.STOPPED
+                    finish_details = "Task stopped because the run was stopped"
+                # Otherwise, fail all tasks of the run
+                else:
+                    finish_sub_status = SubStatus.FAILED
+                    finish_details = "Task failed because the run finished"
+                self._finish_run_tasks(
+                    [(run_id, task_id)],
+                    sub_status=finish_sub_status,
+                    details=finish_details,
                 )
-            ).first()
-            if run is None:
-                return True
-
-            run_id, space_id = run
-            if sub_status == SubStatus.STOPPED:
-                child_sub_status = SubStatus.STOPPED
-                child_details = "Task stopped because the run was stopped"
-            else:
-                child_sub_status = SubStatus.FAILED
-                child_details = "Task failed because the run finished"
-            self._finish_run_tasks(
-                [(run_id, task_id)],
-                sub_status=child_sub_status,
-                details=child_details,
-            )
-            if space_id is None:
-                self.federation_manager.report_run_usage()
-            return True
+                if space_id is None:
+                    self.federation_manager.report_run_usage()
+        return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Fail unfinished tasks for runs whose primary task expired and report usage.
