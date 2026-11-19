@@ -2684,6 +2684,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
         self.assertEqual(entries[1].event.payload["id"], str(message.id))
 
+    def test_user_event_explicit_empty_recipients(self) -> None:
+        """An empty recipient list delivers to nobody, even with a Space ID."""
+        state = self.state_factory()
+        space = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
+        state.store_event(EventType.SPACE_CREATED, space, [], space_id=UUID(space.id))
+        self.assertEqual(state.get_user_events("alice", after_seq=1), [])
+
+        with self.assertRaises(ValueError):
+            state.store_event(EventType.SPACE_CREATED, space)
+
     def test_user_event_replay(self) -> None:
         """Assign event metadata and replay immutable payloads in feed order."""
         state = self.state_factory()
