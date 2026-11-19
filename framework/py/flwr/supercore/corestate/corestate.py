@@ -34,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -294,6 +295,10 @@ class CoreState(ABC):  # pylint: disable=R0904
 
         Concurrent changes may appear in both this response and subsequent replay.
         """
+
+    def _get_active_runs(self, _space_ids: set[UUID]) -> Sequence[ProtoRun]:
+        """Return active Space agent runs when supported by the state."""
+        return []
 
     @abstractmethod
     def store_event(
