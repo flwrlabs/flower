@@ -296,10 +296,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         Concurrent changes may appear in both this response and subsequent replay.
         """
 
-    def _get_active_runs(self, _space_ids: set[UUID]) -> Sequence[ProtoRun]:
-        """Return active Space agent runs when supported by the state."""
-        return []
-
     @abstractmethod
     def store_event(
         self,

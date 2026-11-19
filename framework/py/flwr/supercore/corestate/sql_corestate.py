@@ -819,11 +819,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     UserEventFeedModel.user_id == flwr_aid
                 )
             )
-        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
             agents=self.list_agents(flwr_aid),
-            spaces=spaces,
-            active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
+            spaces=self.get_spaces(flwr_aid),
             cursor=head or 0,
         )
 

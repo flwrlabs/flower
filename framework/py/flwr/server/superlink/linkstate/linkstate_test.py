@@ -521,23 +521,13 @@ class StateTest(CoreStateTest):
     def test_run_activity_lifecycle(self, sub_status: str) -> None:
         """Publish creation and finish once with a minimal, scoped payload."""
         state, run_id, task_id, space_id, agent_id = self._create_activity_run()
-        assert state.get_bootstrap("charlie").active_runs == []
-        queued = state.get_bootstrap("bob")
-        assert [run.run_id for run in queued.active_runs] == [run_id]
-        assert queued.active_runs[0].status.status == Status.PENDING
         assert state.claim_task(task_id) is not None
-        assert (
-            state.get_bootstrap("bob").active_runs[0].status.status == Status.STARTING
-        )
         assert state.activate_task(task_id)
-        active = state.get_bootstrap("bob")
-        assert active.active_runs[0].status.status == Status.RUNNING
         if sub_status == SubStatus.STOPPED:
             assert state.stop_run(run_id)
         else:
             assert state.finish_task(task_id, sub_status, "private failure details")
         assert not state.finish_task(task_id, sub_status, "private failure details")
-        assert state.get_bootstrap("bob").active_runs == []
         events = [
             entry.event
             for entry in state.get_user_events("bob")
@@ -585,9 +575,6 @@ class StateTest(CoreStateTest):
         assert state.activate_task(legacy_task)
         assert state.finish_task(legacy_task, SubStatus.COMPLETED, "")
         assert state.get_user_events("alice", cursor) == []
-        assert [run.run_id for run in state.get_bootstrap("alice").active_runs] == [
-            run_id
-        ]
 
     def test_run_activity_claim_retry_and_heartbeat_expiry(self) -> None:
         """Retryable STARTING expiry stays active and RUNNING expiry finishes once."""
@@ -598,13 +585,11 @@ class StateTest(CoreStateTest):
             seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
         )
         with self._patch_message_time(future):
-            snapshot = state.get_bootstrap("alice")
-        assert snapshot.active_runs[0].status.status == Status.PENDING
+            assert state.get_run_status({run_id})[run_id].status == Status.PENDING
         assert state.get_user_events("alice", cursor) == []
         assert state.claim_task(task_id) is not None
         assert state.activate_task(task_id)
         with self._patch_message_time(future):
-            assert state.get_bootstrap("alice").active_runs == []
             assert state.get_run_status({run_id})[run_id].status == Status.FINISHED
         events = [entry.event for entry in state.get_user_events("alice", cursor)]
         assert [event.type for event in events] == ["run.finished"]
@@ -2171,6 +2156,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
                     )
                     with self._patch_message_time(future):
                         state.get_run_status({run_id})
+        assert state.get_run_status({run_id})[run_id].status == Status.RUNNING
         assert state.get_bootstrap("alice") == before
         assert state.get_user_events("alice", before.cursor) == []
 

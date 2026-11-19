@@ -678,11 +678,9 @@ class InMemoryCoreState(
         """Read the feed cursor before fetching visible state."""
         with self.lock_space_store:
             head = len(self.user_event_store.get(flwr_aid, []))
-        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
             agents=self.list_agents(flwr_aid),
-            spaces=spaces,
-            active_runs=self._get_active_runs({UUID(space.id) for space in spaces}),
+            spaces=self.get_spaces(flwr_aid),
             cursor=head,
         )
 

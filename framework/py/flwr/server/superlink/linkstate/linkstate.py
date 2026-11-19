@@ -26,30 +26,16 @@ from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
-from .utils import create_run_context, run_activity_to_proto
+from .utils import create_run_context
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""
-
-    def _get_active_runs(self, space_ids: set[UUID]) -> Sequence[ProtoRun]:
-        """Return minimal active agent run projections for the visible Spaces."""
-        if not space_ids:
-            return []
-        return [
-            run_activity_to_proto(run)
-            for run in self.get_run_info(
-                federation_ids=[None],
-                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
-            )
-            if run.space_id in space_ids and run.agent_id is not None
-        ]
 
     def get_node_id(self) -> int:
         """Return the SuperLink node ID."""
