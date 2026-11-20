@@ -11,17 +11,24 @@
 ---
 erDiagram
   agent {
-    BIGINT agent_id PK
+    BIGINT agent_id PK,FK
+    BIGINT config_version FK
     CHAR(32) default_space_id FK
     VARCHAR app_spec
+    TIMESTAMP created_at
+    VARCHAR flwr_aid
+    TIMESTAMP updated_at
+  }
+
+  agent_config {
+    BIGINT agent_id PK,FK
+    BIGINT version PK
     VARCHAR avatar
     VARCHAR color
     TIMESTAMP created_at
     TEXT description "nullable"
-    VARCHAR flwr_aid
     VARCHAR name
     VARCHAR title "nullable"
-    TIMESTAMP updated_at
   }
 
   automation {
@@ -336,7 +343,10 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent_config ||--o| agent : agent_id
+  agent_config ||--o{ agent : config_version
   space ||--o{ agent : default_space_id
+  agent ||--o| agent_config : agent_id
   agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
