@@ -190,6 +190,7 @@ class InMemoryCoreState(
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.archived_agent_store: dict[int, tuple[datetime, str]] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -651,16 +652,54 @@ class InMemoryCoreState(
             self.agent_id_counter = agent_id
             return agent
 
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Archive an agent and stop future scheduled activity under state locks."""
+        with (
+            self.lock_automation_store,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            current = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if current is None:
+                return False
+            if agent_id in self.archived_agent_store:
+                return True
+            archived_at = now()
+            agent = Agent()
+            agent.CopyFrom(current)
+            agent.updated_at = archived_at.isoformat()
+            self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
+            self.archived_agent_store[agent_id] = (archived_at, flwr_aid)
+            self.agent_store[flwr_aid][agent_id] = agent
+            for record in self.automation_store.values():
+                automation = record.automation
+                if (
+                    automation.agent_id == agent_id
+                    and automation.status == AutomationStatus.ACTIVE
+                ):
+                    automation.status = AutomationStatus.STOPPED
+                    automation.stopped_at = agent.updated_at
+                    automation.updated_at = agent.updated_at
+            return True
+
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, include_archived: bool = False
+    ) -> Agent | None:
+        """Return an owned active agent, optionally including archived history."""
         with self.lock_agent_store:
+            if not include_archived and agent_id in self.archived_agent_store:
+                return None
             return self.agent_store.get(flwr_aid, {}).get(agent_id)
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
         with self.lock_agent_store:
             agent = self.agent_store.get(flwr_aid, {}).get(agent_id)
-            if agent is None or not agent.default_space_id:
+            if (
+                agent is None
+                or not agent.default_space_id
+                or agent_id in self.archived_agent_store
+            ):
                 return None
             return UUID(agent.default_space_id)
 
@@ -670,7 +709,11 @@ class InMemoryCoreState(
             return []
         with self.lock_agent_store:
             return sorted(
-                self.agent_store.get(flwr_aid, {}).values(),
+                (
+                    agent
+                    for agent in self.agent_store.get(flwr_aid, {}).values()
+                    if agent.id not in self.archived_agent_store
+                ),
                 key=lambda agent: agent.id,
             )
 
@@ -1159,7 +1202,10 @@ class InMemoryCoreState(
                 members.append(participant)
         with self.lock_space_store, self.lock_agent_store:
             known_agent_ids = {
-                agent_id for agents in self.agent_store.values() for agent_id in agents
+                agent_id
+                for agents in self.agent_store.values()
+                for agent_id in agents
+                if agent_id not in self.archived_agent_store
             }
             if any(
                 member.agent_id and member.agent_id not in known_agent_ids
@@ -1192,10 +1238,16 @@ class InMemoryCoreState(
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
         """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipant(flwr_aid=flwr_aid)
-        with self.lock_space_store:
+        with self.lock_space_store, self.lock_agent_store:
+            hidden_spaces = {
+                agent.default_space_id
+                for agents in self.agent_store.values()
+                for agent in agents.values()
+                if agent.id in self.archived_agent_store
+            }
             spaces = []
             for space_id, space in self.space_store.items():
-                if viewer not in space.participants:
+                if viewer not in space.participants or space.id in hidden_spaces:
                     continue
                 result = Space()
                 result.CopyFrom(space)
@@ -1452,10 +1504,9 @@ class InMemoryCoreState(
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
-        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
-            raise ValueError("Agent not found.")
-
         with self.lock_automation_store:
+            if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+                raise ValueError("Agent not found.")
             current = now()
             automation_id = self._next_automation_id
             self._next_automation_id += 1

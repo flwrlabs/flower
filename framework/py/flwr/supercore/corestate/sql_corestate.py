@@ -789,21 +789,61 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return agent
 
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Archive an agent and stop future scheduled activity atomically."""
+        archived_at = now()
         with self.session() as session:
-            row = session.execute(
-                select(AgentModel, AgentConfigModel)
-                .join(
-                    AgentConfigModel,
-                    (AgentConfigModel.agent_id == AgentModel.agent_id)
-                    & (AgentConfigModel.version == AgentModel.config_version),
-                )
+            archived_id = session.scalar(
+                update(AgentModel)
                 .where(
-                    AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.archived_at.is_(None),
                 )
-            ).one_or_none()
+                .values(
+                    archived_at=archived_at,
+                    archived_by=flwr_aid,
+                    updated_at=archived_at,
+                )
+                .returning(AgentModel.agent_id)
+            )
+            agent = self.get_agent(flwr_aid, agent_id, include_archived=True)
+            if archived_id is None:
+                return agent is not None
+            assert agent is not None
+            session.execute(
+                update(AutomationModel)
+                .where(
+                    AutomationModel.agent_id == agent_id,
+                    AutomationModel.status == AutomationStatus.ACTIVE,
+                )
+                .values(
+                    status=AutomationStatus.STOPPED,
+                    stopped_at=archived_at,
+                    updated_at=archived_at,
+                )
+            )
+            self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
+            return True
+
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, include_archived: bool = False
+    ) -> Agent | None:
+        """Return an owned active agent, optionally including archived history."""
+        query = (
+            select(AgentModel, AgentConfigModel)
+            .join(
+                AgentConfigModel,
+                (AgentConfigModel.agent_id == AgentModel.agent_id)
+                & (AgentConfigModel.version == AgentModel.config_version),
+            )
+            .where(AgentModel.flwr_aid == flwr_aid, AgentModel.agent_id == agent_id)
+            .execution_options(populate_existing=True)
+        )
+        if not include_archived:
+            query = query.where(AgentModel.archived_at.is_(None))
+        with self.session() as session:
+            row = session.execute(query).one_or_none()
             return _agent_from_model(*row) if row is not None else None
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
@@ -813,6 +853,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 select(AgentModel.default_space_id).where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
+                    AgentModel.archived_at.is_(None),
                 )
             )
 
@@ -827,7 +868,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 (AgentConfigModel.agent_id == AgentModel.agent_id)
                 & (AgentConfigModel.version == AgentModel.config_version),
             )
-            .where(AgentModel.flwr_aid == flwr_aid)
+            .where(
+                AgentModel.flwr_aid == flwr_aid,
+                AgentModel.archived_at.is_(None),
+            )
             .order_by(AgentModel.agent_id)
         )
         with self.session() as session:
@@ -1439,6 +1483,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 members.append(participant)
         try:
             with self.session() as session:
+                agent_ids = {member.agent_id for member in members if member.agent_id}
+                if agent_ids:
+                    active_ids = set(
+                        session.scalars(
+                            select(AgentModel.agent_id).where(
+                                AgentModel.agent_id.in_(agent_ids),
+                                AgentModel.archived_at.is_(None),
+                            )
+                        )
+                    )
+                    if active_ids != agent_ids:
+                        raise ValueError("Agent participant does not exist")
                 model = session.scalars(
                     insert(SpaceModel)
                     .values(id=uuid4(), title="", created_at=now())
@@ -1494,7 +1550,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SpaceParticipantTable,
                 SpaceParticipantTable.c.space_id == SpaceModel.id,
             )
-            .where(viewer.c.flwr_aid == flwr_aid)
+            .where(
+                viewer.c.flwr_aid == flwr_aid,
+                ~exists().where(
+                    AgentModel.default_space_id == SpaceModel.id,
+                    AgentModel.archived_at.is_not(None),
+                ),
+            )
             .order_by(SpaceModel.created_at.desc())
             .execution_options(populate_existing=True)
         )
@@ -1864,9 +1926,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
-        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
-            raise ValueError("Agent not found.")
-
         current = now()
         stmt = (
             insert(AutomationModel)
@@ -1888,6 +1947,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as session:
+                if agent_id is not None:
+                    active_id = session.scalar(
+                        update(AgentModel)
+                        .where(
+                            AgentModel.agent_id == agent_id,
+                            AgentModel.flwr_aid == flwr_aid,
+                            AgentModel.archived_at.is_(None),
+                        )
+                        .values(updated_at=AgentModel.updated_at)
+                        .returning(AgentModel.agent_id)
+                    )
+                    if active_id is None:
+                        raise ValueError("Agent not found.")
                 automation = session.scalars(stmt).one()
                 return _automation_from_model(automation)
         except IntegrityError as exc:

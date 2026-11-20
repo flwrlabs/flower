@@ -213,8 +213,9 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("backend", ["memory", "sqlite"])
+@pytest.mark.parametrize("archive", [False, True])
 def test_agent_task_input_includes_latest_identity(
-    backend: str, tmp_path: Path
+    backend: str, archive: bool, tmp_path: Path
 ) -> None:
     """Supply current metadata for an agent run while retaining its fixed AgentApp."""
     database = (
@@ -277,12 +278,18 @@ def test_agent_task_input_includes_latest_identity(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
     assert acquired.task.run_id == run_id
+    if archive:
+        assert state.delete_agent("alice", agent.id)
+        agent = state.get_agent("alice", agent.id, include_archived=True)
+        assert agent is not None
     response = runtime_handlers.pull_task_input(
         PullTaskInputRequest(), state, acquired.task
     )
 
     assert response.agent == agent
     assert response.run.fab_hash == fab_hash
+    if archive:
+        assert state.finish_task(acquired.task.task_id, SubStatus.COMPLETED, "")
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

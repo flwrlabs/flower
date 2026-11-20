@@ -396,10 +396,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if space_id is not None and agent_id is not None:
                 self._cleanup_expired_task_tokens_locked()
                 space = self.space_store[space_id]
-                if SpaceParticipant(
-                    agent_id=agent_id
-                ) not in space.participants or self._agent_has_open_run(
-                    space_id, agent_id
+                if (
+                    agent_id in self.archived_agent_store
+                    or SpaceParticipant(agent_id=agent_id) not in space.participants
+                    or self._agent_has_open_run(space_id, agent_id)
                 ):
                     return 0
                 flwr_aid, agent = next(
@@ -540,6 +540,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 agent.id: agent
                 for owned in self.agent_store.values()
                 for agent in owned.values()
+                if agent.id not in self.archived_agent_store
             }
             candidates = []
             for space_id, space in self.space_store.items():
