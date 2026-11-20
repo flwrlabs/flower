@@ -236,6 +236,13 @@ class EventType(StrEnum):
     TASK_UPDATED = "task.updated"
 
 
+class SpaceItemType(StrEnum):
+    """Types of items in a Space's ordered stream."""
+
+    MESSAGE = "message"
+    AUTOMATION = "automation"
+
+
 class AutomationStatus(StrEnum):
     """Status of an automation."""
 
