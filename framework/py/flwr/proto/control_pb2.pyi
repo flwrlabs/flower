@@ -834,7 +834,7 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
     expires_in: builtins.int
     interval: builtins.int
     verification_uri: builtins.str
-    """Providers may return a verification URL and user code without a complete URL."""
+    """Used with user_code when the provider omits verification_uri_complete."""
     user_code: builtins.str
     def __init__(
         self,
