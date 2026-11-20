@@ -553,6 +553,7 @@ def test_run_serialization_deserialization() -> None:
         account_name="test-account",
         space_id=UUID("12345678-1234-5678-1234-567812345678"),
         agent_id=42,
+        trigger_item_type="message",
     )
 
     # Execute
@@ -563,8 +564,11 @@ def test_run_serialization_deserialization() -> None:
     assert isinstance(proto, ProtoRun)
     assert proto.space_id == str(original.space_id)
     assert proto.agent_id == original.agent_id
+    assert proto.trigger_item_type == original.trigger_item_type
     assert original == deserialized
     assert not run_to_proto(Run.create_empty(2)).HasField("space_id")
     assert run_from_proto(ProtoRun()).space_id is None
     assert not run_to_proto(Run.create_empty(2)).HasField("agent_id")
     assert run_from_proto(ProtoRun()).agent_id is None
+    assert not run_to_proto(Run.create_empty(2)).HasField("trigger_item_type")
+    assert run_from_proto(ProtoRun()).trigger_item_type is None
