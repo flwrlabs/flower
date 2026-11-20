@@ -1681,6 +1681,7 @@ class InMemoryCoreState(
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -1703,14 +1704,7 @@ class InMemoryCoreState(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
-                space_id=next(
-                    (
-                        task.space_id
-                        for task in self.task_store.values()
-                        if task.run_id == run_id and task.space_id
-                    ),
-                    "",
-                ),
+                space_id=str(space_id) if space_id is not None else "",
                 status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
                 pending_at=now().isoformat(),
                 fab_hash=fab_hash,

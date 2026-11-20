@@ -260,6 +260,7 @@ def create_task(
     created_task_id = state.create_task(
         task_type=request.type,
         run_id=run.run_id,
+        space_id=run.space_id,
         fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
         model_ref=request.model_ref if request.HasField("model_ref") else None,
         connector_ref=connector_ref,

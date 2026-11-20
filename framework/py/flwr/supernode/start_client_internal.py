@@ -388,6 +388,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 else TaskType.CLIENT_APP
             ),
             run_id=run_id,
+            space_id=run_info.space_id,
             fab_hash=run_info.fab_hash,
         )
         if task_id is None:
