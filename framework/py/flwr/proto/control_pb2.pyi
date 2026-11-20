@@ -872,15 +872,19 @@ class GetAuthTokensResponse(google.protobuf.message.Message):
 
     ACCESS_TOKEN_FIELD_NUMBER: builtins.int
     REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
     access_token: builtins.str
     refresh_token: builtins.str
+    error: builtins.str
+    """OAuth device authorization error, if reported by the auth plugin."""
     def __init__(
         self,
         *,
         access_token: builtins.str = ...,
         refresh_token: builtins.str = ...,
+        error: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "refresh_token", b"refresh_token"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "error", b"error", "refresh_token", b"refresh_token"]) -> None: ...
 
 global___GetAuthTokensResponse = GetAuthTokensResponse
 

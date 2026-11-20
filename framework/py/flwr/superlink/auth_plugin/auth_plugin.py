@@ -22,6 +22,7 @@ from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
     AuthenticatedUser,
+    DeviceAuthorizationError,
 )
 
 
@@ -43,8 +44,10 @@ class ControlAuthnPlugin(ABC):
         """Validate authentication tokens in the provided metadata."""
 
     @abstractmethod
-    def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
-        """Get authentication tokens."""
+    def get_auth_tokens(
+        self, device_code: str
+    ) -> AccountAuthCredentials | DeviceAuthorizationError | None:
+        """Return tokens, a device authorization error, or None while pending."""
 
     @abstractmethod
     def refresh_tokens(

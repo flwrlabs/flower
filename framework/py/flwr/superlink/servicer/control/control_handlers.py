@@ -167,7 +167,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
-from flwr.supercore.auth.typing import AuthenticatedUser
+from flwr.supercore.auth.typing import AuthenticatedUser, DeviceAuthorizationError
 from flwr.supercore.constant import (
     AGENT_RUN_BATCH_LIMIT,
     DEFAULT_FEDERATION_SIMULATION,
@@ -1722,16 +1722,15 @@ def get_auth_tokens(
             "ControlServicer initialized without account authentication.",
         )
 
-    # Get auth tokens
-    credentials = authn_plugin.get_auth_tokens(request.device_code)
-
-    # Return empty response if credentials is None
-    if credentials is None:
+    result = authn_plugin.get_auth_tokens(request.device_code)
+    if result is None:
         return GetAuthTokensResponse()
+    if isinstance(result, DeviceAuthorizationError):
+        return GetAuthTokensResponse(error=result.value)
 
     return GetAuthTokensResponse(
-        access_token=credentials.access_token,
-        refresh_token=credentials.refresh_token,
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
     )
 
 
