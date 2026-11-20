@@ -83,10 +83,12 @@ class Agent(google.protobuf.message.Message):
     CREATED_AT_FIELD_NUMBER: builtins.int
     UPDATED_AT_FIELD_NUMBER: builtins.int
     DEFAULT_SPACE_ID_FIELD_NUMBER: builtins.int
+    CONFIG_VERSION_FIELD_NUMBER: builtins.int
     id: builtins.int
     created_at: builtins.str
     updated_at: builtins.str
     default_space_id: builtins.str
+    config_version: builtins.int
     @property
     def config(self) -> global___AgentConfig: ...
     def __init__(
@@ -97,9 +99,10 @@ class Agent(google.protobuf.message.Message):
         created_at: builtins.str = ...,
         updated_at: builtins.str = ...,
         default_space_id: builtins.str = ...,
+        config_version: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["config", b"config", "created_at", b"created_at", "default_space_id", b"default_space_id", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "config_version", b"config_version", "created_at", b"created_at", "default_space_id", b"default_space_id", "id", b"id", "updated_at", b"updated_at"]) -> None: ...
 
 global___Agent = Agent
 
@@ -162,6 +165,46 @@ class ListAgentsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["agents", b"agents"]) -> None: ...
 
 global___ListAgentsResponse = ListAgentsResponse
+
+@typing.final
+class UpdateAgentRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENT_ID_FIELD_NUMBER: builtins.int
+    EXPECTED_CONFIG_VERSION_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    agent_id: builtins.int
+    expected_config_version: builtins.int
+    @property
+    def config(self) -> global___AgentConfig: ...
+    def __init__(
+        self,
+        *,
+        agent_id: builtins.int = ...,
+        expected_config_version: builtins.int = ...,
+        config: global___AgentConfig | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "config", b"config", "expected_config_version", b"expected_config_version"]) -> None: ...
+
+global___UpdateAgentRequest = UpdateAgentRequest
+
+@typing.final
+class UpdateAgentResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENT_FIELD_NUMBER: builtins.int
+    @property
+    def agent(self) -> global___Agent: ...
+    def __init__(
+        self,
+        *,
+        agent: global___Agent | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["agent", b"agent"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["agent", b"agent"]) -> None: ...
+
+global___UpdateAgentResponse = UpdateAgentResponse
 
 @typing.final
 class StartRunRequest(google.protobuf.message.Message):
