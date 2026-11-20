@@ -2105,6 +2105,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -2118,10 +2119,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
             literal(run_id, type_=TaskModel.run_id.type),
-            select(TaskModel.space_id)
-            .where(TaskModel.run_id == run_id, TaskModel.space_id.is_not(None))
-            .limit(1)
-            .scalar_subquery(),
+            literal(space_id, type_=TaskModel.space_id.type),
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),

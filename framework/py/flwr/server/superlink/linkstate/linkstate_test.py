@@ -461,9 +461,11 @@ class StateTest(CoreStateTest):
                         .where(RunModel.run_id == assigned_run_id)
                         .values(space_id=assigned_space_id)
                     )
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=space_id
+        )
         other_task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=other_run_id
+            task_type=TaskType.AGENT_APP, run_id=other_run_id, space_id=other_space_id
         )
         assert task_id is not None and other_task_id is not None
         assert state.store_task_events(
@@ -504,7 +506,9 @@ class StateTest(CoreStateTest):
             space_id=UUID(space.id),
         )
         task_id = get_primary_task_id(state, run_id)
-        child_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        child_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=UUID(space.id)
+        )
         assert child_id is not None
         transition_run_status(state, run_id, 3)
         created, *events = [
@@ -1205,7 +1209,9 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
         assert state.activate_task(primary_task_id)
@@ -1257,7 +1263,9 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
         if sub_status == SubStatus.COMPLETED:
@@ -1322,7 +1330,9 @@ class StateTest(CoreStateTest):
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
@@ -2332,8 +2342,12 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         """Malformed claimed task Messages should not remain queued forever."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2416,7 +2430,9 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
 

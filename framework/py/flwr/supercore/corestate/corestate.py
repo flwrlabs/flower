@@ -1221,6 +1221,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -1235,6 +1236,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The executor type of the task to create.
         run_id : int
             The run ID this task belongs to.
+        space_id : Optional[UUID]
+            The run's Space ID, or None for a federation run.
         fab_hash : Optional[str] (default: None)
             FAB hash associated with the task, if applicable.
         model_ref : Optional[str] (default: None)
