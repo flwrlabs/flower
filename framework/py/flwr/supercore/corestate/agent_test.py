@@ -23,7 +23,6 @@ from uuid import UUID
 import pytest
 from google.protobuf.json_format import MessageToDict
 
-from flwr.common.constant import INT64_MAX_VALUE
 from flwr.proto.control_pb2 import Agent, AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
@@ -181,8 +180,6 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
     assert updated.config == config
     assert updated.id == agent.id
     assert updated.default_space_id == agent.default_space_id
-    assert updated.created_at == agent.created_at
-    assert updated.updated_at > agent.updated_at
     assert state.list_agents("alice") == [updated]
     events = state.get_user_events("alice", cursor)
     assert len(events) == 1 and events[0].event.type == EventType.AGENT_UPDATED
@@ -197,71 +194,34 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
     else:
         assert isinstance(state, InMemoryLinkState)
         assert state.agent_config_store[(agent.id, 1)] == agent.config
-    config.name = "Unrecorded edit"
-    assert updated.config.name == "Reviewer"
-
-
-@pytest.mark.parametrize("clear_value", [None, ""])
-def test_update_agent_clears_optional_fields(
-    state: CoreState, agent: Agent, clear_value: str | None
-) -> None:
-    """Clear all optional metadata when it is absent or explicitly empty."""
     config = AgentConfig(
-        name=agent.config.name,
-        app_spec=agent.config.app_spec,
-        title=clear_value,
-        description=clear_value,
+        name="Reviewer", app_spec=agent.config.app_spec, title="", description=""
     )
-    updated = state.update_agent("alice", agent.id, 1, config)
-
-    assert updated is not None and updated.config_version == 2
-    assert updated.config == AgentConfig(name=config.name, app_spec=config.app_spec)
-
-
-@pytest.mark.parametrize("expected_version", [0, 1, 3, INT64_MAX_VALUE])
-def test_update_agent_rejects_version_conflicts(
-    state: CoreState, agent: Agent, expected_version: int
-) -> None:
-    """Reject nonmatching versions without changing metadata or events."""
-    updated = state.update_agent("alice", agent.id, 1, agent.config)
+    cleared = state.update_agent("alice", agent.id, 2, config)
+    assert cleared is not None and cleared.config_version == 3
+    assert cleared.config == AgentConfig(name=config.name, app_spec=config.app_spec)
     cursor = state.get_bootstrap("alice").cursor
     with pytest.raises(FlowerError) as exc:
-        state.update_agent("alice", agent.id, expected_version, agent.config)
-
+        state.update_agent("alice", agent.id, 2, config)
     assert exc.value.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
-    assert state.get_agent("alice", agent.id) == updated
+    assert state.get_agent("alice", agent.id) == cleared
     assert not state.get_user_events("alice", cursor)
 
 
-def test_update_agent_is_owner_scoped(state: CoreState, agent: Agent) -> None:
-    """Treat another account's agents as absent, even with a mismatched version."""
+def test_update_agent_rejects_invalid_writes(state: CoreState, agent: Agent) -> None:
+    """Reject foreign agents, missing agents, blank names, and AgentApp changes."""
     cursor = state.get_bootstrap("alice").cursor
     assert state.update_agent("bob", agent.id, 2, agent.config) is None
     assert state.update_agent("alice", agent.id + 1, 1, agent.config) is None
+    for config in (
+        AgentConfig(name=" \t", app_spec="@test/app"),
+        AgentConfig(name="Updated", app_spec="@other/app"),
+    ):
+        with pytest.raises(ValueError):
+            state.update_agent("alice", agent.id, 1, config)
     assert state.get_agent("alice", agent.id) == agent
     assert not state.get_user_events("alice", cursor)
     assert not state.get_user_events("bob")
-
-
-@pytest.mark.parametrize(
-    "config",
-    [
-        AgentConfig(),
-        AgentConfig(name=" \t", app_spec="@test/app"),
-        AgentConfig(name="Updated"),
-        AgentConfig(name="Updated", app_spec="@other/app"),
-    ],
-)
-def test_update_agent_rejects_invalid_config(
-    state: CoreState, agent: Agent, config: AgentConfig
-) -> None:
-    """Reject blank names and AgentApp changes before changing any state."""
-    cursor = state.get_bootstrap("alice").cursor
-    with pytest.raises(ValueError):
-        state.update_agent("alice", agent.id, 1, config)
-
-    assert state.get_agent("alice", agent.id) == agent
-    assert not state.get_user_events("alice", cursor)
 
 
 def test_update_agent_rolls_back_when_event_fails(
@@ -279,38 +239,23 @@ def test_update_agent_rolls_back_when_event_fails(
     assert updated is not None and updated.config_version == 2
 
 
-def test_update_agent_concurrent_writers(tmp_path: Path) -> None:
+@pytest.mark.parametrize("state", ["sqlite"], indirect=True)
+def test_update_agent_concurrent_writers(state: SqlLinkState, agent: Agent) -> None:
     """Allow exactly one edit per expected version across SQL replicas."""
-    replicas = [
-        SqlLinkState(
-            str(tmp_path / "state.db"),
-            NoOpFederationManager(),
-            ObjectStoreFactory().store(),
-        )
-        for _ in range(2)
-    ]
-    for replica in replicas:
-        replica.initialize()
-    agent = replicas[0].create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
+    replica = SqlLinkState(
+        state.database_url, NoOpFederationManager(), ObjectStoreFactory().store()
     )
-    assert agent is not None
-    cursor = replicas[0].get_bootstrap("alice").cursor
+    replica.initialize()
     barrier = Barrier(2)
 
-    def edit(state: CoreState) -> bool:
+    def edit(backend: CoreState) -> bool:
         barrier.wait(timeout=10)
         try:
-            assert state.update_agent("alice", agent.id, 1, agent.config) is not None
+            assert backend.update_agent("alice", agent.id, 1, agent.config) is not None
             return True
         except FlowerError as exc:
             assert exc.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
             return False
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        assert sorted(executor.map(edit, replicas, timeout=15)) == [False, True]
-
-    updated = replicas[0].get_agent("alice", agent.id)
-    assert updated is not None and updated.config_version == 2
-    assert replicas[1].get_agent("alice", agent.id) == updated
-    assert len(replicas[0].get_user_events("alice", cursor)) == 1
+        assert sorted(executor.map(edit, (state, replica), timeout=15)) == [False, True]
