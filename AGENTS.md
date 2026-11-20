@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Pull request titles
+
+Use `<type>(<project>): <subject>` for every PR title (for example,
+`feat(framework): Add SpaceItem table`). Follow the full rules in
+`framework/docs/source/contributor-tutorial-contribute-on-github.rst` and validate
+the exact title with `uv run python -m devtool.check_pr_title "<title>"` from `dev/`
+before opening a PR.
+
 ## PR review philosophy
 
 When reviewing or generating code, apply this checklist:
