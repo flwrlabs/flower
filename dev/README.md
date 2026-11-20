@@ -9,7 +9,8 @@ The Flower `framework` project also uses `uv` for CI and local developer workflo
 ## Prerequisites
 
 - Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
-- Use Python 3.11+ (as defined in `pyproject.toml`)
+- Use Python 3.11.5+ to develop or test `devtool`. The default `dev` dependency
+  group requires this version. The base `devtool` package supports Python 3.11+.
 
 ## Quick Start
 

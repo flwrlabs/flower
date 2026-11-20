@@ -22,7 +22,7 @@ dev = [
     "isort==5.13.2",
     "taplo==0.9.3",
     "mypy==1.8.0",
-    "pylint==3.3.1",
+    "pylint==4.0.9",
     "pytest==9.0.3",
     "types-PyYAML>=6.0.2,<7.0.0",
     "rope==1.13.0",
@@ -53,6 +53,9 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.11.5" }
 
 [tool.uv.sources]
 docstrfmt = { git = "https://github.com/charlesbvll/docstrfmt.git", branch = "patch-2" }
