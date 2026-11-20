@@ -239,6 +239,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="Invalid user event cursor.",
     ),
+    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT: ApiErrorSpec(
+        http_status_code=status.HTTP_409_CONFLICT,
+        public_message="Agent configuration version precondition failed.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",

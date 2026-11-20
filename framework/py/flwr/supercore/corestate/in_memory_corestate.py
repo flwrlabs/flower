@@ -85,6 +85,7 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
+    validate_agent_config_update,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -190,6 +191,7 @@ class InMemoryCoreState(
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.agent_config_store: dict[tuple[int, int], AgentConfig] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -627,8 +629,10 @@ class InMemoryCoreState(
                     created_at=created_at,
                     updated_at=created_at,
                     default_space_id=str(space_id),
+                    config_version=1,
                 )
                 self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
+                self.agent_config_store[(agent_id, 1)] = deepcopy(agent.config)
                 space.participants.extend(
                     [
                         SpaceParticipant(flwr_aid=flwr_aid),
@@ -645,16 +649,52 @@ class InMemoryCoreState(
                     del self.event_store[event_id]
                 del feed[feed_start:]
                 self.agent_store.get(flwr_aid, {}).pop(agent_id, None)
+                self.agent_config_store.pop((agent_id, 1), None)
                 self.space_store.pop(space_id, None)
                 self.space_message_store.pop(space_id, None)
                 raise
             self.agent_id_counter = agent_id
-            return agent
+            return deepcopy(agent)
+
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Publish a configuration snapshot and event under the state locks."""
+        validate_agent_config_update(config, expected_config_version)
+        with self.lock_space_store, self.lock_agent_store:
+            current = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if current is None:
+                return None
+            if current.config.app_spec != config.app_spec:
+                raise ValueError("AgentApp specification cannot be changed.")
+            if current.config_version != expected_config_version:
+                raise FlowerError(
+                    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
+                    "Agent configuration version precondition failed.",
+                )
+            agent = deepcopy(current)
+            agent.config.CopyFrom(config)
+            if not config.title:
+                agent.config.ClearField("title")
+            if not config.description:
+                agent.config.ClearField("description")
+            agent.config_version += 1
+            agent.updated_at = now().isoformat()
+            self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
+            self.agent_config_store[(agent_id, agent.config_version)] = deepcopy(
+                agent.config
+            )
+            self.agent_store[flwr_aid][agent_id] = agent
+            return deepcopy(agent)
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account."""
         with self.lock_agent_store:
-            return self.agent_store.get(flwr_aid, {}).get(agent_id)
+            return deepcopy(self.agent_store.get(flwr_aid, {}).get(agent_id))
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
@@ -669,9 +709,11 @@ class InMemoryCoreState(
         if not flwr_aid:
             return []
         with self.lock_agent_store:
-            return sorted(
-                self.agent_store.get(flwr_aid, {}).values(),
-                key=lambda agent: agent.id,
+            return deepcopy(
+                sorted(
+                    self.agent_store.get(flwr_aid, {}).values(),
+                    key=lambda agent: agent.id,
+                )
             )
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:

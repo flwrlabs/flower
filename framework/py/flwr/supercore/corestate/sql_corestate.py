@@ -163,6 +163,7 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
+    validate_agent_config_update,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -787,6 +788,53 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(
                 EventType.SPACE_CREATED, space, [flwr_aid], space_id=space_model.id
             )
+            return agent
+
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Publish a configuration snapshot and event using a version precondition."""
+        validate_agent_config_update(config, expected_config_version)
+        with self.session() as session:
+            model = session.scalar(
+                update(AgentModel)
+                .where(
+                    AgentModel.agent_id == agent_id,
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.app_spec == config.app_spec,
+                    AgentModel.config_version == expected_config_version,
+                )
+                .values(config_version=expected_config_version + 1, updated_at=now())
+                .returning(AgentModel)
+            )
+            if model is None:
+                current = self.get_agent(flwr_aid, agent_id)
+                if current is None:
+                    return None
+                if current.config.app_spec != config.app_spec:
+                    raise ValueError("AgentApp specification cannot be changed.")
+                raise FlowerError(
+                    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
+                    "Agent configuration version precondition failed.",
+                )
+            snapshot = AgentConfigModel(
+                agent_id=agent_id,
+                version=model.config_version,
+                name=config.name,
+                title=config.title or None,
+                description=config.description or None,
+                avatar=config.avatar,
+                color=config.color,
+                created_at=model.updated_at,
+            )
+            session.add(snapshot)
+            session.flush()
+            agent = _agent_from_model(model, snapshot)
+            self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
             return agent
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
@@ -2790,6 +2838,7 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
         default_space_id=str(model.default_space_id),
+        config_version=model.config_version,
     )
 
 
