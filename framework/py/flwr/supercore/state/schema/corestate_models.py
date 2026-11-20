@@ -342,9 +342,6 @@ class SpaceMessage(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    hidden: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
 
 
 class SpaceItem(FlwrBase):
