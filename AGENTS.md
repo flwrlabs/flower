@@ -15,7 +15,7 @@ Examples: `feat(framework): Add SpaceItem table` and
 `ci(*:skip): Enforce PR title format`.
 
 Before opening a PR, validate the exact title with
-`uv run python -m devtool.check_pr_title "<title>"` from `dev/`. See
+`uv run python -m devtool.check_pr_title "<title>"` from `dev/`. See the appendix of
 `framework/docs/source/contributor-tutorial-contribute-on-github.rst` for the full
 guide.
 
