@@ -133,6 +133,28 @@ def test_sample_population_preserves_order_without_a_seed() -> None:
     assert sample_population(population, 2) == expected
 
 
+def test_seed_server_clears_the_sampler_when_the_key_is_absent() -> None:
+    """A later unseeded ServerApp does not keep the previous sampler."""
+    seed_server({RANDOM_SEED_KEY: 4})
+    assert seed_server({}) is None
+    population = [3, 1, 2]
+    random.seed(0)
+    expected = random.sample(population, 2)
+    random.seed(0)
+    assert sample_population(population, 2) == expected
+
+
+def test_seeded_sample_orders_numeric_cids_independently_of_input() -> None:
+    """``"1"`` and ``"01"`` stay distinct, and a superscript digit does not crash."""
+    population = ["01", "1", "²", "10"]
+    seed_random(2)
+    first = sample_population(population, len(population))
+    seed_random(2)
+    second = sample_population(["²", "10", "1", "01"], len(population))
+    assert first == second
+    assert set(first) == set(population)
+
+
 def test_seed_server_uses_the_configured_seed() -> None:
     """The server process starts at the configured seed."""
     assert seed_server({}) is None

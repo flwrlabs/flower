@@ -15,14 +15,17 @@
 """Tests for ClientApp runtime wiring."""
 
 
+import random
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import httpx
 
 from flwr.app import Context
-from flwr.app.message import make_message
-from flwr.common.constant import SubStatus
+from flwr.app.message import RecordDict, make_message
+from flwr.common.constant import PARTITION_ID_KEY, SubStatus
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed, client_seed
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
@@ -44,6 +47,7 @@ from flwr.supercore.interceptors import (
     RuntimeTokenHttpInterceptor,
     RuntimeVersionHttpInterceptor,
 )
+from flwr.supercore.run import Run
 
 from .run_clientapp import (
     pull_task_input,
@@ -187,3 +191,67 @@ class TestRunClientApp(unittest.TestCase):
         self.assertEqual(
             flwr_exit.call_args.kwargs["code"], ExitCode.TASK_PROC_EXCEPTION
         )
+
+    def test_run_clientapp_seeds_before_loading_the_module(self) -> None:
+        """The ClientApp loader's first draw follows the derived seed."""
+        context = Context(
+            run_id=1,
+            node_id=4,
+            node_config={PARTITION_ID_KEY: 2},
+            state=RecordDict(),
+            run_config={RANDOM_SEED_KEY: 11},
+        )
+        message = make_message(
+            metadata=self.maker.metadata(),
+            content=self.maker.recorddict(1, 1, 1),
+        )
+        message.metadata.message_type = "train"
+        draws: list[float] = []
+
+        def loader(_fab_id: str, _fab_version: str, _fab_hash: str) -> Mock:
+            draws.append(random.random())
+            return Mock(return_value=Mock())
+
+        py_state = random.getstate()
+        random.seed(client_seed(11, context, message))
+        expected = random.random()
+        try:
+            with (
+                patch(
+                    "flwr.supernode.runtime.run_clientapp."
+                    "RuntimeHttpClient.from_server_address"
+                ),
+                patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),
+                patch("flwr.supernode.runtime.run_clientapp.register_signal_handlers"),
+                patch(
+                    "flwr.supernode.runtime.run_clientapp.pull_task_input",
+                    return_value=(
+                        message,
+                        context,
+                        Run.create_empty(1),
+                        Fab("hash", b"content", {}),
+                    ),
+                ),
+                patch("flwr.supernode.runtime.run_clientapp.install_from_fab"),
+                patch(
+                    "flwr.supernode.runtime.run_clientapp.get_project_dir",
+                    return_value=Path("."),
+                ),
+                patch(
+                    "flwr.supernode.runtime.run_clientapp.get_load_client_app_fn",
+                    return_value=loader,
+                ),
+                patch("flwr.supernode.runtime.run_clientapp.push_message"),
+                patch("flwr.supernode.runtime.run_clientapp.flwr_exit"),
+            ):
+                run_clientapp(
+                    "127.0.0.1:9094",
+                    insecure=True,
+                    token="test-token",
+                    runtime_dependency_install=False,
+                )
+        finally:
+            random.setstate(py_state)
+            clear_run_seed()
+
+        self.assertEqual(draws, [expected])

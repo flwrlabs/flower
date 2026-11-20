@@ -27,6 +27,7 @@ from ray.util.actor_pool import ActorPool
 
 from flwr.app import Context, Message
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
+from flwr.common.seeding import seed_client
 from flwr.supercore import log
 
 ClientAppFn = Callable[[], ClientApp]
@@ -52,6 +53,8 @@ class VirtualClientEngineActor(ABC):
         # return also cid which is needed to ensure results
         # from the pool are correctly assigned to each ClientProxy
         try:
+            # Seed before the loader imports the app module.
+            seed_client(context, message)
             # Load app
             app: ClientApp = client_app_fn()
 

@@ -36,11 +36,13 @@ from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.server.superlink.fleet.vce.backend.backend import Backend
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
     _register_nodes,
     add_messages_to_queue,
+    prepare_seeded_vce,
     start_vce,
     worker,
 )
@@ -465,6 +467,54 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 content.config_records["getpropertiesres.properties"]["result"]
                 == expected_results[message_res.metadata.reply_to_message_id]
             )
+
+
+def test_prepare_seeded_vce_registers_all_nodes_before_returning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Driver setup registers the full seeded node set and builds the backend."""
+    built: list[bool] = []
+
+    class _FakeBackend(Backend):
+        """Backend double that records ``build`` without starting Ray."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            self.built_with: Callable[[], ClientApp] | None = None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            self.built_with = app_fn
+            built.append(True)
+
+        def is_worker_idle(self) -> bool:
+            return True
+
+        def terminate(self) -> None:
+            return None
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FakeBackend,
+    )
+    run = Run.create_empty(run_id=11)
+    prepared = prepare_seeded_vce(
+        backend_config_json_stream="{}",
+        app_dir=".",
+        is_app=False,
+        f_stop=threading.Event(),
+        run=run,
+        random_seed=9,
+        client_app=dummy_client_app,
+        num_supernodes=4,
+    )
+
+    assert prepared.nodes_mapping == {2: 0, 3: 1, 4: 2, 5: 3}
+    assert built == [True]
+    assert prepared.app_fn() is dummy_client_app
 
 
 def test_register_nodes_uses_stable_ids_when_seeded() -> None:

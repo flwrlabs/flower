@@ -255,6 +255,42 @@ def run_serverapp_th(
     return serverapp_th
 
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def _start_simulation_runtime(
+    prepared: vce.PreparedVce | None,
+    random_seed: int | None,
+    num_supernodes: int,
+    client_app_attr: str | None,
+    client_app: ClientApp | None,
+    backend_name: str,
+    backend_config_stream: str,
+    app_dir: str,
+    is_app: bool,
+    state_factory: LinkStateFactory,
+    f_stop: threading.Event,
+    run: Run,
+    metrics: VceMetrics,
+) -> None:
+    """Start the runtime, using the already built one when the run is seeded."""
+    if prepared is None:
+        vce.start_vce(
+            num_supernodes=num_supernodes,
+            client_app_attr=client_app_attr,
+            client_app=client_app,
+            backend_name=backend_name,
+            backend_config_json_stream=backend_config_stream,
+            app_dir=app_dir,
+            is_app=is_app,
+            state_factory=state_factory,
+            f_stop=f_stop,
+            run=run,
+            metrics=metrics,
+            random_seed=random_seed,
+        )
+        return
+    vce.run_prepared_vce(prepared, f_stop=f_stop, metrics=metrics)
+
+
 # pylint: disable=too-many-locals,too-many-positional-arguments,too-many-statements
 def _main_loop(
     num_supernodes: int,
@@ -272,7 +308,12 @@ def _main_loop(
     server_app_context: Context | None = None,
     metrics: VceMetrics | None = None,
 ) -> SimulationRunResult:
-    """Start ServerApp on a separate thread, then launch Simulation Runtime."""
+    """Launch the Simulation Runtime.
+
+    A seeded run registers every virtual node and builds the ClientApp and Ray
+    backend on this thread before the ServerApp starts. An unseeded run keeps
+    the previous order and starts the ServerApp first.
+    """
     # Initialize StateFactory
     state_factory = LinkStateFactory(
         FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
@@ -309,6 +350,24 @@ def _main_loop(
         grid = InMemoryGrid(state_factory=state_factory)
         grid.set_run(run)
         output_context_queue: Queue[Context] = Queue()
+        random_seed = read_random_seed(server_app_context.run_config)
+
+        # Seeded runs finish node registration, ClientApp import, and Ray
+        # startup before the server thread seeds its RNGs.
+        prepared: vce.PreparedVce | None = None
+        if random_seed is not None:
+            prepared = vce.prepare_seeded_vce(
+                backend_config_json_stream=backend_config_stream,
+                app_dir=app_dir,
+                is_app=is_app,
+                f_stop=f_stop,
+                run=run,
+                random_seed=random_seed,
+                client_app=client_app,
+                client_app_attr=client_app_attr,
+                num_supernodes=num_supernodes,
+                state_factory=state_factory,
+            )
 
         # Get and run ServerApp thread
         serverapp_th = run_serverapp_th(
@@ -324,19 +383,20 @@ def _main_loop(
         )
 
         # Start Simulation Runtime
-        vce.start_vce(
+        _start_simulation_runtime(
+            prepared=prepared,
+            random_seed=random_seed,
             num_supernodes=num_supernodes,
             client_app_attr=client_app_attr,
             client_app=client_app,
             backend_name=backend_name,
-            backend_config_json_stream=backend_config_stream,
+            backend_config_stream=backend_config_stream,
             app_dir=app_dir,
             is_app=is_app,
             state_factory=state_factory,
             f_stop=f_stop,
             run=run,
             metrics=metrics,
-            random_seed=read_random_seed(server_app_context.run_config),
         )
 
         updated_context = output_context_queue.get(timeout=3)

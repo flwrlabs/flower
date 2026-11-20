@@ -161,10 +161,14 @@ def seed_server(run_config: object) -> int | None:
     Returns
     -------
     int | None
-        The applied seed, or ``None`` when seeding is disabled.
+        The applied seed, or ``None`` when seeding is disabled. An absent key
+        also clears a sampler left by an earlier seeded run in this process.
     """
     seed = read_random_seed(run_config)
     if seed is None:
+        # A previous seeded run in this process must not keep the dedicated
+        # sampler once this run opts out.
+        clear_run_seed()
         return None
     seed_random(seed)
     log(INFO, "Seeded server RNGs from run config %s=%s", RANDOM_SEED_KEY, seed)
@@ -268,7 +272,7 @@ def _parse_seed(value: object) -> int:
     return seed
 
 
-def _candidate_sort_key(value: int | str) -> tuple[int, int | str]:
+def _candidate_sort_key(value: int | str) -> tuple[int, int | str, str]:
     """Return a sort key that orders numeric ids numerically.
 
     Parameters
@@ -278,14 +282,16 @@ def _candidate_sort_key(value: int | str) -> tuple[int, int | str]:
 
     Returns
     -------
-    tuple[int, int | str]
-        Sort key. Numeric ids sort before other strings.
+    tuple[int, int | str, str]
+        Sort key. ASCII decimal ids sort by numeric value, then by their
+        original text, so ``"1"`` and ``"01"`` stay distinct. Other strings,
+        including non-ASCII digits, keep their text order.
     """
     if isinstance(value, int):
-        return (0, value)
-    if value.isdigit():
-        return (0, int(value))
-    return (1, value)
+        return (0, value, "")
+    if value.isascii() and value.isdecimal():
+        return (0, int(value), value)
+    return (1, value, "")
 
 
 def _server_round_token(message: Message) -> str:

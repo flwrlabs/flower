@@ -36,6 +36,10 @@ from flwr.supercore.runtime import RuntimeHttpClient
 
 # pylint: enable=E0611
 
+# Heartbeat spacing must not draw from the global random module. A run seed uses
+# that module, and these draws would otherwise advance the experiment stream.
+_HEARTBEAT_RNG = random.Random()
+
 
 class HeartbeatFailure(Exception):
     """Exception raised when a heartbeat fails."""
@@ -99,7 +103,7 @@ class HeartbeatSender:
 
             # Calculate the interval for the next heartbeat
             # Formula: next_interval = (interval - timeout) * random.uniform(0.7, 0.9)
-            rd = random.uniform(*HEARTBEAT_RANDOM_RANGE)
+            rd = _HEARTBEAT_RNG.uniform(*HEARTBEAT_RANDOM_RANGE)
             next_interval: float = HEARTBEAT_DEFAULT_INTERVAL - HEARTBEAT_CALL_TIMEOUT
             next_interval *= HEARTBEAT_BASE_MULTIPLIER + rd
 

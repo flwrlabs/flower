@@ -299,12 +299,14 @@ Access these values in your code using ``context.run_config``. For example:
  Reproducible runs
 *******************
 
-Set ``random-seed`` to a non-negative integer to make a run repeatable. Flower seeds the
-server process with that value before the ``ServerApp`` runs, and seeds each client
-invocation with a value derived from it. Client selection and aggregation noise that use
-Python's :mod:`random` or the global NumPy RNG then follow the seed. Local training
-follows it too when the app uses those RNGs, or PyTorch or TensorFlow and has already
-imported that library.
+Set ``random-seed`` to a non-negative integer to make a run repeatable. When Flower
+loads an app module, it seeds that process first. The server uses the configured value.
+Each client invocation uses a value derived from it. Client selection and aggregation
+noise that use Python's :mod:`random` or the global NumPy RNG then follow the seed.
+Local training follows it too when the app uses those RNGs, or PyTorch or TensorFlow and
+has already imported that library. Heartbeat intervals, retry delays, and object-pull
+retries use their own RNGs, so that background jitter does not advance the experiment
+stream.
 
 .. code-block:: toml
 
@@ -315,16 +317,30 @@ Override it for one launch with ``flwr run . --run-config random-seed=42``.
 
 The derived client seed includes the ``partition-id`` when the node has one, otherwise
 the ``node_id``, plus the message type, ``group_id``, and ``server-round`` when a config
-record contains that key. The same inputs produce the same client stream. In simulation,
-a configured seed also registers virtual nodes as ids ``2, 3, ...`` so the sampled
-clients keep the same partitions on every run. In a deployment, selection is repeatable
-when the participating node ids stay the same.
+record contains that key. The same inputs produce the same client stream. In a seeded
+simulation, Flower registers every virtual node and starts Ray before the ``ServerApp``
+thread, so the first sample sees the full node set and driver startup does not draw from
+the server RNGs. Those nodes use ids ``2, 3, ...``. In a deployment, selection is
+repeatable when the participating node ids stay the same.
+
+Initialization that already ran before Flower imports the app does not follow the seed.
+That includes models built in the process that calls the Python simulation API. Put that
+initialization inside the client or server function when it must be reproducible.
 
 ``random-seed`` does not seed ``numpy.random.default_rng()`` generators created without
 a seed, GPU kernels that are nondeterministic, or values drawn from operating-system
 entropy. Run ids, message ids, and node authentication keys still use that entropy. The
 deprecated ``start_simulation`` API does not assign stable simulation node ids from this
 key.
+
+.. warning::
+
+    Use ``random-seed`` for reproducibility experiments, not as a privacy mechanism. It
+    must not be relied on for Flower's differential-privacy guarantees. ``LocalDpMod``
+    and the DP strategies add noise through ``add_gaussian_noise_inplace``, which draws
+    from the global NumPy RNG. With this key set, that noise is reproducible. A party
+    that knows the seed and the message metadata can reconstruct the noise and subtract
+    it.
 
 **************************
  Federation Configuration

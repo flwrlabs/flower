@@ -54,6 +54,10 @@ from .inflatable_object import (
     iterate_object_tree,
 )
 
+# Object-pull retries must not draw from the global random module. A run seed
+# uses that module, and these draws would otherwise advance the experiment stream.
+_PULL_RETRY_RNG = random.Random()
+
 # Helper registry that maps names of classes to their type
 inflatable_class_registry: dict[str, type[InflatableObject]] = {
     ArrayChunk.__qualname__: ArrayChunk,
@@ -271,7 +275,7 @@ def pull_objects(  # pylint: disable=too-many-arguments,too-many-locals
                     raise ObjectPullError(object_id, reason) from None
 
                 # Apply exponential backoff with ±20% jitter
-                sleep_time = delay * (1 + random.uniform(-0.2, 0.2))
+                sleep_time = delay * (1 + _PULL_RETRY_RNG.uniform(-0.2, 0.2))
                 early_stop.wait(sleep_time)
                 delay = min(delay * 2, backoff_cap)
             except (ObjectPullError, BaseException):
