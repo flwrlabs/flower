@@ -15,6 +15,8 @@ erDiagram
     BIGINT config_version FK
     CHAR(32) default_space_id FK
     VARCHAR app_spec
+    TIMESTAMP archived_at "nullable"
+    VARCHAR archived_by "nullable"
     TIMESTAMP created_at
     VARCHAR flwr_aid
     TIMESTAMP updated_at
