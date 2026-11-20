@@ -578,6 +578,7 @@ class Task(FlwrBase):
     task_id: Mapped[int] = mapped_column(UInt64(), nullable=False, unique=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
     run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    space_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
