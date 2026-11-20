@@ -217,7 +217,7 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     BIGINT series_id "nullable"
-    VARCHAR trigger_item_type "nullable"
+    BIGINT trigger_item_id "nullable"
     VARCHAR usage_reported_at
   }
 
