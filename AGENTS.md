@@ -4,7 +4,7 @@
 
 Use `<type>(<project>): <subject>` for every PR title (for example,
 `feat(framework): Add SpaceItem table`). Follow the full rules in the
-"PR title format" section of the appendix in
+"PR title format" section in the appendix of
 `framework/docs/source/contributor-tutorial-contribute-on-github.rst` and validate
 the exact title with `uv run python -m devtool.check_pr_title "<title>"` from `dev/`
 before opening a PR.
