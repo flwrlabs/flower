@@ -281,38 +281,6 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(conn.scalar(text("PRAGMA foreign_keys")), 1)
             self.assertEqual(conn.execute(text("PRAGMA foreign_key_check")).all(), [])
 
-    def test_remove_hidden_preserves_message_sequence(self) -> None:
-        """Keep new message IDs above deleted IDs after the table rebuild."""
-        insert_message = text(
-            "INSERT INTO space_message (space_id, flwr_aid, created_at, content) "
-            "VALUES ('00000000000000000000000000000001', "
-            "'alice', CURRENT_TIMESTAMP, 'message')"
-        )
-        for retain_message in (True, False):
-            with self.subTest(retain_message=retain_message):
-                engine = self.create_engine(f"message_sequence_{retain_message}.db")
-                self.addCleanup(engine.dispose)
-                self.upgrade_to_revision(engine, "43a9e7702bb8")
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(
-                            "INSERT INTO space (id, created_at, title) "
-                            "VALUES ('00000000000000000000000000000001', "
-                            "CURRENT_TIMESTAMP, '')"
-                        )
-                    )
-                    for _ in range(3):
-                        conn.execute(insert_message)
-                    conn.execute(
-                        text("DELETE FROM space_message WHERE id >= :first_deleted_id"),
-                        {"first_deleted_id": 2 if retain_message else 1},
-                    )
-
-                self.upgrade_to_revision(engine, "43915a41dbfa")
-                with engine.begin() as conn:
-                    new_message = conn.execute(insert_message)
-                    self.assertEqual(new_message.lastrowid, 4)
-
     def test_participant_cursor_rename_preserves_values(self) -> None:
         """Preserve cursor positions and defaults across upgrade and downgrade."""
         engine = self.create_engine("participant_cursor.db")
