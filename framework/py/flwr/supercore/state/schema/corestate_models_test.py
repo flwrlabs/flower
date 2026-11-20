@@ -38,6 +38,7 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "agent_config",
     "space",
     "space_participant",
     "space_message",
@@ -136,6 +137,7 @@ def test_connector_requires_exactly_one_existing_owner(
     """Accept one owner and require agent owners to reference an existing agent."""
     table = FlwrBase.metadata.tables[table_name]
     agent_table = FlwrBase.metadata.tables["agent"]
+    config_table = FlwrBase.metadata.tables["agent_config"]
     space_table = FlwrBase.metadata.tables["space"]
     timestamp = datetime.now(UTC)
     values: dict[str, object] = {
@@ -160,6 +162,7 @@ def test_connector_requires_exactly_one_existing_owner(
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
         space_table.create(conn)
         agent_table.create(conn)
+        config_table.create(conn)
         table.create(conn)
         conn.execute(
             space_table.insert().values(id=UUID(int=1), created_at=timestamp, title="")
@@ -167,12 +170,20 @@ def test_connector_requires_exactly_one_existing_owner(
         conn.execute(
             agent_table.insert().values(
                 agent_id=1,
-                name="Agent",
-                app_spec="@user/app",
                 flwr_aid="user",
+                app_spec="@user/app",
+                config_version=1,
                 default_space_id=UUID(int=1),
                 created_at=timestamp,
                 updated_at=timestamp,
+            )
+        )
+        conn.execute(
+            config_table.insert().values(
+                agent_id=1,
+                version=1,
+                name="Agent",
+                created_at=timestamp,
             )
         )
         if error is None:
