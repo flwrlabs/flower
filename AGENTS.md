@@ -2,11 +2,22 @@
 
 ## Pull request titles
 
-Use `<type>(<project>): <subject>` for every PR title (for example,
-`feat(framework): Add SpaceItem table`). Follow the full rules in
-`framework/docs/source/contributor-tutorial-contribute-on-github.rst` and validate
-the exact title with `uv run python -m devtool.check_pr_title "<title>"` from `dev/`
-before opening a PR.
+Use `<type>(<project>): <subject>` for every PR title. Use
+`<type>(<project>:skip): <subject>` to omit the PR from the changelog.
+
+- `type` must be `ci`, `fix`, `feat`, `docs`, `refactor`, or `break`.
+- `project` must be `devtool`, `framework`, `agent`, `baselines`, `datasets`,
+  `examples`, `benchmarks`, `glossary`, `intelligence`, `hub`, or `model`. Use `*`
+  only with `:skip` for changes spanning multiple projects.
+- Start `subject` with a capitalized imperative verb and do not end it with a period.
+
+Examples: `feat(framework): Add SpaceItem table` and
+`ci(*:skip): Enforce PR title format`.
+
+Before opening a PR, validate the exact title with
+`uv run python -m devtool.check_pr_title "<title>"` from `dev/`. See
+`framework/docs/source/contributor-tutorial-contribute-on-github.rst` for the full
+guide.
 
 ## PR review philosophy
 
