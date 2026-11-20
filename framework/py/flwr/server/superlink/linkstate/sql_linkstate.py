@@ -38,14 +38,19 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
-from flwr.supercore.constant import NodeStatus, TaskType
-from flwr.supercore.corestate.sql_corestate import SqlCoreState, _agent_from_model
+from flwr.supercore.constant import EventType, NodeStatus, TaskType
+from flwr.supercore.corestate.sql_corestate import (
+    SqlCoreState,
+    _agent_from_model,
+    task_from_model,
+)
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
@@ -90,6 +95,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+
+    def _get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return the run's Space without advancing its task lifecycle."""
+        with self.session() as session:
+            return session.scalar(
+                select(RunModel.space_id).where(RunModel.run_id == run_id)
+            )
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
@@ -390,7 +402,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session() as session:
             return session.scalar(stmt)
 
-    def create_run(  # pylint: disable=R0913, R0914, R0917
+    def create_run(  # pylint: disable=R0912, R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
@@ -552,6 +564,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     connector_ids=connector_ids,
                 )
+                if space_id is not None:
+                    self.store_event(
+                        EventType.RUN_CREATED,
+                        run_to_proto(self.get_run(run_ids=[run_id])[0]),
+                        space_id=space_id,
+                    )
+                    task = session.get(TaskModel, task_id)
+                    assert task is not None
+                    self.store_event(
+                        EventType.TASK_CREATED,
+                        task_from_model(task),
+                        space_id=space_id,
+                    )
                 return run_id
 
         log(ERROR, "Unexpected run creation failure.")
@@ -724,7 +749,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
         )
         with self.session() as session:
-            session.execute(stmt)
+            tasks = session.scalars(stmt.returning(TaskModel)).all()
+            for task in tasks:
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(task)
+                )
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""

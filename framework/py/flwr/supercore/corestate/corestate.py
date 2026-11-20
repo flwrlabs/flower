@@ -34,6 +34,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -112,6 +113,16 @@ class CoreState(ABC):  # pylint: disable=R0904
         Sequence[Run]
             A sequence of Run objects representing runs matching the specified filters.
         """
+
+    @abstractmethod
+    def _get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return a run's locally stored Space ID without expiring tasks."""
+
+    def _store_task_lifecycle_event(self, event_type: str, task: Task) -> None:
+        """Store a task snapshot for participants of its Space."""
+        space_id = self._get_run_space_id(task.run_id)
+        if space_id is not None:
+            self.store_event(event_type, task, space_id=space_id)
 
     @property
     @abstractmethod
@@ -349,7 +360,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
+        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
