@@ -14,16 +14,23 @@
 # ==============================================================================
 """Tests for account-owned agents across CoreState implementations."""
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
+from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from google.protobuf.json_format import MessageToDict
 
-from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import Agent, AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
+from flwr.supercore.constant import EventType
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
@@ -66,6 +73,7 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert first is not None and other is not None and second is not None
     assert 0 < first.id < other.id < second.id
     assert first.config == config
+    assert first.config_version == other.config_version == second.config_version == 1
     assert other.config == minimal_config
     assert first.created_at and first.updated_at == first.created_at
     assert state.list_agents("alice") == [first, second]
@@ -135,3 +143,119 @@ def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None
     assert state.list_agents("alice") == []
     assert state.list_agents("") == []
     assert state.get_spaces("alice") == []
+
+
+@pytest.fixture(name="agent")
+def agent_fixture(state: CoreState) -> Agent:
+    """Provide an owned agent with every editable field populated."""
+    agent = state.create_agent(
+        "alice",
+        AgentConfig(
+            name="Research",
+            app_spec="@test/app",
+            title="Researcher",
+            description="Cite sources.",
+            avatar="robot",
+            color="sky",
+        ),
+    )
+    assert agent is not None
+    return agent
+
+
+def test_update_agent(state: CoreState, agent: Agent) -> None:
+    """Publish current metadata and an event while retaining identity and snapshots."""
+    cursor = state.get_bootstrap("alice").cursor
+    config = AgentConfig(
+        name="Reviewer",
+        app_spec=agent.config.app_spec,
+        title="Reviewer",
+        description="Review changes.",
+        avatar="owl",
+        color="violet",
+    )
+    updated = state.update_agent("alice", agent.id, 1, config)
+
+    assert updated is not None and updated.config_version == 2
+    assert updated.config == config
+    assert updated.id == agent.id
+    assert updated.default_space_id == agent.default_space_id
+    assert state.list_agents("alice") == [updated]
+    events = state.get_user_events("alice", cursor)
+    assert len(events) == 1 and events[0].event.type == EventType.AGENT_UPDATED
+    assert dict(events[0].event.payload) == MessageToDict(
+        updated, preserving_proto_field_name=True
+    )
+    assert not state.get_user_events("bob")
+    if isinstance(state, SqlLinkState):
+        with state.session() as session:
+            original = session.get(AgentConfigModel, (agent.id, 1))
+            assert original is not None and original.name == agent.config.name
+    else:
+        assert isinstance(state, InMemoryLinkState)
+        assert state.agent_config_store[(agent.id, 1)] == agent.config
+    config = AgentConfig(
+        name="Reviewer", app_spec=agent.config.app_spec, title="", description=""
+    )
+    cleared = state.update_agent("alice", agent.id, 2, config)
+    assert cleared is not None and cleared.config_version == 3
+    assert cleared.config == AgentConfig(name=config.name, app_spec=config.app_spec)
+    cursor = state.get_bootstrap("alice").cursor
+    with pytest.raises(FlowerError) as exc:
+        state.update_agent("alice", agent.id, 2, config)
+    assert exc.value.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
+    assert state.get_agent("alice", agent.id) == cleared
+    assert not state.get_user_events("alice", cursor)
+
+
+def test_update_agent_rejects_invalid_writes(state: CoreState, agent: Agent) -> None:
+    """Reject foreign agents, missing agents, blank names, and AgentApp changes."""
+    cursor = state.get_bootstrap("alice").cursor
+    assert state.update_agent("bob", agent.id, 2, agent.config) is None
+    assert state.update_agent("alice", agent.id + 1, 1, agent.config) is None
+    for config in (
+        AgentConfig(name=" \t", app_spec="@test/app"),
+        AgentConfig(name="Updated", app_spec="@other/app"),
+    ):
+        with pytest.raises(ValueError):
+            state.update_agent("alice", agent.id, 1, config)
+    assert state.get_agent("alice", agent.id) == agent
+    assert not state.get_user_events("alice", cursor)
+    assert not state.get_user_events("bob")
+
+
+def test_update_agent_rolls_back_when_event_fails(
+    state: CoreState, agent: Agent
+) -> None:
+    """Keep the prior head and discard the new snapshot if the event cannot be saved."""
+    cursor = state.get_bootstrap("alice").cursor
+    with patch.object(state, "store_event", side_effect=RuntimeError("event failed")):
+        with pytest.raises(RuntimeError, match="event failed"):
+            state.update_agent("alice", agent.id, 1, agent.config)
+
+    assert state.get_agent("alice", agent.id) == agent
+    assert not state.get_user_events("alice", cursor)
+    updated = state.update_agent("alice", agent.id, 1, agent.config)
+    assert updated is not None and updated.config_version == 2
+
+
+@pytest.mark.parametrize("state", ["sqlite"], indirect=True)
+def test_update_agent_concurrent_writers(state: SqlLinkState, agent: Agent) -> None:
+    """Allow exactly one edit per expected version across SQL replicas."""
+    replica = SqlLinkState(
+        state.database_url, NoOpFederationManager(), ObjectStoreFactory().store()
+    )
+    replica.initialize()
+    barrier = Barrier(2)
+
+    def edit(backend: CoreState) -> bool:
+        barrier.wait(timeout=10)
+        try:
+            assert backend.update_agent("alice", agent.id, 1, agent.config) is not None
+            return True
+        except FlowerError as exc:
+            assert exc.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
+            return False
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert sorted(executor.map(edit, (state, replica), timeout=15)) == [False, True]
