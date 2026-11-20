@@ -16,6 +16,7 @@
 
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 
 @dataclass
@@ -29,6 +30,15 @@ class AccountAuthLoginDetails:
     interval: int
     verification_uri: str = ""
     user_code: str = ""
+
+
+class DeviceAuthorizationError(StrEnum):
+    """OAuth device authorization errors reported while polling for tokens."""
+
+    AUTHORIZATION_PENDING = "authorization_pending"
+    SLOW_DOWN = "slow_down"
+    ACCESS_DENIED = "access_denied"
+    EXPIRED_TOKEN = "expired_token"
 
 
 @dataclass
