@@ -24,17 +24,12 @@ from flwr.supercore.typing import JSONObject
 from ..definition import ConnectorDefinition, ConnectorExecutionContext, build_executor
 from .brave import BraveWebSearchProvider
 from .exa import ExaWebSearchProvider
+from .parallel import ParallelWebSearchProvider
 from .provider import WebSearchProvider
 from .proxy import ProxyWebSearchProvider
 from .tavily import TavilyWebSearchProvider
 
 WEB_SEARCH_CONNECTOR_NAME = "web_search"
-_WEB_SEARCH_PROVIDER_ENV_VARS = (
-    ProxyWebSearchProvider.env,
-    BraveWebSearchProvider.env,
-    TavilyWebSearchProvider.env,
-    ExaWebSearchProvider.env,
-)
 
 
 def make_web_search_tool() -> JSONObject:
@@ -69,10 +64,7 @@ def search(query: str, *, context: ConnectorExecutionContext) -> JSONObject:
     elif os.getenv(ExaWebSearchProvider.env, "").strip():
         provider = ExaWebSearchProvider()
     else:
-        raise RuntimeError(
-            "At least one web search provider environment variable is required: "
-            f"{', '.join(_WEB_SEARCH_PROVIDER_ENV_VARS)}."
-        )
+        provider = ParallelWebSearchProvider()
 
     output = provider.search(query)
     context.usage_recorder.record(

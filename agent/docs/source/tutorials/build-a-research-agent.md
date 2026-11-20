@@ -13,6 +13,13 @@ The finished project uses:
 - `agent.events.get_trace` for conversation history
 
 It uses only `web_search` and `web_fetch`. Neither requires an external account.
+When no search provider is configured, `web_search` uses the anonymous,
+rate-limited [Parallel MCP service](https://docs.parallel.ai/integrations/mcp/quickstart)
+with its default Fast mode. Configured providers keep their existing priority:
+`FLWR_WEB_SEARCH_ENDPOINT`, `BRAVE_API_KEY`, `TAVILY_API_KEY`, then `EXA_API_KEY`.
+Provider errors are returned without switching to Parallel. Search is available
+only when the caller includes the `web_search` connector. Try the query
+"Flower federated learning framework documentation".
 
 ## Create the project
 
