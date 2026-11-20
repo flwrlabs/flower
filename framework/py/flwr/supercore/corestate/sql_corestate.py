@@ -163,7 +163,6 @@ from .utils import (
     context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
-    validate_agent_config_update,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -798,7 +797,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         config: AgentConfig,
     ) -> Agent | None:
         """Publish a configuration snapshot and event using a version precondition."""
-        validate_agent_config_update(config, expected_config_version)
+        if not config.name.strip():
+            raise ValueError("Agent name must be nonempty.")
         with self.session() as session:
             model = session.scalar(
                 update(AgentModel)
@@ -808,7 +808,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     AgentModel.app_spec == config.app_spec,
                     AgentModel.config_version == expected_config_version,
                 )
-                .values(config_version=expected_config_version + 1, updated_at=now())
+                .values(config_version=AgentModel.config_version + 1, updated_at=now())
                 .returning(AgentModel)
             )
             if model is None:

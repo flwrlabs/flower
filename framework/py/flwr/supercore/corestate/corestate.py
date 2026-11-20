@@ -359,9 +359,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         Raises
         ------
         ValueError
-            If the name or app_spec is blank, app_spec differs from the agent's
-            existing value, or the expected version cannot be incremented within
-            a positive signed 64-bit integer.
+            If the name is blank or app_spec differs from the agent's existing
+            value.
         FlowerError
             With code ``ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT`` if the owned
             agent's current version differs from expected_config_version.

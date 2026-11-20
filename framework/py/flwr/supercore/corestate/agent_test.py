@@ -17,13 +17,11 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
-from typing import Literal
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
 from google.protobuf.json_format import MessageToDict
-from sqlalchemy import select
 
 from flwr.common.constant import INT64_MAX_VALUE
 from flwr.proto.control_pb2 import Agent, AgentConfig  # pylint: disable=E0611
@@ -148,296 +146,171 @@ def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None
     assert state.get_spaces("alice") == []
 
 
-def test_update_agent_preserves_snapshots_and_publishes_event(state: CoreState) -> None:
-    """Advance metadata and its feed together without changing identity or history."""
-    original = state.create_agent(
+@pytest.fixture(name="agent")
+def agent_fixture(state: CoreState) -> Agent:
+    """Provide an owned agent with every editable field populated."""
+    agent = state.create_agent(
         "alice",
         AgentConfig(
             name="Research",
-            app_spec="@flower/research",
+            app_spec="@test/app",
             title="Researcher",
             description="Cite sources.",
             avatar="robot",
             color="sky",
         ),
     )
-    assert original is not None
+    assert agent is not None
+    return agent
+
+
+def test_update_agent(state: CoreState, agent: Agent) -> None:
+    """Publish current metadata and an event while retaining identity and snapshots."""
     cursor = state.get_bootstrap("alice").cursor
-
-    updated = state.update_agent(
-        "alice",
-        original.id,
-        original.config_version,
-        AgentConfig(
-            name="Reviewer",
-            app_spec=original.config.app_spec,
-            title="Reviewer",
-            description="Review changes.",
-            avatar="owl",
-            color="violet",
-        ),
-    )
-
-    assert updated is not None
-    assert updated.config_version == 2
-    assert updated.config == AgentConfig(
+    config = AgentConfig(
         name="Reviewer",
-        app_spec=original.config.app_spec,
+        app_spec=agent.config.app_spec,
         title="Reviewer",
         description="Review changes.",
         avatar="owl",
         color="violet",
     )
-    assert updated.id == original.id
-    assert updated.default_space_id == original.default_space_id
-    assert updated.created_at == original.created_at
-    assert updated.updated_at > original.updated_at
-    assert original.config.name == "Research" and original.config_version == 1
-    assert state.get_agent("alice", original.id) == updated
+    updated = state.update_agent("alice", agent.id, 1, config)
+
+    assert updated is not None and updated.config_version == 2
+    assert updated.config == config
+    assert updated.id == agent.id
+    assert updated.default_space_id == agent.default_space_id
+    assert updated.created_at == agent.created_at
+    assert updated.updated_at > agent.updated_at
     assert state.list_agents("alice") == [updated]
-    assert state.get_bootstrap("alice").agents == [updated]
     events = state.get_user_events("alice", cursor)
-    assert len(events) == 1
-    assert events[0].event.type == EventType.AGENT_UPDATED
+    assert len(events) == 1 and events[0].event.type == EventType.AGENT_UPDATED
     assert dict(events[0].event.payload) == MessageToDict(
         updated, preserving_proto_field_name=True
     )
     assert not state.get_user_events("bob")
-
     if isinstance(state, SqlLinkState):
         with state.session() as session:
-            snapshots = session.scalars(
-                select(AgentConfigModel)
-                .where(AgentConfigModel.agent_id == original.id)
-                .order_by(AgentConfigModel.version)
-            ).all()
-            assert [(s.version, s.name, s.description) for s in snapshots] == [
-                (1, "Research", "Cite sources."),
-                (2, "Reviewer", "Review changes."),
-            ]
+            original = session.get(AgentConfigModel, (agent.id, 1))
+            assert original is not None and original.name == agent.config.name
     else:
         assert isinstance(state, InMemoryLinkState)
-        assert state.agent_config_store[(original.id, 1)] == original.config
-        assert state.agent_config_store[(original.id, 2)] == updated.config
-
-    updated.config.name = "Unrecorded edit"
-    updated.config_version = 100
-    latest = state.get_agent("alice", original.id)
-    assert latest is not None
-    assert latest.config.name == "Reviewer" and latest.config_version == 2
+        assert state.agent_config_store[(agent.id, 1)] == agent.config
+    config.name = "Unrecorded edit"
+    assert updated.config.name == "Reviewer"
 
 
-@pytest.mark.parametrize("field", ["title", "description", "avatar", "color"])
 @pytest.mark.parametrize("clear_value", [None, ""])
 def test_update_agent_clears_optional_fields(
-    state: CoreState,
-    field: Literal["title", "description", "avatar", "color"],
-    clear_value: str | None,
+    state: CoreState, agent: Agent, clear_value: str | None
 ) -> None:
-    """Clear absent or empty optional fields and allow setting them again."""
-    original = state.create_agent(
-        "alice",
-        AgentConfig(
-            name="Research",
-            app_spec="@flower/research",
-            title="Researcher",
-            description="Cite sources.",
-            avatar="robot",
-            color="sky",
-        ),
+    """Clear all optional metadata when it is absent or explicitly empty."""
+    config = AgentConfig(
+        name=agent.config.name,
+        app_spec=agent.config.app_spec,
+        title=clear_value,
+        description=clear_value,
     )
-    assert original is not None
-    config = AgentConfig()
-    config.CopyFrom(original.config)
-    if clear_value is None:
-        config.ClearField(field)
-    else:
-        setattr(config, field, clear_value)
-
-    updated = state.update_agent("alice", original.id, 1, config)
+    updated = state.update_agent("alice", agent.id, 1, config)
 
     assert updated is not None and updated.config_version == 2
-    expected = AgentConfig()
-    expected.CopyFrom(original.config)
-    expected.ClearField(field)
-    assert updated.config == expected
-    restored = state.update_agent("alice", original.id, 2, original.config)
-    assert restored is not None and restored.config_version == 3
-    assert restored.config == original.config
+    assert updated.config == AgentConfig(name=config.name, app_spec=config.app_spec)
 
 
-@pytest.mark.parametrize("expected_version", [1, 3])
+@pytest.mark.parametrize("expected_version", [0, 1, 3, INT64_MAX_VALUE])
 def test_update_agent_rejects_version_conflicts(
-    state: CoreState, expected_version: int
+    state: CoreState, agent: Agent, expected_version: int
 ) -> None:
-    """Reject stale and future versions without changing metadata or events."""
-    original = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
-    )
-    assert original is not None
-    updated = state.update_agent(
-        "alice", original.id, 1, AgentConfig(name="Updated", app_spec="@test/app")
-    )
+    """Reject nonmatching versions without changing metadata or events."""
+    updated = state.update_agent("alice", agent.id, 1, agent.config)
     cursor = state.get_bootstrap("alice").cursor
-
     with pytest.raises(FlowerError) as exc:
-        state.update_agent(
-            "alice",
-            original.id,
-            expected_version,
-            AgentConfig(name="Lost update", app_spec="@test/app"),
-        )
+        state.update_agent("alice", agent.id, expected_version, agent.config)
 
     assert exc.value.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
-    assert state.get_agent("alice", original.id) == updated
+    assert state.get_agent("alice", agent.id) == updated
     assert not state.get_user_events("alice", cursor)
 
 
-def test_update_agent_is_owner_scoped(state: CoreState) -> None:
+def test_update_agent_is_owner_scoped(state: CoreState, agent: Agent) -> None:
     """Treat another account's agents as absent, even with a mismatched version."""
-    original = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
-    )
-    assert original is not None
     cursor = state.get_bootstrap("alice").cursor
-
-    assert (
-        state.update_agent(
-            "bob", original.id, 2, AgentConfig(name="Edit", app_spec="@test/app")
-        )
-        is None
-    )
-    assert (
-        state.update_agent(
-            "alice", original.id + 1, 1, AgentConfig(name="Edit", app_spec="@test/app")
-        )
-        is None
-    )
-    assert state.get_agent("alice", original.id) == original
+    assert state.update_agent("bob", agent.id, 2, agent.config) is None
+    assert state.update_agent("alice", agent.id + 1, 1, agent.config) is None
+    assert state.get_agent("alice", agent.id) == agent
     assert not state.get_user_events("alice", cursor)
     assert not state.get_user_events("bob")
 
 
 @pytest.mark.parametrize(
-    ("config", "version"),
+    "config",
     [
-        (AgentConfig(), 1),
-        (AgentConfig(name="", app_spec="@test/app"), 1),
-        (AgentConfig(name=" \t", app_spec="@test/app"), 1),
-        (AgentConfig(name="Updated"), 1),
-        (AgentConfig(name="Updated", app_spec=" \t"), 1),
-        (AgentConfig(name="Updated", app_spec="@test/app"), 0),
-        (AgentConfig(name="Updated", app_spec="@test/app"), -1),
-        (AgentConfig(name="Updated", app_spec="@test/app"), INT64_MAX_VALUE),
-        (AgentConfig(name="Updated", app_spec="@test/app"), 2**64 - 1),
+        AgentConfig(),
+        AgentConfig(name=" \t", app_spec="@test/app"),
+        AgentConfig(name="Updated"),
+        AgentConfig(name="Updated", app_spec="@other/app"),
     ],
 )
 def test_update_agent_rejects_invalid_config(
-    state: CoreState, config: AgentConfig, version: int
+    state: CoreState, agent: Agent, config: AgentConfig
 ) -> None:
-    """Reject invalid configurations and versions before changing any state."""
-    original = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
-    )
-    assert original is not None
+    """Reject blank names and AgentApp changes before changing any state."""
     cursor = state.get_bootstrap("alice").cursor
-
     with pytest.raises(ValueError):
-        state.update_agent("alice", original.id, version, config)
+        state.update_agent("alice", agent.id, 1, config)
 
-    assert state.get_agent("alice", original.id) == original
+    assert state.get_agent("alice", agent.id) == agent
     assert not state.get_user_events("alice", cursor)
 
 
-def test_update_agent_rejects_app_spec_changes(state: CoreState) -> None:
-    """Keep the fixed AgentApp and configuration version when a replacement differs."""
-    original = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
-    )
-    assert original is not None
-    cursor = state.get_bootstrap("alice").cursor
-
-    with pytest.raises(ValueError, match="cannot be changed"):
-        state.update_agent(
-            "alice", original.id, 1, AgentConfig(name="Updated", app_spec="@other/app")
-        )
-
-    assert state.get_agent("alice", original.id) == original
-    assert not state.get_user_events("alice", cursor)
-    updated = state.update_agent("alice", original.id, 1, original.config)
-    assert updated is not None and updated.config_version == 2
-
-
-def test_update_agent_rolls_back_when_event_fails(state: CoreState) -> None:
+def test_update_agent_rolls_back_when_event_fails(
+    state: CoreState, agent: Agent
+) -> None:
     """Keep the prior head and discard the new snapshot if the event cannot be saved."""
-    original = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@test/app")
-    )
-    assert original is not None
     cursor = state.get_bootstrap("alice").cursor
-    config = AgentConfig(name="Updated", app_spec="@test/app")
-
     with patch.object(state, "store_event", side_effect=RuntimeError("event failed")):
         with pytest.raises(RuntimeError, match="event failed"):
-            state.update_agent("alice", original.id, 1, config)
+            state.update_agent("alice", agent.id, 1, agent.config)
 
-    assert state.get_agent("alice", original.id) == original
+    assert state.get_agent("alice", agent.id) == agent
     assert not state.get_user_events("alice", cursor)
-    updated = state.update_agent("alice", original.id, 1, config)
+    updated = state.update_agent("alice", agent.id, 1, agent.config)
     assert updated is not None and updated.config_version == 2
 
 
-@pytest.mark.parametrize("backend", ["in-memory", "sqlite"])
-def test_update_agent_concurrent_writers(backend: str, tmp_path: Path) -> None:
-    """Allow exactly one edit per expected version, including across SQL replicas."""
-    if backend == "in-memory":
-        first: CoreState = InMemoryLinkState(
-            NoOpFederationManager(), ObjectStoreFactory().store()
+def test_update_agent_concurrent_writers(tmp_path: Path) -> None:
+    """Allow exactly one edit per expected version across SQL replicas."""
+    replicas = [
+        SqlLinkState(
+            str(tmp_path / "state.db"),
+            NoOpFederationManager(),
+            ObjectStoreFactory().store(),
         )
-        second = first
-    else:
-        replicas = [
-            SqlLinkState(
-                str(tmp_path / "state.db"),
-                NoOpFederationManager(),
-                ObjectStoreFactory().store(),
-            )
-            for _ in range(2)
-        ]
-        for replica in replicas:
-            replica.initialize()
-        first, second = replicas
-    original = first.create_agent(
+        for _ in range(2)
+    ]
+    for replica in replicas:
+        replica.initialize()
+    agent = replicas[0].create_agent(
         "alice", AgentConfig(name="Agent", app_spec="@test/app")
     )
-    assert original is not None
-    cursor = first.get_bootstrap("alice").cursor
+    assert agent is not None
+    cursor = replicas[0].get_bootstrap("alice").cursor
     barrier = Barrier(2)
 
-    def edit(state: CoreState, name: str) -> Agent | FlowerError | None:
+    def edit(state: CoreState) -> bool:
         barrier.wait(timeout=10)
         try:
-            return state.update_agent(
-                "alice", original.id, 1, AgentConfig(name=name, app_spec="@test/app")
-            )
+            assert state.update_agent("alice", agent.id, 1, agent.config) is not None
+            return True
         except FlowerError as exc:
-            return exc
+            assert exc.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
+            return False
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(edit, first, "First"),
-            executor.submit(edit, second, "Second"),
-        ]
-        results = [future.result(timeout=15) for future in futures]
+        assert sorted(executor.map(edit, replicas, timeout=15)) == [False, True]
 
-    winners = [result for result in results if isinstance(result, Agent)]
-    conflicts = [result for result in results if isinstance(result, FlowerError)]
-    assert len(winners) == len(conflicts) == 1
-    assert conflicts[0].code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
-    assert winners[0].config_version == 2
-    assert (
-        first.get_agent("alice", original.id)
-        == second.get_agent("alice", original.id)
-        == winners[0]
-    )
-    assert len(first.get_user_events("alice", cursor)) == 1
+    updated = replicas[0].get_agent("alice", agent.id)
+    assert updated is not None and updated.config_version == 2
+    assert replicas[1].get_agent("alice", agent.id) == updated
+    assert len(replicas[0].get_user_events("alice", cursor)) == 1

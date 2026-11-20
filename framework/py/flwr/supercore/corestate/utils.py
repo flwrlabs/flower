@@ -21,26 +21,12 @@ from os import urandom
 from flwr.app import Context, Message
 from flwr.app.metadata import Metadata
 from flwr.common import serde
-from flwr.common.constant import INT64_MAX_VALUE
-from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
-
-
-def validate_agent_config_update(
-    config: AgentConfig, expected_config_version: int
-) -> None:
-    """Reject invalid replacement configurations before changing state."""
-    if not 0 < expected_config_version < INT64_MAX_VALUE:
-        raise ValueError("Expected configuration version must allow an increment.")
-    if not config.name.strip():
-        raise ValueError("Agent name must be nonempty.")
-    if not config.app_spec.strip():
-        raise ValueError("AgentApp specification must be nonempty.")
 
 
 def validate_event_cursor(after_seq: int, head: int, limit: int) -> None:

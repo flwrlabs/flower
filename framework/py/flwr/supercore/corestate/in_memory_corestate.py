@@ -85,7 +85,6 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
-    validate_agent_config_update,
     validate_event_cursor,
     validate_message_metadata,
     validate_task_event_data,
@@ -632,7 +631,7 @@ class InMemoryCoreState(
                     config_version=1,
                 )
                 self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
-                self.agent_config_store[(agent_id, 1)] = deepcopy(agent.config)
+                self.agent_config_store[(agent_id, 1)] = agent.config
                 space.participants.extend(
                     [
                         SpaceParticipant(flwr_aid=flwr_aid),
@@ -654,7 +653,7 @@ class InMemoryCoreState(
                 self.space_message_store.pop(space_id, None)
                 raise
             self.agent_id_counter = agent_id
-            return deepcopy(agent)
+            return agent
 
     def update_agent(
         self,
@@ -664,7 +663,8 @@ class InMemoryCoreState(
         config: AgentConfig,
     ) -> Agent | None:
         """Publish a configuration snapshot and event under the state locks."""
-        validate_agent_config_update(config, expected_config_version)
+        if not config.name.strip():
+            raise ValueError("Agent name must be nonempty.")
         with self.lock_space_store, self.lock_agent_store:
             current = self.agent_store.get(flwr_aid, {}).get(agent_id)
             if current is None:
@@ -676,25 +676,27 @@ class InMemoryCoreState(
                     ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
                     "Agent configuration version precondition failed.",
                 )
-            agent = deepcopy(current)
-            agent.config.CopyFrom(config)
+            agent = Agent(
+                id=current.id,
+                config=config,
+                config_version=current.config_version + 1,
+                default_space_id=current.default_space_id,
+                created_at=current.created_at,
+                updated_at=now().isoformat(),
+            )
             if not config.title:
                 agent.config.ClearField("title")
             if not config.description:
                 agent.config.ClearField("description")
-            agent.config_version += 1
-            agent.updated_at = now().isoformat()
             self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
-            self.agent_config_store[(agent_id, agent.config_version)] = deepcopy(
-                agent.config
-            )
+            self.agent_config_store[(agent_id, agent.config_version)] = agent.config
             self.agent_store[flwr_aid][agent_id] = agent
-            return deepcopy(agent)
+            return agent
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account."""
         with self.lock_agent_store:
-            return deepcopy(self.agent_store.get(flwr_aid, {}).get(agent_id))
+            return self.agent_store.get(flwr_aid, {}).get(agent_id)
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
@@ -709,11 +711,9 @@ class InMemoryCoreState(
         if not flwr_aid:
             return []
         with self.lock_agent_store:
-            return deepcopy(
-                sorted(
-                    self.agent_store.get(flwr_aid, {}).values(),
-                    key=lambda agent: agent.id,
-                )
+            return sorted(
+                self.agent_store.get(flwr_aid, {}).values(),
+                key=lambda agent: agent.id,
             )
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
