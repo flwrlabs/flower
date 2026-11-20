@@ -374,36 +374,6 @@ class SpaceItem(FlwrBase):
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class SpaceItem(FlwrBase):
-    """Represent a typed input in a space."""
-
-    __tablename__ = "space_item"
-    __table_args__ = (
-        CheckConstraint(
-            "(type = 'message' AND ((flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
-            "(flwr_aid IS NULL AND agent_id IS NOT NULL))) OR "
-            "(type <> 'message' AND flwr_aid IS NULL AND agent_id IS NULL)",
-            name="ck_space_item_identity",
-        ),
-        Index("idx_space_item_space_id_id", "space_id", "id"),
-        {"sqlite_autoincrement": True},
-    )
-
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-        autoincrement=True,
-    )
-    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
-    type: Mapped[str] = mapped_column(String, nullable=False)
-    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
-    agent_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("agent.agent_id"), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-
-
 class SeriesContext(FlwrBase):
     """Represent context data for a run series."""
 
