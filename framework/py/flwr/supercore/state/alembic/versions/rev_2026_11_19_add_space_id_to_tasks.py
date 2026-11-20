@@ -15,7 +15,7 @@
 """Add Space ID to tasks.
 
 Revision ID: d5b6e8a9a3bc
-Revises: 3fb31831d5eb
+Revises: b4f77fe217a1
 Create Date: 2026-11-19 20:15:13.160112
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d5b6e8a9a3bc"
-down_revision: str | Sequence[str] | None = "3fb31831d5eb"
+down_revision: str | Sequence[str] | None = "b4f77fe217a1"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

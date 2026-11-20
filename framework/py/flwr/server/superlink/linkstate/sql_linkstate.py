@@ -56,6 +56,7 @@ from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
 from flwr.supercore.state.schema.corestate_models import (
     SpaceMessage as SpaceMessageModel,
@@ -411,6 +412,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
+        trigger_item_type: str | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -512,6 +514,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         series_id=resolved_series_id,
                         space_id=space_id,
                         agent_id=agent_id,
+                        trigger_item_type=trigger_item_type,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -584,8 +587,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         self._cleanup_expired_task_tokens()
         with self.session() as session:
             return [
-                (space_id, _agent_from_model(agent))
-                for space_id, agent in session.execute(
+                (space_id, _agent_from_model(agent, config))
+                for space_id, agent, config in session.execute(
                     _agent_run_candidates_query().limit(limit)
                 )
             ]
@@ -966,10 +969,11 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         series_id=run.series_id or 0,
         space_id=run.space_id,
         agent_id=run.agent_id,
+        trigger_item_type=run.trigger_item_type,
     )
 
 
-def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
+def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigModel]]:
     """Select participating agents with unread messages and no open primary Task."""
     unread = (
         select(SpaceMessageModel.id)
@@ -998,10 +1002,15 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
         .exists()
     )
     return (
-        select(SpaceParticipantTable.c.space_id, AgentModel)
+        select(SpaceParticipantTable.c.space_id, AgentModel, AgentConfigModel)
         .join(
             AgentModel,
             AgentModel.agent_id == SpaceParticipantTable.c.agent_id,
+        )
+        .join(
+            AgentConfigModel,
+            (AgentConfigModel.agent_id == AgentModel.agent_id)
+            & (AgentConfigModel.version == AgentModel.config_version),
         )
         .where(unread, ~open_run)
         .order_by(

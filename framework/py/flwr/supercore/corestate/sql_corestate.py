@@ -101,6 +101,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -740,6 +741,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(space_model)
             session.flush()
             model = AgentModel(
+                app_spec=config.app_spec,
+                flwr_aid=flwr_aid,
+                config_version=1,
+                default_space_id=space_model.id,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+            session.add(model)
+            session.flush()
+            snapshot = AgentConfigModel(
+                agent_id=model.agent_id,
+                version=1,
                 name=config.name,
                 title=config.title if config.HasField("title") else None,
                 description=(
@@ -747,15 +760,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 ),
                 avatar=config.avatar,
                 color=config.color,
-                app_spec=config.app_spec,
-                flwr_aid=flwr_aid,
-                default_space_id=space_model.id,
                 created_at=created_at,
-                updated_at=created_at,
             )
-            session.add(model)
+            session.add(snapshot)
             session.flush()
-            agent = _agent_from_model(model)
+            agent = _agent_from_model(model, snapshot)
             participants = [
                 SpaceParticipant(flwr_aid=flwr_aid),
                 SpaceParticipant(agent_id=agent.id),
@@ -783,13 +792,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account."""
         with self.session() as session:
-            model = session.scalar(
-                select(AgentModel).where(
+            row = session.execute(
+                select(AgentModel, AgentConfigModel)
+                .join(
+                    AgentConfigModel,
+                    (AgentConfigModel.agent_id == AgentModel.agent_id)
+                    & (AgentConfigModel.version == AgentModel.config_version),
+                )
+                .where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
                 )
-            )
-            return _agent_from_model(model) if model is not None else None
+            ).one_or_none()
+            return _agent_from_model(*row) if row is not None else None
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
@@ -806,12 +821,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not flwr_aid:
             return []
         stmt = (
-            select(AgentModel)
+            select(AgentModel, AgentConfigModel)
+            .join(
+                AgentConfigModel,
+                (AgentConfigModel.agent_id == AgentModel.agent_id)
+                & (AgentConfigModel.version == AgentModel.config_version),
+            )
             .where(AgentModel.flwr_aid == flwr_aid)
             .order_by(AgentModel.agent_id)
         )
         with self.session() as session:
-            return [_agent_from_model(model) for model in session.scalars(stmt)]
+            return [_agent_from_model(*row) for row in session.execute(stmt)]
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Read the feed cursor before fetching visible state."""
@@ -2758,16 +2778,16 @@ def _event_from_model(model: EventModel) -> Event:
     return event
 
 
-def _agent_from_model(model: AgentModel) -> Agent:
+def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
     """Convert an agent ORM model to its protobuf message."""
     return Agent(
         id=model.agent_id,
         config=AgentConfig(
-            name=model.name,
-            title=model.title,
-            description=model.description,
-            avatar=model.avatar,
-            color=model.color,
+            name=config.name,
+            title=config.title,
+            description=config.description,
+            avatar=config.avatar,
+            color=config.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
