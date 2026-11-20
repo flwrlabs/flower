@@ -366,6 +366,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
+        trigger_item_type: str | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -459,6 +460,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
                     agent_id=agent_id,
+                    trigger_item_type=trigger_item_type,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,
