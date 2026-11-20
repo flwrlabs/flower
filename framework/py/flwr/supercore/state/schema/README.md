@@ -257,6 +257,16 @@ erDiagram
     VARCHAR title
   }
 
+  space_item {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
+    VARCHAR type
+  }
+
   space_message {
     BIGINT id PK
     BIGINT agent_id FK "nullable"
@@ -362,6 +372,8 @@ erDiagram
   space ||--o{ run : space_id
   agent ||--o{ run : agent_id
   objects ||--o| run_objects : object_id
+  space ||--o{ space_item : space_id
+  agent ||--o{ space_item : agent_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
   space ||--o{ space_participant : space_id
