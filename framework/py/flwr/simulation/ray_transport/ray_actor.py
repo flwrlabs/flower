@@ -14,7 +14,11 @@
 # ==============================================================================
 """Ray-based Flower Actor and ActorPool implementation."""
 
+# pylint: disable=too-many-lines
 
+import errno
+import glob
+import os
 import threading
 from abc import ABC
 from collections.abc import Callable
@@ -83,6 +87,394 @@ class ClientAppActor(VirtualClientEngineActor):
             on_actor_init_fn()
 
 
+_AMD_PCI_VENDOR_ID = "0x1002"
+
+
+def _is_amd_render_node(node: str) -> bool | None:
+    """Return whether a `/dev/dri/renderD*` node is backed by an AMD GPU.
+
+    An accessible render node is not necessarily an AMD one: a hybrid host or
+    container can expose an unrelated node (e.g. an integrated Intel GPU's
+    `renderD128`) that ROCm cannot use. Disambiguate via the PCI vendor ID in
+    sysfs rather than assuming any accessible node is ROCm-capable. Returns
+    `None` -- rather than guessing either way -- when the vendor cannot be
+    determined (sysfs missing, as in some restricted containers): an
+    unreadable vendor file says nothing about which GPU actually backs the
+    node, and certifying it as AMD on that basis can send a user chasing
+    `amdsmi`/`ROCM_PATH` when the real problem is that the only passed-through
+    node is not AMD's.
+    """
+    vendor_path = f"/sys/class/drm/{os.path.basename(node)}/device/vendor"
+    try:
+        with open(vendor_path, encoding="utf-8") as vendor_file:
+            return vendor_file.read().strip().lower() == _AMD_PCI_VENDOR_ID
+    except OSError:
+        return None
+
+
+def _can_open_device(path: str) -> bool | None:
+    """Whether `path` can actually be opened for read/write.
+
+    `os.access()` only consults the device node's permission bits via `stat(2)`;
+    a container's devices cgroup can deny the `open(2)` itself with `EPERM`
+    independently of those bits, which `os.access()` does not detect, so it can
+    report a device as accessible when it is not. Attempting the real open
+    avoids that false positive.
+
+    Returns `None`, not `False`, when `open(2)` fails for a reason other than
+    `EACCES`/`EPERM` (e.g. `ENODEV`/`EIO` from the driver, or `EMFILE` in this
+    process): those are not a permissions problem, and the caller must not
+    prescribe a permissions fix for them.
+    """
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except OSError as exc:
+        if exc.errno in (errno.EACCES, errno.EPERM):
+            return False
+        return None
+    os.close(fd)
+    return True
+
+
+# pylint: disable-next=too-many-branches
+def _log_kfd_diagnostics() -> None:
+    """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
+
+    Split out of `pool_size_from_resources` purely to keep that function's branch
+    count manageable; this covers only the no-GPU-detected diagnostic path.
+    """
+    if not os.path.exists("/dev/kfd"):
+        return
+
+    kfd_openable = _can_open_device("/dev/kfd")
+    if kfd_openable is False:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), but this "
+            "process cannot open it (no read/write access). This is a "
+            "permissions issue, not a missing or unimportable "
+            "`amdsmi`: the current user is likely missing from "
+            "the `render` (and `video`) group that owns `/dev/kfd` -- the "
+            "`/dev/dri/renderD*` node ROCm also needs is commonly owned by "
+            "the same group and likely affected too -- or "
+            "the container was started without `--device=/dev/kfd "
+            "--device=/dev/dri --group-add render --group-add video`. "
+            "Both Ray and the ML framework will report zero GPUs until "
+            "device access is fixed; fixing `amdsmi`/ROCM_PATH "
+            "configuration will not help.",
+        )
+        return
+    if kfd_openable is None:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), but "
+            "opening it failed for a reason other than a permissions "
+            "problem (e.g. a driver-level `ENODEV`/`EIO`, or this process "
+            "running out of file descriptors). This is inconclusive: it is "
+            "not the common group-membership/container `--device` issue, "
+            "so adding `--device=/dev/kfd --group-add render` or adjusting "
+            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
+            "process's open-file limit and the kernel/dmesg log for "
+            "driver errors on `/dev/kfd`.",
+        )
+        return
+
+    # /dev/kfd alone is not sufficient: ROCm also reaches the GPU through a
+    # /dev/dri/renderD* node, which a container or host can pass through (or
+    # permission) independently of /dev/kfd. If no such node is usable, fixing
+    # `amdsmi`/ROCM_PATH -- the fix for the common case below -- would not help
+    # at all.
+    render_nodes = glob.glob("/dev/dri/renderD*")
+    # Vendor is classified before access state, for every node, not just the
+    # accessible ones: `_is_amd_render_node` reads a sysfs file and does not
+    # require the render node itself to be openable. A hybrid host or
+    # container can expose an accessible-but-non-AMD node (e.g. an integrated
+    # Intel GPU's renderD128) alongside an AMD-backed node that fails to open
+    # (permission-denied or ENODEV/EIO); only the AMD node's state is actually
+    # relevant to ROCm GPU discovery. Bucketing by access state first -- and
+    # only checking vendor on nodes that happened to open -- would let that
+    # unrelated node's permission issue win over the AMD node's (possibly
+    # inconclusive) access failure. A node whose vendor cannot be determined
+    # (sysfs missing) is neither confirmed AMD nor confirmed otherwise, so it
+    # gets its own inconclusive branch rather than being folded into either
+    # certainty.
+    amd_accessible_render_nodes = []
+    amd_denied_render_nodes = []
+    amd_inconclusive_render_nodes = []
+    unknown_vendor_render_nodes = []
+    other_vendor_render_nodes = []
+    for node in render_nodes:
+        is_amd = _is_amd_render_node(node)
+        if is_amd is None:
+            unknown_vendor_render_nodes.append(node)
+            continue
+        if is_amd is False:
+            other_vendor_render_nodes.append(node)
+            continue
+        # `_can_open_device` is tri-state: a `None` (inconclusive) result must
+        # not collapse into "not accessible" via plain truthiness, the same
+        # way the `/dev/kfd` branches above distinguish it from a confirmed
+        # `False`.
+        openable = _can_open_device(node)
+        if openable is True:
+            amd_accessible_render_nodes.append(node)
+        elif openable is False:
+            amd_denied_render_nodes.append(node)
+        else:
+            amd_inconclusive_render_nodes.append(node)
+
+    if amd_accessible_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded (/dev/kfd exists), so "
+            "an AMD GPU is likely present on this host. If Ray's GPU "
+            "resources were not limited deliberately, check that Ray "
+            "can enumerate it: Ray 2.56+ discovers AMD GPUs through "
+            "the `amdsmi` Python package rather than opening "
+            "`librocm_smi64.so` directly, and a missing or "
+            "unimportable `amdsmi` fails silently -- Ray simply "
+            "reports zero GPUs with no visible error. Confirm it is "
+            "importable in the exact Python environment Ray runs in: "
+            "`python -c 'import amdsmi'`. If that fails, install "
+            "`amd-smi-lib` (system package) or the `amdsmi` pip "
+            "wheel; the pip wheel also needs ROCM_HOME or ROCM_PATH "
+            "pointing at a root containing the unversioned "
+            "`libamd_smi.so` symlink, rather than only a versioned "
+            "`libamd_smi.so.<N>`.",
+        )
+    elif amd_denied_render_nodes and amd_inconclusive_render_nodes:
+        # Neither outcome rules out the other: a permission fix for the
+        # denied node(s) would leave the inconclusive node(s) still failing,
+        # and vice versa -- reporting only one via a plain `elif` would mask
+        # the other and point at an incomplete fix.
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "opening the AMD-backed `/dev/dri/renderD*` node(s) on this host "
+            "failed for two different reasons: (%s) are permission-denied "
+            "(no read/write access -- the current user is likely missing "
+            "from the `render` (and `video`) group that owns these nodes, or "
+            "the container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`), while (%s) failed for a "
+            "reason other than permissions (e.g. a driver-level "
+            "`ENODEV`/`EIO`, or this process running out of file "
+            "descriptors). Fixing group membership or container device "
+            "pass-through alone will not necessarily restore GPU discovery: "
+            "it addresses the permission-denied node(s) but not the "
+            "inconclusive one(s), which may need a file-descriptor-limit "
+            "check or a kernel/dmesg inspection instead.",
+            ", ".join(amd_denied_render_nodes),
+            ", ".join(amd_inconclusive_render_nodes),
+        )
+    elif amd_denied_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "this process cannot open the AMD-backed `/dev/dri/renderD*` "
+            "node(s) (%s) (no read/write access). This is a permissions "
+            "issue, not a missing or unimportable `amdsmi`: the current user "
+            "is likely missing from the `render` (and `video`) group that "
+            "owns these nodes, or the container was started without "
+            "`--device=/dev/dri --group-add render --group-add video`. Ray "
+            "and the ML framework will both keep reporting zero GPUs until "
+            "device access is fixed; fixing `amdsmi`/ROCM_PATH configuration "
+            "will not help.",
+            ", ".join(amd_denied_render_nodes),
+        )
+    elif amd_inconclusive_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+            "opening the AMD-backed `/dev/dri/renderD*` node(s) (%s) failed "
+            "for a reason other than a permissions problem (e.g. a "
+            "driver-level `ENODEV`/`EIO`, or this process running out of "
+            "file descriptors). This is inconclusive: it is not the common "
+            "group-membership/container `--device` issue, so adding "
+            "`--device=/dev/dri --group-add render` or adjusting "
+            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
+            "process's open-file limit and the kernel/dmesg log for driver "
+            "errors on these nodes.",
+            ", ".join(amd_inconclusive_render_nodes),
+        )
+    elif unknown_vendor_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), and a `/dev/dri/renderD*` node exists (%s), "
+            "but this host cannot determine its PCI vendor ID (sysfs "
+            "is missing or unreadable, as in some restricted "
+            "containers) -- it is therefore unclear whether this node "
+            "is AMD-backed or an unrelated GPU (e.g. an integrated "
+            "Intel GPU's renderD128) that ROCm cannot use, and whether "
+            "it can even be opened is undetermined too. Check the "
+            "node's vendor manually if possible (`cat "
+            "/sys/class/drm/<node>/device/vendor`, expecting `%s` for "
+            "AMD) before assuming `amdsmi`/ROCM_PATH is the issue -- "
+            "it is not if this node turns out not to be AMD's.",
+            ", ".join(unknown_vendor_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
+    elif other_vendor_render_nodes:
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), and a `/dev/dri/renderD*` node exists (%s), "
+            "but it is not AMD-backed (its PCI vendor ID is not "
+            "`%s`) -- ROCm cannot use it regardless of whether it can "
+            "be opened. This usually means the AMD GPU's own render "
+            "node is missing or permission-denied on this host or "
+            "container, not that `amdsmi`/ROCM_PATH needs adjusting: "
+            "check that `--device=/dev/dri --group-add render` passes "
+            "through and grants access to the AMD device specifically, "
+            "not just any render node.",
+            ", ".join(other_vendor_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
+    else:
+        # Every node found above is classified into exactly one of the five
+        # buckets handled by the branches above, so this is only reached when
+        # `render_nodes` itself is empty.
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible "
+            "(/dev/kfd), but no `/dev/dri/renderD*` node was found at "
+            "all. ROCm reaches the GPU through both `/dev/kfd` and a "
+            "render node, so fixing `amdsmi`/ROCM_PATH will not help "
+            "here -- Ray and the ML framework will both keep reporting "
+            "zero GPUs until the render node itself exists. Unlike a "
+            "permission-denied node, this is not a group-membership "
+            "issue -- there is no node for `--group-add render` to "
+            "grant access to. Check that the device is passed through "
+            "at all (e.g. a container started with `--device=/dev/kfd` "
+            "but without `--device=/dev/dri`), and that the host's "
+            "`amdgpu` driver has actually created a render node "
+            "(`ls /dev/dri`).",
+        )
+
+
+def _ray_client_conn_host() -> str | None:
+    """Return the host this process's Ray Client connection targets, if known.
+
+    No public Ray API exposes the connected host; the private
+    `client_worker._conn_str` is read best-effort, and any failure to read it
+    returns `None` rather than raising, since this only feeds a diagnostic
+    message. The caller must not treat `None` as confirmation of remoteness --
+    it means locality could not be checked at all, not that it was ruled out.
+    """
+    try:
+        client_worker = (
+            ray.util.client.ray.get_context().client_worker  # type: ignore[no-untyped-call]
+        )
+        conn_str: str = client_worker._conn_str  # pylint: disable=protected-access
+    except AttributeError:
+        return None
+    return conn_str.rsplit(":", 1)[0].strip("[]")
+
+
+def _log_node_locality_diagnostics(
+    active_node_count: int, active_node_id: str | None
+) -> None:
+    """Log a GPU-discovery hint appropriate to where the active node(s) are.
+
+    Split out of `pool_size_from_resources` purely to keep that function's branch
+    count manageable; this covers only the no-GPU-detected diagnostic path.
+    Callers must only reach this once at least one Ray node is known to be
+    active -- the empty-cluster case (`active_node_count == 0`) is diagnosed
+    separately, before the GPU-specific split, since it also needs to fire for
+    CPU-only requests.
+    """
+    if active_node_count > 1:
+        # `_log_kfd_diagnostics` only inspects the driver host's own device
+        # nodes. On a multi-node cluster, AMD GPU discovery already ran
+        # independently on each node at `ray start` time, so a driver-only
+        # check cannot say which node is missing access -- naming the driver's
+        # state here would misleadingly implicate it instead. This must still
+        # fire unconditionally (a CPU-only driver can front a pool of AMD GPU
+        # workers, so gating on this host's own `/dev/kfd` would suppress the
+        # one warning that tells the user where to look), but the driver's
+        # `/dev/kfd` state also cannot establish that any worker is AMD, so the
+        # device-node specifics are phrased as conditional within the message
+        # rather than asserted.
+        log(
+            WARNING,
+            "This is a multi-node Ray cluster (%s nodes reporting "
+            "resources). GPU discovery runs independently on each node "
+            "when `ray start` executes there, so checking only this "
+            "driver host cannot identify which node is missing device "
+            "access. If AMD GPUs are in use, check `/dev/kfd` and "
+            "`/dev/dri/renderD*` access on each node individually, not "
+            "just here.",
+            active_node_count,
+        )
+    elif ray.util.client.ray.is_connected():  # type: ignore[no-untyped-call]
+        # `ray.init("ray://host:port")` (Ray Client) proxies
+        # `get_runtime_context()` into the remote cluster, so it returns the
+        # *server's* node ID -- which then trivially equals the sole
+        # `active_node_id` from `ray.nodes()` even though this process's own
+        # `/dev` is not necessarily on the client host. A NodeID comparison can
+        # therefore never detect this case; checking
+        # `ray.util.client.ray.is_connected()` instead. Whether the Ray Client
+        # server actually runs on a different machine can never be confirmed
+        # from the connection endpoint alone: a loopback or resolvable
+        # hostname/LAN address doesn't prove it's local (an SSH port forward
+        # or a sidecar sharing only the network namespace can present either),
+        # and the absence of a local match doesn't prove it's remote either
+        # (a NAT-hairpinned or VIP address can resolve to this same host while
+        # never itself binding to a local interface). This is therefore always
+        # treated as ambiguous rather than attempting -- and inevitably
+        # mis-trusting -- a remoteness determination, and the local KFD probe
+        # always runs afterwards in case the connection does turn out to be
+        # genuinely co-located.
+        conn_host = _ray_client_conn_host()
+        log(
+            WARNING,
+            "This process connected to the Ray cluster over Ray Client "
+            "at %s, which this host cannot confirm is a different "
+            "machine from its own. That usually means the Ray Client "
+            "server runs on this same host, but an SSH port forward or "
+            "a sidecar container that only shares this host's network "
+            "namespace can present the same endpoint while the Ray "
+            "Client server's `/dev` belongs to a different machine or "
+            "container. The `/dev/kfd` and `/dev/dri/renderD*` check "
+            "that follows assumes they are shared with the cluster "
+            "node (NodeID=%s) that reported zero GPUs; if that "
+            "assumption turns out to be wrong, check device access on "
+            "the actual Ray Client server host instead.",
+            (
+                conn_host
+                if conn_host is not None
+                else "an address this host could not determine"
+            ),
+            active_node_id,
+        )
+        _log_kfd_diagnostics()
+    elif active_node_id is not None and active_node_id != (
+        driver_node_id := ray.get_runtime_context().get_node_id()
+    ):
+        # A single reporting node that is not this driver's own node means
+        # `init_args` connected this process to a remote single-node cluster
+        # (for example via `address="<ip>:<port>"`). Probing this host's
+        # `/dev/kfd`/`/dev/dri/renderD*` would diagnose the wrong machine. When
+        # the node dict has no `NodeID` at all (active_node_id is None), there is
+        # nothing to compare against the driver's own ID -- querying the runtime
+        # context here would either hit an unconnected global Ray worker or
+        # compare against a value that can never match, misclassifying a local
+        # node as remote. Fall through to the local KFD probe instead.
+        log(
+            WARNING,
+            "The only node reporting resources (NodeID=%s) is not this "
+            "driver's own node (NodeID=%s) -- `ray.init()` connected to a "
+            "remote cluster. Checking `/dev/kfd` and `/dev/dri/renderD*` on "
+            "this host cannot diagnose a device on a different machine; "
+            "check device access on the node that reported zero GPUs "
+            "instead.",
+            active_node_id,
+            driver_node_id,
+        )
+    else:
+        _log_kfd_diagnostics()
+
+
 def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     """Calculate number of Actors that fit in the cluster.
 
@@ -90,6 +482,32 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     client.
     """
     total_num_actors = 0
+    # Bound before the loop: `ray.nodes()` can return no usable node (empty list, or
+    # every node reporting empty resources), and both are read in the error path below.
+    num_cpus: int | float = 0
+    num_gpus: int | float = 0
+    # `num_gpus` above only retains the last node's value, so it cannot answer "does
+    # this cluster have a GPU at all?". Track that separately across every node.
+    cluster_num_gpus: int | float = 0
+    # Best case (across all nodes) of how many actors CPU alone could host, ignoring
+    # the GPU requirement. If this is 0, no node has enough CPUs for even one client,
+    # so GPU-lowering advice alone would still leave the pool empty.
+    max_actors_by_cpu = 0
+    # `num_cpus` above only retains the last node's value, which misreports "the best
+    # node" when node order doesn't match node capacity. Track the actual best alongside
+    # `max_actors_by_cpu` so the two stay consistent.
+    max_num_cpus: int | float = 0
+    # AMD GPU discovery (the diagnostic below) only inspects the driver host. Track how
+    # many nodes actually report resources so that diagnostic can be skipped both when
+    # no node is active at all (nothing to diagnose on this host) and on a multi-node
+    # cluster, where the driver's own device state says nothing about which worker node
+    # is missing access.
+    active_node_count = 0
+    # The single active node's own ID, if there is exactly one. `init_args` can hand
+    # `ray.init()` an `address` that joins this driver to a single-node cluster running
+    # on another host entirely -- active_node_count==1 alone does not mean the driver
+    # shares a host with that node. Compared against the driver's own node ID below.
+    active_node_id: str | None = None
 
     # We calculate the number of actors that fit in a node per node basis. This is
     # the right way of doing it otherwise situations like the following arise: imagine
@@ -105,12 +523,17 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         # however, its resources will be empty.
         if not node_resources:
             continue
+        active_node_count += 1
+        active_node_id = node.get("NodeID")
 
         # Fallback to zero when resource quantity is not configured on the ray node
         # e.g.: node without GPU; head node set up not to run tasks (zero resources)
         num_cpus = node_resources.get("CPU", 0)
         num_gpus = node_resources.get("GPU", 0)
+        cluster_num_gpus = max(cluster_num_gpus, num_gpus)
+        max_num_cpus = max(max_num_cpus, num_cpus)
         num_actors = int(num_cpus / client_resources["num_cpus"])
+        max_actors_by_cpu = max(max_actors_by_cpu, num_actors)
 
         # If a GPU is present and client resources do require one
         if "num_gpus" in client_resources.keys() and client_resources["num_gpus"] > 0.0:
@@ -124,15 +547,76 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
         total_num_actors += num_actors
 
     if total_num_actors == 0:
-        log(
-            WARNING,
-            "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
-            "does not meet the criteria to host at least one client with resources:"
-            " %s. Lowering these resources could help.",
-            num_cpus,
-            num_gpus,
-            client_resources,
-        )
+        requested_gpus = client_resources.get("num_gpus", 0)
+        if active_node_count == 0:
+            # Nothing registered any resources at all (empty `ray.nodes()`, or
+            # every entry detached with empty `Resources`). This is unrelated to
+            # GPU discovery and must be surfaced regardless of whether a GPU was
+            # requested -- a CPU-only client with `num_gpus=0` hits this branch
+            # just as easily as a GPU request would.
+            log(
+                WARNING,
+                "No active Ray node reported resources: `ray.nodes()` returned "
+                "either no entries, or only detached ones with empty "
+                "`Resources`. This is not a per-node GPU discovery problem to "
+                "fix on this host -- check why the Ray cluster has no usable "
+                "node (for example, it failed to start or every node has "
+                "disconnected). Reconnect with the same `address` (or "
+                "`RAY_ADDRESS`) this run used before calling `ray.nodes()` -- a "
+                "bare `ray.init()` can start or attach to a different local "
+                "cluster instead of the one that just failed.",
+            )
+        elif requested_gpus > 0 and not cluster_num_gpus:
+            # No node in the cluster reported a GPU while each client asks for a
+            # fraction of one. Only `num_gpus=0` is satisfiable here, so the generic
+            # "lower your resources" advice does not describe the fix. Zero advertised
+            # GPUs does not by itself mean discovery failed, though: `ray.init()` can
+            # be configured (e.g. `--init-args-num-gpus 0`) to hide GPUs that are
+            # otherwise healthy, and that must not be reported as a discovery failure.
+            # A cluster that does have a GPU somewhere, just not enough of one, falls
+            # through to the generic warning instead.
+            log(
+                WARNING,
+                "Ray reports no GPU resources (GPUs=%s) but each client requests "
+                "num_gpus=%s, which no node can satisfy. This does not by itself mean "
+                "GPU discovery failed: the cluster may have no GPU, or Ray's GPU "
+                "resources may have been limited deliberately (for example "
+                "`--init-args-num-gpus 0`). Set `num_gpus=0` if no GPU is expected, "
+                "otherwise review that limit before suspecting discovery. Reconnect "
+                "with the same `address` (or `RAY_ADDRESS`) this run used before "
+                "calling `ray.cluster_resources()` to compare what Ray actually "
+                "detects -- a bare `ray.init()` can start or attach to a different "
+                "local cluster and report its GPUs instead of the one that just "
+                "failed. "
+                "Note that an ML framework reporting a usable GPU (for instance "
+                "`torch.cuda.is_available()` returning True) does not imply Ray found "
+                "one -- they discover devices independently.",
+                cluster_num_gpus,
+                requested_gpus,
+            )
+            if max_actors_by_cpu == 0:
+                # Setting num_gpus=0 would not be enough either: no node has the CPUs
+                # this client needs, so the pool would still end up empty.
+                log(
+                    WARNING,
+                    "In addition, no node has enough CPUs for even one client: each "
+                    "client requests num_cpus=%s but the best node only reports "
+                    "CPUs=%s. Setting `num_gpus=0` alone will not fix this -- also "
+                    "lower `num_cpus` or add CPU capacity to the cluster.",
+                    client_resources.get("num_cpus"),
+                    max_num_cpus,
+                )
+            _log_node_locality_diagnostics(active_node_count, active_node_id)
+        else:
+            log(
+                WARNING,
+                "The ActorPool is empty. The system (CPUs=%s, GPUs=%s) "
+                "does not meet the criteria to host at least one client with resources:"
+                " %s. Lowering these resources could help.",
+                num_cpus,
+                num_gpus,
+                client_resources,
+            )
         raise ValueError(
             "ActorPool is empty. Stopping Simulation. "
             "Check `num_cpus` and/or `num_gpus` passed to the simulation engine"

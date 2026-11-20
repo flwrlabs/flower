@@ -17,3 +17,4 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
 
     how-to-run-flower-locally
     how-to-run-simulations
+    how-to-run-simulations-on-amd-gpus
