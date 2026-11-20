@@ -39,7 +39,6 @@ message ListSpacesRequest {}
 message ListSpacesResponse { repeated Space spaces = 1; }
 
 message SpaceMessage {
-  reserved 6;
   uint64 id = 1;
   string space_id = 2;
   SpaceParticipant author = 3;
