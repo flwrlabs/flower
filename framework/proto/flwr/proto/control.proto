@@ -45,11 +45,19 @@ message Agent {
   string created_at = 3;
   string updated_at = 4;
   string default_space_id = 5;
+  uint64 config_version = 6;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }
 message ListAgentsRequest {}
 message ListAgentsResponse { repeated Agent agents = 1; }
+
+message UpdateAgentRequest {
+  uint64 agent_id = 1;
+  uint64 expected_config_version = 2;
+  AgentConfig config = 3;
+}
+message UpdateAgentResponse { Agent agent = 1; }
 
 message StartRunRequest {
   Fab fab = 1;
