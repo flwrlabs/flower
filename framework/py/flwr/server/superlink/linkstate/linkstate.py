@@ -275,7 +275,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
-        trigger_item_type: str | None = None,
+        trigger_item_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -320,8 +320,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Executing agent assigned by the server for a Space run. Creation
             returns 0 unless the agent participates, has no open Run, and its
             app matches the resolved FAB. The FAB must already be stored.
-        trigger_item_type : str | None (default: None)
-            Type of the Space item that triggered the run, if applicable.
+        trigger_item_id : int | None (default: None)
+            ID of the Space item that triggered the run, if applicable.
 
         Returns
         -------

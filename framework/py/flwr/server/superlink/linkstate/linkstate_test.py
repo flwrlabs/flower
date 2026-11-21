@@ -79,7 +79,6 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
-    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -920,8 +919,8 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_run_trigger_item_type(self) -> None:
-        """Return the trigger item type supplied when creating a run."""
+    def test_get_run_trigger_item_id(self) -> None:
+        """Return the trigger item ID supplied when creating a run."""
         state = self.state_factory()
         space_id = UUID(state.create_space(participants=[]).id)
         run_id = state.create_run(
@@ -934,16 +933,12 @@ class StateTest(CoreStateTest):
             flwr_aid="account",
             primary_task_type=TaskType.AGENT_APP,
             space_id=space_id,
-            trigger_item_type=SpaceItemType.MESSAGE,
+            trigger_item_id=123,
         )
 
+        assert state.get_run(run_ids=[run_id])[0].trigger_item_id == 123
         assert (
-            state.get_run(run_ids=[run_id])[0].trigger_item_type
-            == SpaceItemType.MESSAGE
-        )
-        assert (
-            state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_type
-            is None
+            state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_id is None
         )
 
     def test_get_run_filter_space_and_federation_runs(self) -> None:
