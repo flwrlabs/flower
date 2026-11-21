@@ -103,6 +103,27 @@ def test_seed_random_seeds_already_imported_frameworks(
     assert tf_seeds == [3]
 
 
+def test_seed_random_seeds_a_framework_only_after_it_is_imported(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """A framework imported after seeding is seeded only by the next call."""
+    monkeypatch.delitem(sys.modules, "torch", raising=False)
+    torch_seeds: list[int] = []
+
+    seed_random(5)
+    assert "torch" not in sys.modules
+
+    torch = SimpleNamespace(
+        manual_seed=torch_seeds.append,
+        cuda=SimpleNamespace(is_available=lambda: False),
+    )
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    assert not torch_seeds
+
+    seed_random(5)
+    assert torch_seeds == [5]
+
+
 def test_derive_seed_is_stable_and_distinguishes_parts() -> None:
     """Derived seeds depend on every identity part and stay in range."""
     first = derive_seed(4, "partition:0", "train", "", "1")

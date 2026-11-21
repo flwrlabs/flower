@@ -55,7 +55,8 @@ def run(
             server_app = loaded_server_app
         return server_app
 
-    # Seed before the import so module-level initialization follows the run seed.
+    # Seed Python and NumPy before the import. A framework the module imports
+    # is seeded when ServerApp runs, after that import finishes.
     seed_server(context.run_config)
     server_app = _load()
 

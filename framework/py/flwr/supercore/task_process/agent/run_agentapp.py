@@ -126,7 +126,10 @@ class PreloadedAgentApp:
 def _load_agentapp_for_run(
     run_config: object, agent_app_attr: str, app_path: Path
 ) -> AgentApp:
-    """Seed the process, then import the AgentApp."""
+    """Seed Python and NumPy, then import the AgentApp.
+
+    A framework this module imports is seeded when the AgentApp runs.
+    """
     seed_server(run_config, process="agent")
     return _load_agentapp_component(agent_app_attr, app_path)
 

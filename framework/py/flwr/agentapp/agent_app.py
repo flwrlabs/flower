@@ -44,8 +44,10 @@ class AgentApp:
 
     def __call__(self, agent: AgentSession, context: Context) -> None:
         """Execute `AgentApp`."""
-        # Reseed before user code. Loading the module may already have drawn
-        # from this seed.
+        # Reseed before user code, including a framework this module imported.
+        # The load may already have drawn from the Python and NumPy streams.
+        # Weights created while the module was importing that framework are
+        # not redone.
         seed_server(context.run_config, process="agent")
         if self._main is None:
             raise ValueError("AgentApp has no main function.")

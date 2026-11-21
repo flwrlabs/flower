@@ -83,8 +83,12 @@ def seed_random(seed: int) -> None:
 
     Notes
     -----
-    PyTorch and TensorFlow are seeded only when the app has already imported
-    them. This helper does not import machine-learning frameworks.
+    Python's ``random`` and the global NumPy RNG are always seeded. PyTorch
+    and TensorFlow are seeded only when they are already in ``sys.modules``.
+    This helper does not import them. A framework imported later stays
+    unseeded until the next call. The app handlers make that call after the
+    app module has been imported. Weights created while the module was
+    importing the framework are not redone.
     """
     parsed = _parse_seed(seed)
     random.seed(parsed)
@@ -322,12 +326,17 @@ def _server_round_token(message: Message) -> str:
 
 
 def _seed_imported_frameworks(seed: int) -> None:
-    """Seed ML frameworks that the process has already imported.
+    """Seed PyTorch and TensorFlow when they are already in ``sys.modules``.
 
     Parameters
     ----------
     seed : int
         Seed passed to the framework helpers.
+
+    Notes
+    -----
+    This does not import either library. A framework that appears after this
+    call stays unseeded until the next call.
     """
     torch = sys.modules.get("torch")
     if torch is not None:

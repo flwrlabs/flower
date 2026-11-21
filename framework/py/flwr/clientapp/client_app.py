@@ -139,8 +139,10 @@ class ClientApp:
 
     def __call__(self, message: Message, context: Context) -> Message:
         """Execute `ClientApp`."""
-        # Reseed before user code. Each client task is a fresh process in
-        # deployment, and simulation actors do not share the server process.
+        # Reseed before user code, including a framework this module imported.
+        # Each client task is a fresh process in deployment, and simulation
+        # actors do not share the server process. Weights created while the
+        # module was importing that framework are not redone.
         seed_client(context, message)
         with self._lifespan(context):
             # Execute message using `client_fn`

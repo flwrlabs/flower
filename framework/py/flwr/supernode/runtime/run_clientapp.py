@@ -184,7 +184,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             multi_app=True,
         )
 
-        # Seed before the import so module-level initialization follows this message.
+        # Seed Python and NumPy before the import. A framework the module
+        # imports is seeded when ClientApp runs, after that import finishes.
         seed_client(context, message)
         # Load ClientApp
         log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
