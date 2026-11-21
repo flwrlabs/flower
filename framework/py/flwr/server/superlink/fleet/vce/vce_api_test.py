@@ -517,6 +517,52 @@ def test_prepare_seeded_vce_registers_all_nodes_before_returning(
     assert prepared.app_fn() is dummy_client_app
 
 
+def test_prepare_seeded_vce_terminates_backend_when_build_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A backend created during seeded setup is shut down if building it fails."""
+    terminated: list[bool] = []
+
+    class _FailingBackend(Backend):
+        """Backend double whose pool construction fails after initialization."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            return None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            raise RuntimeError("cannot build pool")
+
+        def is_worker_idle(self) -> bool:
+            return False
+
+        def terminate(self) -> None:
+            terminated.append(True)
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FailingBackend,
+    )
+
+    with pytest.raises(RuntimeError, match="cannot build pool"):
+        prepare_seeded_vce(
+            backend_config_json_stream="{}",
+            app_dir=".",
+            is_app=False,
+            f_stop=threading.Event(),
+            run=Run.create_empty(run_id=12),
+            random_seed=3,
+            client_app=dummy_client_app,
+            num_supernodes=2,
+        )
+
+    assert terminated == [True]
+
+
 def test_register_nodes_uses_stable_ids_when_seeded() -> None:
     """A run seed registers simulation nodes as 2, 3, ... in partition order."""
     first = _seeded_node_mapping(num_nodes=3, random_seed=42)

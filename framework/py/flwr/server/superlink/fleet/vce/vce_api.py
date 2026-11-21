@@ -514,7 +514,12 @@ def prepare_seeded_vce(
     )
     app_fn = _import_client_app(app_fn, client_app_attr, f_stop)
     backend = backend_fn()
-    backend.build(app_fn)
+    try:
+        backend.build(app_fn)
+    except Exception:
+        # run_api's cleanup never sees a backend that failed during preparation.
+        backend.terminate()
+        raise
     return PreparedVce(
         app_fn=app_fn,
         nodes_mapping=nodes_mapping,

@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from flwr.app import Context
+from flwr.common.seeding import seed_server
 
 from .base import AgentAppCallable, AgentSession
 
@@ -43,6 +44,9 @@ class AgentApp:
 
     def __call__(self, agent: AgentSession, context: Context) -> None:
         """Execute `AgentApp`."""
+        # Reseed before user code. Loading the module may already have drawn
+        # from this seed.
+        seed_server(context.run_config, process="agent")
         if self._main is None:
             raise ValueError("AgentApp has no main function.")
         self._main(agent, context)

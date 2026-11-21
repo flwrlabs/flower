@@ -150,13 +150,16 @@ def sample_population(population: Iterable[_T], k: int) -> list[_T]:
     return _SAMPLING_STATE.generator.sample(ordered, k)
 
 
-def seed_server(run_config: object) -> int | None:
-    """Seed the server process from ``random-seed`` when it is configured.
+def seed_server(run_config: object, *, process: str = "server") -> int | None:
+    """Seed a Flower process from ``random-seed`` when it is configured.
 
     Parameters
     ----------
     run_config : object
-        Server ``Context.run_config``.
+        ``Context.run_config`` for this process.
+    process : str (default: "server")
+        Name used in the log line. ServerApp uses ``"server"`` and AgentApp
+        uses ``"agent"``.
 
     Returns
     -------
@@ -171,7 +174,7 @@ def seed_server(run_config: object) -> int | None:
         clear_run_seed()
         return None
     seed_random(seed)
-    log(INFO, "Seeded server RNGs from run config %s=%s", RANDOM_SEED_KEY, seed)
+    log(INFO, "Seeded %s RNGs from run config %s=%s", process, RANDOM_SEED_KEY, seed)
     return seed
 
 
