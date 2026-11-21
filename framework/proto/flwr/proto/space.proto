@@ -44,7 +44,6 @@ message SpaceMessage {
   SpaceParticipant author = 3;
   string created_at = 4;
   string content = 5;
-  bool hidden = 6;
 }
 
 // Selects the newest page by default. All reads advance the caller's read
