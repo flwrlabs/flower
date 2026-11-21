@@ -42,6 +42,7 @@ def _configure_openapi(
     """Add the common protobuf wire contract to OpenAPI metadata."""
     openapi_extra = dict(kwargs.get("openapi_extra") or {})
     openapi_extra["requestBody"] = {
+        **openapi_extra.get("requestBody", {}),
         "required": True,
         "content": {
             PROTOBUF_MEDIA_TYPE: {"schema": _BINARY_SCHEMA},
@@ -58,7 +59,8 @@ def _configure_openapi(
     )
     responses = dict(kwargs.get("responses") or {})
     responses[200] = {
-        "description": "Successful Response",
+        **responses.get(200, {}),
+        "description": responses.get(200, {}).get("description", "Successful Response"),
         "content": {response_media_type: {"schema": _BINARY_SCHEMA}},
     }
     kwargs["responses"] = responses
