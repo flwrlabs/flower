@@ -379,7 +379,11 @@ def get_filtered_fab_paths(
 
     # Apply built-in constraints and validate against user patterns
     if has_user_rules:
-        _raise_on_built_in_pattern_conflicts(candidate_paths, built_in_include_spec)
+        _raise_on_built_in_pattern_conflicts(
+            candidate_paths,
+            built_in_include_spec,
+            built_in_exclude_spec if user_include_spec else None,
+        )
     final_paths = [
         path
         for path in candidate_paths
@@ -412,13 +416,14 @@ def _raise_on_unresolved_patterns(
 def _raise_on_built_in_pattern_conflicts(
     candidate_paths: list[str],
     built_in_include_spec: pathspec.PathSpec[pathspec.pattern.Pattern],
+    built_in_exclude_spec: pathspec.PathSpec[pathspec.pattern.Pattern] | None,
 ) -> None:
     """Raise ValueError for user-defined rules and built-in rules conflicts."""
-    # Only count files whose type is not supported by built-in include patterns
-    # (e.g. .txt files). Files that match built-in includes but are removed by
-    # built-in excludes (e.g. .toml inside .venv/, pyproject.toml) are expected
-    # removals and should not be flagged.
     removed_files = set(built_in_include_spec.match_files(candidate_paths, negate=True))
+    if built_in_exclude_spec:
+        removed_files.update(built_in_exclude_spec.match_files(candidate_paths))
+        # The root config is rewritten and always included in the FAB.
+        removed_files.discard(FAB_CONFIG_FILE)
     if removed_files:
         files_list = "\n".join(f"- {file}" for file in removed_files)
         raise ValueError(
