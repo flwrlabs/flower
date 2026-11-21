@@ -30,6 +30,7 @@ from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.common.constant import PARTITION_ID_KEY
 from flwr.common.seeding import (
     RANDOM_SEED_KEY,
+    call_under_seed,
     clear_run_seed,
     client_seed,
     derive_seed,
@@ -132,6 +133,73 @@ def test_derive_seed_is_stable_and_distinguishes_parts() -> None:
     assert first != derive_seed(4, "partition:1", "train", "", "1")
     assert first != derive_seed(4, "partition:0", "train", "", "2")
     assert first != derive_seed(5, "partition:0", "train", "", "1")
+
+
+def test_derive_seed_does_not_collide_on_part_boundaries() -> None:
+    """A separator inside one part does not match a split across parts."""
+    assert derive_seed(1, "a|b", "c") != derive_seed(1, "a", "b|c")
+    assert derive_seed(1, "", "a") != derive_seed(1, "a", "")
+
+
+def test_call_under_seed_restores_process_rngs() -> None:
+    """The import sees the seed, and the previous stream is restored."""
+    random.seed(1)
+    expected_after = random.random()
+    random.seed(4)
+    expected_during = random.random()
+    np.random.seed(1)
+    expected_np = np.random.random()
+    random.seed(1)
+    np.random.seed(1)
+    seen: list[float] = []
+
+    def _load() -> None:
+        seen.append(random.random())
+
+    call_under_seed(4, _load)
+
+    assert seen == [expected_during]
+    assert random.random() == expected_after
+    assert np.random.random() == expected_np
+    population = [3, 1, 2]
+    random.seed(0)
+    unseeded = random.sample(population, 2)
+    random.seed(0)
+    assert sample_population(population, 2) == unseeded
+
+
+def test_call_under_seed_restores_rngs_when_the_call_fails() -> None:
+    """A failed import does not leave the process on the run seed."""
+    random.seed(2)
+    expected = random.random()
+    random.seed(2)
+
+    def _load() -> None:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        call_under_seed(8, _load)
+    assert random.random() == expected
+
+
+def test_call_under_seed_restores_an_already_imported_torch(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """PyTorch is seeded for the call, then put back."""
+    restored: list[str] = []
+    seeded: list[int] = []
+    torch = SimpleNamespace(
+        manual_seed=seeded.append,
+        get_rng_state=lambda: "cpu-before",
+        set_rng_state=restored.append,
+        cuda=SimpleNamespace(is_available=lambda: False),
+    )
+    monkeypatch.setitem(sys.modules, "torch", torch)
+
+    call_under_seed(6, lambda: None)
+
+    assert seeded == [6]
+    assert restored == ["cpu-before"]
 
 
 def test_sample_population_is_stable_when_seeded() -> None:

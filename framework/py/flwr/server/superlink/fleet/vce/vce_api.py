@@ -40,6 +40,7 @@ from flwr.common.constant import (
     PARTITION_ID_KEY,
     ErrorCode,
 )
+from flwr.common.seeding import call_under_seed
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore import log
@@ -495,8 +496,9 @@ def prepare_seeded_vce(
     """Register every node, import the ClientApp, and build the backend.
 
     Seeded simulations do this on the main thread before the ServerApp starts.
-    The first sample then sees the full node set, and driver startup does not
-    draw from the server RNGs.
+    The ClientApp import runs under the run seed, then that RNG state is
+    restored so Ray startup does not keep the stream. The first sample then
+    sees the full node set.
     """
     app_fn, backend_fn, nodes_mapping, state_factory, node_info_stores = (
         _vce_components(
@@ -512,7 +514,14 @@ def prepare_seeded_vce(
             random_seed=random_seed,
         )
     )
-    app_fn = _import_client_app(app_fn, client_app_attr, f_stop)
+
+    # One import, before any client message exists, so this uses the run seed.
+    # Actors still apply the derived seed before handling a message.
+    def _load_client_app() -> Callable[[], ClientApp]:
+        """Import the ClientApp while the run seed is applied."""
+        return _import_client_app(app_fn, client_app_attr, f_stop)
+
+    app_fn = call_under_seed(random_seed, _load_client_app)
     backend = backend_fn()
     try:
         backend.build(app_fn)

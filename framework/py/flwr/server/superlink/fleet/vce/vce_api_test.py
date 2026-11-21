@@ -14,6 +14,8 @@
 # ==============================================================================
 """Test Fleet Simulation Runtime API."""
 
+import random
+import sys
 import threading
 from collections.abc import Callable
 from itertools import cycle
@@ -561,6 +563,69 @@ def test_prepare_seeded_vce_terminates_backend_when_build_fails(
         )
 
     assert terminated == [True]
+
+
+def test_prepare_seeded_vce_seeds_before_importing_the_client_app(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The driver import follows the run seed and does not keep that stream."""
+    module_name = "driver_client_seed_mod"
+    (tmp_path / f"{module_name}.py").write_text(
+        "import random\n"
+        "from flwr.clientapp import ClientApp\n"
+        "IMPORT_DRAW = random.random()\n"
+        "app = ClientApp()\n",
+        encoding="utf-8",
+    )
+
+    class _FakeBackend(Backend):
+        """Backend double that records ``build`` without starting Ray."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            return None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            return None
+
+        def is_worker_idle(self) -> bool:
+            return True
+
+        def terminate(self) -> None:
+            return None
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FakeBackend,
+    )
+    random.seed(9)
+    expected = random.random()
+    random.seed(123)
+    before = random.getstate()
+    sys.path.insert(0, str(tmp_path))
+    sys.modules.pop(module_name, None)
+    try:
+        prepare_seeded_vce(
+            backend_config_json_stream="{}",
+            app_dir=str(tmp_path),
+            is_app=False,
+            f_stop=threading.Event(),
+            run=Run.create_empty(run_id=13),
+            random_seed=9,
+            client_app_attr=f"{module_name}:app",
+            num_supernodes=1,
+        )
+        assert sys.modules[module_name].IMPORT_DRAW == expected
+        assert random.getstate() == before
+    finally:
+        sys.modules.pop(module_name, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+        random.setstate(before)
 
 
 def test_register_nodes_uses_stable_ids_when_seeded() -> None:

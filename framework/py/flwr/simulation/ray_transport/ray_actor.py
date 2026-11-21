@@ -53,8 +53,10 @@ class VirtualClientEngineActor(ABC):
         # return also cid which is needed to ensure results
         # from the pool are correctly assigned to each ClientProxy
         try:
-            # Seed Python and NumPy before the loader imports the app module.
-            # A framework that import brings in is seeded when ClientApp runs.
+            # Seed Python and NumPy before this loader runs. Unpickling the
+            # task may already have imported the module; that import is not
+            # covered. A framework the module imported is seeded when
+            # ClientApp runs.
             seed_client(context, message)
             # Load app
             app: ClientApp = client_app_fn()

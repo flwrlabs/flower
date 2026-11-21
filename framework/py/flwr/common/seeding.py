@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import random
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from logging import DEBUG, INFO
 from typing import TypeVar
 
@@ -47,6 +47,7 @@ class _SamplingState:
 _SAMPLING_STATE = _SamplingState()
 
 _T = TypeVar("_T", int, str)
+_R = TypeVar("_R")
 
 
 def read_random_seed(run_config: object) -> int | None:
@@ -97,6 +98,43 @@ def seed_random(seed: int) -> None:
     _seed_imported_frameworks(parsed)
 
 
+def call_under_seed(seed: int, fn: Callable[[], _R]) -> _R:
+    """Seed the process RNGs, call ``fn``, then restore the previous state.
+
+    Parameters
+    ----------
+    seed : int
+        Non-negative seed no larger than ``2**32 - 1``.
+    fn : Callable[[], Any]
+        Work that should see the seed, usually an app import.
+
+    Returns
+    -------
+    Any
+        The value returned by ``fn``.
+
+    Notes
+    -----
+    Python, NumPy, the dedicated sampler, and PyTorch (when its RNG state can
+    be read) are restored afterward. TensorFlow has no portable state snapshot,
+    so a later ``seed_random`` call reseeds it. Restoring keeps later driver
+    work, such as Ray startup after a simulation imports the ClientApp, off
+    this stream.
+    """
+    py_state = random.getstate()
+    np_state = np.random.get_state()
+    sampler = _SAMPLING_STATE.generator
+    torch_state = _torch_rng_state()
+    try:
+        seed_random(seed)
+        return fn()
+    finally:
+        random.setstate(py_state)
+        np.random.set_state(np_state)
+        _SAMPLING_STATE.generator = sampler
+        _restore_torch_rng_state(torch_state)
+
+
 def clear_run_seed() -> None:
     """Drop the dedicated client-sampling generator.
 
@@ -120,9 +158,13 @@ def derive_seed(base_seed: int, *parts: str) -> int:
     -------
     int
         Seed in the range ``[0, 2**32 - 1]``.
+
+    Notes
+    -----
+    Each part is length-prefixed UTF-8. A delimiter inside one part cannot
+    collide with the boundary between parts.
     """
-    material = "|".join((str(_parse_seed(base_seed)), *parts))
-    digest = hashlib.sha256(material.encode()).digest()
+    digest = hashlib.sha256(_seed_material(base_seed, parts)).digest()
     return int.from_bytes(digest[:4], "little")
 
 
@@ -245,6 +287,25 @@ def client_seed(base_seed: int, context: Context, message: Message) -> int:
     )
 
 
+def _seed_material(base_seed: int, parts: tuple[str, ...]) -> bytes:
+    """Encode a seed and its parts so boundaries stay unambiguous.
+
+    Parameters
+    ----------
+    base_seed : int
+        Run-level seed.
+    parts : tuple[str, ...]
+        Identity strings, in order.
+
+    Returns
+    -------
+    bytes
+        Each chunk is its UTF-8 bytes prefixed by an 8-byte length.
+    """
+    chunks = [str(_parse_seed(base_seed)).encode(), *(part.encode() for part in parts)]
+    return b"".join(len(chunk).to_bytes(8, "little") + chunk for chunk in chunks)
+
+
 def _parse_seed(value: object) -> int:
     """Validate a user-supplied seed.
 
@@ -323,6 +384,38 @@ def _server_round_token(message: Message) -> str:
         if isinstance(record, Mapping) and "server-round" in record:
             return str(record["server-round"])
     return ""
+
+
+def _torch_rng_state() -> tuple[object, object | None] | None:
+    """Return PyTorch's RNG state when that library is already imported."""
+    torch = sys.modules.get("torch")
+    if torch is None or not hasattr(torch, "get_rng_state"):
+        return None
+    cuda_state = None
+    cuda = getattr(torch, "cuda", None)
+    if (
+        cuda is not None
+        and hasattr(cuda, "get_rng_state_all")
+        and bool(cuda.is_available())
+    ):
+        cuda_state = cuda.get_rng_state_all()
+    return torch.get_rng_state(), cuda_state
+
+
+def _restore_torch_rng_state(state: tuple[object, object | None] | None) -> None:
+    """Restore a snapshot from :func:`_torch_rng_state`."""
+    if state is None:
+        return
+    torch = sys.modules.get("torch")
+    if torch is None:
+        return
+    cpu_state, cuda_state = state
+    torch.set_rng_state(cpu_state)
+    if cuda_state is None:
+        return
+    cuda = getattr(torch, "cuda", None)
+    if cuda is not None:
+        cuda.set_rng_state_all(cuda_state)
 
 
 def _seed_imported_frameworks(seed: int) -> None:
