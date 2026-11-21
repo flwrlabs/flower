@@ -15,7 +15,7 @@
 """Replace run trigger item type with ID.
 
 Revision ID: 1fdccc948e8f
-Revises: 43915a41dbfa
+Revises: 43a9e7702bb8
 Create Date: 2026-11-20 17:23:06.579657
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "1fdccc948e8f"
-down_revision: str | Sequence[str] | None = "43915a41dbfa"
+down_revision: str | Sequence[str] | None = "43a9e7702bb8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
