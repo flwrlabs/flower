@@ -15,6 +15,7 @@
 """Unit tests for inflatable_utils.py."""
 
 
+import random
 from unittest.mock import Mock
 
 import pytest
@@ -22,6 +23,7 @@ import pytest
 from .inflatable_object import get_object_tree
 from .inflatable_object_test import CustomDataClass
 from .inflatable_utils import (
+    ObjectUnavailableError,
     inflatable_class_registry,
     pull_and_inflate_object_from_tree,
     pull_objects,
@@ -101,6 +103,30 @@ def test_pull_objects_reraises_exception() -> None:
             object_ids=fake_object_ids,
             pull_object_fn=mock_pull_object,
         )
+
+
+def test_pull_retry_jitter_leaves_the_global_rng_unchanged() -> None:
+    """A failed object pull must not consume a seeded experiment stream."""
+    random.seed(5)
+    expected = random.random()
+    random.seed(5)
+    attempts = 0
+
+    def pull_once(_object_id: str) -> bytes:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise ObjectUnavailableError(_object_id)
+        return b"ok"
+
+    pulled = pull_objects(
+        object_ids=["obj"],
+        pull_object_fn=pull_once,
+        max_tries_per_object=2,
+        initial_backoff=0,
+    )
+    assert pulled == {"obj": b"ok"}
+    assert random.random() == expected
 
 
 def test_push_object_contents_from_iterable_reraises_exception() -> None:

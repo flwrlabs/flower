@@ -185,12 +185,19 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         *,
         location: str | None = None,
         name: str | None = None,
+        node_id: int | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
-        # Sample a random int64 as node_id
-        node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
-        )
+        if node_id is None:
+            # Sample a random int64 as node_id
+            node_id = generate_rand_int_from_bytes(
+                NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
+            )
+        elif node_id in {0, SUPERLINK_NODE_ID}:
+            raise ValueError(
+                "Explicit node_id must not be 0 or "
+                f"the SuperLink node id ({SUPERLINK_NODE_ID})."
+            )
 
         with self.lock:
             if node_id in self.nodes:

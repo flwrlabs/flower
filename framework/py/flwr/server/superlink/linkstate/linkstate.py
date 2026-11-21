@@ -153,6 +153,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         *,
         location: str | None = None,
         name: str | None = None,
+        node_id: int | None = None,
     ) -> int:
         """Create, store in the link state, and return `node_id`."""
 

@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import random
 import time
 from logging import DEBUG
 from typing import cast
@@ -25,6 +24,7 @@ from typing import cast
 from flwr.agentapp import AgentEvents, AgentGrid
 from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.seeding import sample_population
 from flwr.serverapp import Grid
 from flwr.supercore import log
 from flwr.supercore.constant import (
@@ -333,11 +333,14 @@ class RuntimeAgentGrid(AgentGrid):
         nodes = list(self._grid.get_nodes())
         if sample_size is not None and sample_size < 1:
             raise ValueError("Grid sample size must be positive.")
-        selected = (
-            nodes
-            if sample_size is None
-            else random.sample(nodes, min(sample_size, len(nodes)))
-        )
+        if sample_size is None:
+            selected = nodes
+        else:
+            # Sample ids so a run seed sorts them before drawing. Unseeded
+            # runs still use random.sample and keep this list's order.
+            by_id = {int(node.node_id): node for node in nodes}
+            chosen_ids = sample_population(list(by_id), min(sample_size, len(by_id)))
+            selected = [by_id[node_id] for node_id in chosen_ids]
         return {
             "nodes": [
                 {

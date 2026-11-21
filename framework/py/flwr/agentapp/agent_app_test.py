@@ -17,10 +17,12 @@
 
 from __future__ import annotations
 
+import random
 from unittest.mock import Mock
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context, RecordDict
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed
 
 
 def _context() -> Context:
@@ -48,3 +50,24 @@ def test_agentapp_registers_and_calls_main() -> None:
     app(session, context)
 
     assert calls == [(session, context)]
+
+
+def test_agentapp_seeds_before_main() -> None:
+    """User code starts from the configured run seed."""
+    app = AgentApp()
+    context = _context()
+    context.run_config = {RANDOM_SEED_KEY: 15}
+    seen: list[float] = []
+
+    @app.main()
+    def _main(_session: AgentSession, _context_arg: Context) -> None:
+        seen.append(random.random())
+
+    random.seed(15)
+    expected = random.random()
+    try:
+        app(Mock(spec=AgentSession), context)
+    finally:
+        clear_run_seed()
+
+    assert seen == [expected]

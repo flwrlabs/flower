@@ -15,8 +15,11 @@
 """Fleet Simulation Runtime side."""
 
 
-from .vce_api import start_vce
+from .vce_api import PreparedVce, prepare_seeded_vce, run_prepared_vce, start_vce
 
 __all__ = [
+    "PreparedVce",
+    "prepare_seeded_vce",
+    "run_prepared_vce",
     "start_vce",
 ]

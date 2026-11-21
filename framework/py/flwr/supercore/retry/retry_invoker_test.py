@@ -15,12 +15,14 @@
 """Tests for `RetryInvoker`."""
 
 
+import random
 from collections.abc import Generator
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from flwr.supercore.retry import RetryInvoker, constant
+from flwr.supercore.retry.retry_invoker import full_jitter
 
 
 def successful_function() -> str:
@@ -169,6 +171,15 @@ def test_event_handlers() -> None:
     backoff_handler.assert_called_once()
     giveup_handler.assert_called_once()
     success_handler.assert_not_called()
+
+
+def test_full_jitter_leaves_the_global_rng_unchanged() -> None:
+    """Retry jitter must not consume a seeded experiment stream."""
+    random.seed(5)
+    expected = random.random()
+    random.seed(5)
+    assert 0 <= full_jitter(3) < 3
+    assert random.random() == expected
 
 
 def test_giveup_condition() -> None:

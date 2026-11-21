@@ -14,6 +14,8 @@
 # ==============================================================================
 """Test Fleet Simulation Runtime API."""
 
+import random
+import sys
 import threading
 from collections.abc import Callable
 from itertools import cycle
@@ -36,11 +38,13 @@ from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.compat.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.server.superlink.fleet.vce.backend.backend import Backend
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
     _register_nodes,
     add_messages_to_queue,
+    prepare_seeded_vce,
     start_vce,
     worker,
 )
@@ -465,3 +469,182 @@ class TestFleetSimulationEngineRayBackend(TestCase):
                 content.config_records["getpropertiesres.properties"]["result"]
                 == expected_results[message_res.metadata.reply_to_message_id]
             )
+
+
+def test_prepare_seeded_vce_registers_all_nodes_before_returning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Driver setup registers the full seeded node set and builds the backend."""
+    built: list[bool] = []
+
+    class _FakeBackend(Backend):
+        """Backend double that records ``build`` without starting Ray."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            self.built_with: Callable[[], ClientApp] | None = None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            self.built_with = app_fn
+            built.append(True)
+
+        def is_worker_idle(self) -> bool:
+            return True
+
+        def terminate(self) -> None:
+            return None
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FakeBackend,
+    )
+    run = Run.create_empty(run_id=11)
+    prepared = prepare_seeded_vce(
+        backend_config_json_stream="{}",
+        app_dir=".",
+        is_app=False,
+        f_stop=threading.Event(),
+        run=run,
+        random_seed=9,
+        client_app=dummy_client_app,
+        num_supernodes=4,
+    )
+
+    assert prepared.nodes_mapping == {2: 0, 3: 1, 4: 2, 5: 3}
+    assert built == [True]
+    assert prepared.app_fn() is dummy_client_app
+
+
+def test_prepare_seeded_vce_terminates_backend_when_build_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A backend created during seeded setup is shut down if building it fails."""
+    terminated: list[bool] = []
+
+    class _FailingBackend(Backend):
+        """Backend double whose pool construction fails after initialization."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            return None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            raise RuntimeError("cannot build pool")
+
+        def is_worker_idle(self) -> bool:
+            return False
+
+        def terminate(self) -> None:
+            terminated.append(True)
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FailingBackend,
+    )
+
+    with pytest.raises(RuntimeError, match="cannot build pool"):
+        prepare_seeded_vce(
+            backend_config_json_stream="{}",
+            app_dir=".",
+            is_app=False,
+            f_stop=threading.Event(),
+            run=Run.create_empty(run_id=12),
+            random_seed=3,
+            client_app=dummy_client_app,
+            num_supernodes=2,
+        )
+
+    assert terminated == [True]
+
+
+def test_prepare_seeded_vce_seeds_before_importing_the_client_app(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The driver import follows the run seed and does not keep that stream."""
+    module_name = "driver_client_seed_mod"
+    (tmp_path / f"{module_name}.py").write_text(
+        "import random\n"
+        "from flwr.clientapp import ClientApp\n"
+        "IMPORT_DRAW = random.random()\n"
+        "app = ClientApp()\n",
+        encoding="utf-8",
+    )
+
+    class _FakeBackend(Backend):
+        """Backend double that records ``build`` without starting Ray."""
+
+        def __init__(self, _backend_config: dict[str, dict[str, object]]) -> None:
+            return None
+
+        def build(self, app_fn: Callable[[], ClientApp]) -> None:
+            return None
+
+        def is_worker_idle(self) -> bool:
+            return True
+
+        def terminate(self) -> None:
+            return None
+
+        def process_message(
+            self, message: Message, context: Context
+        ) -> tuple[Message, Context]:
+            raise AssertionError("prepare must not process messages")
+
+    monkeypatch.setattr(
+        "flwr.server.superlink.fleet.vce.backend.raybackend.RayBackend",
+        _FakeBackend,
+    )
+    random.seed(9)
+    expected = random.random()
+    random.seed(123)
+    before = random.getstate()
+    sys.path.insert(0, str(tmp_path))
+    sys.modules.pop(module_name, None)
+    try:
+        prepare_seeded_vce(
+            backend_config_json_stream="{}",
+            app_dir=str(tmp_path),
+            is_app=False,
+            f_stop=threading.Event(),
+            run=Run.create_empty(run_id=13),
+            random_seed=9,
+            client_app_attr=f"{module_name}:app",
+            num_supernodes=1,
+        )
+        assert sys.modules[module_name].IMPORT_DRAW == expected
+        assert random.getstate() == before
+    finally:
+        sys.modules.pop(module_name, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+        random.setstate(before)
+
+
+def test_register_nodes_uses_stable_ids_when_seeded() -> None:
+    """A run seed registers simulation nodes as 2, 3, ... in partition order."""
+    first = _seeded_node_mapping(num_nodes=3, random_seed=42)
+    second = _seeded_node_mapping(num_nodes=3, random_seed=7)
+    assert first == {2: 0, 3: 1, 4: 2}
+    assert second == first
+
+
+def _seeded_node_mapping(
+    num_nodes: int, random_seed: int | None
+) -> NodeToPartitionMapping:
+    """Register nodes in a fresh in-memory state."""
+    state_factory = LinkStateFactory(
+        FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
+    )
+    return _register_nodes(
+        num_nodes=num_nodes,
+        state_factory=state_factory,
+        random_seed=random_seed,
+    )

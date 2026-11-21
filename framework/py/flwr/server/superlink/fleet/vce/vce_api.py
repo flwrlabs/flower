@@ -22,6 +22,7 @@ import time
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from logging import DEBUG, ERROR, INFO, WARN
 from pathlib import Path
 from queue import Empty, Queue
@@ -39,6 +40,7 @@ from flwr.common.constant import (
     PARTITION_ID_KEY,
     ErrorCode,
 )
+from flwr.common.seeding import call_under_seed
 from flwr.compat.client.run_info_store import DeprecatedRunInfoStore
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore import log
@@ -53,21 +55,49 @@ from .metrics import VceMetrics
 NodeToPartitionMapping = dict[int, int]
 
 
+@dataclass
+class PreparedVce:
+    """Simulation runtime brought up before a seeded ServerApp starts."""
+
+    app_fn: Callable[[], ClientApp]
+    nodes_mapping: NodeToPartitionMapping
+    state_factory: LinkStateFactory
+    node_info_stores: dict[int, DeprecatedRunInfoStore]
+    backend: Backend
+
+
 def _register_nodes(
-    num_nodes: int, state_factory: LinkStateFactory
+    num_nodes: int,
+    state_factory: LinkStateFactory,
+    random_seed: int | None = None,
 ) -> NodeToPartitionMapping:
-    """Register nodes with the StateFactory and create node-id:partition-id mapping."""
+    """Register nodes with the StateFactory and create node-id:partition-id mapping.
+
+    Parameters
+    ----------
+    num_nodes : int
+        Number of virtual nodes to register.
+    state_factory : LinkStateFactory
+        State factory that stores the nodes.
+    random_seed : Optional[int] (default: None)
+        When set, node ids are ``2 .. num_nodes + 1`` so client sampling selects
+        the same partitions on every run. Id ``1`` is reserved for the SuperLink.
+        The seed value itself does not change the ids; it only enables stable ids.
+    """
     nodes_mapping: NodeToPartitionMapping = {}
     state = state_factory.state()
     for i in range(num_nodes):
+        # No node authentication in simulation;
+        # use NOOP_FLWR_AID as owner_aid and
+        # use random bytes as public key.
+        # Id 1 is the SuperLink, so seeded simulation nodes start at 2.
+        explicit_node_id = None if random_seed is None else i + 2
         node_id = state.create_node(
-            # No node authentication in simulation;
-            # use NOOP_FLWR_AID as owner_aid and
-            # use random bytes as public key
             NOOP_FLWR_AID,
             NOOP_ACCOUNT_NAME,
             secrets.token_bytes(32),
             heartbeat_interval=HEARTBEAT_INTERVAL_INF,
+            node_id=explicit_node_id,
         )
         state.acknowledge_node_heartbeat(
             node_id=node_id, heartbeat_interval=HEARTBEAT_INTERVAL_INF
@@ -203,19 +233,19 @@ def run_api(
     node_info_stores: dict[int, DeprecatedRunInfoStore],
     f_stop: threading.Event,
     metrics: VceMetrics,
+    backend: Backend | None = None,
 ) -> None:
     """Run the Simulation Runtime."""
     messageins_queue: Queue[Message] = Queue()
     messageres_queue: Queue[Message] = Queue()
 
-    backend = None
     try:
+        if backend is None:
+            # Instantiate backend
+            backend = backend_fn()
 
-        # Instantiate backend
-        backend = backend_fn()
-
-        # Build backend
-        backend.build(app_fn)
+            # Build backend
+            backend.build(app_fn)
 
         # Add workers (they submit Messages to Backend)
         state = state_factory.state()
@@ -276,24 +306,28 @@ def run_api(
             backend.terminate()
 
 
-# pylint: disable=too-many-arguments,unused-argument,too-many-locals,too-many-branches
-# pylint: disable=too-many-statements,too-many-positional-arguments
-def start_vce(
-    backend_name: str,
+# pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+# pylint: disable=too-many-positional-arguments
+def _vce_components(
     backend_config_json_stream: str,
     app_dir: str,
     is_app: bool,
-    f_stop: threading.Event,
     run: Run,
-    metrics: VceMetrics,
-    client_app: ClientApp | None = None,
-    client_app_attr: str | None = None,
-    num_supernodes: int | None = None,
-    state_factory: LinkStateFactory | None = None,
-    existing_nodes_mapping: NodeToPartitionMapping | None = None,
-) -> None:
-    """Start Fleet API with the Simulation Runtime."""
-    nodes_mapping = {}
+    client_app: ClientApp | None,
+    client_app_attr: str | None,
+    num_supernodes: int | None,
+    state_factory: LinkStateFactory | None,
+    existing_nodes_mapping: NodeToPartitionMapping | None,
+    random_seed: int | None,
+) -> tuple[
+    Callable[[], ClientApp],
+    Callable[[], Backend],
+    NodeToPartitionMapping,
+    LinkStateFactory,
+    dict[int, DeprecatedRunInfoStore],
+]:
+    """Validate arguments and register nodes. Do not import the app or Ray."""
+    nodes_mapping: NodeToPartitionMapping = {}
 
     if client_app_attr is not None and client_app is not None:
         raise ValueError(
@@ -336,7 +370,9 @@ def start_vce(
     if num_supernodes:
         # Register SuperNodes
         nodes_mapping = _register_nodes(
-            num_nodes=num_supernodes, state_factory=state_factory
+            num_nodes=num_supernodes,
+            state_factory=state_factory,
+            random_seed=random_seed,
         )
 
     # Construct mapping of DeprecatedRunInfoStore
@@ -367,31 +403,20 @@ def start_vce(
 
         raise ValueError("Either `client_app_attr` or `client_app` must be provided")
 
-    app_fn = _load
+    return _load, backend_fn, nodes_mapping, state_factory, node_info_stores
 
+
+def _import_client_app(
+    app_fn: Callable[[], ClientApp],
+    client_app_attr: str | None,
+    f_stop: threading.Event,
+) -> Callable[[], ClientApp]:
+    """Import the ClientApp once.
+
+    A reference load is cached so later calls do not import the module again.
+    """
     try:
-        # Test if ClientApp can be loaded
-        client_app = app_fn()
-
-        # Cache `ClientApp`
-        if client_app_attr:
-            # Now wrap the loaded ClientApp in a dummy function
-            # this prevent unnecesary low-level loading of ClientApp
-            def _load_client_app() -> ClientApp:
-                return client_app
-
-            app_fn = _load_client_app
-
-        # Run main simulation loop
-        run_api(
-            app_fn,
-            backend_fn,
-            nodes_mapping,
-            state_factory,
-            node_info_stores,
-            f_stop,
-            metrics,
-        )
+        loaded = app_fn()
     except LoadClientAppError as loadapp_ex:
         f_stop_delay = 10
         log(
@@ -402,5 +427,130 @@ def start_vce(
         time.sleep(f_stop_delay)
         f_stop.set()  # set termination event
         raise loadapp_ex
-    except Exception as ex:
-        raise ex
+
+    if not client_app_attr:
+        return app_fn
+
+    def _cached() -> ClientApp:
+        return loaded
+
+    return _cached
+
+
+# pylint: disable=too-many-arguments,unused-argument,too-many-positional-arguments
+def start_vce(
+    backend_name: str,
+    backend_config_json_stream: str,
+    app_dir: str,
+    is_app: bool,
+    f_stop: threading.Event,
+    run: Run,
+    metrics: VceMetrics,
+    client_app: ClientApp | None = None,
+    client_app_attr: str | None = None,
+    num_supernodes: int | None = None,
+    state_factory: LinkStateFactory | None = None,
+    existing_nodes_mapping: NodeToPartitionMapping | None = None,
+    random_seed: int | None = None,
+) -> None:
+    """Start Fleet API with the Simulation Runtime."""
+    app_fn, backend_fn, nodes_mapping, state_factory, node_info_stores = (
+        _vce_components(
+            backend_config_json_stream=backend_config_json_stream,
+            app_dir=app_dir,
+            is_app=is_app,
+            run=run,
+            client_app=client_app,
+            client_app_attr=client_app_attr,
+            num_supernodes=num_supernodes,
+            state_factory=state_factory,
+            existing_nodes_mapping=existing_nodes_mapping,
+            random_seed=random_seed,
+        )
+    )
+    app_fn = _import_client_app(app_fn, client_app_attr, f_stop)
+    run_api(
+        app_fn,
+        backend_fn,
+        nodes_mapping,
+        state_factory,
+        node_info_stores,
+        f_stop,
+        metrics,
+    )
+
+
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def prepare_seeded_vce(
+    backend_config_json_stream: str,
+    app_dir: str,
+    is_app: bool,
+    f_stop: threading.Event,
+    run: Run,
+    random_seed: int,
+    client_app: ClientApp | None = None,
+    client_app_attr: str | None = None,
+    num_supernodes: int | None = None,
+    state_factory: LinkStateFactory | None = None,
+) -> PreparedVce:
+    """Register every node, import the ClientApp, and build the backend.
+
+    Seeded simulations do this on the main thread before the ServerApp starts.
+    The ClientApp import runs under the run seed, then that RNG state is
+    restored so Ray startup does not keep the stream. The first sample then
+    sees the full node set.
+    """
+    app_fn, backend_fn, nodes_mapping, state_factory, node_info_stores = (
+        _vce_components(
+            backend_config_json_stream=backend_config_json_stream,
+            app_dir=app_dir,
+            is_app=is_app,
+            run=run,
+            client_app=client_app,
+            client_app_attr=client_app_attr,
+            num_supernodes=num_supernodes,
+            state_factory=state_factory,
+            existing_nodes_mapping=None,
+            random_seed=random_seed,
+        )
+    )
+
+    # One import, before any client message exists, so this uses the run seed.
+    # Actors still apply the derived seed before handling a message.
+    def _load_client_app() -> Callable[[], ClientApp]:
+        """Import the ClientApp while the run seed is applied."""
+        return _import_client_app(app_fn, client_app_attr, f_stop)
+
+    app_fn = call_under_seed(random_seed, _load_client_app)
+    backend = backend_fn()
+    try:
+        backend.build(app_fn)
+    except Exception:
+        # run_api's cleanup never sees a backend that failed during preparation.
+        backend.terminate()
+        raise
+    return PreparedVce(
+        app_fn=app_fn,
+        nodes_mapping=nodes_mapping,
+        state_factory=state_factory,
+        node_info_stores=node_info_stores,
+        backend=backend,
+    )
+
+
+def run_prepared_vce(
+    prepared: PreparedVce,
+    f_stop: threading.Event,
+    metrics: VceMetrics,
+) -> None:
+    """Run a simulation runtime that :func:`prepare_seeded_vce` already built."""
+    run_api(
+        prepared.app_fn,
+        lambda: prepared.backend,
+        prepared.nodes_mapping,
+        prepared.state_factory,
+        prepared.node_info_stores,
+        f_stop,
+        metrics,
+        backend=prepared.backend,
+    )

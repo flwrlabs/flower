@@ -19,7 +19,9 @@
 import hashlib
 import importlib
 import os
+import random
 import signal
+import sys
 import threading
 from pathlib import Path
 from queue import Queue
@@ -30,6 +32,7 @@ import pytest
 from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SubStatus
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
     AGENT_MESSAGE_TEXT_KEY,
@@ -45,6 +48,7 @@ from .run_agentapp import (
     PreloadedAgentApp,
     _AgentAppTaskLifecycle,
     _ignore_graceful_signals,
+    _load_agentapp_for_run,
     _run_agentapp_task,
     _set_runtime_environment,
     message_to_prompt,
@@ -572,3 +576,33 @@ def test_run_agentapp_keeps_cold_process_behavior(
             "success": False,
         },
     )
+
+
+def test_load_agentapp_for_run_seeds_before_import(tmp_path: Path) -> None:
+    """Module-level initialization sees the AgentApp run seed."""
+    module_name = "agent_seed_mod"
+    (tmp_path / f"{module_name}.py").write_text(
+        "import random\n"
+        "from flwr.agentapp import AgentApp\n"
+        "IMPORT_DRAW = random.random()\n"
+        "app = AgentApp()\n"
+        "\n"
+        "@app.main()\n"
+        "def main(agent, context):\n"
+        "    return None\n",
+        encoding="utf-8",
+    )
+    py_state = random.getstate()
+    sys.path.insert(0, str(tmp_path))
+    sys.modules.pop(module_name, None)
+    try:
+        random.seed(18)
+        expected = random.random()
+        _load_agentapp_for_run({RANDOM_SEED_KEY: 18}, f"{module_name}:app", tmp_path)
+        assert sys.modules[module_name].IMPORT_DRAW == expected
+    finally:
+        sys.modules.pop(module_name, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+        random.setstate(py_state)
+        clear_run_seed()
