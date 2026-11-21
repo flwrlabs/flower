@@ -1,0 +1,256 @@
+{
+    "round_staleness_mean": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
+    "round_staleness_std": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+    ],
+    "client_participation": {
+        "6": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "15": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "7": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "19": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "11": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "10": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "18": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "13": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "17": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "9": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "14": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "8": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "12": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "16": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "1": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "5": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "4": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "2": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "0": {
+            "mean": 25.0,
+            "std": 0.0
+        },
+        "3": {
+            "mean": 25.0,
+            "std": 0.0
+        }
+    },
+    "client_staleness": {
+        "6": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "15": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "7": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "19": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "11": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "10": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "18": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "13": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "17": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "9": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "14": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "8": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "12": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "16": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "1": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "5": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "4": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "2": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "0": {
+            "mean": 0.0,
+            "std": 0.0
+        },
+        "3": {
+            "mean": 0.0,
+            "std": 0.0
+        }
+    },
+    "tta_metrics": {
+        "tta50_success_count": 5,
+        "tta50_total_runs": 5,
+        "tta50_mean": 0.0,
+        "tta50_std": 0.0,
+        "tta58_success_count": 5,
+        "tta58_total_runs": 5,
+        "tta58_mean": 0.0,
+        "tta58_std": 0.0
+    },
+    "acc_at_time_metrics": {
+        "acc_at_15s_success_count": 5,
+        "acc_at_15s_total_runs": 5,
+        "acc_at_15s_mean": 96.14333333333335,
+        "acc_at_15s_std": 0.22025238048909904,
+        "acc_at_25s_success_count": 5,
+        "acc_at_25s_total_runs": 5,
+        "acc_at_25s_mean": 97.31833333333334,
+        "acc_at_25s_std": 0.14155878245058556
+    },
+    "loss_per_sec_metrics": {
+        "loss_per_sec_mean": 0.00020089274577437632,
+        "loss_per_sec_std": 5.6742057153654795e-05
+    },
+    "scheduler_metrics": {
+        "polling_calls_count_mean": 3167.0,
+        "polling_calls_count_std": 1.7320508075688772,
+        "time_in_pull_sec_mean": 0.6843584346570424,
+        "time_in_pull_sec_std": 0.0010758249563333493,
+        "server_cpu_time_sec_mean": 13.532,
+        "server_cpu_time_sec_std": 0.11099549540409123,
+        "messages_received_count_mean": 500.0,
+        "messages_received_count_std": 0.0,
+        "total_time_mean": 160.26524784340145,
+        "total_time_std": 0.1324040077567809
+    }
+}
