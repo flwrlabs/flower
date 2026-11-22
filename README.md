@@ -103,6 +103,7 @@ Flower Baselines is a collection of community-contributed projects that reproduc
 - [FedPara](https://github.com/flwrlabs/flower/tree/main/baselines/fedpara)
 - [FedAvg](https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/fedavg_mnist)
 - [FedOpt](https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/adaptive_federated_optimization)
+- [Floco](https://github.com/flwrlabs/flower/tree/main/baselines/floco)
 
 Please refer to the [Flower Baselines Documentation](https://flower.ai/docs/baselines/) for a detailed categorization of baselines and for additional info including:
 * [How to use Flower Baselines](https://flower.ai/docs/baselines/how-to-use-baselines.html)
