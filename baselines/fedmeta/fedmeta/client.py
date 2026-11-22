@@ -46,7 +46,7 @@ class FlowerClient(fl.client.NumPyClient):
     def set_parameters(self, parameters: NDArrays) -> None:
         """Change the parameters of the model using the given ones."""
         params_dict = zip(self.net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        state_dict = OrderedDict({k: torch.from_numpy(v) for k, v in params_dict})
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(  # type: ignore
