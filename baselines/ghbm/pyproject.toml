@@ -1,0 +1,196 @@
+# =====================================================================
+# For a full TOML configuration guide, check the Flower docs:
+# https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html
+# =====================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ghbm"
+version = "1.0.0"
+description = "Communication-Efficient Federated Learning with Generalized Heavy-Ball Momentum"
+license = "Apache-2.0"
+# Dependencies for your Flower App
+dependencies = [
+    "flwr[simulation]>=1.24.0",
+    "ray[default]==2.51.1",
+    "flwr-datasets[vision]>=0.5.0",
+    "torch==2.3.1",
+    "torchvision==0.18.1",
+    "wandb>=0.19.0",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.optional-dependencies]
+dev = [
+    "isort==5.13.2",
+    "black==24.2.0",
+    "docformatter==1.7.5",
+    "mypy==1.8.0",
+    "pylint==3.3.1",
+    "pytest==7.4.4",
+    "pytest-watch==4.2.0",
+    "ruff==0.4.5",
+    "types-requests==2.31.0.20240125",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+extend-exclude = '''
+(
+    /datasets
+  | /wandb
+  | /\.mypy_cache
+  | /\.pytest_cache
+  | /\.ruff_cache
+)
+'''
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+addopts = "-qq"
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = false
+plugins = "numpy.typing.mypy_plugin"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = "duplicate-code,too-few-public-methods,useless-import-alias"
+good-names = "i,j,k,_,x,y,X,Y,K,N"
+max-args = 10
+max-attributes = 15
+max-locals = 36
+max-branches = 20
+max-statements = 55
+
+[tool.pylint.typecheck]
+generated-members = "numpy.*, torch.*, tensorflow.*"
+
+[[tool.mypy.overrides]]
+module = [
+    "importlib.metadata.*",
+    "importlib_metadata.*",
+]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[tool.docformatter]
+wrap-summaries = 88
+wrap-descriptions = 88
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "proto",
+]
+
+[tool.ruff.lint]
+select = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+fixable = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+ignore = ["B024", "B027", "D205", "D209"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ghbm"]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+fab-exclude = [
+    ".mypy_cache/",
+]
+
+# Point to your ServerApp and ClientApp objects
+# Format: "<module>:<object>"
+[tool.flwr.app.components]
+serverapp = "ghbm.server_app:app"
+clientapp = "ghbm.client_app:app"
+
+# Custom config values accessible via `context.run_config`
+[tool.flwr.app.config]
+num-server-rounds = 3
+fraction-train = 0.1
+local-epochs = 1
+learning-rate = 0.01
+weight-decay = 1e-5
+ghbm-beta = 0.9
+ghbm-tau = 0
+dataset-name = "cifar10"
+dirichlet-alpha = 0.1
+batch-size = 32
+evaluate-every = 1
+algorithm-name = "fedavg"
+wandb-enabled = false
+wandb-project = "flower-ghbm"
+wandb-group = "default"
+wandb-run-name = ""
+model-name = "resnet"
+resnet-version = 20
+norm-layer = "group"
+
+# Default federation to use when running the app
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-simulation"
+
+# # Local simulation federation with 100 virtual SuperNodes
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 100
+# options.backend.client-resources.num-cpus = 4
+# options.backend.client-resources.num-gpus = 4
+
+# [tool.flwr.federations.supergrid-deployment]
+# address = "supergrid.flower.ai"
+# enable-account-auth = true
