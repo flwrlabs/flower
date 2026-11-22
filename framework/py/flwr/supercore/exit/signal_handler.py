@@ -17,7 +17,7 @@
 
 import signal
 from collections.abc import Callable
-from threading import Lock, Thread
+from threading import RLock, Thread
 from types import FrameType
 
 from flwr.supercore.telemetry import EventType
@@ -59,7 +59,10 @@ def register_signal_handlers(
     """
     default_handlers: dict[int, Callable[[int, FrameType], None]] = {}
     is_exiting = False
-    lock = Lock()
+    # Python runs signal handlers on the main thread between bytecode instructions.
+    # A second signal can therefore re-enter this handler while its first invocation
+    # still holds the guard; an RLock prevents that same thread from deadlocking.
+    lock = RLock()
 
     def _wait_to_stop() -> None:
         if bckg_threads is not None:
