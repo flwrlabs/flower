@@ -1,187 +1,268 @@
 #include "communicator.h"
+#include "serde.h"
 
-const std::string KEY_NODE = "node";
-const std::string KEY_TASK_INS = "current_task_ins";
+#include <iostream>
+#include <mutex>
 
-std::map<std::string, std::optional<flwr::proto::Node>> node_store;
-std::map<std::string, std::optional<flwr::proto::TaskIns>> state;
+static std::mutex node_mutex;
+static std::optional<uint64_t> stored_node_id;
+static double stored_heartbeat_interval = 30.0;
+static std::optional<flwr_local::Message> current_message;
 
-std::mutex node_store_mutex;
-std::mutex state_mutex;
+void register_node(Communicator *communicator) {
+  flwr::proto::RegisterNodeFleetRequest request;
+  flwr::proto::RegisterNodeFleetResponse response;
 
-std::optional<flwr::proto::Node> get_node_from_store() {
-  std::lock_guard<std::mutex> lock(node_store_mutex);
-  auto node = node_store.find(KEY_NODE);
-  if (node == node_store.end() || !node->second.has_value()) {
-    std::cerr << "Node instance missing" << std::endl;
-    return std::nullopt;
-  }
-  return node->second;
-}
+  // The server identifies nodes by the public key in the request body.
+  // It must match the key sent in the auth metadata header.
+  request.set_public_key(communicator->public_key_pem());
 
-bool validate_task_ins(const flwr::proto::TaskIns &task_ins,
-                       const bool discard_reconnect_ins) {
-  return task_ins.has_task() && task_ins.task().has_recordset();
-}
-
-bool validate_task_res(const flwr::proto::TaskRes &task_res) {
-  // Retrieve initialized fields in TaskRes
-  return true;
-}
-
-flwr::proto::TaskRes
-configure_task_res(const flwr::proto::TaskRes &task_res,
-                   const flwr::proto::TaskIns &ref_task_ins,
-                   const flwr::proto::Node &producer) {
-  flwr::proto::TaskRes result_task_res;
-
-  // Setting scalar fields
-  result_task_res.set_task_id("");
-  result_task_res.set_group_id(ref_task_ins.group_id());
-  result_task_res.set_run_id(ref_task_ins.run_id());
-
-  // Merge the task from the input task_res
-  *result_task_res.mutable_task() = task_res.task();
-
-  // Construct and set the producer and consumer for the task
-  std::unique_ptr<flwr::proto::Node> new_producer =
-      std::make_unique<flwr::proto::Node>(producer);
-  result_task_res.mutable_task()->set_allocated_producer(
-      new_producer.release());
-
-  std::unique_ptr<flwr::proto::Node> new_consumer =
-      std::make_unique<flwr::proto::Node>(ref_task_ins.task().producer());
-  result_task_res.mutable_task()->set_allocated_consumer(
-      new_consumer.release());
-
-  // Set ancestry in the task
-  result_task_res.mutable_task()->add_ancestry(ref_task_ins.task_id());
-
-  return result_task_res;
-}
-
-void delete_node_from_store() {
-  std::lock_guard<std::mutex> lock(node_store_mutex);
-  auto node = node_store.find(KEY_NODE);
-  if (node == node_store.end() || !node->second.has_value()) {
-    node_store.erase(node);
+  if (!communicator->send_register_node(request, &response)) {
+    // "Public key already in use" means the node is already registered.
+    // Proceed to ActivateNode which will look it up by the same key.
+    std::cerr << "RegisterNode failed; proceeding to ActivateNode anyway."
+              << std::endl;
   }
 }
 
-std::optional<flwr::proto::TaskIns> get_current_task_ins() {
-  std::lock_guard<std::mutex> state_lock(state_mutex);
-  auto current_task_ins = state.find(KEY_TASK_INS);
-  if (current_task_ins == state.end() ||
-      !current_task_ins->second.has_value()) {
-    std::cerr << "No current TaskIns" << std::endl;
-    return std::nullopt;
-  }
-  return current_task_ins->second;
-}
+uint64_t activate_node(Communicator *communicator, double heartbeat_interval) {
+  flwr::proto::ActivateNodeRequest request;
+  flwr::proto::ActivateNodeResponse response;
 
-void create_node(Communicator *communicator) {
-  flwr::proto::CreateNodeRequest create_node_request;
-  flwr::proto::CreateNodeResponse create_node_response;
+  request.set_public_key(communicator->public_key_pem());
+  request.set_heartbeat_interval(heartbeat_interval);
 
-  create_node_request.set_ping_interval(300.0);
-
-  communicator->send_create_node(create_node_request, &create_node_response);
-
-  // Validate the response
-  if (!create_node_response.has_node()) {
-    std::cerr << "Received response does not contain a node." << std::endl;
-    return;
+  if (!communicator->send_activate_node(request, &response)) {
+    std::cerr << "Failed to activate node." << std::endl;
+    return 0;
   }
 
+  uint64_t node_id = response.node_id();
   {
-    std::lock_guard<std::mutex> lock(node_store_mutex);
-    node_store[KEY_NODE] = create_node_response.node();
+    std::lock_guard<std::mutex> lock(node_mutex);
+    stored_node_id = node_id;
+    stored_heartbeat_interval = heartbeat_interval;
   }
+
+  return node_id;
 }
 
-void delete_node(Communicator *communicator) {
-  auto node = get_node_from_store();
-  if (!node) {
+void deactivate_node(Communicator *communicator) {
+  std::lock_guard<std::mutex> lock(node_mutex);
+  if (!stored_node_id) {
     return;
   }
-  flwr::proto::DeleteNodeRequest delete_node_request;
-  flwr::proto::DeleteNodeResponse delete_node_response;
 
-  auto heap_node = new flwr::proto::Node(*node);
-  delete_node_request.set_allocated_node(heap_node);
+  flwr::proto::DeactivateNodeRequest request;
+  flwr::proto::DeactivateNodeResponse response;
 
-  if (!communicator->send_delete_node(delete_node_request,
-                                      &delete_node_response)) {
-    delete heap_node; // Make sure to delete if status is not ok
-    return;
-  } else {
-    delete_node_request.release_node(); // Release if status is ok
-  }
+  request.set_node_id(*stored_node_id);
 
-  delete_node_from_store();
+  communicator->send_deactivate_node(request, &response);
 }
 
-std::optional<flwr::proto::TaskIns> receive(Communicator *communicator) {
-  auto node = get_node_from_store();
-  if (!node) {
-    return std::nullopt;
-  }
-  flwr::proto::PullTaskInsResponse response;
-  flwr::proto::PullTaskInsRequest request;
-
-  request.set_allocated_node(new flwr::proto::Node(*node));
-
-  bool success = communicator->send_pull_task_ins(request, &response);
-
-  // Release ownership so that the heap_node won't be deleted when request
-  // goes out of scope.
-  request.release_node();
-
-  if (!success) {
-    return std::nullopt;
+void unregister_node(Communicator *communicator) {
+  std::lock_guard<std::mutex> lock(node_mutex);
+  if (!stored_node_id) {
+    return;
   }
 
-  if (response.task_ins_list_size() > 0) {
-    flwr::proto::TaskIns task_ins = response.task_ins_list().at(0);
-    if (validate_task_ins(task_ins, true)) {
-      std::lock_guard<std::mutex> state_lock(state_mutex);
-      state[KEY_TASK_INS] = task_ins;
-      return task_ins;
+  flwr::proto::UnregisterNodeFleetRequest request;
+  flwr::proto::UnregisterNodeFleetResponse response;
+
+  request.set_node_id(*stored_node_id);
+
+  communicator->send_unregister_node(request, &response);
+
+  stored_node_id.reset();
+}
+
+bool send_heartbeat(Communicator *communicator, double heartbeat_interval) {
+  std::lock_guard<std::mutex> lock(node_mutex);
+  if (!stored_node_id) {
+    return false;
+  }
+
+  flwr::proto::SendNodeHeartbeatRequest request;
+  flwr::proto::SendNodeHeartbeatResponse response;
+
+  auto *node = new flwr::proto::Node();
+  node->set_node_id(*stored_node_id);
+  request.set_allocated_node(node);
+  request.set_heartbeat_interval(heartbeat_interval);
+
+  bool success = communicator->send_heartbeat(request, &response);
+  return success && response.success();
+}
+
+std::optional<flwr_local::Message> receive(Communicator *communicator) {
+  uint64_t node_id;
+  {
+    std::lock_guard<std::mutex> lock(node_mutex);
+    if (!stored_node_id) {
+      return std::nullopt;
     }
+    node_id = *stored_node_id;
   }
-  std::cerr << "TaskIns list is empty." << std::endl;
-  return std::nullopt;
+
+  flwr::proto::PullMessagesRequest request;
+  flwr::proto::PullMessagesResponse response;
+
+  auto *node = new flwr::proto::Node();
+  node->set_node_id(node_id);
+  request.set_allocated_node(node);
+
+  if (!communicator->send_pull_messages(request, &response)) {
+    return std::nullopt;
+  }
+
+  if (response.messages_list_size() == 0) {
+    return std::nullopt;
+  }
+
+  const auto &proto_msg = response.messages_list(0);
+  flwr_local::Message msg = message_from_proto(proto_msg);
+
+  // Inflate content from object tree (Flower 1.27+ inflatable objects protocol).
+  // The proto message always carries an empty RecordDict as placeholder content;
+  // actual payload is stored as inflatable objects referenced by the object tree.
+  if (response.message_object_trees_size() > 0) {
+    const auto &msg_tree = response.message_object_trees(0);
+
+    // Collect all object IDs from the tree
+    std::vector<std::string> obj_ids;
+    collect_object_ids(msg_tree, obj_ids);
+
+    // Pull all objects from server
+    std::cerr << "[DEBUG recv] obj_ids count=" << obj_ids.size() << std::endl;
+    std::map<std::string, std::string> objects;
+    bool all_objects_pulled = true;
+    for (const auto &obj_id : obj_ids) {
+      flwr::proto::PullObjectRequest pull_req;
+      flwr::proto::PullObjectResponse pull_resp;
+
+      auto *pull_node = new flwr::proto::Node();
+      pull_node->set_node_id(node_id);
+      pull_req.set_allocated_node(pull_node);
+      pull_req.set_run_id(msg.metadata.run_id);
+      pull_req.set_object_id(obj_id);
+
+      if (communicator->send_pull_object(pull_req, &pull_resp)) {
+        std::cerr << "[DEBUG recv] obj " << obj_id.substr(0,16)
+                  << " found=" << pull_resp.object_found()
+                  << " avail=" << pull_resp.object_available()
+                  << " size=" << pull_resp.object_content().size() << std::endl;
+        if (pull_resp.object_found() && pull_resp.object_available()) {
+          objects[obj_id] = pull_resp.object_content();
+        } else {
+          std::cerr << "[WARN recv] Object " << obj_id.substr(0,16)
+                    << " not ready (found=" << pull_resp.object_found()
+                    << " avail=" << pull_resp.object_available()
+                    << "); will not confirm message" << std::endl;
+          all_objects_pulled = false;
+        }
+      } else {
+        std::cerr << "[DEBUG recv] PullObject RPC failed for " << obj_id.substr(0,16) << std::endl;
+        all_objects_pulled = false;
+      }
+    }
+    std::cerr << "[DEBUG recv] pulled " << objects.size() << " objects" << std::endl;
+
+    // If any objects are missing, do not confirm — return nullopt so the
+    // message remains on the server and can be retried on the next poll.
+    if (!all_objects_pulled) {
+      std::cerr << "[WARN recv] Incomplete objects; not confirming message."
+                << std::endl;
+      return std::nullopt;
+    }
+
+    // The Message has one child: the RecordDict (content)
+    if (msg_tree.children_size() > 0) {
+      const std::string &rd_obj_id = msg_tree.children(0).object_id();
+      try {
+        msg.content = inflate_recorddict(rd_obj_id, objects);
+      } catch (const std::exception &e) {
+        std::cerr << "Failed to inflate RecordDict: " << e.what() << std::endl;
+        // Inflation failed — don't confirm, allow retry.
+        return std::nullopt;
+      }
+    }
+
+    // All objects pulled and inflated successfully — confirm receipt.
+    flwr::proto::ConfirmMessageReceivedRequest confirm_req;
+    flwr::proto::ConfirmMessageReceivedResponse confirm_resp;
+    auto *confirm_node = new flwr::proto::Node();
+    confirm_node->set_node_id(node_id);
+    confirm_req.set_allocated_node(confirm_node);
+    confirm_req.set_run_id(msg.metadata.run_id);
+    confirm_req.set_message_object_id(msg.metadata.message_id);
+    communicator->send_confirm_message_received(confirm_req, &confirm_resp);
+  }
+
+  current_message = msg;
+  return msg;
 }
 
-void send(Communicator *communicator, flwr::proto::TaskRes task_res) {
-  auto node = get_node_from_store();
-  if (!node) {
-    return;
-  }
-
-  auto task_ins = get_current_task_ins();
-  if (!task_ins) {
-    return;
-  }
-
-  if (!validate_task_res(task_res)) {
-    std::cerr << "TaskRes is invalid" << std::endl;
-    std::lock_guard<std::mutex> state_lock(state_mutex);
-    state[KEY_TASK_INS].reset();
-    return;
-  }
-
-  flwr::proto::TaskRes new_task_res =
-      configure_task_res(task_res, *task_ins, *node);
-
-  flwr::proto::PushTaskResRequest request;
-  *request.add_task_res_list() = new_task_res;
-  flwr::proto::PushTaskResResponse response;
-
-  communicator->send_push_task_res(request, &response);
-
+void send(Communicator *communicator, const flwr_local::Message &message) {
+  uint64_t node_id;
   {
-    std::lock_guard<std::mutex> state_lock(state_mutex);
-    state[KEY_TASK_INS].reset();
+    std::lock_guard<std::mutex> lock(node_mutex);
+    if (!stored_node_id) {
+      return;
+    }
+    node_id = *stored_node_id;
   }
+
+  flwr::proto::PushMessagesRequest request;
+  flwr::proto::PushMessagesResponse response;
+
+  auto *node = new flwr::proto::Node();
+  node->set_node_id(node_id);
+  request.set_allocated_node(node);
+
+  if (message.content) {
+    // Deflate message content into inflatable objects (Flower 1.27+ protocol)
+    DeflatedContent deflated = deflate_message(*message.content, message.metadata);
+
+    // Build proto message with empty RecordDict placeholder content (Python's
+    // Message constructor requires content to be set, even if empty), plus the
+    // computed message_id.
+    flwr_local::Message msg_no_content = message;
+    msg_no_content.content = flwr_local::RecordDict{};
+    msg_no_content.metadata.message_id = deflated.message_id;
+
+    *request.add_messages_list() = message_to_proto(msg_no_content);
+    *request.add_message_object_trees() = deflated.message_tree;
+
+    if (!communicator->send_push_messages(request, &response)) {
+      current_message.reset();
+      return;
+    }
+
+    // Push objects that the server requested
+    for (const auto &obj_id : response.objects_to_push()) {
+      auto it = deflated.objects.find(obj_id);
+      if (it == deflated.objects.end()) {
+        std::cerr << "Server requested unknown object: " << obj_id << std::endl;
+        continue;
+      }
+
+      flwr::proto::PushObjectRequest push_req;
+      flwr::proto::PushObjectResponse push_resp;
+      auto *push_node = new flwr::proto::Node();
+      push_node->set_node_id(node_id);
+      push_req.set_allocated_node(push_node);
+      push_req.set_run_id(message.metadata.run_id);
+      push_req.set_object_id(obj_id);
+      push_req.set_object_content(it->second);
+
+      communicator->send_push_object(push_req, &push_resp);
+    }
+  } else {
+    // No content: send empty message
+    *request.add_messages_list() = message_to_proto(message);
+    communicator->send_push_messages(request, &response);
+  }
+
+  current_message.reset();
 }
