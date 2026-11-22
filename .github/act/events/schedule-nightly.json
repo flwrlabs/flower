@@ -1,0 +1,14 @@
+{
+  "repository": {
+    "default_branch": "main",
+    "full_name": "flwrlabs/flower",
+    "name": "flower",
+    "owner": {
+      "login": "flwrlabs"
+    }
+  },
+  "schedule": "0 23 * * *",
+  "sender": {
+    "login": "act"
+  }
+}

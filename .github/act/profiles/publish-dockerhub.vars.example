@@ -1,0 +1,13 @@
+# Copy this file to .github/act/profiles/<profile>.vars.local.
+#
+# Use this profile when publishing test images to Docker Hub and dry-running
+# Python package publishes against a non-production package repository such as
+# TestPyPI or devpi. Set ACT_ALLOW_PACKAGE_PUBLISH=1 only for an intentional
+# publish to that disposable repository.
+DOCKER_IMAGE_REGISTRY=docker.io
+DOCKER_IMAGE_REGISTRY_USER=<dockerhub-user>
+DOCKER_IMAGE_NAMESPACE=<dockerhub-user>/flower-act
+
+PYPI_REPOSITORY_NAME=testpypi
+PYPI_REPOSITORY_URL=https://test.pypi.org/legacy/
+PYPI_REPOSITORY_USERNAME=__token__

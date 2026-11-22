@@ -1,0 +1,8 @@
+# Repository/environment variables used by workflows.
+# Copy this file to .github/act/vars.local and adjust values as needed.
+DOCKER_IMAGE_REGISTRY=registry.gitlab.com
+DOCKER_IMAGE_REGISTRY_USER=<gitlab-user-or-deploy-token-user>
+DOCKER_IMAGE_NAMESPACE=<gitlab-group>/<gitlab-project>/flower-act
+PYPI_REPOSITORY_USERNAME=__token__
+PYPI_REPOSITORY_NAME=testpypi
+PYPI_REPOSITORY_URL=https://test.pypi.org/legacy/
