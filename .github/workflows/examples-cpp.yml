@@ -1,0 +1,49 @@
+name: C++ Quickstart
+
+on:
+  pull_request:
+    paths:
+      - 'examples/quickstart-cpp/**'
+      - 'framework/cc/**'
+      - 'framework/proto/**'
+      - '.github/workflows/examples-cpp.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/quickstart-cpp/**'
+      - 'framework/cc/**'
+      - 'framework/proto/**'
+      - '.github/workflows/examples-cpp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        flower: ['1.36.0', '1.37.0']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc libssl-dev
+      - name: Install Flower ${{ matrix.flower }} and example dependencies
+        run: |
+          python -m pip install -e examples/quickstart-cpp "flwr==${{ matrix.flower }}"
+          python -m pip check
+          python -c "import flwr; assert flwr.__version__ == '${{ matrix.flower }}', flwr.__version__"
+      - name: Configure and build
+        run: |
+          cmake -S examples/quickstart-cpp -B build/quickstart-cpp -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE="$(command -v python)"
+          cmake --build build/quickstart-cpp --parallel 2
+      - name: Test native and Python interoperability
+        run: ctest --test-dir build/quickstart-cpp --output-on-failure
