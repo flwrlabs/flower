@@ -12,7 +12,7 @@ from flwr.serverapp.strategy import FedAvg
 from torch.utils.data import DataLoader
 from transformers import WhisperProcessor
 
-from whisper_example.dataset import get_encoding_fn
+from whisper_example.dataset import get_encoding_fn, with_torch_transform
 from whisper_example.model import eval_model, get_model
 
 # Create ServerApp
@@ -97,7 +97,7 @@ def get_evaluate_fn(
             encoded = val_set.map(encoding_fn, num_proc=4, remove_columns=remove_cols)
 
         torch.set_num_threads(og_threads)
-        val_encoded = encoded.with_format("torch", columns=["data", "targets"])
+        val_encoded = with_torch_transform(encoded)
         val_loader = DataLoader(val_encoded, batch_size=64, num_workers=4)
 
         # Run global evaluation
