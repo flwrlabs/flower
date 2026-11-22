@@ -1,0 +1,17 @@
+---
+# this is the config that will be loaded as default by main.py
+# Please follow the provided structure (this will ensuring all baseline follow
+# a similar configuration structure and hence be easy to customise)
+
+dataset:
+  # dataset config
+
+model:
+  # model config
+
+strategy:
+  _target_: # points to your strategy (either custom or exiting in Flower)
+  # rest of strategy config
+
+client:
+  # client config
