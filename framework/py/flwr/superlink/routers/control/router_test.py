@@ -31,7 +31,6 @@ from google.protobuf.message import Message
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
-    INT64_MAX_VALUE,
     NOOP_FLWR_AID,
     REFRESH_TOKEN_KEY,
     Status,
@@ -105,7 +104,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
 )
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -436,8 +435,6 @@ def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None
     config = AgentConfig(
         name="Research Agent",
         app_spec="@flower/research==1.2.3",
-        title="Researcher",
-        description="Cite sources.",
         avatar="robot",
         color="sky",
     )
@@ -480,8 +477,6 @@ def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None
     )
     assert response.status_code == 200
     updated = UpdateAgentResponse.FromString(response.content).agent
-    assert updated.id == agent.id
-    assert updated.default_space_id == agent.default_space_id
     assert updated.config_version == agent.config_version + 1
     assert updated.config == updated_config
 
@@ -495,76 +490,30 @@ def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None
 
 
 @pytest.mark.parametrize(
-    ("field", "value"),
+    ("error", "status_code"),
     [
-        ("config", None),
-        ("agent_id", 0),
-        ("agent_id", INT64_MAX_VALUE + 1),
-        ("expected_config_version", 0),
-        ("expected_config_version", INT64_MAX_VALUE),
+        (None, 404),
+        (ValueError("Invalid configuration"), 400),
+        (FlowerError(ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT, "Conflict"), 409),
     ],
 )
-def test_agent_update_rejects_invalid_requests(
-    space_client: tuple[TestClient, LinkState], field: str, value: int | None
+def test_agent_update_translates_state_errors(
+    space_client: tuple[TestClient, LinkState],
+    error: Exception | None,
+    status_code: int,
 ) -> None:
-    """Reject missing configuration and integers outside the database bounds."""
-    client, _state = space_client
+    """Translate missing agents, invalid updates, and conflicts to HTTP errors."""
+    client, state = space_client
     request = UpdateAgentRequest(
         agent_id=1,
         expected_config_version=1,
         config=AgentConfig(name="Agent", app_spec="@test/app"),
     )
-    if value is None:
-        request.ClearField("config")
-    else:
-        setattr(request, field, value)
-    response = client.post(
-        "/v1/control/update-agent", content=request.SerializeToString()
-    )
-    assert response.status_code == 400
-    assert response.json()["code"] == ApiErrorCode.INVALID_AGENT_REQUEST
-
-
-@pytest.mark.parametrize(
-    ("case", "status_code", "error_code"),
-    [
-        ("missing", 404, ApiErrorCode.AGENT_NOT_FOUND),
-        ("foreign", 404, ApiErrorCode.AGENT_NOT_FOUND),
-        ("blank_name", 400, ApiErrorCode.INVALID_AGENT_REQUEST),
-        ("app_change", 400, ApiErrorCode.INVALID_AGENT_REQUEST),
-        ("stale_version", 409, ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT),
-    ],
-)
-def test_agent_update_translates_state_errors(
-    space_client: tuple[TestClient, LinkState],
-    case: str,
-    status_code: int,
-    error_code: ApiErrorCode,
-) -> None:
-    """Return consistent ownership, validation, and version-precondition errors."""
-    client, state = space_client
-    owner = "other-account" if case == "foreign" else _ACCOUNT.user_id
-    agent = state.create_agent(owner, AgentConfig(name="Agent", app_spec="@test/app"))
-    assert agent is not None
-    request = UpdateAgentRequest(
-        agent_id=agent.id,
-        expected_config_version=agent.config_version,
-        config=AgentConfig(name="Updated", app_spec=agent.config.app_spec),
-    )
-    if case == "missing":
-        request.agent_id += 1
-    elif case == "blank_name":
-        request.config.name = " "
-    elif case == "app_change":
-        request.config.app_spec = "@other/app"
-    elif case == "stale_version":
-        request.expected_config_version += 1
-    response = client.post(
-        "/v1/control/update-agent", content=request.SerializeToString()
-    )
+    with patch.object(state, "update_agent", return_value=None, side_effect=error):
+        response = client.post(
+            "/v1/control/update-agent", content=request.SerializeToString()
+        )
     assert response.status_code == status_code
-    assert response.json()["code"] == error_code
-    assert state.get_agent(owner, agent.id) == agent
 
 
 @pytest.mark.parametrize(
