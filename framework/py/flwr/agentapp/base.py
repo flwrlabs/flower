@@ -176,7 +176,7 @@ class AgentSpace(ABC):
         -------
         list[JSONObject]
             Messages in ascending ID order, with id, space_id, author, created_at,
-            and content. Author contains either flwr_aid or agent_id.
+            content, and hidden. Author contains either flwr_aid or agent_id.
 
         Notes
         -----

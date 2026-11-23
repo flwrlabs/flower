@@ -366,7 +366,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
-        trigger_item_id: int | None = None,
+        trigger_item_type: str | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -407,7 +407,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     for owner, agents in self.agent_store.items()
                     if agent_id in agents
                 )
-                app_id, version = parse_app_spec(agent.app_spec)
+                app_id, version = parse_app_spec(agent.config.app_spec)
                 if app_id != f"@{fab_id}" or (version and version != fab_version):
                     return 0
                 if not fab_hash or self.get_fab(fab_hash) is None:
@@ -460,7 +460,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
                     agent_id=agent_id,
-                    trigger_item_id=trigger_item_id,
+                    trigger_item_type=trigger_item_type,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,

@@ -725,11 +725,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def create_agent(
         self,
         flwr_aid: str,
-        app_spec: str,
         config: AgentConfig,
     ) -> Agent | None:
         """Create an agent and its initial Space in the same transaction."""
-        if not flwr_aid or not config.name or not app_spec:
+        if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
             config.HasField("description") and not config.description
@@ -742,7 +741,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(space_model)
             session.flush()
             model = AgentModel(
-                app_spec=app_spec,
+                app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
                 config_version=1,
                 default_space_id=space_model.id,
@@ -806,6 +805,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .where(
                     AgentModel.agent_id == agent_id,
                     AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.app_spec == config.app_spec,
                     AgentModel.config_version == expected_config_version,
                 )
                 .values(config_version=AgentModel.config_version + 1, updated_at=now())
@@ -815,6 +815,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 current = self.get_agent(flwr_aid, agent_id)
                 if current is None:
                     return None
+                if current.config.app_spec != config.app_spec:
+                    raise ValueError("AgentApp specification cannot be changed.")
                 raise FlowerError(
                     ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
                     "Agent configuration version precondition failed.",
@@ -2825,13 +2827,13 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
     """Convert an agent ORM model to its protobuf message."""
     return Agent(
         id=model.agent_id,
-        app_spec=model.app_spec,
         config=AgentConfig(
             name=config.name,
             title=config.title,
             description=config.description,
             avatar=config.avatar,
             color=config.color,
+            app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
@@ -2954,6 +2956,7 @@ def _space_message_from_model(
         author=author,
         created_at=model.created_at.isoformat(),
         content=model.content,
+        hidden=model.hidden,
     )
 
 

@@ -287,13 +287,11 @@ def create_agent(
             "Agent description must be nonempty when provided."
         )
     try:
-        parse_app_spec(request.app_spec)
+        parse_app_spec(config.app_spec)
     except ValueError as exc:
         raise InvalidAgentRequestError(str(exc)) from exc
 
-    agent = state.create_agent(
-        flwr_aid=account.user_id, app_spec=request.app_spec, config=config
-    )
+    agent = state.create_agent(flwr_aid=account.user_id, config=config)
     if agent is None:
         raise InvalidAgentRequestError(
             "Unable to create agent with the supplied values."
@@ -1282,7 +1280,7 @@ def process_pending_agent_runs(
             break
         try:
             # Resolve the configured FAB and validate its size and app type.
-            content, verifications, _ = _get_remote_fab(agent.app_spec)
+            content, verifications, _ = _get_remote_fab(agent.config.app_spec)
             fab = _prepare_fab(content, verifications)
             if fab is None:
                 continue
@@ -1306,8 +1304,6 @@ def process_pending_agent_runs(
                 primary_task_type=TaskType.AGENT_APP,
                 space_id=space_id,
                 agent_id=agent.id,
-                # SpaceMessages have no SpaceItem ID until they enter the item stream.
-                trigger_item_id=None,
             )
             if run_id:
                 created += 1

@@ -79,6 +79,7 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -96,7 +97,6 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
-from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
@@ -536,7 +536,9 @@ class StateTest(CoreStateTest):
     def test_bootstrap_active_runs(self) -> None:
         """Bootstrap includes visible active agent runs and omits finished runs."""
         state = self.state_factory()
-        agent = state.create_agent("alice", "@publisher/app", AgentConfig(name="Agent"))
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
         assert agent is not None
         space_id = UUID(state.get_spaces("alice")[0].id)
         run_id = state.create_run(
@@ -918,22 +920,10 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_run_trigger_item_id(self) -> None:
-        """Return the trigger item ID supplied when creating a run."""
+    def test_get_run_trigger_item_type(self) -> None:
+        """Return the trigger item type supplied when creating a run."""
         state = self.state_factory()
         space_id = UUID(state.create_space(participants=[]).id)
-        trigger_item_id = 123
-        if isinstance(state, SqlLinkState):
-            with state.session() as session:
-                item = SpaceItemModel(
-                    space_id=space_id,
-                    type="automation",
-                    created_at=now(),
-                    content="test",
-                )
-                session.add(item)
-                session.flush()
-                trigger_item_id = item.id
         run_id = state.create_run(
             fab_id="flwr/test",
             fab_version="1.0",
@@ -944,20 +934,17 @@ class StateTest(CoreStateTest):
             flwr_aid="account",
             primary_task_type=TaskType.AGENT_APP,
             space_id=space_id,
-            trigger_item_id=trigger_item_id,
+            trigger_item_type=SpaceItemType.MESSAGE,
         )
 
-        assert state.get_run(run_ids=[run_id])[0].trigger_item_id == trigger_item_id
         assert (
-            state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_id is None
+            state.get_run(run_ids=[run_id])[0].trigger_item_type
+            == SpaceItemType.MESSAGE
         )
-        if isinstance(state, SqlLinkState):
-            with self.assertRaises(IntegrityError), state.session() as session:
-                session.execute(
-                    update(RunModel)
-                    .where(RunModel.run_id == run_id)
-                    .values(trigger_item_id=trigger_item_id + 1)
-                )
+        assert (
+            state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_type
+            is None
+        )
 
     def test_get_run_filter_space_and_federation_runs(self) -> None:
         """Distinguish unrestricted, empty, Space-only, and mixed filters."""
@@ -2146,8 +2133,12 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_get_compacted_contexts(self) -> None:
         """Read only one agent in newest-first order with an exclusive cursor."""
         state = self.state_factory()
-        agent = state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
-        other = state.create_agent("alice", "@test/app", AgentConfig(name="Other"))
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
         assert agent is not None and other is not None
         with state.session() as session:
             rows = [
@@ -2560,7 +2551,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
             state = states[0]
             agent = state.create_agent(
-                "alice", "@publisher/app", AgentConfig(name="Agent")
+                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
             )
             assert agent is not None
             space_id = UUID(state.get_spaces("alice")[0].id)

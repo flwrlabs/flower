@@ -126,8 +126,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Resolve an AgentApp and create one Run for an unread user message."""
         agent = self.state.create_agent(
             self.account.user_id,
-            "@publisher/app",
-            AgentConfig(name="Agent"),
+            AgentConfig(name="Agent", app_spec="@publisher/app"),
         )
         assert agent is not None
         space_id = UUID(self.state.get_spaces(self.account.user_id)[0].id)
@@ -153,7 +152,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         ):
             process_pending_agent_runs(self.state)
             process_pending_agent_runs(self.state)
-        resolve.assert_called_once_with(agent.app_spec)
+        resolve.assert_called_once_with(agent.config.app_spec)
         runs = self.state.get_run()
         assert len(runs) == 1 and runs[0].agent_id == agent.id
 

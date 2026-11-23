@@ -600,11 +600,10 @@ class InMemoryCoreState(
     def create_agent(
         self,
         flwr_aid: str,
-        app_spec: str,
         config: AgentConfig,
     ) -> Agent | None:
         """Create an agent and its initial Space together."""
-        if not flwr_aid or not config.name or not app_spec:
+        if not flwr_aid or not config.name or not config.app_spec:
             return None
         if (config.HasField("title") and not config.title) or (
             config.HasField("description") and not config.description
@@ -625,7 +624,6 @@ class InMemoryCoreState(
                 self.space_message_store[space_id] = []
                 agent = Agent(
                     id=agent_id,
-                    app_spec=app_spec,
                     config=config,
                     created_at=created_at,
                     updated_at=created_at,
@@ -671,6 +669,8 @@ class InMemoryCoreState(
             current = self.agent_store.get(flwr_aid, {}).get(agent_id)
             if current is None:
                 return None
+            if current.config.app_spec != config.app_spec:
+                raise ValueError("AgentApp specification cannot be changed.")
             if current.config_version != expected_config_version:
                 raise FlowerError(
                     ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
@@ -678,7 +678,6 @@ class InMemoryCoreState(
                 )
             agent = Agent(
                 id=current.id,
-                app_spec=current.app_spec,
                 config=config,
                 config_version=current.config_version + 1,
                 default_space_id=current.default_space_id,

@@ -59,21 +59,20 @@ def test_create_and_list_agents(state: CoreState) -> None:
     assert state.list_agents("alice") == []
     config = AgentConfig(
         name="Research Agent",
+        app_spec="@flower/research==1.2.3",
         title="Researcher",
         description="Investigate and cite sources.",
         avatar="robot",
         color="sky",
     )
-    minimal_config = AgentConfig(name="Research Agent")
-    first = state.create_agent("alice", "@flower/research==1.2.3", config)
-    other = state.create_agent("bob", "@flower/research", minimal_config)
-    second = state.create_agent("alice", "@flower/research==1.2.3", config)
+    minimal_config = AgentConfig(name="Research Agent", app_spec="@flower/research")
+    first = state.create_agent(flwr_aid="alice", config=config)
+    other = state.create_agent(flwr_aid="bob", config=minimal_config)
+    second = state.create_agent(flwr_aid="alice", config=config)
 
     assert first is not None and other is not None and second is not None
     assert 0 < first.id < other.id < second.id
     assert first.config == config
-    assert first.app_spec == second.app_spec == "@flower/research==1.2.3"
-    assert other.app_spec == "@flower/research"
     assert first.config_version == other.config_version == second.config_version == 1
     assert other.config == minimal_config
     assert first.created_at and first.updated_at == first.created_at
@@ -88,8 +87,8 @@ def test_create_and_list_agents(state: CoreState) -> None:
 
 def test_create_agent_creates_space(state: CoreState) -> None:
     """Each new agent gets an empty Space containing only itself and its creator."""
-    config = AgentConfig(name="Research")
-    agents = [state.create_agent("alice", "@flower/research", config) for _ in range(2)]
+    config = AgentConfig(name="Research", app_spec="@flower/research")
+    agents = [state.create_agent("alice", config) for _ in range(2)]
     spaces = state.get_spaces("alice")
     assert len(spaces) == 2 and spaces[0].id != spaces[1].id
     for agent in agents:
@@ -110,7 +109,7 @@ def test_create_agent_creates_space(state: CoreState) -> None:
 
 def test_get_default_space_is_owner_scoped(state: CoreState) -> None:
     """Resolve the recorded default even if an agent joins another Space."""
-    agent = state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@test/app"))
     assert agent is not None
     default_space_id = UUID(state.get_spaces("alice")[0].id)
     state.create_space(
@@ -130,17 +129,17 @@ def test_get_default_space_is_owner_scoped(state: CoreState) -> None:
 )
 def test_create_agent_rejects_empty_fields(state: CoreState, field: str) -> None:
     """Reject invalid creation without storing an agent."""
-    values = {"name": "Research Agent"}
+    values = {
+        "name": "Research Agent",
+        "app_spec": "@flower/research",
+    }
     flwr_aid = "alice"
-    app_spec = "@flower/research"
     if field == "flwr_aid":
         flwr_aid = ""
-    elif field == "app_spec":
-        app_spec = ""
     else:
         values[field] = ""
 
-    assert state.create_agent(flwr_aid, app_spec, AgentConfig(**values)) is None
+    assert state.create_agent(flwr_aid=flwr_aid, config=AgentConfig(**values)) is None
     assert state.list_agents("alice") == []
     assert state.list_agents("") == []
     assert state.get_spaces("alice") == []
@@ -151,9 +150,9 @@ def agent_fixture(state: CoreState) -> Agent:
     """Provide an owned agent with every editable field populated."""
     agent = state.create_agent(
         "alice",
-        "@test/app",
         AgentConfig(
             name="Research",
+            app_spec="@test/app",
             title="Researcher",
             description="Cite sources.",
             avatar="robot",
@@ -169,6 +168,7 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
     cursor = state.get_bootstrap("alice").cursor
     config = AgentConfig(
         name="Reviewer",
+        app_spec=agent.config.app_spec,
         title="Reviewer",
         description="Review changes.",
         avatar="owl",
@@ -179,7 +179,6 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
     assert updated is not None and updated.config_version == 2
     assert updated.config == config
     assert updated.id == agent.id
-    assert updated.app_spec == agent.app_spec
     assert updated.default_space_id == agent.default_space_id
     assert state.list_agents("alice") == [updated]
     events = state.get_user_events("alice", cursor)
@@ -195,10 +194,12 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
     else:
         assert isinstance(state, InMemoryLinkState)
         assert state.agent_config_store[(agent.id, 1)] == agent.config
-    config = AgentConfig(name="Reviewer", title="", description="")
+    config = AgentConfig(
+        name="Reviewer", app_spec=agent.config.app_spec, title="", description=""
+    )
     cleared = state.update_agent("alice", agent.id, 2, config)
     assert cleared is not None and cleared.config_version == 3
-    assert cleared.config == AgentConfig(name=config.name)
+    assert cleared.config == AgentConfig(name=config.name, app_spec=config.app_spec)
     cursor = state.get_bootstrap("alice").cursor
     with pytest.raises(FlowerError) as exc:
         state.update_agent("alice", agent.id, 2, config)
@@ -208,12 +209,53 @@ def test_update_agent(state: CoreState, agent: Agent) -> None:
 
 
 def test_update_agent_rejects_invalid_writes(state: CoreState, agent: Agent) -> None:
-    """Reject foreign agents, missing agents, and blank names."""
+    """Reject foreign agents, missing agents, blank names, and AgentApp changes."""
     cursor = state.get_bootstrap("alice").cursor
     assert state.update_agent("bob", agent.id, 2, agent.config) is None
     assert state.update_agent("alice", agent.id + 1, 1, agent.config) is None
-    with pytest.raises(ValueError):
-        state.update_agent("alice", agent.id, 1, AgentConfig(name=" \t"))
+    for config in (
+        AgentConfig(name=" \t", app_spec="@test/app"),
+        AgentConfig(name="Updated", app_spec="@other/app"),
+    ):
+        with pytest.raises(ValueError):
+            state.update_agent("alice", agent.id, 1, config)
     assert state.get_agent("alice", agent.id) == agent
     assert not state.get_user_events("alice", cursor)
     assert not state.get_user_events("bob")
+
+
+def test_update_agent_rolls_back_when_event_fails(
+    state: CoreState, agent: Agent
+) -> None:
+    """Keep the prior head and discard the new snapshot if the event cannot be saved."""
+    cursor = state.get_bootstrap("alice").cursor
+    with patch.object(state, "store_event", side_effect=RuntimeError("event failed")):
+        with pytest.raises(RuntimeError, match="event failed"):
+            state.update_agent("alice", agent.id, 1, agent.config)
+
+    assert state.get_agent("alice", agent.id) == agent
+    assert not state.get_user_events("alice", cursor)
+    updated = state.update_agent("alice", agent.id, 1, agent.config)
+    assert updated is not None and updated.config_version == 2
+
+
+@pytest.mark.parametrize("state", ["sqlite"], indirect=True)
+def test_update_agent_concurrent_writers(state: SqlLinkState, agent: Agent) -> None:
+    """Allow exactly one edit per expected version across SQL replicas."""
+    replica = SqlLinkState(
+        state.database_url, NoOpFederationManager(), ObjectStoreFactory().store()
+    )
+    replica.initialize()
+    barrier = Barrier(2)
+
+    def edit(backend: CoreState) -> bool:
+        barrier.wait(timeout=10)
+        try:
+            assert backend.update_agent("alice", agent.id, 1, agent.config) is not None
+            return True
+        except FlowerError as exc:
+            assert exc.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
+            return False
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert sorted(executor.map(edit, (state, replica), timeout=15)) == [False, True]

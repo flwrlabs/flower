@@ -136,8 +136,9 @@ def test_space_session_exposes_agent_identity() -> None:
     """Expose the full agent identity supplied with the task input."""
     identity = Agent(
         id=42,
-        app_spec="@flower/research",
-        config=AgentConfig(name="Research", description="Cite sources."),
+        config=AgentConfig(
+            name="Research", app_spec="@flower/research", description="Cite sources."
+        ),
     )
     task_input = PullTaskInputResponse(agent=identity)
     agent = create_space_session(Mock(_runtime_client=Mock()), Mock(), task_input)
@@ -239,6 +240,7 @@ def test_space_session_reads_messages() -> None:
                 id=2,
                 author=SpaceParticipant(agent_id=42),
                 content="Hello",
+                hidden=True,
             ),
         ]
     )
@@ -259,6 +261,7 @@ def test_space_session_reads_messages() -> None:
         {"agent_id": 42},
     ]
     assert [message["id"] for message in messages] == [1, 2]
+    assert [message["hidden"] for message in messages] == [False, True]
 
 
 @pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
@@ -285,6 +288,7 @@ def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
         "author": {"agent_id": 42},
         "created_at": "",
         "content": "Hello",
+        "hidden": False,
     }
     stub.SendSpaceMessage.assert_called_once_with(
         SendSpaceMessageRequest(content="Hello")

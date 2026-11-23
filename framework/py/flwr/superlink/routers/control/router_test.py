@@ -149,8 +149,7 @@ def test_space_routes(
     client, state = space_client
     agent = state.create_agent(
         flwr_aid=_ACCOUNT.user_id,
-        app_spec="@flower/research",
-        config=AgentConfig(name="Research"),
+        config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
     personal = state.get_spaces(_ACCOUNT.user_id)[0]
@@ -219,8 +218,7 @@ def test_create_space_rejects_other_users_agent(
     client, state = space_client
     agent = state.create_agent(
         flwr_aid="other-user",
-        app_spec="@flower/research",
-        config=AgentConfig(name="Research"),
+        config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
     response = client.post(
@@ -386,11 +384,11 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     ).state()
     config = AgentConfig(
         name="Research Agent",
+        app_spec="@flower/research==1.2.3",
         avatar="robot",
         color="sky",
     )
-    app_spec = "@flower/research==1.2.3"
-    assert state.create_agent("other-account", app_spec, config) is not None
+    assert state.create_agent(flwr_aid="other-account", config=config) is not None
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     client = TestClient(app)
@@ -401,9 +399,7 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
 
     response = client.post(
         "/v1/control/create-agent",
-        content=CreateAgentRequest(
-            config=config, app_spec=app_spec
-        ).SerializeToString(),
+        content=CreateAgentRequest(config=config).SerializeToString(),
         headers=headers,
     )
     assert response.status_code == 200
@@ -411,7 +407,6 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     agent = CreateAgentResponse.FromString(response.content).agent
     assert agent.id > 0
     assert agent.config == config
-    assert agent.app_spec == app_spec
     assert agent.created_at and agent.updated_at == agent.created_at
     assert state.list_agents(_ACCOUNT.user_id) == [agent]
     spaces = state.get_spaces(_ACCOUNT.user_id)
@@ -434,31 +429,33 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     [
         (CreateAgentRequest(), "configuration"),
         (
-            CreateAgentRequest(app_spec="@flower/research", config=AgentConfig()),
+            CreateAgentRequest(config=AgentConfig(app_spec="@flower/research")),
             "name",
         ),
         (
             CreateAgentRequest(
-                app_spec="@flower/research", config=AgentConfig(name="  ")
+                config=AgentConfig(name="  ", app_spec="@flower/research")
             ),
             "name",
         ),
         (CreateAgentRequest(config=AgentConfig(name="Research")), "app"),
         (
-            CreateAgentRequest(app_spec="invalid", config=AgentConfig(name="Research")),
+            CreateAgentRequest(config=AgentConfig(name="Research", app_spec="invalid")),
             "app",
         ),
         (
             CreateAgentRequest(
-                app_spec="@flower/research",
-                config=AgentConfig(name="Research", title=""),
+                config=AgentConfig(
+                    name="Research", app_spec="@flower/research", title=""
+                )
             ),
             "title",
         ),
         (
             CreateAgentRequest(
-                app_spec="@flower/research",
-                config=AgentConfig(name="Research", description=""),
+                config=AgentConfig(
+                    name="Research", app_spec="@flower/research", description=""
+                )
             ),
             "description",
         ),
@@ -1374,9 +1371,9 @@ def test_bootstrap_uses_authenticated_account(
 ) -> None:
     """Return the caller's Agents, Space summaries, and cursor."""
     client, state = space_client
-    config = AgentConfig(name="Agent")
-    state.create_agent(_ACCOUNT.user_id, "@test/app", config)
-    state.create_agent("other-account", "@test/app", config)
+    config = AgentConfig(name="Agent", app_spec="@test/app")
+    state.create_agent(_ACCOUNT.user_id, config)
+    state.create_agent("other-account", config)
     space = state.get_spaces(_ACCOUNT.user_id)[0]
     state.create_space_message(
         UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.user_id), "Latest prompt"

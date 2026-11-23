@@ -88,7 +88,7 @@ def fixture_client(state: LinkState) -> TestClient:
 @pytest.fixture(name="agent")
 def fixture_agent(state: LinkState) -> tuple[int, str, str]:
     """Create the shared Space agent and return its IDs and task token."""
-    agent = state.create_agent("alice", "@flwr/app", AgentConfig(name="Agent"))
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@flwr/app"))
     assert agent is not None
     space = state.create_space(participants=[SpaceParticipant(agent_id=agent.id)])
     token = _create_running_task(
@@ -341,7 +341,7 @@ def test_agent_connector_rejects_foreign_connection(
 ) -> None:
     """Hide another agent's connection and deny its use."""
     _, _, token = agent
-    other = state.create_agent("bob", "@test/app", AgentConfig(name="Other"))
+    other = state.create_agent("bob", AgentConfig(name="Other", app_spec="@test/app"))
     assert other is not None
     foreign = state.create_connector(None, "slack", "{}", "{}", "bob", other.id)
     assert foreign is not None

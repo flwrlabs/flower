@@ -44,8 +44,8 @@ message Run {
   optional string space_id = 20;
   // Present when the server binds the run to an executing agent.
   optional uint64 agent_id = 21;
-  // ID of the Space item that triggered this run, when applicable.
-  optional uint64 trigger_item_id = 22;
+  // Type of the Space item that triggered this run, when applicable.
+  optional string trigger_item_type = 22;
 }
 
 message RunStatus {

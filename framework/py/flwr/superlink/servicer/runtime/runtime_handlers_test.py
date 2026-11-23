@@ -221,8 +221,9 @@ def test_agent_task_input_includes_latest_identity(
     ).state()
     agent = state.create_agent(
         "alice",
-        "@publisher/app",
-        AgentConfig(name="Research", description="Cite sources."),
+        AgentConfig(
+            name="Research", app_spec="@publisher/app", description="Cite sources."
+        ),
     )
     assert agent is not None
     space_id = UUID(state.get_spaces("alice")[0].id)
@@ -249,6 +250,7 @@ def test_agent_task_input_includes_latest_identity(
         agent.config_version,
         AgentConfig(
             name="Updated Research",
+            app_spec=agent.config.app_spec,
             title="Updated title",
             description="Updated description",
             avatar="robot",
