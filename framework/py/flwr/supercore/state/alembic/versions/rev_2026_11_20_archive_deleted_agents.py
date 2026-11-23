@@ -15,7 +15,7 @@
 """Archive deleted agents.
 
 Revision ID: 78f7c7833f29
-Revises: 43a9e7702bb8
+Revises: 1fdccc948e8f
 Create Date: 2026-11-20 19:30:54.972446
 """
 from collections.abc import Sequence
@@ -29,7 +29,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 
 # revision identifiers, used by Alembic.
 revision: str = "78f7c7833f29"
-down_revision: str | Sequence[str] | None = "43a9e7702bb8"
+down_revision: str | Sequence[str] | None = "1fdccc948e8f"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
