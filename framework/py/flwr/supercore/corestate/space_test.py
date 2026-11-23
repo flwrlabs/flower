@@ -14,6 +14,9 @@
 # ==============================================================================
 """Space persistence tests."""
 
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
@@ -22,10 +25,62 @@ from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
+from flwr.supercore.constant import SpaceItemType
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 from . import CoreState
+
+
+def _file_state(tmp_path: Path) -> SqlLinkState:
+    """Create a file-backed SQL state for transaction tests."""
+    state = SqlLinkState(
+        str(tmp_path / "state.db"),
+        NoOpFederationManager(),
+        ObjectStoreFactory().store(),
+    )
+    state.initialize()
+    return state
+
+
+def test_space_items_rollback_with_outer_transaction(tmp_path: Path) -> None:
+    """A later failure rolls back a batch stored inside an outer session."""
+    state = _file_state(tmp_path)
+    author = SpaceParticipant(flwr_aid="alice")
+    space_id = UUID(state.create_space(participants=[author]).id)
+
+    with pytest.raises(RuntimeError, match="abort"):
+        with state.session():
+            state.store_space_items(
+                space_id, SpaceItemType.MESSAGE, ["first", "second"], author
+            )
+            raise RuntimeError("abort")
+
+    assert state.get_space_items(space_id, author) == []
+
+
+def test_space_items_concurrent_file_writes(tmp_path: Path) -> None:
+    """Two SQLite writers can store batches for the same Space."""
+    state = _file_state(tmp_path)
+    author = SpaceParticipant(flwr_aid="alice")
+    space_id = UUID(state.create_space(participants=[author]).id)
+    barrier = Barrier(2)
+
+    def store_batch(index: int) -> list[str]:
+        barrier.wait(timeout=10)
+        items = state.store_space_items(
+            space_id, SpaceItemType.MESSAGE, [f"{index}-a", f"{index}-b"], author
+        )
+        assert items is not None
+        return [item.content for item in items]
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        batches = list(executor.map(store_batch, range(2)))
+
+    assert batches == [["0-a", "0-b"], ["1-a", "1-b"]]
+    stored = state.get_space_items(space_id, author)
+    assert stored is not None
+    assert {item.content for item in stored} == {"0-a", "0-b", "1-a", "1-b"}
 
 
 @pytest.fixture(name="state", params=["memory", "sqlite"])

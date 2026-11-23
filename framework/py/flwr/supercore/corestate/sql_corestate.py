@@ -36,12 +36,15 @@ from sqlalchemy import (
     literal,
     or_,
     select,
+    true,
+    union_all,
     update,
 )
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql.elements import ColumnElement
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -1577,37 +1580,66 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Only message items may have an author")
 
         if author is None:
-            membership = select(SpaceModel.id).where(SpaceModel.id == space_id)
+            source_table = SpaceModel.__table__
+            source_space_id: ColumnElement[Any] = source_table.c.id
+            source_flwr_aid: ColumnElement[Any] = literal(None)
+            source_agent_id: ColumnElement[Any] = literal(None)
+            source_conditions: tuple[ColumnElement[bool], ...] = (
+                SpaceModel.id == space_id,
+            )
         else:
+            source_table = SpaceParticipantTable
+            source_space_id = SpaceParticipantTable.c.space_id
+            source_flwr_aid = SpaceParticipantTable.c.flwr_aid
+            source_agent_id = SpaceParticipantTable.c.agent_id
             field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
-            membership = select(SpaceParticipantTable.c.space_id).where(
+            source_conditions = (
                 SpaceParticipantTable.c.space_id == space_id,
                 SpaceParticipantTable.c[field] == (author.flwr_aid or author.agent_id),
             )
-        with self.session() as session:
-            # shortcut: no removal API exists; check membership in inserts if added.
-            if session.scalar(membership) is None:
-                return None
-            created_at = now()
-            flwr_aid = (
-                author.flwr_aid if author and author.HasField("flwr_aid") else None
-            )
-            agent_id = (
-                author.agent_id if author and author.HasField("agent_id") else None
-            )
-            models = [
-                SpaceItemModel(
-                    space_id=space_id,
-                    type=item_type.value,
-                    flwr_aid=flwr_aid,
-                    agent_id=agent_id,
-                    created_at=created_at,
-                    content=content,
+        input_items = union_all(
+            *(
+                select(
+                    literal(position).label("position"),
+                    literal(content).label("content"),
                 )
-                for content in contents
-            ]
-            session.add_all(models)
-            session.flush()
+                for position, content in enumerate(contents)
+            )
+        ).subquery("input_items")
+        source = (
+            select(
+                source_space_id,
+                literal(item_type.value),
+                source_flwr_aid,
+                source_agent_id,
+                literal(now(), type_=UTCDateTime()),
+                input_items.c.content,
+            )
+            .select_from(source_table.join(input_items, true()))
+            .where(*source_conditions)
+            .order_by(input_items.c.position)
+        )
+        with self.session() as session:
+            models = list(
+                session.scalars(
+                    insert(SpaceItemModel)
+                    .from_select(
+                        [
+                            "space_id",
+                            "type",
+                            "flwr_aid",
+                            "agent_id",
+                            "created_at",
+                            "content",
+                        ],
+                        source,
+                    )
+                    .returning(SpaceItemModel)
+                )
+            )
+            if not models:
+                return None
+            models.sort(key=lambda model: model.id)
             return [_space_item_from_model(model) for model in models]
 
     def get_space_items(  # pylint: disable=too-many-arguments
