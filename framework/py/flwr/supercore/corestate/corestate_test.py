@@ -799,12 +799,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_store_compacted_context(self) -> None:
         """Store summaries at distinct event boundaries for an agent."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@test/app")
-        )
-        other = state.create_agent(
-            "alice", AgentConfig(name="Other", app_spec="@test/app")
-        )
+        agent = state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
+        other = state.create_agent("alice", "@test/app", AgentConfig(name="Other"))
         assert agent is not None and other is not None
         state.store_compacted_context(agent.id, 2**63, "First", token_count=123)
         with self.assertRaises(ValueError):
@@ -1552,9 +1548,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_store_automation_persists_agent_id(self) -> None:
         """Store the agent ID in both state implementations."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "aid-a", AgentConfig(name="Agent", app_spec="@publisher/app")
-        )
+        agent = state.create_agent("aid-a", "@publisher/app", AgentConfig(name="Agent"))
         assert agent is not None
 
         automation = state.store_automation(
@@ -2655,9 +2649,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_user_event_bootstrap(self) -> None:
         """Snapshot owned state and replay shared user and agent messages."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@test/app")
-        )
+        agent = state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
         assert agent is not None
         snapshot = state.get_bootstrap("alice")
         self.assertEqual(list(snapshot.agents), [agent])
@@ -2735,9 +2727,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch.object(state, "store_event", side_effect=fail_space_event):
             with self.assertRaises(ValueError):
-                state.create_agent(
-                    "alice", AgentConfig(name="Agent", app_spec="@test/app")
-                )
+                state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
         snapshot = state.get_bootstrap("alice")
         self.assertFalse(snapshot.agents or snapshot.spaces or snapshot.cursor)
 
@@ -2810,7 +2800,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 agent = executor.submit(
                     state.create_agent,
                     "alice",
-                    AgentConfig(name="Agent", app_spec="@test/app"),
+                    "@test/app",
+                    AgentConfig(name="Agent"),
                 ).result(timeout=5)
             finally:
                 release.set()
@@ -2831,20 +2822,22 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             or state._is_in_memory_sqlite  # pylint: disable=protected-access
         ):
             self.skipTest("Requires persistent SQL state")
-        config = AgentConfig(name="Agent", app_spec="@test/app")
-        state.create_agent("alice", config)
+        config = AgentConfig(name="Agent")
+        state.create_agent("alice", "@test/app", config)
         snapshot = state.get_bootstrap("alice")
         events = state.get_user_events("alice")
         with self.assertRaises(ValueError), state.session():
-            state.create_agent("alice", config)
+            state.create_agent("alice", "@test/app", config)
             raise ValueError("abort")
         state.initialize()
         self.assertEqual(state.get_bootstrap("alice"), snapshot)
         self.assertEqual(state.get_user_events("alice"), events)
         with ThreadPoolExecutor(max_workers=1) as executor:
             with state.session():
-                state.create_agent("alice", config)
-                follower = executor.submit(state.create_agent, "alice", config)
+                state.create_agent("alice", "@test/app", config)
+                follower = executor.submit(
+                    state.create_agent, "alice", "@test/app", config
+                )
                 with self.assertRaises(TimeoutError):
                     follower.result(timeout=0.1)
             follower.result(timeout=5)

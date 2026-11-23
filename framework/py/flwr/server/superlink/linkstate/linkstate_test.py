@@ -536,9 +536,7 @@ class StateTest(CoreStateTest):
     def test_bootstrap_active_runs(self) -> None:
         """Bootstrap includes visible active agent runs and omits finished runs."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
-        )
+        agent = state.create_agent("alice", "@publisher/app", AgentConfig(name="Agent"))
         assert agent is not None
         space_id = UUID(state.get_spaces("alice")[0].id)
         run_id = state.create_run(
@@ -2133,12 +2131,8 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
     def test_get_compacted_contexts(self) -> None:
         """Read only one agent in newest-first order with an exclusive cursor."""
         state = self.state_factory()
-        agent = state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@test/app")
-        )
-        other = state.create_agent(
-            "alice", AgentConfig(name="Other", app_spec="@test/app")
-        )
+        agent = state.create_agent("alice", "@test/app", AgentConfig(name="Agent"))
+        other = state.create_agent("alice", "@test/app", AgentConfig(name="Other"))
         assert agent is not None and other is not None
         with state.session() as session:
             rows = [
@@ -2551,7 +2545,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
             state = states[0]
             agent = state.create_agent(
-                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+                "alice", "@publisher/app", AgentConfig(name="Agent")
             )
             assert agent is not None
             space_id = UUID(state.get_spaces("alice")[0].id)

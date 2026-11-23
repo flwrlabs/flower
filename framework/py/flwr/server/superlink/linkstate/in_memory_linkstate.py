@@ -407,7 +407,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     for owner, agents in self.agent_store.items()
                     if agent_id in agents
                 )
-                app_id, version = parse_app_spec(agent.config.app_spec)
+                app_id, version = parse_app_spec(agent.app_spec)
                 if app_id != f"@{fab_id}" or (version and version != fab_version):
                     return 0
                 if not fab_hash or self.get_fab(fab_hash) is None:

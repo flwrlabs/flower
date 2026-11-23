@@ -44,7 +44,8 @@ def test_create_and_list_spaces(state: CoreState) -> None:
     """Store explicit participants, deduplicate them, and filter listings."""
     agent = state.create_agent(
         flwr_aid="alice",
-        config=AgentConfig(name="Research", app_spec="@flower/research"),
+        app_spec="@flower/research",
+        config=AgentConfig(name="Research"),
     )
     assert agent is not None
     personal = state.get_spaces("alice")[0]
@@ -75,9 +76,7 @@ def test_create_and_list_spaces(state: CoreState) -> None:
 
 def test_latest_user_message(state: CoreState) -> None:
     """Summarize each space's newest user message without consuming history."""
-    agent = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@flower/research")
-    )
+    agent = state.create_agent("alice", "@flower/research", AgentConfig(name="Agent"))
     assert agent is not None
     personal = state.get_spaces("alice")[0]
     assert personal.latest_user_message == ""
@@ -237,9 +236,7 @@ def test_invalid_message_range(state: CoreState, before_id: int, after_id: int) 
 def test_reads_advance_each_participants_cursor(state: CoreState) -> None:
     """Reads advance independent user/agent cursors and never move them backward."""
     agents = [
-        state.create_agent(
-            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
-        )
+        state.create_agent("alice", "@publisher/app", AgentConfig(name="Agent"))
         for _ in range(2)
     ]
     members = [

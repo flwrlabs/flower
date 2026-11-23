@@ -136,9 +136,8 @@ def test_space_session_exposes_agent_identity() -> None:
     """Expose the full agent identity supplied with the task input."""
     identity = Agent(
         id=42,
-        config=AgentConfig(
-            name="Research", app_spec="@flower/research", description="Cite sources."
-        ),
+        app_spec="@flower/research",
+        config=AgentConfig(name="Research", description="Cite sources."),
     )
     task_input = PullTaskInputResponse(agent=identity)
     agent = create_space_session(Mock(_runtime_client=Mock()), Mock(), task_input)

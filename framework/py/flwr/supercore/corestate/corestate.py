@@ -302,6 +302,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def create_agent(
         self,
         flwr_aid: str,
+        app_spec: str,
         config: AgentConfig,
     ) -> Agent | None:
         """Create an agent and its initial Space atomically.
@@ -313,8 +314,10 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         flwr_aid : str
             Account ID owning the agent.
+        app_spec : str
+            Fixed AgentApp specification.
         config : AgentConfig
-            Agent name, app specification, and optional title and description.
+            Agent name and optional title and description.
             Duplicate names are allowed. Optional fields must be nonempty when set.
 
         Returns
@@ -345,9 +348,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         expected_config_version : int
             Current configuration version, which must match to accept the update.
         config : AgentConfig
-            Complete replacement configuration with a nonempty name and the
-            agent's existing app_spec. Absent or empty title and description clear
-            their presence; empty avatar and color reset them.
+            Complete replacement configuration with a nonempty name. Absent or
+            empty title and description clear their presence; empty avatar and
+            color reset them.
 
         Returns
         -------
@@ -359,8 +362,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Raises
         ------
         ValueError
-            If the name is blank or app_spec differs from the agent's existing
-            value.
+            If the name is blank.
         FlowerError
             With code ``ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT`` if the owned
             agent's current version differs from expected_config_version.

@@ -33,11 +33,10 @@ message AgentConfig {
   string name = 1;
   optional string description = 2;
   optional string title = 3;
-  string app_spec = 4;
   // Frontend preset avatar identifier.
-  string avatar = 5;
+  string avatar = 4;
   // Frontend color identifier.
-  string color = 6;
+  string color = 5;
 }
 message Agent {
   uint64 id = 1;
@@ -46,8 +45,12 @@ message Agent {
   string updated_at = 4;
   string default_space_id = 5;
   uint64 config_version = 6;
+  string app_spec = 7;
 }
-message CreateAgentRequest { AgentConfig config = 1; }
+message CreateAgentRequest {
+  AgentConfig config = 1;
+  string app_spec = 2;
+}
 message CreateAgentResponse { Agent agent = 1; }
 message ListAgentsRequest {}
 message ListAgentsResponse { repeated Agent agents = 1; }

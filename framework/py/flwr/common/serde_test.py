@@ -103,7 +103,7 @@ def test_agent_config_proto_roundtrip(
     title: str | None, description: str | None
 ) -> None:
     """Preserve absent and empty nullable Agent configuration fields on the wire."""
-    config = ProtoAgentConfig(name="Research Agent", app_spec="@flower/research==1.2.3")
+    config = ProtoAgentConfig(name="Research Agent")
     if title is not None:
         config.title = title
     if description is not None:
@@ -122,11 +122,11 @@ def test_agent_messages_proto_roundtrip() -> None:
         name="Research Agent",
         title="Researcher",
         description="Investigate and cite sources.",
-        app_spec="@flower/research",
     )
-    request = CreateAgentRequest(config=config)
+    request = CreateAgentRequest(config=config, app_spec="@flower/research")
     agent = ProtoAgent(
         id=42,
+        app_spec=request.app_spec,
         config=config,
         created_at="2026-10-29T08:00:00Z",
         updated_at="2026-10-29T09:00:00Z",
