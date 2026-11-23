@@ -117,8 +117,8 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
-    SendSpaceItemsRequest,
-    SendSpaceItemsResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -286,13 +286,13 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=SendSpaceMessageResponse,
         )
 
-    def SendSpaceItems(self, request: SendSpaceItemsRequest) -> SendSpaceItemsResponse:
-        """Send message items to a Space."""
+    def SendSpaceItem(self, request: SendSpaceItemRequest) -> SendSpaceItemResponse:
+        """Send a message item to a Space."""
         return self._unary_unary(
-            path="/v1/control/send-space-items",
-            rpc_method="/flwr.proto.Control/SendSpaceItems",
+            path="/v1/control/send-space-item",
+            rpc_method="/flwr.proto.Control/SendSpaceItem",
             request=request,
-            response_type=SendSpaceItemsResponse,
+            response_type=SendSpaceItemResponse,
         )
 
     def ListRunSeries(self, request: ListRunSeriesRequest) -> ListRunSeriesResponse:

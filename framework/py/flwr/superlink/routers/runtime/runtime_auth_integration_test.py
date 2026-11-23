@@ -40,7 +40,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
-    SendSpaceItemsRequest,
+    SendSpaceItemRequest,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -311,7 +311,7 @@ def test_space_messages_use_authenticated_run(
     "endpoint,payload",
     [
         ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+        ("send-space-item", SendSpaceItemRequest(content="Hello")),
     ],
 )
 def test_space_item_endpoints_not_available(
