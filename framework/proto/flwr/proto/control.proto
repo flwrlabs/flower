@@ -186,6 +186,9 @@ message GetLoginDetailsResponse {
   string verification_uri_complete = 3;
   int64 expires_in = 4;
   int64 interval = 5;
+  // Used with user_code when the provider omits verification_uri_complete.
+  string verification_uri = 6;
+  string user_code = 7;
 }
 
 message GetAuthTokensRequest { string device_code = 1; }

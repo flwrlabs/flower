@@ -16,11 +16,12 @@
 
 from unittest.mock import Mock, patch
 
+from typer.testing import CliRunner
+
+from flwr.cli.app import app
 from flwr.cli.typing import SuperLinkConnection
 from flwr.proto.control_pb2 import GetLoginDetailsResponse  # pylint: disable=E0611
-from flwr.supercore.auth.typing import AccountAuthCredentials
-
-from .login import login
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 
 
 def test_login_uses_control_http_client() -> None:
@@ -33,7 +34,8 @@ def test_login_uses_control_http_client() -> None:
     response = GetLoginDetailsResponse(
         authn_type="oidc",
         device_code="device-code",
-        verification_uri_complete="https://identity.example/device",
+        verification_uri="https://identity.example/device",
+        user_code="ABCD-EFGH",
         expires_in=300,
         interval=5,
     )
@@ -44,7 +46,7 @@ def test_login_uses_control_http_client() -> None:
     auth_plugin.login.return_value = credentials
 
     with (
-        patch("flwr.cli.login.login.warn_if_federation_config_overrides"),
+        patch("flwr.cli.app.warn_if_flwr_update_available"),
         patch("flwr.cli.login.login.migrate"),
         patch(
             "flwr.cli.login.login.read_superlink_connection",
@@ -60,11 +62,22 @@ def test_login_uses_control_http_client() -> None:
         ),
         patch("flwr.cli.login.login.typer.secho"),
     ):
-        login(Mock(args=[]))
+        result = CliRunner().invoke(app, ["login", "remote"])
 
+    assert result.exit_code == 0
     init_client.assert_called_once()
     assert init_client.call_args.args[0] == connection
-    auth_plugin.login.assert_called_once()
-    assert auth_plugin.login.call_args.args[1] is client
+    auth_plugin.login.assert_called_once_with(
+        AccountAuthLoginDetails(
+            authn_type="oidc",
+            device_code="device-code",
+            verification_uri_complete="",
+            expires_in=300,
+            interval=5,
+            verification_uri="https://identity.example/device",
+            user_code="ABCD-EFGH",
+        ),
+        client,
+    )
     auth_plugin.store_tokens.assert_called_once_with(credentials)
     client.close.assert_called_once_with()

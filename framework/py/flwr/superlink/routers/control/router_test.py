@@ -730,16 +730,27 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
     handler.assert_not_called()
 
 
-def test_get_login_details_does_not_require_bearer_authentication() -> None:
+@pytest.mark.parametrize(
+    ("complete_uri", "verification_uri", "user_code"),
+    [
+        ("https://example.test/verify", "", ""),
+        ("", "https://example.test/verify-code", "ABCD-EFGH"),
+    ],
+)
+def test_get_login_details_does_not_require_bearer_authentication(
+    complete_uri: str, verification_uri: str, user_code: str
+) -> None:
     """Return login details without validating an access token."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.get_login_details.return_value = AccountAuthLoginDetails(
         authn_type="oidc",
         device_code="device-code",
-        verification_uri_complete="https://example.test/verify",
+        verification_uri_complete=complete_uri,
         expires_in=600,
         interval=5,
+        verification_uri=verification_uri,
+        user_code=user_code,
     )
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -754,9 +765,11 @@ def test_get_login_details_does_not_require_bearer_authentication() -> None:
         GetLoginDetailsResponse(
             authn_type="oidc",
             device_code="device-code",
-            verification_uri_complete="https://example.test/verify",
+            verification_uri_complete=complete_uri,
             expires_in=600,
             interval=5,
+            verification_uri=verification_uri,
+            user_code=user_code,
         )
     )
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
