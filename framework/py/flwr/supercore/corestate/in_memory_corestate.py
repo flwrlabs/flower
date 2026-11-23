@@ -677,8 +677,10 @@ class InMemoryCoreState(
             return True
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an owned agent, including retained deleted agents."""
+        """Return an owned active agent, or None if unavailable."""
         with self.lock_agent_store:
+            if agent_id in self.deleted_agent_store:
+                return None
             return self.agent_store.get(flwr_aid, {}).get(agent_id)
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
@@ -988,10 +990,7 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if (
-            agent_id is not None
-            and self.get_default_space(created_by, agent_id) is None
-        ):
+        if agent_id is not None and self.get_agent(created_by, agent_id) is None:
             return None
         with self.lock_connector_store:
             self.connector_id_counter += 1
@@ -1126,7 +1125,7 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if agent_id is not None and self.get_default_space(flwr_aid, agent_id) is None:
+        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
             return None
         expires_at = expires_at.astimezone(UTC)
         session = ConnectorOAuthSessionRecord(
@@ -1498,10 +1497,7 @@ class InMemoryCoreState(
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
         with self.lock_automation_store:
-            if (
-                agent_id is not None
-                and self.get_default_space(flwr_aid, agent_id) is None
-            ):
+            if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
                 raise ValueError("Agent not found.")
             current = now()
             automation_id = self._next_automation_id

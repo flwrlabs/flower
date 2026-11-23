@@ -793,7 +793,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Archive an agent and stop future scheduled activity atomically."""
         deleted_at = now()
         with self.session() as session:
-            deleted_id = session.scalar(
+            model = session.scalar(
                 update(AgentModel)
                 .where(
                     AgentModel.agent_id == agent_id,
@@ -804,12 +804,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     deleted_at=deleted_at,
                     updated_at=deleted_at,
                 )
-                .returning(AgentModel.agent_id)
+                .returning(AgentModel)
             )
-            agent = self.get_agent(flwr_aid, agent_id)
-            if deleted_id is None:
-                return agent is not None
-            assert agent is not None
+            if model is None:
+                current = session.get(AgentModel, agent_id)
+                return current is not None and current.flwr_aid == flwr_aid
+            snapshot = session.get(AgentConfigModel, (agent_id, model.config_version))
+            assert snapshot is not None
+            agent = _agent_from_model(model, snapshot)
             session.execute(
                 update(AutomationModel)
                 .where(
@@ -826,7 +828,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return True
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an owned agent, including retained deleted agents."""
+        """Return an owned active agent, or None if unavailable."""
         with self.session() as session:
             row = session.execute(
                 select(AgentModel, AgentConfigModel)
@@ -838,6 +840,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
+                    AgentModel.deleted_at.is_(None),
                 )
                 .execution_options(populate_existing=True)
             ).one_or_none()
@@ -1259,10 +1262,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            if (
-                agent_id is not None
-                and self.get_default_space(created_by, agent_id) is None
-            ):
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
                 return None
             return session.scalar(stmt)
 
@@ -1423,10 +1423,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as db_session:
-                if (
-                    agent_id is not None
-                    and self.get_default_space(flwr_aid, agent_id) is None
-                ):
+                if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
                     return None
                 db_session.add(model)
                 db_session.flush()

@@ -173,12 +173,10 @@ def test_delete_agent(state: CoreState, agent: Agent) -> None:
     assert not state.delete_agent("bob", agent.id)
     assert not state.delete_agent("alice", agent.id + 1)
     assert state.delete_agent("alice", agent.id)
+    assert state.get_agent("alice", agent.id) is None
     assert state.get_default_space("alice", agent.id) is None
     assert not state.get_bootstrap("alice").agents
     assert [space.id for space in state.get_spaces("alice")] == [group.id]
-    archived = state.get_agent("alice", agent.id)
-    assert archived is not None and archived.config == agent.config
-    deleted_at = archived.updated_at
     assert state.get_agent("bob", agent.id) is None
     assert state.get_space_messages(
         UUID(group.id), SpaceParticipant(flwr_aid="alice")
@@ -188,18 +186,19 @@ def test_delete_agent(state: CoreState, agent: Agent) -> None:
     events = state.get_user_events("alice", cursor)
     assert len(events) == 1 and events[0].event.type == EventType.AGENT_DELETED
     assert events[0].event.payload["id"] == str(agent.id)
+    deleted_at = events[0].event.payload["updated_at"]
     assert state.delete_agent("alice", agent.id)
-    repeated = state.get_agent("alice", agent.id)
-    assert repeated is not None and repeated.updated_at == deleted_at
     assert state.get_user_events("alice", cursor) == events
     assert not state.get_user_events("bob")
     if isinstance(state, SqlLinkState):
         with state.session() as session:
             model = session.get(AgentModel, agent.id)
             assert model is not None and model.deleted_at is not None
+            assert model.deleted_at.isoformat() == deleted_at
             assert session.get(AgentConfigModel, (agent.id, 1)) is not None
     else:
         assert isinstance(state, InMemoryLinkState)
+        assert state.agent_store["alice"][agent.id].config == agent.config
         assert state.deleted_agent_store[agent.id].isoformat() == deleted_at
 
 
