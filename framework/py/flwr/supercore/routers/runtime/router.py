@@ -318,7 +318,7 @@ def runtime_send_space_items(
     _request: Annotated[SendSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     _task: TaskDependency,
 ) -> SendSpaceItemsResponse:
-    """Publish an item to the authenticated task's Space once supported."""
+    """Publish message items to the authenticated task's Space once supported."""
     raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItems pending")
 
 

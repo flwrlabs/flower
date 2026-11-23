@@ -287,7 +287,7 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
         )
 
     def SendSpaceItems(self, request: SendSpaceItemsRequest) -> SendSpaceItemsResponse:
-        """Send a space item."""
+        """Send message items to a Space."""
         return self._unary_unary(
             path="/v1/control/send-space-items",
             rpc_method="/flwr.proto.Control/SendSpaceItems",

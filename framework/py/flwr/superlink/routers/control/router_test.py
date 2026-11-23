@@ -84,8 +84,10 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     ListSpacesRequest,
     ListSpacesResponse,
     SendSpaceItemsRequest,
+    SendSpaceItemsResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceItem,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -201,7 +203,7 @@ def test_space_routes(
     "endpoint,payload",
     [
         ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-items", SendSpaceItemsRequest(content="Hello")),
+        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
     ],
 )
 def test_space_item_endpoints_not_available(
@@ -214,6 +216,27 @@ def test_space_item_endpoints_not_available(
     )
     assert response.status_code == 501
     assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+
+
+def test_send_space_items_batch_wire_format() -> None:
+    """Preserve multiple message contents and created items on the wire."""
+    request = SendSpaceItemsRequest(contents=["First", "Second"])
+    response = SendSpaceItemsResponse(
+        items=[SpaceItem(content="First"), SpaceItem(content="Second")]
+    )
+
+    assert list(
+        SendSpaceItemsRequest.FromString(request.SerializeToString()).contents
+    ) == [
+        "First",
+        "Second",
+    ]
+    assert [
+        item.content
+        for item in SendSpaceItemsResponse.FromString(
+            response.SerializeToString()
+        ).items
+    ] == ["First", "Second"]
 
 
 def test_create_space_rejects_invalid_participants(

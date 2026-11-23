@@ -289,7 +289,7 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
         )
 
     def SendSpaceItems(self, request: SendSpaceItemsRequest) -> SendSpaceItemsResponse:
-        """Publish a message item as the task's agent participant."""
+        """Publish message items as the task's agent participant."""
         return self._unary_unary(
             path="/v1/runtime/send-space-items",
             rpc_method="/flwr.proto.Runtime/SendSpaceItems",

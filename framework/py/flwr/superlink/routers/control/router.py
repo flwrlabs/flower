@@ -294,7 +294,7 @@ def send_space_items(
     _request: Annotated[SendSpaceItemsRequest, Depends(get_protobuf_request)],
     _account: AccountDependency,
 ) -> SendSpaceItemsResponse:
-    """Send a space item once supported."""
+    """Send message items once supported."""
     raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItems pending")
 
 

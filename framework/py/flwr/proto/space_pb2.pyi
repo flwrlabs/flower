@@ -356,20 +356,23 @@ class SendSpaceItemsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SPACE_ID_FIELD_NUMBER: builtins.int
-    CONTENT_FIELD_NUMBER: builtins.int
+    CONTENTS_FIELD_NUMBER: builtins.int
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
-    content: builtins.str
-    """This endpoint will accept only message items. The server supplies
-    type = "message" and resolves the author, so callers omit both fields.
-    """
+    @property
+    def contents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """When implemented, each entry becomes one message item, in order.
+        The server supplies type = "message" and resolves the author;
+        other item types are not accepted.
+        """
+
     def __init__(
         self,
         *,
         space_id: builtins.str = ...,
-        content: builtins.str = ...,
+        contents: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["contents", b"contents", "space_id", b"space_id"]) -> None: ...
 
 global___SendSpaceItemsRequest = SendSpaceItemsRequest
 
@@ -377,15 +380,16 @@ global___SendSpaceItemsRequest = SendSpaceItemsRequest
 class SendSpaceItemsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ITEM_FIELD_NUMBER: builtins.int
+    ITEMS_FIELD_NUMBER: builtins.int
     @property
-    def item(self) -> global___SpaceItem: ...
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceItem]:
+        """Created items in request order."""
+
     def __init__(
         self,
         *,
-        item: global___SpaceItem | None = ...,
+        items: collections.abc.Iterable[global___SpaceItem] | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["item", b"item"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["item", b"item"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
 
 global___SendSpaceItemsResponse = SendSpaceItemsResponse

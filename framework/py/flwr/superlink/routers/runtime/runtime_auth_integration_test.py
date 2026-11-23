@@ -310,7 +310,7 @@ def test_space_messages_use_authenticated_run(
     "endpoint,payload",
     [
         ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-items", SendSpaceItemsRequest(content="Hello")),
+        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
     ],
 )
 def test_space_item_endpoints_not_available(
