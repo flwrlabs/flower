@@ -1306,6 +1306,8 @@ def process_pending_agent_runs(
                 primary_task_type=TaskType.AGENT_APP,
                 space_id=space_id,
                 agent_id=agent.id,
+                # SpaceMessages have no SpaceItem ID until they enter the item stream.
+                trigger_item_id=None,
             )
             if run_id:
                 created += 1

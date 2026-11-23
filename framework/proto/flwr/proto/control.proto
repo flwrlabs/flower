@@ -61,6 +61,8 @@ message UpdateAgentRequest {
   AgentConfig config = 3;
 }
 message UpdateAgentResponse { Agent agent = 1; }
+message DeleteAgentRequest { uint64 agent_id = 1; }
+message DeleteAgentResponse {}
 
 message StartRunRequest {
   Fab fab = 1;
