@@ -238,6 +238,7 @@ class EventType(StrEnum):
     """Application events delivered through user feeds."""
 
     AGENT_CREATED = "agent.created"
+    AGENT_UPDATED = "agent.updated"
     SPACE_CREATED = "space.created"
     MESSAGE_CREATED = "message.created"
     RUN_CREATED = "run.created"
