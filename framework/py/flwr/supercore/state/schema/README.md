@@ -16,6 +16,7 @@ erDiagram
     CHAR(32) default_space_id FK
     VARCHAR app_spec
     TIMESTAMP created_at
+    TIMESTAMP deleted_at "nullable"
     VARCHAR flwr_aid
     TIMESTAMP updated_at
   }
