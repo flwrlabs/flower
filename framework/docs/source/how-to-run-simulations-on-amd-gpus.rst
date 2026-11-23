@@ -339,6 +339,7 @@ exported, silently leaving Ray's original import failure in place:
         else
             IFS=',' read -ra _rocr_ids <<<"$ROCR_VISIBLE_DEVICES"
             _rocr_norm=()
+            _rocr_bad_id=0
             for _id in "${_rocr_ids[@]}"; do
                 if [[ "$_id" =~ ^[0-9]+$ ]]; then
                     # ROCr treats `0` and `00` as the same ordinal, but they
@@ -348,30 +349,51 @@ exported, silently leaving Ray's original import failure in place:
                     _trimmed_id="${_id#"${_id%%[!0]*}"}"
                     [ -z "$_trimmed_id" ] && _trimmed_id=0
                     _rocr_norm+=("$_trimmed_id")
-                else
+                elif [[ "$_id" =~ ^GPU-[0-9a-fA-F-]+$ ]]; then
+                    # ROCR_VISIBLE_DEVICES also accepts a `GPU-<hex>` UUID in
+                    # place of a numeric ordinal; it still names exactly one
+                    # device, so it is counted the same as a numeric entry,
+                    # just not leading-zero-normalized.
                     _rocr_norm+=("$_id")
+                else
+                    # Neither a numeric ordinal nor the documented `GPU-<hex>`
+                    # UUID syntax -- for example a typo like `bogus`. Counting
+                    # it as one real device below would let Ray size a
+                    # schedulable GPU slot that ROCr never actually exposes.
+                    # Leave `_n` unset instead, handled the same "bound
+                    # unknown" way as ROCR_VISIBLE_DEVICES itself being unset.
+                    _rocr_bad_id=1
                 fi
             done
-            _rocr_dup=$(printf '%s\n' "${_rocr_norm[@]}" | sort | uniq -d)
-            if [ -n "$_rocr_dup" ]; then
-                # A duplicated entry (e.g. `0,0`, or `0,00` once normalized)
-                # makes a plain comma count overstate how many distinct
-                # devices ROCR_VISIBLE_DEVICES actually exposes -- `0,0` is
-                # one device, not two -- so deriving `_n` from it would size
-                # both the HIP_VISIBLE_DEVICES synthesis and the
-                # ordinal-bounds check below off a wrong count, and would
-                # under-count ROCr's own filtering: only one distinct GPU
-                # remains, yet Ray would still advertise a second,
-                # no-ordinal-backed slot. Leave `_n` unset instead.
-                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
-                     "repeats ordinal(s) $_rocr_dup once leading zeros are" \
-                     "normalized -- the number of distinct devices it" \
-                     "exposes cannot be derived from it. Fix" \
-                     "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+            if [ "$_rocr_bad_id" -eq 1 ]; then
+                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has an" \
+                     "entry that is neither a numeric ordinal nor a GPU-<hex>" \
+                     "UUID -- the number of devices it exposes cannot be" \
+                     "derived from it. Fix ROCR_VISIBLE_DEVICES itself and" \
+                     "re-run this snippet." >&2
             else
-                _n=${#_rocr_ids[@]}
+                _rocr_dup=$(printf '%s\n' "${_rocr_norm[@]}" | sort | uniq -d)
+                if [ -n "$_rocr_dup" ]; then
+                    # A duplicated entry (e.g. `0,0`, or `0,00` once
+                    # normalized) makes a plain comma count overstate how
+                    # many distinct devices ROCR_VISIBLE_DEVICES actually
+                    # exposes -- `0,0` is one device, not two -- so deriving
+                    # `_n` from it would size both the HIP_VISIBLE_DEVICES
+                    # synthesis and the ordinal-bounds check below off a
+                    # wrong count, and would under-count ROCr's own
+                    # filtering: only one distinct GPU remains, yet Ray would
+                    # still advertise a second, no-ordinal-backed slot. Leave
+                    # `_n` unset instead.
+                    echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                         "repeats ordinal(s) $_rocr_dup once leading zeros are" \
+                         "normalized -- the number of distinct devices it" \
+                         "exposes cannot be derived from it. Fix" \
+                         "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+                else
+                    _n=${#_rocr_ids[@]}
+                fi
             fi
-            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup
+            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then

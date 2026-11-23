@@ -292,6 +292,134 @@ def test_kfd_accessible_but_no_usable_render_node_reports_render_node(
     assert "render" in output
 
 
+def test_kfd_accessible_unknown_vendor_node_denied_reports_both_issues(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that a render node with unknown vendor and denied access reports
+    both issues, rather than letting the vendor-undetermined message hide a
+    concrete, actionable permission failure.
+
+    `_is_amd_render_node` returning `None` (sysfs missing/unreadable) does not
+    mean the node's access state is also unknown -- `_can_open_device` can
+    still return a definite `False` for it, and that must be surfaced.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            # /dev/kfd itself opens fine; only the render node is denied.
+            side_effect=lambda path: False if path != "/dev/kfd" else True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=None,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "this process cannot open it" in output
+    assert "cannot determine its PCI vendor ID" in output
+    assert "opens successfully" not in output
+    assert "undetermined too" not in output
+
+
+def test_kfd_accessible_unknown_vendor_node_inconclusive_reports_undetermined(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that a render node with unknown vendor and inconclusive access
+    reports both as undetermined, rather than falsely claiming a concrete
+    permission denial that did not occur.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            # /dev/kfd itself opens fine; only the render node is inconclusive.
+            side_effect=lambda path: None if path != "/dev/kfd" else True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=None,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "undetermined too" in output
+    assert "this process cannot open it" not in output
+    assert "opens successfully" not in output
+
+
+def test_kfd_accessible_unknown_vendor_node_accessible_reports_vendor_only(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that a render node with unknown vendor but confirmed access only
+    reports the vendor as undetermined, and is not mistaken for the
+    confirmed-AMD-and-accessible branch that points at `amdsmi`.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=None,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "opens successfully" in output
+    assert "this process cannot open it" not in output
+    assert "undetermined too" not in output
+    assert "python -c 'import amdsmi'" not in output
+
+
 def test_multi_node_cluster_skips_driver_host_diagnostics(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
