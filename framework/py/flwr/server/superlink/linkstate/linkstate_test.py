@@ -96,6 +96,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
@@ -923,6 +924,18 @@ class StateTest(CoreStateTest):
         """Return the trigger item ID supplied when creating a run."""
         state = self.state_factory()
         space_id = UUID(state.create_space(participants=[]).id)
+        trigger_item_id = 123
+        if isinstance(state, SqlLinkState):
+            with state.session() as session:
+                item = SpaceItemModel(
+                    space_id=space_id,
+                    type="automation",
+                    created_at=now(),
+                    content="test",
+                )
+                session.add(item)
+                session.flush()
+                trigger_item_id = item.id
         run_id = state.create_run(
             fab_id="flwr/test",
             fab_version="1.0",
@@ -933,13 +946,20 @@ class StateTest(CoreStateTest):
             flwr_aid="account",
             primary_task_type=TaskType.AGENT_APP,
             space_id=space_id,
-            trigger_item_id=123,
+            trigger_item_id=trigger_item_id,
         )
 
-        assert state.get_run(run_ids=[run_id])[0].trigger_item_id == 123
+        assert state.get_run(run_ids=[run_id])[0].trigger_item_id == trigger_item_id
         assert (
             state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_id is None
         )
+        if isinstance(state, SqlLinkState):
+            with self.assertRaises(IntegrityError), state.session() as session:
+                session.execute(
+                    update(RunModel)
+                    .where(RunModel.run_id == run_id)
+                    .values(trigger_item_id=trigger_item_id + 1)
+                )
 
     def test_get_run_filter_space_and_federation_runs(self) -> None:
         """Distinguish unrestricted, empty, Space-only, and mixed filters."""
