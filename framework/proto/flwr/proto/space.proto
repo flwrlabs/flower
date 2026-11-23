@@ -46,6 +46,16 @@ message SpaceMessage {
   string content = 5;
 }
 
+message SpaceItem {
+  uint64 id = 1;
+  string space_id = 2;
+  // Set for message items; absent for automations.
+  SpaceParticipant author = 3;
+  string created_at = 4;
+  string content = 5;
+  string type = 6;
+}
+
 // Selects the newest page by default. All reads advance the caller's read
 // cursor.
 message GetSpaceMessagesRequest {
@@ -63,6 +73,23 @@ message GetSpaceMessagesRequest {
 message GetSpaceMessagesResponse {
   // Messages in the selected page, ordered by ascending ID.
   repeated SpaceMessage messages = 1;
+}
+
+message GetSpaceItemsRequest {
+  // Required by Control. Runtime uses the authenticated task's Space.
+  string space_id = 1;
+  // Exclusive upper ID bound.
+  optional uint64 before_id = 2;
+  // Absent uses the server's default page size.
+  optional uint32 limit = 3;
+  // Runtime only: exclusive lower bound, selecting the earliest matching page.
+  optional uint64 after_id = 4;
+  // Return only items after the caller's read cursor, oldest first.
+  bool unread_only = 5;
+}
+message GetSpaceItemsResponse {
+  // Items in the selected page, ordered by ascending ID.
+  repeated SpaceItem items = 1;
 }
 
 message SendSpaceMessageRequest {
