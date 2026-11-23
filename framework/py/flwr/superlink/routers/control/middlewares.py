@@ -26,7 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.types import ASGIApp
 
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.superlink.config_loader import get_license_plugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
@@ -98,7 +98,7 @@ class ControlEventLogMiddleware(BaseHTTPMiddleware):
 
         # Authentication runs before event logging and stores the account.
         account_info = getattr(request.state, "account", None)
-        if not isinstance(account_info, AccountInfo):
+        if not isinstance(account_info, AuthenticatedUser):
             account_info = None
 
         def write_before_event() -> None:

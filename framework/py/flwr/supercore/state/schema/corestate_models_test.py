@@ -22,6 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from flwr.supercore.constant import SpaceItemType
 from flwr.supercore.state.schema.corestate_models import (
     Event,
     FlwrBase,
@@ -38,9 +39,11 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "agent_config",
     "space",
     "space_participant",
     "space_message",
+    "space_item",
     "events",
     "user_events",
     "user_event_feeds",
@@ -136,6 +139,7 @@ def test_connector_requires_exactly_one_existing_owner(
     """Accept one owner and require agent owners to reference an existing agent."""
     table = FlwrBase.metadata.tables[table_name]
     agent_table = FlwrBase.metadata.tables["agent"]
+    config_table = FlwrBase.metadata.tables["agent_config"]
     space_table = FlwrBase.metadata.tables["space"]
     timestamp = datetime.now(UTC)
     values: dict[str, object] = {
@@ -160,15 +164,28 @@ def test_connector_requires_exactly_one_existing_owner(
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
         space_table.create(conn)
         agent_table.create(conn)
+        config_table.create(conn)
         table.create(conn)
+        conn.execute(
+            space_table.insert().values(id=UUID(int=1), created_at=timestamp, title="")
+        )
         conn.execute(
             agent_table.insert().values(
                 agent_id=1,
-                name="Agent",
-                app_spec="@user/app",
                 flwr_aid="user",
+                app_spec="@user/app",
+                config_version=1,
+                default_space_id=UUID(int=1),
                 created_at=timestamp,
                 updated_at=timestamp,
+            )
+        )
+        conn.execute(
+            config_table.insert().values(
+                agent_id=1,
+                version=1,
+                name="Agent",
+                created_at=timestamp,
             )
         )
         if error is None:
@@ -206,6 +223,44 @@ def test_space_requires_exactly_one_identity(
     }
     if table_name == "space_message":
         values.update(content="Hello", created_at=datetime.now(UTC))
+
+    with engine.begin() as conn:
+        if valid:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
+                conn.execute(table.insert().values(**values))
+
+
+@pytest.mark.parametrize(
+    ("item_type", "flwr_aid", "agent_id", "valid"),
+    [
+        (SpaceItemType.MESSAGE, "user", None, True),
+        (SpaceItemType.MESSAGE, None, 1, True),
+        (SpaceItemType.MESSAGE, None, None, False),
+        (SpaceItemType.MESSAGE, "user", 1, False),
+        (SpaceItemType.AUTOMATION, None, None, True),
+        (SpaceItemType.AUTOMATION, "user", None, False),
+    ],
+)
+def test_space_item_requires_author_only_for_messages(
+    item_type: SpaceItemType,
+    flwr_aid: str | None,
+    agent_id: int | None,
+    valid: bool,
+) -> None:
+    """Keep message authors while allowing system-created automation items."""
+    table = FlwrBase.metadata.tables["space_item"]
+    engine = create_engine("sqlite:///:memory:")
+    table.create(engine)
+    values = {
+        "space_id": UUID(int=1),
+        "type": item_type,
+        "flwr_aid": flwr_aid,
+        "agent_id": agent_id,
+        "created_at": datetime.now(UTC),
+        "content": "Hello",
+    }
 
     with engine.begin() as conn:
         if valid:

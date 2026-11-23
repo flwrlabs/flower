@@ -73,6 +73,39 @@ def test_create_and_list_spaces(state: CoreState) -> None:
     )
 
 
+def test_latest_user_message(state: CoreState) -> None:
+    """Summarize each space's newest user message without consuming history."""
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@flower/research")
+    )
+    assert agent is not None
+    personal = state.get_spaces("alice")[0]
+    assert personal.latest_user_message == ""
+    alice = SpaceParticipant(flwr_aid="alice")
+    bob = SpaceParticipant(flwr_aid="bob")
+    author = SpaceParticipant(agent_id=agent.id)
+    state.create_space_message(UUID(personal.id), author, "Agent-only space")
+    shared = state.create_space(participants=[alice, bob, author])
+    space_id = UUID(shared.id)
+    first = state.create_space_message(space_id, alice, "First prompt")
+    previous = state.get_spaces("bob")[0]
+    prompt = "  Follow up: €100.\nNext line.  "
+    latest = state.create_space_message(space_id, bob, prompt)
+    reply = state.create_space_message(space_id, author, "Agent reply")
+    other = state.create_space(participants=[alice])
+    state.create_space_message(UUID(other.id), alice, "Other space")
+    expected = {personal.id: "", shared.id: prompt, other.id: "Other space"}
+    assert {
+        space.id: space.latest_user_message for space in state.get_spaces("alice")
+    } == expected
+    assert previous.latest_user_message == "First prompt"
+    assert state.get_space_messages(space_id, alice, unread_only=True) == [
+        first,
+        latest,
+        reply,
+    ]
+
+
 def test_participation_controls_message_access(state: CoreState) -> None:
     """Only initial participants can read and publish space messages."""
     bob = SpaceParticipant(flwr_aid="bob")
@@ -85,7 +118,6 @@ def test_participation_controls_message_access(state: CoreState) -> None:
     assert state.create_space_message(space_id, outsider, "No access") is None
     message = state.create_space_message(space_id, bob, "Hello")
     assert message is not None and message.author == bob
-    assert message.hidden is False
     assert state.get_space_messages(space_id, SpaceParticipant(flwr_aid="bob")) == [
         message
     ]

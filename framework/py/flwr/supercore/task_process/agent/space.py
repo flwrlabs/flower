@@ -44,7 +44,6 @@ def _message_to_json(message: SpaceMessage) -> JSONObject:
         "author": author,
         "created_at": message.created_at,
         "content": message.content,
-        "hidden": message.hidden,
     }
 
 

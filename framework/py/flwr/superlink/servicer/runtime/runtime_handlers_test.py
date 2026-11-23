@@ -31,6 +31,7 @@ from uuid import UUID
 
 import pytest
 from parameterized import parameterized
+from sqlalchemy import update as sql_update
 
 from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import NOOP_FLWR_AID, SUPERLINK_NODE_ID, Status, SubStatus
@@ -77,6 +78,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
+from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
@@ -93,6 +95,8 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.oauth import OAuthFlow
 from flwr.superlink.federation import NoOpFederationManager
@@ -209,8 +213,10 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("backend", ["memory", "sqlite"])
-def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> None:
-    """Resolve an accountless agent run to its owner and supply its identity."""
+def test_agent_task_input_includes_latest_identity(
+    backend: str, tmp_path: Path
+) -> None:
+    """Supply current metadata for an agent run while retaining its fixed AgentApp."""
     database = (
         FLWR_IN_MEMORY_DB_NAME if backend == "memory" else str(tmp_path / "state.db")
     )
@@ -241,7 +247,32 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
         agent_id=agent.id,
     )
     assert run_id
-    assert state.get_run_info(run_ids=[run_id])[0].flwr_aid == "alice"
+    assert state.get_run(run_ids=[run_id])[0].flwr_aid == "alice"
+    if isinstance(state, SqlLinkState):
+        # An edit after acceptance must be visible when the task pulls its input.
+        with state.session() as session:
+            session.add(
+                AgentConfigModel(
+                    agent_id=agent.id,
+                    version=2,
+                    name="Updated Research",
+                    title="Updated title",
+                    description="Updated description",
+                    avatar="robot",
+                    color="blue",
+                    created_at=datetime.now(UTC),
+                )
+            )
+            session.execute(
+                sql_update(AgentModel)
+                .where(AgentModel.agent_id == agent.id)
+                .values(config_version=2)
+            )
+        agent.config.name = "Updated Research"
+        agent.config.title = "Updated title"
+        agent.config.description = "Updated description"
+        agent.config.avatar = "robot"
+        agent.config.color = "blue"
     acquired = core_runtime_handlers.acquire_task(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
@@ -251,6 +282,7 @@ def test_agent_task_input_includes_identity(backend: str, tmp_path: Path) -> Non
     )
 
     assert response.agent == agent
+    assert response.run.fab_hash == fab_hash
 
 
 def test_push_empty_messages_returns_empty_response() -> None:
@@ -313,7 +345,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     state = Mock(spec=LinkState)
     current_run = Mock(run_id=123, series_id=456, primary_task_id=789)
     series_runs = [Mock(run_id=120, primary_task_id=780), current_run]
-    state.get_run_info.side_effect = [[current_run], series_runs]
+    state.get_run.side_effect = [[current_run], series_runs]
     state.get_run_series.return_value = [Mock(run_ids=[120, 123])]
     expected_event = TaskEvent(
         id=11,
@@ -348,7 +380,7 @@ def test_get_run_series_events_uses_authenticated_task_series() -> None:
     )
 
     state.get_task_events.reset_mock()
-    state.get_run_info.side_effect = [[current_run], series_runs]
+    state.get_run.side_effect = [[current_run], series_runs]
     runtime_handlers.get_run_series_events(
         GetRunSeriesEventsRequest(after_event_id=10, last_n=0),
         state,
@@ -367,7 +399,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     """Read only events from the authenticated task's Space."""
     state = Mock(spec=LinkState)
     space_id = UUID("12345678-1234-5678-1234-567812345678")
-    state.get_run_info.return_value = [Mock(space_id=space_id)]
+    state.get_run.return_value = [Mock(space_id=space_id)]
     expected_event = TaskEvent(id=11, run_id=123, event="message", data="{}")
     state.get_task_events.return_value = [expected_event]
     request = GetSpaceEventsRequest(
@@ -380,7 +412,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
     response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
 
     assert response == GetSpaceEventsResponse(events=[expected_event])
-    state.get_run_info.assert_called_once_with(run_ids=[123])
+    state.get_run.assert_called_once_with(run_ids=[123])
     state.get_task_events.assert_called_once_with(
         space_id=space_id,
         event_types=["message"],
@@ -393,7 +425,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
 def test_get_space_events_rejects_non_space_run() -> None:
     """A federation task cannot use the Space event endpoint."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [Mock(space_id=None)]
+    state.get_run.return_value = [Mock(space_id=None)]
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.get_space_events(
@@ -407,7 +439,7 @@ def test_get_space_events_rejects_non_space_run() -> None:
 def test_get_space_events_rejects_unknown_run() -> None:
     """Reject requests whose authenticated run no longer exists."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = []
+    state.get_run.return_value = []
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.get_space_events(
@@ -421,7 +453,7 @@ def test_get_space_events_rejects_unknown_run() -> None:
 def test_get_compacted_contexts_uses_authenticated_agent() -> None:
     """Summary requests use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [
+    state.get_run.return_value = [
         Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
     ]
     state.get_compacted_contexts.return_value = []
@@ -437,7 +469,7 @@ def test_get_compacted_contexts_uses_authenticated_agent() -> None:
 def test_put_compacted_context_uses_authenticated_agent() -> None:
     """Summary writes use the authenticated task's agent."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [
+    state.get_run.return_value = [
         Mock(series_id=456, agent_id=789, space_id=UUID(int=1), primary_task_id=1)
     ]
     request = PutCompactedContextRequest(
@@ -458,7 +490,7 @@ def test_compacted_contexts_require_primary_agent(
 ) -> None:
     """Only the bound primary AgentApp task can access compacted contexts."""
     state = Mock(spec=LinkState)
-    state.get_run_info.return_value = [
+    state.get_run.return_value = [
         Mock(agent_id=agent_id, space_id=UUID(int=1), primary_task_id=1)
     ]
     task = Task(task_id=task_id, run_id=123, type=TaskType.AGENT_APP)
@@ -507,7 +539,7 @@ def _create_shared_runtime(
         "",
         TaskType.SERVER_APP,
     )
-    run = state_0.get_run_info(run_ids=[run_id])[0]
+    run = state_0.get_run(run_ids=[run_id])[0]
     state_0.set_run_series_context(
         run.series_id,
         Context(
@@ -579,7 +611,7 @@ class TestGetConnector(unittest.TestCase):
             connector_ref="example",
             run_id=123,
         )
-        self.state.get_run_info.return_value = [
+        self.state.get_run.return_value = [
             Mock(federation_id="@bob/fed-a", agent_id=None)
         ]
         self.state.get_run_connector_ids.return_value = [42]
@@ -718,7 +750,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         self._auth_task = self.state.get_tasks(task_ids=[auth_task_id])[0]
 
     def _primary_task_id(self, run_id: int) -> int:
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         assert run.primary_task_id is not None
         return run.primary_task_id
 
@@ -733,7 +765,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_acquire_task_processes_due_automations(self) -> None:
         """A SuperExec poll should create and claim a due automation's task."""
-        series_id = self.state.get_run_info(run_ids=[self._auth_run_id])[0].series_id
+        series_id = self.state.get_run(run_ids=[self._auth_run_id])[0].series_id
         automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
             flwr_aid=NOOP_FLWR_AID,
@@ -768,7 +800,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             )
 
         self.assertTrue(response.token)
-        run = self.state.get_run_info(run_ids=[response.task.run_id])[0]
+        run = self.state.get_run(run_ids=[response.task.run_id])[0]
         self.assertEqual(run.series_id, automation.series_id)
         completed = self.state.list_automations(
             automation_ids=[automation.automation_id],
@@ -884,13 +916,13 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert
         assert isinstance(response, PushTaskOutputResponse)
-        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        run = self.state.get_run(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
 
     def test_push_task_output_stores_run_series_context(self) -> None:
         """PushTaskOutput should persist context in the authenticated run series."""
         # Prepare
-        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        run = self.state.get_run(run_ids=[self._auth_run_id])[0]
         request_context = Context(
             run_id=123,
             node_id=SUPERLINK_NODE_ID,
@@ -1298,7 +1330,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert self.state.claim_task(task_id) is not None
 
         # Set run series context as if it was persisted by an earlier run.
-        run = self.state.get_run_info(run_ids=[run_id])[0]
+        run = self.state.get_run(run_ids=[run_id])[0]
         context = Context(
             123,
             SUPERLINK_NODE_ID,

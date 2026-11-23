@@ -35,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -43,7 +44,7 @@ from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.supercore import log
-from flwr.supercore.constant import NodeStatus, TaskType
+from flwr.supercore.constant import EventType, NodeStatus, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.corestate.utils import validate_task_event_data
 from flwr.supercore.date import now
@@ -127,6 +128,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if task is None:
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
+
+    def _get_run_space_id(self, run_id: int) -> UUID | None:
+        """Return the run's Space without advancing its task lifecycle."""
+        with self.lock:
+            record = self.run_ids.get(run_id)
+            return record.space_id if record is not None else None
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
@@ -342,7 +349,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return node_id
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-    def create_run(
+    def create_run(  # pylint: disable=too-many-branches
         self,
         fab_id: str | None,
         fab_version: str | None,
@@ -359,6 +366,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
+        trigger_item_type: str | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -452,6 +460,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
                     agent_id=agent_id,
+                    trigger_item_type=trigger_item_type,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,
@@ -491,6 +500,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 connector_ids=connector_ids,
             )
 
+            if space_id is not None:
+                self.store_event(
+                    EventType.RUN_CREATED,
+                    run_to_proto(self._get_run(run_id)),
+                    space_id=space_id,
+                )
+                self.store_event(
+                    EventType.TASK_CREATED,
+                    self.task_store[task_id],
+                    space_id=space_id,
+                )
             return run_id
 
     def _agent_has_open_run(self, space_id: UUID, agent_id: int) -> bool:
@@ -541,10 +561,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                             return candidates
             return candidates
 
-    def get_run_info(
+    def get_run(
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -566,6 +587,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if not run_ids:
                     return []
                 matched_run_ids &= set(run_ids)
+
+            if space_ids is not None:
+                space_id_set = set(space_ids)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self.run_ids[run_id].space_id in space_id_set
+                }
 
             # Filter by statuses
             if statuses is not None:
@@ -657,6 +686,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     task.status.details = details
                     if record := self.task_token_store.pop(task.task_id, None):
                         self.task_token_to_task_id.pop(record.token, None)
+                    self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""

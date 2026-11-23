@@ -79,7 +79,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
@@ -105,9 +105,9 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get events from all runs in the authenticated task's series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
-    run = state.get_run_info(run_ids=[task.run_id])[0]
+    run = state.get_run(run_ids=[task.run_id])[0]
     series = state.get_run_series(series_ids=[run.series_id])[0]
-    series_runs = state.get_run_info(run_ids=series.run_ids)
+    series_runs = state.get_run(run_ids=series.run_ids)
     primary_task_ids = [
         run.primary_task_id for run in series_runs if run.primary_task_id is not None
     ]
@@ -131,7 +131,7 @@ def get_space_events(
     task: Task,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    runs = state.get_run_info(run_ids=[task.run_id])
+    runs = state.get_run(run_ids=[task.run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
@@ -147,7 +147,7 @@ def get_space_events(
 
 def _get_task_run(state: LinkState, task: Task) -> Run:
     """Resolve the authenticated task's Run."""
-    runs = state.get_run_info(run_ids=[task.run_id])
+    runs = state.get_run(run_ids=[task.run_id])
     if not runs:
         raise FlowerError(
             ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
@@ -197,7 +197,7 @@ def put_compacted_context(
 
 def _get_agent_id(state: LinkState, task: Task) -> int:
     """Resolve the authenticated task's agent ID for file scoping."""
-    runs = state.get_run_info(run_ids=[task.run_id])
+    runs = state.get_run(run_ids=[task.run_id])
     return core_runtime_handlers.require_agent_id(
         runs[0] if runs else None, task.run_id
     )
@@ -362,7 +362,7 @@ def get_connector(
             "Connector credentials are not available to this task.",
         )
 
-    runs = state.get_run_info(run_ids=[task.run_id])
+    runs = state.get_run(run_ids=[task.run_id])
     run = runs[0] if runs else None
     if run is None:
         raise FlowerError(ApiErrorCode.CONNECTOR_NOT_FOUND, "Connector not found.")
@@ -424,7 +424,7 @@ def pull_task_input(
     log(DEBUG, "Runtime.PullTaskInput")
     run_id = task.run_id
 
-    runs = state.get_run_info(run_ids=[run_id])
+    runs = state.get_run(run_ids=[run_id])
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
     agent = (
@@ -474,7 +474,7 @@ def push_task_output(
     ):
         log(INFO, "Finished task %d of run %d", task.task_id, run_id)
         if request.HasField("context"):
-            runs = state.get_run_info(run_ids=[run_id])
+            runs = state.get_run(run_ids=[run_id])
             run = runs[0] if runs else None
             if run and run.series_id and run.primary_task_id == task.task_id:
                 state.set_run_series_context(
@@ -497,7 +497,7 @@ def start_automation(
             "Only AgentApp and ServerApp tasks can create automations.",
         )
 
-    run = state.get_run_info(run_ids=[task.run_id])[0]
+    run = state.get_run(run_ids=[task.run_id])[0]
     if not run.federation_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
@@ -510,9 +510,9 @@ def start_automation(
     )
     return start_control_automation(
         request,
-        AccountInfo(
-            flwr_aid=run.flwr_aid,
-            account_name=run.account_name,
+        AuthenticatedUser(
+            user_id=run.flwr_aid,
+            handle=run.account_name,
         ),
         state,
     )

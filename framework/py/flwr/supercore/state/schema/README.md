@@ -11,15 +11,24 @@
 ---
 erDiagram
   agent {
-    BIGINT agent_id PK
-    CHAR(32) default_space_id FK "nullable"
+    BIGINT agent_id PK,FK
+    BIGINT config_version FK
+    CHAR(32) default_space_id FK
     VARCHAR app_spec
     TIMESTAMP created_at
-    TEXT description "nullable"
     VARCHAR flwr_aid
+    TIMESTAMP updated_at
+  }
+
+  agent_config {
+    BIGINT agent_id PK,FK
+    BIGINT version PK
+    VARCHAR avatar
+    VARCHAR color
+    TIMESTAMP created_at
+    TEXT description "nullable"
     VARCHAR name
     VARCHAR title "nullable"
-    TIMESTAMP updated_at
   }
 
   automation {
@@ -208,6 +217,7 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     BIGINT series_id "nullable"
+    VARCHAR trigger_item_type "nullable"
     VARCHAR usage_reported_at
   }
 
@@ -245,6 +255,16 @@ erDiagram
     CHAR(32) id PK
     TIMESTAMP created_at
     VARCHAR title
+  }
+
+  space_item {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
+    VARCHAR type
   }
 
   space_message {
@@ -334,7 +354,10 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent_config ||--o| agent : agent_id
+  agent_config ||--o{ agent : config_version
   space ||--o{ agent : default_space_id
+  agent ||--o| agent_config : agent_id
   agent ||--o{ automation : agent_id
   agent ||--o{ compacted_contexts : agent_id
   agent ||--o{ connector : agent_id
@@ -348,6 +371,8 @@ erDiagram
   space ||--o{ run : space_id
   agent ||--o{ run : agent_id
   objects ||--o| run_objects : object_id
+  space ||--o{ space_item : space_id
+  agent ||--o{ space_item : agent_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
   space ||--o{ space_participant : space_id

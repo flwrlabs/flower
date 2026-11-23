@@ -54,9 +54,11 @@ class Space(google.protobuf.message.Message):
     TITLE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     PARTICIPANTS_FIELD_NUMBER: builtins.int
+    LATEST_USER_MESSAGE_FIELD_NUMBER: builtins.int
     id: builtins.str
     title: builtins.str
     created_at: builtins.str
+    latest_user_message: builtins.str
     @property
     def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceParticipant]: ...
     def __init__(
@@ -66,8 +68,9 @@ class Space(google.protobuf.message.Message):
         title: builtins.str = ...,
         created_at: builtins.str = ...,
         participants: collections.abc.Iterable[global___SpaceParticipant] | None = ...,
+        latest_user_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "participants", b"participants", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "latest_user_message", b"latest_user_message", "participants", b"participants", "title", b"title"]) -> None: ...
 
 global___Space = Space
 
@@ -139,12 +142,10 @@ class SpaceMessage(google.protobuf.message.Message):
     AUTHOR_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     CONTENT_FIELD_NUMBER: builtins.int
-    HIDDEN_FIELD_NUMBER: builtins.int
     id: builtins.int
     space_id: builtins.str
     created_at: builtins.str
     content: builtins.str
-    hidden: builtins.bool
     @property
     def author(self) -> global___SpaceParticipant: ...
     def __init__(
@@ -155,10 +156,9 @@ class SpaceMessage(google.protobuf.message.Message):
         author: global___SpaceParticipant | None = ...,
         created_at: builtins.str = ...,
         content: builtins.str = ...,
-        hidden: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["author", b"author"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "hidden", b"hidden", "id", b"id", "space_id", b"space_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "id", b"id", "space_id", b"space_id"]) -> None: ...
 
 global___SpaceMessage = SpaceMessage
 

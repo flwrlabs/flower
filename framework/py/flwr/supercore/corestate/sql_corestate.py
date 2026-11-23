@@ -55,7 +55,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
+from flwr.common.serde import recorddict_from_proto, recorddict_to_proto, run_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
@@ -73,6 +73,7 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
@@ -100,6 +101,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.state.schema.corestate_models import Automation as AutomationModel
 from flwr.supercore.state.schema.corestate_models import (
     CompactedContext as CompactedContextModel,
@@ -739,20 +741,30 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.add(space_model)
             session.flush()
             model = AgentModel(
-                name=config.name,
-                title=config.title if config.HasField("title") else None,
-                description=(
-                    config.description if config.HasField("description") else None
-                ),
                 app_spec=config.app_spec,
                 flwr_aid=flwr_aid,
+                config_version=1,
                 default_space_id=space_model.id,
                 created_at=created_at,
                 updated_at=created_at,
             )
             session.add(model)
             session.flush()
-            agent = _agent_from_model(model)
+            snapshot = AgentConfigModel(
+                agent_id=model.agent_id,
+                version=1,
+                name=config.name,
+                title=config.title if config.HasField("title") else None,
+                description=(
+                    config.description if config.HasField("description") else None
+                ),
+                avatar=config.avatar,
+                color=config.color,
+                created_at=created_at,
+            )
+            session.add(snapshot)
+            session.flush()
+            agent = _agent_from_model(model, snapshot)
             participants = [
                 SpaceParticipant(flwr_aid=flwr_aid),
                 SpaceParticipant(agent_id=agent.id),
@@ -780,13 +792,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account."""
         with self.session() as session:
-            model = session.scalar(
-                select(AgentModel).where(
+            row = session.execute(
+                select(AgentModel, AgentConfigModel)
+                .join(
+                    AgentConfigModel,
+                    (AgentConfigModel.agent_id == AgentModel.agent_id)
+                    & (AgentConfigModel.version == AgentModel.config_version),
+                )
+                .where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
                 )
-            )
-            return _agent_from_model(model) if model is not None else None
+            ).one_or_none()
+            return _agent_from_model(*row) if row is not None else None
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
         """Return the owned agent's default Space ID."""
@@ -803,12 +821,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if not flwr_aid:
             return []
         stmt = (
-            select(AgentModel)
+            select(AgentModel, AgentConfigModel)
+            .join(
+                AgentConfigModel,
+                (AgentConfigModel.agent_id == AgentModel.agent_id)
+                & (AgentConfigModel.version == AgentModel.config_version),
+            )
             .where(AgentModel.flwr_aid == flwr_aid)
             .order_by(AgentModel.agent_id)
         )
         with self.session() as session:
-            return [_agent_from_model(model) for model in session.scalars(stmt)]
+            return [_agent_from_model(*row) for row in session.execute(stmt)]
 
     def get_bootstrap(self, flwr_aid: str) -> BootstrapResponse:
         """Read the feed cursor before fetching visible state."""
@@ -818,22 +841,41 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     UserEventFeedModel.user_id == flwr_aid
                 )
             )
+        agents = self.list_agents(flwr_aid)
+        spaces = self.get_spaces(flwr_aid)
         return BootstrapResponse(
-            agents=self.list_agents(flwr_aid),
-            spaces=self.get_spaces(flwr_aid),
+            agents=agents,
+            spaces=spaces,
+            active_runs=[
+                run_to_proto(run)
+                for run in self.get_run(
+                    space_ids=[UUID(space.id) for space in spaces],
+                    statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+                )
+                if run.agent_id is not None
+            ],
             cursor=head or 0,
         )
 
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Create an event and its deliveries, returning its UUID."""
         event_id = uuid4()
         with self.session() as session:
+            if recipients is None:
+                if space_id is None:
+                    raise ValueError("Provide recipients or a space_id")
+                recipients = session.scalars(
+                    select(SpaceParticipantTable.c.flwr_aid).where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c.flwr_aid.is_not(None),
+                    )
+                ).all()
             session.execute(
                 insert(EventModel).values(
                     event_id=event_id,
@@ -1427,11 +1469,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces, newest first."""
+        """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
+        latest_user_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.flwr_aid.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
+                latest_user_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1446,9 +1500,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, member_flwr_aid, member_agent_id in session.execute(query):
+            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+                query
+            ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
+                    spaces[model.id].latest_user_message = prompt or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
@@ -1494,17 +1551,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if model is None:
                 return None
             message = _space_message_from_model(model)
-            recipients = list(
-                session.scalars(
-                    select(SpaceParticipantTable.c.flwr_aid).where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.flwr_aid.is_not(None),
-                    )
-                )
-            )
-            self.store_event(
-                EventType.MESSAGE_CREATED, message, recipients, space_id=space_id
-            )
+            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
     def get_space_messages(  # pylint: disable=too-many-arguments
@@ -2122,13 +2169,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 ],
                 task_values,
             )
-            .returning(TaskModel.task_id)
+            .returning(TaskModel)
         )
 
         with self.session() as session:
             try:
-                if session.scalar(insert_stmt) is None:
+                task = session.scalar(insert_stmt)
+                if task is None:
                     return None
+                self._store_task_lifecycle_event(
+                    EventType.TASK_CREATED, task_from_model(task)
+                )
                 return task_id
             except IntegrityError:
                 return None
@@ -2256,7 +2307,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             # The conditional UPDATE is the atomic claim: exactly one caller can
             # move a pending, unclaimed task to STARTING and attach a token.
             with self.session() as session:
-                claimed_task_id = session.scalar(
+                task = session.scalar(
                     update(TaskModel)
                     .where(
                         TaskModel.task_id == task_id,
@@ -2268,12 +2319,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         active_until=active_until,
                         starting_at=claimed_at,
                     )
-                    .returning(TaskModel.task_id)
+                    .returning(TaskModel)
                 )
-            if claimed_task_id is None:
-                return None
-
-            return token
+                if task is None:
+                    return None
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(task)
+                )
+                return token
         except IntegrityError:
             # Rare failure: generated token already exists (duplicate)
             return None
@@ -2290,16 +2343,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
 
             # Activation is a strict STARTING -> RUNNING transition.
-            activated_task_id = session.scalar(
+            task = session.scalar(
                 update(TaskModel)
                 .where(
                     TaskModel.task_id == task_id,
                     _task_status_filter(Status.STARTING),
                 )
                 .values(running_at=activated_at, active_until=active_until)
-                .returning(TaskModel.task_id)
+                .returning(TaskModel)
             )
-        return activated_task_id is not None
+            if task is None:
+                return False
+            self._store_task_lifecycle_event(
+                EventType.TASK_UPDATED, task_from_model(task)
+            )
+            return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -2318,16 +2376,21 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if sub_status == SubStatus.COMPLETED:
                 query = query.where(TaskModel.running_at.is_not(None))
 
-            finished_task_id = session.scalar(
+            task = session.scalar(
                 query.values(
                     finished_at=now(),
                     sub_status=sub_status,
                     details=details,
                     active_until=None,
                     token=None,
-                ).returning(TaskModel.task_id)
+                ).returning(TaskModel)
             )
-            return finished_task_id is not None
+            if task is None:
+                return False
+            self._store_task_lifecycle_event(
+                EventType.TASK_UPDATED, task_from_model(task)
+            )
+            return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
@@ -2610,7 +2673,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         expired_at = now()
         with self.session() as session:
             # Claims that never reached RUNNING are retryable launch failures.
-            session.execute(
+            pending_tasks = session.scalars(
                 update(TaskModel)
                 .where(
                     TaskModel.token.is_not(None),
@@ -2624,7 +2687,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     sub_status="",
                     details="",
                 )
-            )
+                .returning(TaskModel)
+            ).all()
 
             # Expired running task claims are terminal failures and lose their token.
             expired_tasks = [
@@ -2646,8 +2710,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .returning(TaskModel)
                 ).all()
             ]
-        if expired_tasks:
-            self._on_task_tokens_expired(expired_tasks)
+            for model in pending_tasks:
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(model)
+                )
+            for task in expired_tasks:
+                self._store_task_lifecycle_event(EventType.TASK_UPDATED, task)
+            if expired_tasks:
+                self._on_task_tokens_expired(expired_tasks)
 
     def _cleanup_invalid_task_messages(self) -> None:
         """Remove expired task Messages."""
@@ -2705,18 +2775,21 @@ def _event_from_model(model: EventModel) -> Event:
     return event
 
 
-def _agent_from_model(model: AgentModel) -> Agent:
+def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
     """Convert an agent ORM model to its protobuf message."""
     return Agent(
         id=model.agent_id,
         config=AgentConfig(
-            name=model.name,
-            title=model.title,
-            description=model.description,
+            name=config.name,
+            title=config.title,
+            description=config.description,
+            avatar=config.avatar,
+            color=config.color,
             app_spec=model.app_spec,
         ),
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
+        default_space_id=str(model.default_space_id),
     )
 
 
@@ -2834,7 +2907,6 @@ def _space_message_from_model(
         author=author,
         created_at=model.created_at.isoformat(),
         content=model.content,
-        hidden=model.hidden,
     )
 
 
