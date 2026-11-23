@@ -1283,7 +1283,7 @@ class InMemoryCoreState(
             self.space_item_id_counter += len(items)
             return items
 
-    def get_space_items(
+    def get_space_items(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
         participant: SpaceParticipant,

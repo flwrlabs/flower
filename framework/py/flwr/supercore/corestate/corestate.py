@@ -847,7 +847,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_space_items(
+    def get_space_items(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
         participant: SpaceParticipant,

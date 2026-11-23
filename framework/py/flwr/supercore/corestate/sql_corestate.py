@@ -1610,7 +1610,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             session.flush()
             return [_space_item_from_model(model) for model in models]
 
-    def get_space_items(
+    def get_space_items(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
         participant: SpaceParticipant,
