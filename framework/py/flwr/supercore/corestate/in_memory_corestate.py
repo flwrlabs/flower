@@ -1249,7 +1249,13 @@ class InMemoryCoreState(
         author: SpaceParticipant | None = None,
     ) -> Sequence[SpaceItem] | None:
         """Store a batch of typed items in a Space."""
-        _validate_space_item_batch(item_type, contents, author)
+        _validate_space_item_batch(item_type, contents)
+        # Revisit author rules when SendSpaceItems accepts automation items.
+        if item_type == SpaceItemType.MESSAGE:
+            if author is None or not (author.flwr_aid or author.agent_id):
+                raise ValueError("Message items require an author")
+        elif author is not None:
+            raise ValueError("Only message items may have an author")
         with self.lock_space_store:
             space = self.space_store.get(space_id)
             if space is None or (

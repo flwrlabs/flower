@@ -1568,7 +1568,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         author: SpaceParticipant | None = None,
     ) -> Sequence[SpaceItem] | None:
         """Store a batch of typed items in a Space atomically."""
-        _validate_space_item_batch(item_type, contents, author)
+        _validate_space_item_batch(item_type, contents)
+        if author is not None and not (author.flwr_aid or author.agent_id):
+            raise ValueError("SpaceItem author must have an identity")
 
         if author is None:
             source_table = SpaceModel.__table__
@@ -1583,10 +1585,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             source_space_id = SpaceParticipantTable.c.space_id
             source_flwr_aid = SpaceParticipantTable.c.flwr_aid
             source_agent_id = SpaceParticipantTable.c.agent_id
-            field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
             source_conditions = (
                 SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c[field] == (author.flwr_aid or author.agent_id),
+                SpaceParticipantTable.c[
+                    "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+                ]
+                == (author.flwr_aid or author.agent_id),
             )
         input_items = union_all(
             *(
@@ -1610,28 +1614,31 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .where(*source_conditions)
             .order_by(input_items.c.position)
         )
-        with self.session() as session:
-            models = list(
-                session.scalars(
-                    insert(SpaceItemModel)
-                    .from_select(
-                        [
-                            "space_id",
-                            "type",
-                            "flwr_aid",
-                            "agent_id",
-                            "created_at",
-                            "content",
-                        ],
-                        source,
+        try:
+            with self.session() as session:
+                models = list(
+                    session.scalars(
+                        insert(SpaceItemModel)
+                        .from_select(
+                            [
+                                "space_id",
+                                "type",
+                                "flwr_aid",
+                                "agent_id",
+                                "created_at",
+                                "content",
+                            ],
+                            source,
+                        )
+                        .returning(SpaceItemModel)
                     )
-                    .returning(SpaceItemModel)
                 )
-            )
-            if not models:
-                return None
-            models.sort(key=lambda model: model.id)
-            return [_space_item_from_model(model) for model in models]
+                if not models:
+                    return None
+                models.sort(key=lambda model: model.id)
+                return [_space_item_from_model(model) for model in models]
+        except IntegrityError as exc:
+            raise ValueError("Invalid SpaceItem") from exc
 
     def get_space_items(  # pylint: disable=too-many-arguments
         self,

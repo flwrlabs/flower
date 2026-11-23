@@ -65,21 +65,14 @@ MAX_SPACE_ITEM_BATCH_SIZE = 400
 def _validate_space_item_batch(
     item_type: SpaceItemType,
     contents: Sequence[str],
-    author: SpaceParticipant | None,
 ) -> None:
-    """Validate a batch before either CoreState backend stores it."""
+    """Validate item type, content, and batch size before storing."""
     if not isinstance(item_type, SpaceItemType):
         raise ValueError("Invalid SpaceItem type")
     if not contents or any(not content.strip() for content in contents):
         raise ValueError("SpaceItem contents must be nonempty")
     if len(contents) > MAX_SPACE_ITEM_BATCH_SIZE:
         raise ValueError("SpaceItem batch is too large")
-    # Revisit author rules when SendSpaceItems accepts automation items.
-    if item_type == SpaceItemType.MESSAGE:
-        if author is None or not (author.flwr_aid or author.agent_id):
-            raise ValueError("Message items require an author")
-    elif author is not None:
-        raise ValueError("Only message items may have an author")
 
 
 class CoreState(ABC):  # pylint: disable=R0904

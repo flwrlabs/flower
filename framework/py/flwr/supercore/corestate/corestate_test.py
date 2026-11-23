@@ -2808,6 +2808,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(ValueError):
             state.store_space_items(space_id, SpaceItemType.MESSAGE, ["message"])
         with self.assertRaises(ValueError):
+            state.store_space_items(
+                space_id, SpaceItemType.MESSAGE, ["message"], SpaceParticipant()
+            )
+        with self.assertRaises(ValueError):
             state.store_space_items(space_id, SpaceItemType.AUTOMATION, [])
         with self.assertRaises(ValueError):
             state.store_space_items(
