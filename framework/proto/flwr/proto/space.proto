@@ -99,3 +99,16 @@ message SendSpaceMessageRequest {
   string content = 2;
 }
 message SendSpaceMessageResponse { SpaceMessage message = 1; }
+
+message SendSpaceItemsRequest {
+  // Required by Control. Runtime uses the authenticated task's Space.
+  string space_id = 1;
+  // When implemented, each entry becomes one message item, in order.
+  // The server supplies type = "message" and resolves the author;
+  // other item types are not accepted.
+  repeated string contents = 2;
+}
+message SendSpaceItemsResponse {
+  // Created items in request order.
+  repeated SpaceItem items = 1;
+}

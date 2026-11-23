@@ -78,12 +78,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemsRequest,
+    SendSpaceItemsResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceItem,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -193,6 +197,46 @@ def test_space_routes(
     ]
     assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
+
+
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("get-space-items", GetSpaceItemsRequest()),
+        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+    ],
+)
+def test_space_item_endpoints_not_available(
+    space_client: tuple[TestClient, LinkState], endpoint: str, payload: Message
+) -> None:
+    """Expose the new routes without changing the active message path."""
+    client, _ = space_client
+    response = client.post(
+        f"/v1/control/{endpoint}", content=payload.SerializeToString()
+    )
+    assert response.status_code == 501
+    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+
+
+def test_send_space_items_batch_wire_format() -> None:
+    """Preserve multiple message contents and created items on the wire."""
+    request = SendSpaceItemsRequest(contents=["First", "Second"])
+    response = SendSpaceItemsResponse(
+        items=[SpaceItem(content="First"), SpaceItem(content="Second")]
+    )
+
+    assert list(
+        SendSpaceItemsRequest.FromString(request.SerializeToString()).contents
+    ) == [
+        "First",
+        "Second",
+    ]
+    assert [
+        item.content
+        for item in SendSpaceItemsResponse.FromString(
+            response.SerializeToString()
+        ).items
+    ] == ["First", "Second"]
 
 
 def test_create_space_rejects_invalid_participants(
