@@ -190,6 +190,7 @@ class InMemoryCoreState(
         self.pending_message_ids_by_dst: dict[int, set[str]] = {}
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
+        self.agent_config_store: dict[tuple[int, int], AgentConfig] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -627,8 +628,10 @@ class InMemoryCoreState(
                     created_at=created_at,
                     updated_at=created_at,
                     default_space_id=str(space_id),
+                    config_version=1,
                 )
                 self.agent_store.setdefault(flwr_aid, {})[agent_id] = agent
+                self.agent_config_store[(agent_id, 1)] = agent.config
                 space.participants.extend(
                     [
                         SpaceParticipant(flwr_aid=flwr_aid),
@@ -645,10 +648,49 @@ class InMemoryCoreState(
                     del self.event_store[event_id]
                 del feed[feed_start:]
                 self.agent_store.get(flwr_aid, {}).pop(agent_id, None)
+                self.agent_config_store.pop((agent_id, 1), None)
                 self.space_store.pop(space_id, None)
                 self.space_message_store.pop(space_id, None)
                 raise
             self.agent_id_counter = agent_id
+            return agent
+
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Publish a configuration snapshot and event under the state locks."""
+        if not config.name.strip():
+            raise ValueError("Agent name must be nonempty.")
+        with self.lock_space_store, self.lock_agent_store:
+            current = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if current is None:
+                return None
+            if current.config.app_spec != config.app_spec:
+                raise ValueError("AgentApp specification cannot be changed.")
+            if current.config_version != expected_config_version:
+                raise FlowerError(
+                    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
+                    "Agent configuration version precondition failed.",
+                )
+            agent = Agent(
+                id=current.id,
+                config=config,
+                config_version=current.config_version + 1,
+                default_space_id=current.default_space_id,
+                created_at=current.created_at,
+                updated_at=now().isoformat(),
+            )
+            if not config.title:
+                agent.config.ClearField("title")
+            if not config.description:
+                agent.config.ClearField("description")
+            self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
+            self.agent_config_store[(agent_id, agent.config_version)] = agent.config
+            self.agent_store[flwr_aid][agent_id] = agent
             return agent
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
@@ -1681,6 +1723,7 @@ class InMemoryCoreState(
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -1703,6 +1746,7 @@ class InMemoryCoreState(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
+                space_id=str(space_id) if space_id is not None else "",
                 status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
                 pending_at=now().isoformat(),
                 fab_hash=fab_hash,

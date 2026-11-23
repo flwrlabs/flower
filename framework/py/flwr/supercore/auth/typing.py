@@ -27,6 +27,8 @@ class AccountAuthLoginDetails:
     verification_uri_complete: str
     expires_in: int
     interval: int
+    verification_uri: str = ""
+    user_code: str = ""
 
 
 @dataclass

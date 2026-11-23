@@ -789,6 +789,54 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             return agent
 
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Publish a configuration snapshot and event using a version precondition."""
+        if not config.name.strip():
+            raise ValueError("Agent name must be nonempty.")
+        with self.session() as session:
+            model = session.scalar(
+                update(AgentModel)
+                .where(
+                    AgentModel.agent_id == agent_id,
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.app_spec == config.app_spec,
+                    AgentModel.config_version == expected_config_version,
+                )
+                .values(config_version=AgentModel.config_version + 1, updated_at=now())
+                .returning(AgentModel)
+            )
+            if model is None:
+                current = self.get_agent(flwr_aid, agent_id)
+                if current is None:
+                    return None
+                if current.config.app_spec != config.app_spec:
+                    raise ValueError("AgentApp specification cannot be changed.")
+                raise FlowerError(
+                    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT,
+                    "Agent configuration version precondition failed.",
+                )
+            snapshot = AgentConfigModel(
+                agent_id=agent_id,
+                version=model.config_version,
+                name=config.name,
+                title=config.title or None,
+                description=config.description or None,
+                avatar=config.avatar,
+                color=config.color,
+                created_at=model.updated_at,
+            )
+            session.add(snapshot)
+            session.flush()
+            agent = _agent_from_model(model, snapshot)
+            self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
+            return agent
+
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account."""
         with self.session() as session:
@@ -2125,6 +2173,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -2138,6 +2187,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             literal(task_id, type_=TaskModel.task_id.type),
             literal(task_type, type_=TaskModel.type.type),
             literal(run_id, type_=TaskModel.run_id.type),
+            literal(space_id, type_=TaskModel.space_id.type),
             literal(fab_hash, type_=TaskModel.fab_hash.type),
             literal(model_ref, type_=TaskModel.model_ref.type),
             literal(connector_ref, type_=TaskModel.connector_ref.type),
@@ -2161,6 +2211,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     TaskModel.task_id,
                     TaskModel.type,
                     TaskModel.run_id,
+                    TaskModel.space_id,
                     TaskModel.fab_hash,
                     TaskModel.model_ref,
                     TaskModel.connector_ref,
@@ -2790,6 +2841,7 @@ def _agent_from_model(model: AgentModel, config: AgentConfigModel) -> Agent:
         created_at=_timestamp_to_iso_assuming_utc(model.created_at),
         updated_at=_timestamp_to_iso_assuming_utc(model.updated_at),
         default_space_id=str(model.default_space_id),
+        config_version=model.config_version,
     )
 
 
@@ -2871,6 +2923,7 @@ def task_from_model(model: TaskModel) -> Task:
         task_id=model.task_id,
         type=model.type,
         run_id=model.run_id,
+        space_id=str(model.space_id) if model.space_id is not None else "",
         pending_at=timestamp_to_iso(model.pending_at),
         starting_at=timestamp_to_iso(model.starting_at),
         running_at=timestamp_to_iso(model.running_at),

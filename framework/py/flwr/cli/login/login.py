@@ -89,6 +89,8 @@ def login(
             verification_uri_complete=login_response.verification_uri_complete,
             expires_in=login_response.expires_in,
             interval=login_response.interval,
+            verification_uri=login_response.verification_uri,
+            user_code=login_response.user_code,
         )
         try:
             with flwr_cli_exc_handler():
