@@ -16,6 +16,7 @@ erDiagram
     CHAR(32) default_space_id FK
     VARCHAR app_spec
     TIMESTAMP created_at
+    TIMESTAMP deleted_at "nullable"
     VARCHAR flwr_aid
     TIMESTAMP updated_at
   }
@@ -295,6 +296,7 @@ erDiagram
     TIMESTAMP pending_at
     BIGINT run_id
     TIMESTAMP running_at "nullable"
+    CHAR(32) space_id "nullable"
     TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK

@@ -78,12 +78,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemsRequest,
+    SendSpaceItemsResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceItem,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -193,6 +197,46 @@ def test_space_routes(
     ]
     assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
+
+
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("get-space-items", GetSpaceItemsRequest()),
+        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+    ],
+)
+def test_space_item_endpoints_not_available(
+    space_client: tuple[TestClient, LinkState], endpoint: str, payload: Message
+) -> None:
+    """Expose the new routes without changing the active message path."""
+    client, _ = space_client
+    response = client.post(
+        f"/v1/control/{endpoint}", content=payload.SerializeToString()
+    )
+    assert response.status_code == 501
+    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+
+
+def test_send_space_items_batch_wire_format() -> None:
+    """Preserve multiple message contents and created items on the wire."""
+    request = SendSpaceItemsRequest(contents=["First", "Second"])
+    response = SendSpaceItemsResponse(
+        items=[SpaceItem(content="First"), SpaceItem(content="Second")]
+    )
+
+    assert list(
+        SendSpaceItemsRequest.FromString(request.SerializeToString()).contents
+    ) == [
+        "First",
+        "Second",
+    ]
+    assert [
+        item.content
+        for item in SendSpaceItemsResponse.FromString(
+            response.SerializeToString()
+        ).items
+    ] == ["First", "Second"]
 
 
 def test_create_space_rejects_invalid_participants(
@@ -686,16 +730,27 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
     handler.assert_not_called()
 
 
-def test_get_login_details_does_not_require_bearer_authentication() -> None:
+@pytest.mark.parametrize(
+    ("complete_uri", "verification_uri", "user_code"),
+    [
+        ("https://example.test/verify", "", ""),
+        ("", "https://example.test/verify-code", "ABCD-EFGH"),
+    ],
+)
+def test_get_login_details_does_not_require_bearer_authentication(
+    complete_uri: str, verification_uri: str, user_code: str
+) -> None:
     """Return login details without validating an access token."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.get_login_details.return_value = AccountAuthLoginDetails(
         authn_type="oidc",
         device_code="device-code",
-        verification_uri_complete="https://example.test/verify",
+        verification_uri_complete=complete_uri,
         expires_in=600,
         interval=5,
+        verification_uri=verification_uri,
+        user_code=user_code,
     )
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -710,9 +765,11 @@ def test_get_login_details_does_not_require_bearer_authentication() -> None:
         GetLoginDetailsResponse(
             authn_type="oidc",
             device_code="device-code",
-            verification_uri_complete="https://example.test/verify",
+            verification_uri_complete=complete_uri,
             expires_in=600,
             interval=5,
+            verification_uri=verification_uri,
+            user_code=user_code,
         )
     )
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
