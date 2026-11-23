@@ -207,6 +207,31 @@ class UpdateAgentResponse(google.protobuf.message.Message):
 global___UpdateAgentResponse = UpdateAgentResponse
 
 @typing.final
+class DeleteAgentRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENT_ID_FIELD_NUMBER: builtins.int
+    agent_id: builtins.int
+    def __init__(
+        self,
+        *,
+        agent_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id"]) -> None: ...
+
+global___DeleteAgentRequest = DeleteAgentRequest
+
+@typing.final
+class DeleteAgentResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteAgentResponse = DeleteAgentResponse
+
+@typing.final
 class StartRunRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
