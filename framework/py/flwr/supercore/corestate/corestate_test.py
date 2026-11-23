@@ -1606,6 +1606,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
             fab_hash=None,
             connector_ref="web_search",
         )
@@ -1636,6 +1637,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         requesting_task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
             run_id=run_id,
+            space_id=None,
         )
         assert requesting_task_id is not None
         self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
@@ -1643,6 +1645,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
             connector_ref="connector://test",
             requesting_task_id=requesting_task_id,
         )
@@ -1659,9 +1662,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id_1 = self.task_run_id(state)
         run_id_2 = self.other_task_run_id(state)
-        task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
-        task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_2)
-        task_id_3 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        task_id_1 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_1, space_id=None
+        )
+        task_id_2 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_2, space_id=None
+        )
+        task_id_3 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_1, space_id=None
+        )
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
@@ -1675,7 +1684,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
@@ -1713,6 +1724,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
             run_id=run_id,
+            space_id=None,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -1736,6 +1748,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
         )
         assert task_id is not None
 
@@ -1781,6 +1794,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         log_entry_1 = "Log entry 1"
@@ -1808,6 +1822,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         log_entry_1 = "Log entry 1"
@@ -1836,6 +1851,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         fixed_now = now()
@@ -1856,6 +1872,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         fixed_now = now()
@@ -1878,7 +1895,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1904,9 +1921,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        claimed_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         finished_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert claimed_task_id is not None and finished_task_id is not None
 
@@ -1922,7 +1941,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1956,7 +1975,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1997,7 +2016,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -2030,7 +2051,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
 
@@ -2077,7 +2100,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -2109,7 +2134,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -2131,7 +2158,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             assert (token := state.claim_task(task_id))
 
@@ -2155,7 +2184,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         if not hasattr(state, "session"):
             self.skipTest("SQL session test")
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert task_id is not None
 
         with state.session():
@@ -2179,7 +2210,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ) as on_expired:
             with patch("datetime.datetime") as mock_dt:
                 mock_dt.now.return_value = fixed_now
-                task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+                task_id = state.create_task(
+                    task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+                )
                 assert task_id is not None
                 assert state.claim_task(task_id) is not None
 
@@ -2200,10 +2233,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Task Messages should round-trip, filter, and be delivered once."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         other_dst_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert (
             src_task_id is not None
@@ -2258,16 +2295,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         other_run_id = self.other_task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         other_run_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=other_run_id
+            task_type=TaskType.CONNECTOR, run_id=other_run_id, space_id=None
         )
         finished_src_task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=run_id
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
         )
         finished_dst_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert (
             src_task_id is not None
@@ -2324,8 +2365,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Getting task Messages should not return expired Messages."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         msg_ttl = 60.0
@@ -2348,8 +2393,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Getting task Messages should respect the provided limit."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2378,9 +2427,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A source-specific claim should not consume another task's message."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
-        src_task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        src_task_id_1 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
+        src_task_id_2 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert (
             src_task_id_1 is not None
             and src_task_id_2 is not None
@@ -2412,7 +2467,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Prepare: Create one run with a task and two valid task events.
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         event_1 = TaskEvent(
             run_id=run_id,
@@ -2469,7 +2526,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Store task events with several types and return them in ID order."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         state.store_task_events(
             [
@@ -2555,7 +2614,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Prepare: Create one valid event followed by an invalid payload variant.
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
 
         # Execute: Attempt to store the mixed event batch.
