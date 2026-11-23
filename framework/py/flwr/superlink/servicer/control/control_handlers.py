@@ -1709,6 +1709,8 @@ def get_login_details(
         verification_uri_complete=details.verification_uri_complete,
         expires_in=details.expires_in,
         interval=details.interval,
+        verification_uri=details.verification_uri,
+        user_code=details.user_code,
     )
 
 
