@@ -358,7 +358,12 @@ exported, silently leaving Ray's original import failure in place:
                     # suffix (as an earlier version of this regex did) still
                     # matches malformed values with no hex digits at all, such
                     # as `GPU--`, and would count them as one real device too.
-                    _rocr_norm+=("$_id")
+                    # The hex digits are case-insensitive to ROCr but not to a
+                    # raw-string comparison -- lowercase before storing so
+                    # `GPU-abcd` and `GPU-ABCD` are recognized as the same
+                    # device by the duplicate check below, the same way
+                    # leading zeros are normalized for numeric ordinals above.
+                    _rocr_norm+=("${_id,,}")
                 else
                     # Neither a numeric ordinal nor the documented `GPU-<hex>`
                     # UUID syntax -- for example a typo like `bogus`. Counting

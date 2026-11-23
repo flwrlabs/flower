@@ -278,6 +278,34 @@ def _log_kfd_diagnostics() -> None:
             ", ".join(amd_denied_render_nodes),
             ", ".join(amd_inconclusive_render_nodes),
         )
+    elif amd_denied_render_nodes and unknown_vendor_accessible_render_nodes:
+        # An accessible unknown-vendor node means device access already works
+        # for at least one GPU candidate on this host. If that node turns out
+        # to be AMD-backed, the plain `amd_denied_render_nodes` branch below --
+        # which claims Ray and the ML framework will both stay at zero GPUs
+        # until permissions are fixed, and that `amdsmi` cannot help -- would
+        # be wrong: a missing/unimportable `amdsmi` could still explain a
+        # zero-GPU report from Ray even though access already works.
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd). A "
+            "confirmed AMD-backed `/dev/dri/renderD*` node (%s) is "
+            "permission-denied (no read/write access -- the current user is "
+            "likely missing from the `render` (and `video`) group that owns "
+            "it, or the container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`). Separately, another "
+            "`/dev/dri/renderD*` node (%s) opens successfully but this host "
+            "cannot determine its PCI vendor ID (sysfs is missing or "
+            "unreadable). If that accessible node turns out to be AMD-backed "
+            "(check with `cat /sys/class/drm/<node>/device/vendor`, "
+            "expecting `%s`), device access already works for a GPU and a "
+            "missing or unimportable `amdsmi` could still explain Ray "
+            "reporting zero GPUs -- see the check above. Do not assume fixing "
+            "permissions on the denied node is the only thing needed.",
+            ", ".join(amd_denied_render_nodes),
+            ", ".join(unknown_vendor_accessible_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
     elif amd_denied_render_nodes:
         log(
             WARNING,
