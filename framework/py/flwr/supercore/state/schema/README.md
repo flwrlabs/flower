@@ -17,7 +17,6 @@ erDiagram
     VARCHAR app_spec
     TIMESTAMP created_at
     TIMESTAMP deleted_at "nullable"
-    VARCHAR deleted_by "nullable"
     VARCHAR flwr_aid
     TIMESTAMP updated_at
   }
