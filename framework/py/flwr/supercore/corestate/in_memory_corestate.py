@@ -60,6 +60,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -75,6 +76,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -213,6 +215,8 @@ class InMemoryCoreState(
         self.space_store: dict[UUID, Space] = {}
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
+        self.space_item_store: dict[UUID, list[SpaceItem]] = {}
+        self.space_item_id_counter = 0
         self.lock_space_store = RLock()
         self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
@@ -621,6 +625,7 @@ class InMemoryCoreState(
                 space = Space(id=str(space_id), created_at=created_at)
                 self.space_store[space_id] = space
                 self.space_message_store[space_id] = []
+                self.space_item_store[space_id] = []
                 agent = Agent(
                     id=agent_id,
                     config=config,
@@ -647,6 +652,7 @@ class InMemoryCoreState(
                 self.agent_store.get(flwr_aid, {}).pop(agent_id, None)
                 self.space_store.pop(space_id, None)
                 self.space_message_store.pop(space_id, None)
+                self.space_item_store.pop(space_id, None)
                 raise
             self.agent_id_counter = agent_id
             return agent
@@ -1176,6 +1182,7 @@ class InMemoryCoreState(
             )
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
+            self.space_item_store[space_id] = []
             try:
                 self.store_event(
                     EventType.SPACE_CREATED,
@@ -1186,6 +1193,7 @@ class InMemoryCoreState(
             except Exception:
                 del self.space_store[space_id]
                 del self.space_message_store[space_id]
+                del self.space_item_store[space_id]
                 raise
             return space
 
@@ -1232,6 +1240,74 @@ class InMemoryCoreState(
             self.space_message_id_counter = message.id
             self.space_message_store[space_id].append(message)
             return message
+
+    def store_space_items(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        contents: Sequence[str],
+        author: SpaceParticipant | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Store a batch of typed items in a Space."""
+        if not isinstance(item_type, SpaceItemType):
+            raise ValueError("Invalid SpaceItem type")
+        if not contents or any(not content.strip() for content in contents):
+            raise ValueError("SpaceItem contents must be nonempty")
+        if item_type == SpaceItemType.MESSAGE:
+            if author is None or not (author.flwr_aid or author.agent_id):
+                raise ValueError("Message items require an author")
+        elif author is not None:
+            raise ValueError("Only message items may have an author")
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or (
+                author is not None and author not in space.participants
+            ):
+                return None
+            created_at = now().isoformat()
+            items = [
+                SpaceItem(
+                    id=self.space_item_id_counter + index + 1,
+                    space_id=str(space_id),
+                    created_at=created_at,
+                    content=content,
+                    type=item_type.value,
+                )
+                for index, content in enumerate(contents)
+            ]
+            if author is not None:
+                for item in items:
+                    item.author.CopyFrom(author)
+            self.space_item_store[space_id].extend(items)
+            self.space_item_id_counter += len(items)
+            return items
+
+    def get_space_items(
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items for a Space participant."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or participant not in space.participants:
+                return None
+            items = [
+                item
+                for item in self.space_item_store[space_id]
+                if (before_id is None or item.id < before_id)
+                and (after_id is None or item.id > after_id)
+            ]
+            page = items[:limit] if after_id is not None else items[-limit:]
+            return page
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,

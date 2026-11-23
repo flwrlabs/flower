@@ -80,6 +80,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -95,6 +96,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -139,6 +141,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.corestate_models import (
     SpaceMessage as SpaceMessageModel,
 )
@@ -1554,6 +1557,103 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
+    def store_space_items(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        contents: Sequence[str],
+        author: SpaceParticipant | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Store a batch of typed items in a Space atomically."""
+        if not isinstance(item_type, SpaceItemType):
+            raise ValueError("Invalid SpaceItem type")
+        if not contents or any(not content.strip() for content in contents):
+            raise ValueError("SpaceItem contents must be nonempty")
+        if item_type == SpaceItemType.MESSAGE:
+            if author is None or not (author.flwr_aid or author.agent_id):
+                raise ValueError("Message items require an author")
+        elif author is not None:
+            raise ValueError("Only message items may have an author")
+
+        if author is None:
+            membership = select(SpaceModel.id).where(SpaceModel.id == space_id)
+        else:
+            field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+            membership = select(SpaceParticipantTable.c.space_id).where(
+                SpaceParticipantTable.c.space_id == space_id,
+                SpaceParticipantTable.c[field] == (author.flwr_aid or author.agent_id),
+            )
+        with self.session() as session:
+            # shortcut: no removal API exists; check membership in inserts if added.
+            if session.scalar(membership) is None:
+                return None
+            created_at = now()
+            flwr_aid = (
+                author.flwr_aid if author and author.HasField("flwr_aid") else None
+            )
+            agent_id = (
+                author.agent_id if author and author.HasField("agent_id") else None
+            )
+            models = [
+                SpaceItemModel(
+                    space_id=space_id,
+                    type=item_type.value,
+                    flwr_aid=flwr_aid,
+                    agent_id=agent_id,
+                    created_at=created_at,
+                    content=content,
+                )
+                for content in contents
+            ]
+            session.add_all(models)
+            session.flush()
+            return [_space_item_from_model(model) for model in models]
+
+    def get_space_items(
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items for a Space participant."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
+        item_conditions = [SpaceItemModel.space_id == SpaceParticipantTable.c.space_id]
+        if before_id is not None and before_id <= 2**63 - 1:
+            item_conditions.append(SpaceItemModel.id < before_id)
+        if after_id is not None:
+            item_conditions.append(SpaceItemModel.id > min(after_id, 2**63 - 1))
+        query = (
+            select(SpaceItemModel)
+            .select_from(SpaceParticipantTable)
+            .outerjoin(SpaceItemModel, and_(*item_conditions))
+            .where(
+                SpaceParticipantTable.c.space_id == space_id,
+                SpaceParticipantTable.c[field] == identity,
+            )
+            .order_by(
+                SpaceItemModel.id.asc()
+                if after_id is not None
+                else SpaceItemModel.id.desc()
+            )
+            .limit(limit)
+        )
+        with self.session() as session:
+            models = list(session.scalars(query))
+            if not models:
+                return None
+            items = [_space_item_from_model(model) for model in models if model]
+            return items if after_id is not None else items[::-1]
+
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
@@ -2908,6 +3008,22 @@ def _space_message_from_model(
         created_at=model.created_at.isoformat(),
         content=model.content,
     )
+
+
+def _space_item_from_model(model: SpaceItemModel) -> SpaceItem:
+    """Convert a persisted SpaceItem to its API representation."""
+    item = SpaceItem(
+        id=model.id,
+        space_id=str(model.space_id),
+        created_at=model.created_at.isoformat(),
+        content=model.content,
+        type=model.type,
+    )
+    if model.flwr_aid is not None:
+        item.author.flwr_aid = model.flwr_aid
+    elif model.agent_id is not None:
+        item.author.agent_id = model.agent_id
+    return item
 
 
 def _run_series_from_model(model: RunSeriesModel) -> RunSeries:

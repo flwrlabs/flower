@@ -41,6 +41,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -54,7 +55,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
-from ..constant import AutomationStatus
+from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
 
 
@@ -829,6 +830,37 @@ class CoreState(ABC):  # pylint: disable=R0904
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def store_space_items(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        contents: Sequence[str],
+        author: SpaceParticipant | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Store an ordered batch of items atomically, or return None if unauthorized.
+
+        Message items require an author in the Space. Other items have no author.
+        Empty batches, blank content, and invalid type or author combinations raise
+        ValueError. A missing Space returns None.
+        """
+
+    @abstractmethod
+    def get_space_items(
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items for a Space participant.
+
+        Returns None if the Space or membership is absent. An after_id bound
+        selects the oldest matching page; otherwise the newest page is returned.
+        """
 
     @abstractmethod
     def get_space_messages(  # pylint: disable=too-many-arguments
