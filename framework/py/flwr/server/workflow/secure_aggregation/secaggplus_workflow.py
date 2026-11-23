@@ -92,6 +92,10 @@ class SecAggPlusWorkflow:
     ('parameters') from the client's `FitRes`. The server then aggregates these
     contributions to compute the weighted average of model parameters.
 
+    Note that only this uploaded vector is masked. Each client's 'num_examples' and
+    'metrics' from its `FitRes` are also sent to the server unmasked and are passed
+    to `Strategy.aggregate_fit` per client.
+
     The protocol involves four main stages:
 
     - 'setup': Send SecAgg+ configuration to clients and collect their public keys.
