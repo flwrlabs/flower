@@ -58,6 +58,9 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
 
+# Stay below SQLite's compound SELECT and legacy bind-parameter limits.
+MAX_SPACE_ITEM_BATCH_SIZE = 400
+
 
 class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
@@ -842,8 +845,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store an ordered batch of items atomically, or return None if unauthorized.
 
         Message items require an author in the Space. Other items have no author.
-        Empty batches, blank content, and invalid type or author combinations raise
-        ValueError. A missing Space returns None.
+        Empty batches, batches over 400 items, blank content, and invalid type or
+        author combinations raise ValueError. A missing Space returns None.
         """
 
     @abstractmethod

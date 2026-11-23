@@ -163,7 +163,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import MAX_SPACE_ITEM_BATCH_SIZE, CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -1572,6 +1572,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid SpaceItem type")
         if not contents or any(not content.strip() for content in contents):
             raise ValueError("SpaceItem contents must be nonempty")
+        if len(contents) > MAX_SPACE_ITEM_BATCH_SIZE:
+            raise ValueError("SpaceItem batch is too large")
         # Revisit author rules when SendSpaceItems accepts automation items.
         if item_type == SpaceItemType.MESSAGE:
             if author is None or not (author.flwr_aid or author.agent_id):

@@ -2750,6 +2750,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.store_space_items(space_id, SpaceItemType.AUTOMATION, [])
         with self.assertRaises(ValueError):
             state.store_space_items(
+                space_id, SpaceItemType.MESSAGE, ["item"] * 401, alice
+            )
+        with self.assertRaises(ValueError):
+            state.store_space_items(
                 space_id, SpaceItemType.AUTOMATION, ["scheduled"], alice
             )
         self.assertEqual(state.get_space_items(space_id, alice), [])
@@ -2772,6 +2776,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert items is not None
         self.assertEqual(items[0].author, author)
         self.assertEqual(state.get_space_items(space_id, author), items)
+
+    def test_space_items_accept_maximum_batch(self) -> None:
+        """The largest supported batch fits the SQL insert."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        items = state.store_space_items(
+            space_id, SpaceItemType.AUTOMATION, [str(i) for i in range(400)]
+        )
+        assert items is not None
+        self.assertEqual(len(items), 400)
+        self.assertEqual([items[0].content, items[-1].content], ["0", "399"])
 
     def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
         """Reading items does not mark legacy messages as read."""

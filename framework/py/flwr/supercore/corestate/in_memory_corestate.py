@@ -84,7 +84,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import MAX_SPACE_ITEM_BATCH_SIZE, CoreState
 from .utils import (
     generate_rand_int_from_bytes,
     validate_event_cursor,
@@ -1253,6 +1253,8 @@ class InMemoryCoreState(
             raise ValueError("Invalid SpaceItem type")
         if not contents or any(not content.strip() for content in contents):
             raise ValueError("SpaceItem contents must be nonempty")
+        if len(contents) > MAX_SPACE_ITEM_BATCH_SIZE:
+            raise ValueError("SpaceItem batch is too large")
         # Revisit author rules when SendSpaceItems accepts automation items.
         if item_type == SpaceItemType.MESSAGE:
             if author is None or not (author.flwr_aid or author.agent_id):
