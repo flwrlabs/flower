@@ -29,7 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from flwr.supercore.state.schema.corestate_models import Agent, Space
+from flwr.supercore.state.schema.corestate_models import Agent, Space, SpaceItem
 from flwr.supercore.state.schema.types import UInt64
 
 
@@ -98,7 +98,11 @@ class Run(LinkStateBase):
     agent_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey(Agent.agent_id, name="fk_run_agent_id"), nullable=True
     )
-    trigger_item_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    trigger_item_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey(SpaceItem.id, name="fk_run_trigger_item_id"),
+        nullable=True,
+    )
     bytes_sent: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     bytes_recv: Mapped[int | None] = mapped_column(BigInteger, server_default="0")
     clientapp_runtime: Mapped[float | None] = mapped_column(Float, server_default="0.0")

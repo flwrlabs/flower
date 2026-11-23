@@ -249,6 +249,7 @@ class Agent(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class AgentConfig(FlwrBase):
@@ -342,9 +343,40 @@ class SpaceMessage(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # This field is not in use.
     hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
+
+
+class SpaceItem(FlwrBase):
+    """Represent a typed input in a space."""
+
+    __tablename__ = "space_item"
+    __table_args__ = (
+        CheckConstraint(
+            "(type = 'message' AND ((flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
+            "(flwr_aid IS NULL AND agent_id IS NOT NULL))) OR "
+            "(type <> 'message' AND flwr_aid IS NULL AND agent_id IS NULL)",
+            name="ck_space_item_identity",
+        ),
+        Index("idx_space_item_space_id_id", "space_id", "id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
+    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("agent.agent_id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class SeriesContext(FlwrBase):
@@ -548,6 +580,7 @@ class Task(FlwrBase):
     task_id: Mapped[int] = mapped_column(UInt64(), nullable=False, unique=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
     run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    space_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)

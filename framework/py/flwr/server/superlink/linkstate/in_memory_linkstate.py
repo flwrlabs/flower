@@ -129,12 +129,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
-    def _get_run_space_id(self, run_id: int) -> UUID | None:
-        """Return the run's Space without advancing its task lifecycle."""
-        with self.lock:
-            record = self.run_ids.get(run_id)
-            return record.space_id if record is not None else None
-
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of runs associated with the given space."""
         with self.lock:
@@ -366,7 +360,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
-        trigger_item_type: str | None = None,
+        trigger_item_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -460,7 +454,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     primary_task_type=primary_task_type,
                     series_id=resolved_series_id or 0,
                     agent_id=agent_id,
-                    trigger_item_type=trigger_item_type,
+                    trigger_item_id=trigger_item_id,
                 ),
                 federation_config=federation_config,
                 space_id=space_id,
@@ -474,6 +468,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 task_id=task_id,
                 type=primary_task_type,
                 run_id=run_id,
+                space_id=str(space_id) if space_id is not None else "",
                 status=TaskStatus(
                     status=Status.PENDING,
                     sub_status="",
