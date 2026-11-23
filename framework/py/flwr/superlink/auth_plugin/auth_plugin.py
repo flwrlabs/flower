@@ -22,8 +22,8 @@ from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
     AuthenticatedUser,
-    DeviceAuthorizationError,
 )
+from flwr.supercore.constant import DeviceAuthorizationError
 
 
 class ControlAuthnPlugin(ABC):

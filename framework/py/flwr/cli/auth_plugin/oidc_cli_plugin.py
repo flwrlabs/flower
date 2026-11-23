@@ -31,11 +31,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
 )
-from flwr.supercore.auth.typing import (
-    AccountAuthCredentials,
-    AccountAuthLoginDetails,
-    DeviceAuthorizationError,
-)
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.constant import DeviceAuthorizationError
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 

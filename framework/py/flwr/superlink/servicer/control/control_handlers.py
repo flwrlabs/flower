@@ -167,7 +167,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore import log
-from flwr.supercore.auth.typing import AuthenticatedUser, DeviceAuthorizationError
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import (
     AGENT_RUN_BATCH_LIMIT,
     DEFAULT_FEDERATION_SIMULATION,
@@ -179,6 +179,7 @@ from flwr.supercore.constant import (
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
     AutomationStatus,
+    DeviceAuthorizationError,
     RunTime,
     TaskType,
 )
