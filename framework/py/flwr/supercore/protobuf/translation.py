@@ -117,7 +117,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     ListSpacesRequest,
-    SendSpaceItemsRequest,
+    SendSpaceItemRequest,
     SendSpaceMessageRequest,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -157,7 +157,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/control/get-space-messages"): GetSpaceMessagesRequest,
     ("POST", "/v1/control/get-space-items"): GetSpaceItemsRequest,
     ("POST", "/v1/control/send-space-message"): SendSpaceMessageRequest,
-    ("POST", "/v1/control/send-space-items"): SendSpaceItemsRequest,
+    ("POST", "/v1/control/send-space-item"): SendSpaceItemRequest,
     ("POST", "/v1/control/start-run"): StartRunRequest,
     ("POST", "/v1/control/list-runs"): ListRunsRequest,
     ("POST", "/v1/control/list-run-series"): ListRunSeriesRequest,
@@ -234,7 +234,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/runtime/get-space-messages"): GetSpaceMessagesRequest,
     ("POST", "/v1/runtime/get-space-items"): GetSpaceItemsRequest,
     ("POST", "/v1/runtime/send-space-message"): SendSpaceMessageRequest,
-    ("POST", "/v1/runtime/send-space-items"): SendSpaceItemsRequest,
+    ("POST", "/v1/runtime/send-space-item"): SendSpaceItemRequest,
     ("POST", "/v1/runtime/get-compacted-contexts"): GetCompactedContextsRequest,
     ("POST", "/v1/runtime/put-compacted-context"): PutCompactedContextRequest,
     ("POST", "/v1/runtime/pull-task-message"): PullTaskMessageRequest,

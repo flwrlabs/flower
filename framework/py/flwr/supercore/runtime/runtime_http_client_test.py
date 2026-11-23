@@ -47,7 +47,7 @@ _UNARY_UNARY_PATHS = (
     "get-space-messages",
     "get-space-items",
     "send-space-message",
-    "send-space-items",
+    "send-space-item",
     "get-compacted-contexts",
     "put-compacted-context",
     "pull-task-message",
