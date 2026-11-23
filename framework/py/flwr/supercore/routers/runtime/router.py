@@ -85,8 +85,8 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
-    SendSpaceItemsRequest,
-    SendSpaceItemsResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -313,13 +313,13 @@ def runtime_send_space_message(
     return handlers.send_space_message(request, state, task)
 
 
-@router.post("/send-space-items")
-def runtime_send_space_items(
-    _request: Annotated[SendSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+@router.post("/send-space-item")
+def runtime_send_space_item(
+    _request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
     _task: TaskDependency,
-) -> SendSpaceItemsResponse:
-    """Publish message items to the authenticated task's Space once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItems pending")
+) -> SendSpaceItemResponse:
+    """Publish a message item to the task's Space once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItem pending")
 
 
 @router.post("/get-compacted-contexts")

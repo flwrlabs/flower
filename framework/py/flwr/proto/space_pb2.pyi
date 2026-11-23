@@ -352,44 +352,41 @@ class SendSpaceMessageResponse(google.protobuf.message.Message):
 global___SendSpaceMessageResponse = SendSpaceMessageResponse
 
 @typing.final
-class SendSpaceItemsRequest(google.protobuf.message.Message):
+class SendSpaceItemRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SPACE_ID_FIELD_NUMBER: builtins.int
-    CONTENTS_FIELD_NUMBER: builtins.int
+    CONTENT_FIELD_NUMBER: builtins.int
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
-    @property
-    def contents(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """When implemented, each entry becomes one message item, in order.
-        The server supplies type = "message" and resolves the author;
-        other item types are not accepted.
-        """
-
+    content: builtins.str
+    """When implemented, this becomes one message item.
+    The server supplies type = "message" and resolves the author;
+    other item types are not accepted.
+    """
     def __init__(
         self,
         *,
         space_id: builtins.str = ...,
-        contents: collections.abc.Iterable[builtins.str] | None = ...,
+        content: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["contents", b"contents", "space_id", b"space_id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
 
-global___SendSpaceItemsRequest = SendSpaceItemsRequest
+global___SendSpaceItemRequest = SendSpaceItemRequest
 
 @typing.final
-class SendSpaceItemsResponse(google.protobuf.message.Message):
+class SendSpaceItemResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ITEMS_FIELD_NUMBER: builtins.int
+    ITEM_FIELD_NUMBER: builtins.int
     @property
-    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceItem]:
-        """Created items in request order."""
-
+    def item(self) -> global___SpaceItem: ...
     def __init__(
         self,
         *,
-        items: collections.abc.Iterable[global___SpaceItem] | None = ...,
+        item: global___SpaceItem | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["item", b"item"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["item", b"item"]) -> None: ...
 
-global___SendSpaceItemsResponse = SendSpaceItemsResponse
+global___SendSpaceItemResponse = SendSpaceItemResponse
