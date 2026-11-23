@@ -31,6 +31,7 @@ from google.protobuf.message import Message
 
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
+    INT64_MAX_VALUE,
     NOOP_FLWR_AID,
     REFRESH_TOKEN_KEY,
     Status,
@@ -74,6 +75,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     StreamRunEventsRequest,
     StreamRunEventsResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
@@ -425,14 +428,16 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
-    """Persist an agent through HTTP and list only the authenticated owner's agents."""
+def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None:
+    """Create, update, and list owned agents through authenticated protobuf HTTP."""
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
     config = AgentConfig(
         name="Research Agent",
         app_spec="@flower/research==1.2.3",
+        title="Researcher",
+        description="Cite sources.",
         avatar="robot",
         color="sky",
     )
@@ -463,13 +468,103 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert SpaceParticipant(flwr_aid=_ACCOUNT.user_id) in spaces[0].participants
     assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
+    updated_config = AgentConfig(name="Updated Agent", app_spec=config.app_spec)
+    response = client.post(
+        "/v1/control/update-agent",
+        content=UpdateAgentRequest(
+            agent_id=agent.id,
+            expected_config_version=agent.config_version,
+            config=updated_config,
+        ).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    updated = UpdateAgentResponse.FromString(response.content).agent
+    assert updated.id == agent.id
+    assert updated.default_space_id == agent.default_space_id
+    assert updated.config_version == agent.config_version + 1
+    assert updated.config == updated_config
+
     response = client.post(
         "/v1/control/list-agents",
         content=ListAgentsRequest().SerializeToString(),
         headers=headers,
     )
     assert response.status_code == 200
-    assert ListAgentsResponse.FromString(response.content).agents == [agent]
+    assert ListAgentsResponse.FromString(response.content).agents == [updated]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("config", None),
+        ("agent_id", 0),
+        ("agent_id", INT64_MAX_VALUE + 1),
+        ("expected_config_version", 0),
+        ("expected_config_version", INT64_MAX_VALUE),
+    ],
+)
+def test_agent_update_rejects_invalid_requests(
+    space_client: tuple[TestClient, LinkState], field: str, value: int | None
+) -> None:
+    """Reject missing configuration and integers outside the database bounds."""
+    client, _state = space_client
+    request = UpdateAgentRequest(
+        agent_id=1,
+        expected_config_version=1,
+        config=AgentConfig(name="Agent", app_spec="@test/app"),
+    )
+    if value is None:
+        request.ClearField("config")
+    else:
+        setattr(request, field, value)
+    response = client.post(
+        "/v1/control/update-agent", content=request.SerializeToString()
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == ApiErrorCode.INVALID_AGENT_REQUEST
+
+
+@pytest.mark.parametrize(
+    ("case", "status_code", "error_code"),
+    [
+        ("missing", 404, ApiErrorCode.AGENT_NOT_FOUND),
+        ("foreign", 404, ApiErrorCode.AGENT_NOT_FOUND),
+        ("blank_name", 400, ApiErrorCode.INVALID_AGENT_REQUEST),
+        ("app_change", 400, ApiErrorCode.INVALID_AGENT_REQUEST),
+        ("stale_version", 409, ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT),
+    ],
+)
+def test_agent_update_translates_state_errors(
+    space_client: tuple[TestClient, LinkState],
+    case: str,
+    status_code: int,
+    error_code: ApiErrorCode,
+) -> None:
+    """Return consistent ownership, validation, and version-precondition errors."""
+    client, state = space_client
+    owner = "other-account" if case == "foreign" else _ACCOUNT.user_id
+    agent = state.create_agent(owner, AgentConfig(name="Agent", app_spec="@test/app"))
+    assert agent is not None
+    request = UpdateAgentRequest(
+        agent_id=agent.id,
+        expected_config_version=agent.config_version,
+        config=AgentConfig(name="Updated", app_spec=agent.config.app_spec),
+    )
+    if case == "missing":
+        request.agent_id += 1
+    elif case == "blank_name":
+        request.config.name = " "
+    elif case == "app_change":
+        request.config.app_spec = "@other/app"
+    elif case == "stale_version":
+        request.expected_config_version += 1
+    response = client.post(
+        "/v1/control/update-agent", content=request.SerializeToString()
+    )
+    assert response.status_code == status_code
+    assert response.json()["code"] == error_code
+    assert state.get_agent(owner, agent.id) == agent
 
 
 @pytest.mark.parametrize(
@@ -680,6 +775,7 @@ def test_connector_route_returns_existing_structured_error() -> None:
     ("path", "protobuf_request", "handler_name"),
     [
         ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
+        ("/v1/control/update-agent", UpdateAgentRequest(), "update_agent"),
         ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",

@@ -24,6 +24,7 @@ from flwr.supercore.protobuf.client import ProtobufClient
 _UNARY_UNARY_ENDPOINTS = (
     "bootstrap",
     "create-agent",
+    "update-agent",
     "list-agents",
     "start-run",
     "stop-run",
