@@ -249,6 +249,7 @@ class Agent(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class AgentConfig(FlwrBase):
@@ -342,6 +343,7 @@ class SpaceMessage(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # This field is not in use.
     hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
@@ -578,6 +580,7 @@ class Task(FlwrBase):
     task_id: Mapped[int] = mapped_column(UInt64(), nullable=False, unique=True)
     type: Mapped[str] = mapped_column(String, nullable=False)
     run_id: Mapped[int] = mapped_column(UInt64(), nullable=False)
+    space_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     fab_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     model_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     connector_ref: Mapped[str | None] = mapped_column(String, nullable=True)
