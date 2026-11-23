@@ -352,7 +352,7 @@ class SendSpaceMessageResponse(google.protobuf.message.Message):
 global___SendSpaceMessageResponse = SendSpaceMessageResponse
 
 @typing.final
-class SendSpaceItemRequest(google.protobuf.message.Message):
+class SendSpaceItemsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SPACE_ID_FIELD_NUMBER: builtins.int
@@ -369,10 +369,10 @@ class SendSpaceItemRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
 
-global___SendSpaceItemRequest = SendSpaceItemRequest
+global___SendSpaceItemsRequest = SendSpaceItemsRequest
 
 @typing.final
-class SendSpaceItemResponse(google.protobuf.message.Message):
+class SendSpaceItemsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ITEM_FIELD_NUMBER: builtins.int
@@ -386,4 +386,4 @@ class SendSpaceItemResponse(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["item", b"item"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["item", b"item"]) -> None: ...
 
-global___SendSpaceItemResponse = SendSpaceItemResponse
+global___SendSpaceItemsResponse = SendSpaceItemsResponse

@@ -81,8 +81,8 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
-    SendSpaceItemRequest,
-    SendSpaceItemResponse,
+    SendSpaceItemsRequest,
+    SendSpaceItemsResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -288,13 +288,13 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=SendSpaceMessageResponse,
         )
 
-    def SendSpaceItem(self, request: SendSpaceItemRequest) -> SendSpaceItemResponse:
+    def SendSpaceItems(self, request: SendSpaceItemsRequest) -> SendSpaceItemsResponse:
         """Publish a message item as the task's agent participant."""
         return self._unary_unary(
-            path="/v1/runtime/send-space-item",
-            rpc_method="/flwr.proto.Runtime/SendSpaceItem",
+            path="/v1/runtime/send-space-items",
+            rpc_method="/flwr.proto.Runtime/SendSpaceItems",
             request=request,
-            response_type=SendSpaceItemResponse,
+            response_type=SendSpaceItemsResponse,
         )
 
     def GetCompactedContexts(

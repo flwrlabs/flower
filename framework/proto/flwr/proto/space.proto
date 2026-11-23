@@ -100,10 +100,10 @@ message SendSpaceMessageRequest {
 }
 message SendSpaceMessageResponse { SpaceMessage message = 1; }
 
-message SendSpaceItemRequest {
+message SendSpaceItemsRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
   string space_id = 1;
   // A message item's author and type are assigned by the server.
   string content = 2;
 }
-message SendSpaceItemResponse { SpaceItem item = 1; }
+message SendSpaceItemsResponse { SpaceItem item = 1; }
