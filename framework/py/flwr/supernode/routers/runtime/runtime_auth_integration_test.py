@@ -15,7 +15,7 @@
 """SuperNode Runtime HTTP authentication integration tests."""
 
 from typing import cast
-from uuid import uuid4
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
@@ -83,7 +83,7 @@ def fixture_client(state: NodeState) -> TestClient:
 def fixture_valid_token(state: NodeState) -> str:
     """Claim the ClientApp task and return its token."""
     state.store_run(Run.create_empty(run_id=99))
-    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99, space_id=None)
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -182,7 +182,7 @@ def test_acquire_task_allows_with_superexec_metadata(
     client: TestClient, state: NodeState
 ) -> None:
     """Signed acquisition returns a task and its claim token."""
-    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99, space_id=None)
     assert task_id is not None
     proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
     headers = create_superexec_auth_metadata(
@@ -216,7 +216,9 @@ def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
     run = Run.create_empty(run_id=99)
     run.series_id = 7
     state.store_run(run)
-    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    task_id = state.create_task(
+        task_type=TaskType.AGENT_APP, run_id=run.run_id, space_id=None
+    )
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -253,13 +255,14 @@ def test_space_events_return_only_local_events_in_authenticated_space(
 ) -> None:
     """A task token reads local events only from its run's Space."""
     run = Run.create_empty(run_id=99)
-    run.space_id = uuid4()
     other_run = Run.create_empty(run_id=100)
-    other_run.space_id = uuid4()
     for current_run in (run, other_run):
+        current_run.space_id = UUID(state.create_space(participants=[]).id)
         state.store_run(current_run)
         task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=current_run.run_id
+            task_type=TaskType.AGENT_APP,
+            run_id=current_run.run_id,
+            space_id=current_run.space_id,
         )
         assert task_id is not None
         assert state.store_task_events(

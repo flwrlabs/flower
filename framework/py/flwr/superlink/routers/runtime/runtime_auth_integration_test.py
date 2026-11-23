@@ -37,8 +37,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ListAgentConnectorsResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemsRequest,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -178,6 +180,7 @@ def test_get_connector_requires_and_uses_connector_task_token(
     task_id = state.create_task(
         TaskType.CONNECTOR,
         run_id,
+        space_id=None,
         connector_ref="notion",
         connector_id=connector_id,
     )
@@ -304,11 +307,32 @@ def test_space_messages_use_authenticated_run(
         )
 
 
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("get-space-items", GetSpaceItemsRequest()),
+        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+    ],
+)
+def test_space_item_endpoints_not_available(
+    client: TestClient,
+    agent: tuple[int, str, str],
+    endpoint: str,
+    payload: Message,
+) -> None:
+    """Authenticate new routes while item persistence is pending."""
+    _, _, token = agent
+    assert _post(client, endpoint, payload).status_code == 401
+    response = _post(client, endpoint, payload, token=token)
+    assert response.status_code == 501
+    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+
+
 def test_agent_connector_discovery_and_credentials(
     client: TestClient, state: LinkState, agent: tuple[int, str, str]
 ) -> None:
     """List agent connections and use the selected connector task's credentials."""
-    agent_id, _, token = agent
+    agent_id, space_id, token = agent
     connector_id = state.create_connector(
         None, "slack", '{"access_token":"secret"}', "{}", "alice", agent_id
     )
@@ -326,6 +350,7 @@ def test_agent_connector_discovery_and_credentials(
     )
     assert created.status_code == 200
     child_id = CreateTaskResponse.FromString(created.content).task_id
+    assert state.get_tasks(task_ids=[child_id])[0].space_id == space_id
     child_token = state.claim_task(child_id)
     assert child_token is not None and state.activate_task(child_id)
     response = _post(client, "get-connector", GetConnectorRequest(), child_token)

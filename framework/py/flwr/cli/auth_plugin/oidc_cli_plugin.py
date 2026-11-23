@@ -73,15 +73,26 @@ class OidcCliPlugin(CliAuthPlugin):
         Raises
         ------
         LoginError
-            If authentication times out.
+            If verification details are incomplete or authentication times out.
         """
-        # Prompt user to login via browser
-        webbrowser.open(login_details.verification_uri_complete)
+        verification_uri = login_details.verification_uri_complete
+        if not verification_uri:
+            verification_uri = login_details.verification_uri
+            if not verification_uri or not login_details.user_code:
+                raise LoginError(
+                    "The provider did not return a verification URL and code."
+                )
+            typer.secho(
+                f"Enter this code on the sign-in page: {login_details.user_code}",
+                fg=typer.colors.BLUE,
+            )
+
+        webbrowser.open(verification_uri)
         typer.secho(
             "A browser window has been opened for you to "
             "log into your Flower account.\n"
             "If it did not open automatically, use this URL:\n"
-            f"{login_details.verification_uri_complete}",
+            f"{verification_uri}",
             fg=typer.colors.BLUE,
         )
 
