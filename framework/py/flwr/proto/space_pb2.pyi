@@ -360,7 +360,9 @@ class SendSpaceItemsRequest(google.protobuf.message.Message):
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
     content: builtins.str
-    """A message item's author and type are assigned by the server."""
+    """This endpoint will accept only message items. The server supplies
+    type = "message" and resolves the author, so callers omit both fields.
+    """
     def __init__(
         self,
         *,

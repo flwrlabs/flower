@@ -103,7 +103,8 @@ message SendSpaceMessageResponse { SpaceMessage message = 1; }
 message SendSpaceItemsRequest {
   // Required by Control. Runtime uses the authenticated task's Space.
   string space_id = 1;
-  // A message item's author and type are assigned by the server.
+  // This endpoint will accept only message items. The server supplies
+  // type = "message" and resolves the author, so callers omit both fields.
   string content = 2;
 }
 message SendSpaceItemsResponse { SpaceItem item = 1; }
