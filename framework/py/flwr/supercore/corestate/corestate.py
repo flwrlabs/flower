@@ -327,8 +327,34 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account, or None if it does not exist."""
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Archive an owned agent, preserving its identity and historical records.
+
+        Stop its active automations and publish agent.deleted atomically. Already
+        accepted runs can finish; future runs and use as a new Space participant
+        are rejected. Archived agents and their default Spaces disappear from
+        normal reads. Repeated deletion succeeds without changing the original
+        deletion timestamp or publishing another event.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent and performing the deletion.
+        agent_id : int
+            Agent to archive.
+
+        Returns
+        -------
+        bool
+            True if the owned agent is now archived, including repeated deletion;
+            False if absent or owned by another account.
+        """
+
+    @abstractmethod
+    def get_agent(
+        self, flwr_aid: str, agent_id: int, *, include_deleted: bool = False
+    ) -> Agent | None:
+        """Return an owned active agent, optionally including archived history."""
 
     @abstractmethod
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:

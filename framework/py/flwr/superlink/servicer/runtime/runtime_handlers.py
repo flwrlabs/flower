@@ -428,7 +428,7 @@ def pull_task_input(
     run = runs[0] if runs else None
     fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
     agent = (
-        state.get_agent(run.flwr_aid, run.agent_id)
+        state.get_agent(run.flwr_aid, run.agent_id, include_deleted=True)
         if run and run.agent_id is not None
         else None
     )

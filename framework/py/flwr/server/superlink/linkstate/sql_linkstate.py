@@ -448,14 +448,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                # Serialize admission before checking for an open Run.
+                # Serialize admission with deletion before checking for an open Run.
                 session.execute(
-                    update(SpaceParticipantTable)
+                    update(AgentModel)
                     .where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == agent_id,
+                        AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                     )
-                    .values(agent_id=agent_id)
+                    .values(updated_at=AgentModel.updated_at)
                 )
                 open_run = (
                     select(RunModel.run_id)
@@ -476,6 +476,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                         ~open_run,
                     )
                     .execution_options(populate_existing=True)
@@ -1018,7 +1019,7 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigM
             (AgentConfigModel.agent_id == AgentModel.agent_id)
             & (AgentConfigModel.version == AgentModel.config_version),
         )
-        .where(unread, ~open_run)
+        .where(unread, ~open_run, AgentModel.deleted_at.is_(None))
         .order_by(
             SpaceParticipantTable.c.space_id,
             AgentModel.agent_id,
