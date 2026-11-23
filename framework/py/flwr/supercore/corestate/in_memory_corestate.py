@@ -671,15 +671,9 @@ class InMemoryCoreState(
             self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
             self.deleted_agent_store[agent_id] = deleted_at
             self.agent_store[flwr_aid][agent_id] = agent
-            for record in self.automation_store.values():
-                automation = record.automation
-                if (
-                    automation.agent_id == agent_id
-                    and automation.status == AutomationStatus.ACTIVE
-                ):
-                    automation.status = AutomationStatus.STOPPED
-                    automation.stopped_at = agent.updated_at
-                    automation.updated_at = agent.updated_at
+            for automation_id, record in self.automation_store.items():
+                if record.automation.agent_id == agent_id:
+                    self.stop_automation(automation_id)
             return True
 
     def get_agent(
