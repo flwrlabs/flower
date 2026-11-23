@@ -130,7 +130,7 @@ explicitly overrides it with ``high`` in the second:
       }'
 
 For the Chat Completions API (``/v1/chat/completions``), use the top-level
-``reasoning_effort`` field instead of ``reasoning.effort``. The same default applies
+``reasoning_effort`` field. The same default applies
 when it is omitted. For example, to explicitly request ``high`` effort:
 
 .. code-block:: bash
