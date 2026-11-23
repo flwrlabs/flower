@@ -37,8 +37,10 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     ListAgentConnectorsResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -302,6 +304,27 @@ def test_space_messages_use_authenticated_run(
         assert (
             GetSpaceMessagesResponse.FromString(response.content).messages == expected
         )
+
+
+@pytest.mark.parametrize(
+    "endpoint,payload",
+    [
+        ("get-space-items", GetSpaceItemsRequest()),
+        ("send-space-item", SendSpaceItemRequest(content="Hello")),
+    ],
+)
+def test_space_item_endpoints_not_available(
+    client: TestClient,
+    agent: tuple[int, str, str],
+    endpoint: str,
+    payload: Message,
+) -> None:
+    """Authenticate new routes while item persistence is pending."""
+    _, _, token = agent
+    assert _post(client, endpoint, payload).status_code == 401
+    response = _post(client, endpoint, payload, token=token)
+    assert response.status_code == 501
+    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
 
 
 def test_agent_connector_discovery_and_credentials(

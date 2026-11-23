@@ -114,16 +114,21 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -265,6 +270,15 @@ def get_space_messages(
     return control_handlers.get_space_messages(request, account, linkstate)
 
 
+@router.post("/get-space-items")
+def get_space_items(
+    _request: Annotated[GetSpaceItemsRequest, Depends(get_protobuf_request)],
+    _account: AccountDependency,
+) -> GetSpaceItemsResponse:
+    """Get space items once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "GetSpaceItems pending")
+
+
 @router.post("/send-space-message")
 def send_space_message(
     request: Annotated[SendSpaceMessageRequest, Depends(get_protobuf_request)],
@@ -273,6 +287,15 @@ def send_space_message(
 ) -> SendSpaceMessageResponse:
     """Send space message."""
     return control_handlers.send_space_message(request, account, linkstate)
+
+
+@router.post("/send-space-item")
+def send_space_item(
+    _request: Annotated[SendSpaceItemRequest, Depends(get_protobuf_request)],
+    _account: AccountDependency,
+) -> SendSpaceItemResponse:
+    """Send a space item once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItem pending")
 
 
 @router.post("/list-run-series")
