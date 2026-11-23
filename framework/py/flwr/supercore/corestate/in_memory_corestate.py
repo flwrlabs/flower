@@ -1253,6 +1253,7 @@ class InMemoryCoreState(
             raise ValueError("Invalid SpaceItem type")
         if not contents or any(not content.strip() for content in contents):
             raise ValueError("SpaceItem contents must be nonempty")
+        # Revisit author rules when SendSpaceItems accepts automation items.
         if item_type == SpaceItemType.MESSAGE:
             if author is None or not (author.flwr_aid or author.agent_id):
                 raise ValueError("Message items require an author")
