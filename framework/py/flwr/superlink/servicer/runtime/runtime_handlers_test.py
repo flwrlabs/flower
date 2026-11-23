@@ -280,7 +280,7 @@ def test_agent_task_input_includes_latest_identity(
     assert acquired.task.run_id == run_id
     if archive:
         assert state.delete_agent("alice", agent.id)
-        agent = state.get_agent("alice", agent.id, include_deleted=True)
+        agent = state.get_agent("alice", agent.id)
         assert agent is not None
     response = runtime_handlers.pull_task_input(
         PullTaskInputRequest(), state, acquired.task

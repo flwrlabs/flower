@@ -338,7 +338,7 @@ def _validate_connector_owner(
             "exactly one of federation or agent_id is required"
         )
     if agent_id is not None:
-        if state.get_agent(flwr_aid, agent_id) is None:
+        if state.get_default_space(flwr_aid, agent_id) is None:
             raise InvalidConnectorRequestError("agent does not belong to this account")
     elif federation_id is not None:
         state.federation_manager.ensure_default_federations_exist(flwr_aid=flwr_aid)

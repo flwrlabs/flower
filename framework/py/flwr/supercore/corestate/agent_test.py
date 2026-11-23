@@ -173,14 +173,13 @@ def test_delete_agent(state: CoreState, agent: Agent) -> None:
     assert not state.delete_agent("bob", agent.id)
     assert not state.delete_agent("alice", agent.id + 1)
     assert state.delete_agent("alice", agent.id)
-    assert state.get_agent("alice", agent.id) is None
     assert state.get_default_space("alice", agent.id) is None
     assert not state.get_bootstrap("alice").agents
     assert [space.id for space in state.get_spaces("alice")] == [group.id]
-    archived = state.get_agent("alice", agent.id, include_deleted=True)
+    archived = state.get_agent("alice", agent.id)
     assert archived is not None and archived.config == agent.config
     deleted_at = archived.updated_at
-    assert state.get_agent("bob", agent.id, include_deleted=True) is None
+    assert state.get_agent("bob", agent.id) is None
     assert state.get_space_messages(
         UUID(group.id), SpaceParticipant(flwr_aid="alice")
     ) == [message]
@@ -190,7 +189,7 @@ def test_delete_agent(state: CoreState, agent: Agent) -> None:
     assert len(events) == 1 and events[0].event.type == EventType.AGENT_DELETED
     assert events[0].event.payload["id"] == str(agent.id)
     assert state.delete_agent("alice", agent.id)
-    repeated = state.get_agent("alice", agent.id, include_deleted=True)
+    repeated = state.get_agent("alice", agent.id)
     assert repeated is not None and repeated.updated_at == deleted_at
     assert state.get_user_events("alice", cursor) == events
     assert not state.get_user_events("bob")
@@ -220,6 +219,7 @@ def test_delete_agent_blocks_future_activity(state: CoreState, agent: Agent) -> 
     assert state.get_agent_run_candidates()
     assert state.delete_agent("alice", agent.id)
     assert not state.get_agent_run_candidates()
+    assert state.create_connector(None, "slack", "{}", "{}", "alice", agent.id) is None
     assert (
         state.create_run(
             "test/app",

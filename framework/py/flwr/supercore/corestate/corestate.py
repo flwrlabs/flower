@@ -333,7 +333,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         Stop its active automations and publish agent.deleted atomically. Already
         accepted runs can finish; future runs and use as a new Space participant
         are rejected. Archived agents and their default Spaces disappear from
-        normal reads. Repeated deletion succeeds without changing the original
+        listings. Repeated deletion succeeds without changing the original
         deletion timestamp or publishing another event.
 
         Parameters
@@ -351,14 +351,12 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def get_agent(
-        self, flwr_aid: str, agent_id: int, *, include_deleted: bool = False
-    ) -> Agent | None:
-        """Return an owned active agent, optionally including archived history."""
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an owned agent, including retained deleted agents."""
 
     @abstractmethod
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID, or None if unavailable."""
+        """Return an owned active agent's default Space ID, or None if unavailable."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:

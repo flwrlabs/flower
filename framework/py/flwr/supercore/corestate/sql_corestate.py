@@ -806,7 +806,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
                 .returning(AgentModel.agent_id)
             )
-            agent = self.get_agent(flwr_aid, agent_id, include_deleted=True)
+            agent = self.get_agent(flwr_aid, agent_id)
             if deleted_id is None:
                 return agent is not None
             assert agent is not None
@@ -825,28 +825,26 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
             return True
 
-    def get_agent(
-        self, flwr_aid: str, agent_id: int, *, include_deleted: bool = False
-    ) -> Agent | None:
-        """Return an owned active agent, optionally including archived history."""
-        query = (
-            select(AgentModel, AgentConfigModel)
-            .join(
-                AgentConfigModel,
-                (AgentConfigModel.agent_id == AgentModel.agent_id)
-                & (AgentConfigModel.version == AgentModel.config_version),
-            )
-            .where(AgentModel.flwr_aid == flwr_aid, AgentModel.agent_id == agent_id)
-            .execution_options(populate_existing=True)
-        )
-        if not include_deleted:
-            query = query.where(AgentModel.deleted_at.is_(None))
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an owned agent, including retained deleted agents."""
         with self.session() as session:
-            row = session.execute(query).one_or_none()
+            row = session.execute(
+                select(AgentModel, AgentConfigModel)
+                .join(
+                    AgentConfigModel,
+                    (AgentConfigModel.agent_id == AgentModel.agent_id)
+                    & (AgentConfigModel.version == AgentModel.config_version),
+                )
+                .where(
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.agent_id == agent_id,
+                )
+                .execution_options(populate_existing=True)
+            ).one_or_none()
             return _agent_from_model(*row) if row is not None else None
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID."""
+        """Return the default Space ID of an owned active agent."""
         with self.session() as session:
             return session.scalar(
                 select(AgentModel.default_space_id).where(
@@ -1261,7 +1259,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+            if (
+                agent_id is not None
+                and self.get_default_space(created_by, agent_id) is None
+            ):
                 return None
             return session.scalar(stmt)
 
@@ -1422,7 +1423,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as db_session:
-                if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+                if (
+                    agent_id is not None
+                    and self.get_default_space(flwr_aid, agent_id) is None
+                ):
                     return None
                 db_session.add(model)
                 db_session.flush()
