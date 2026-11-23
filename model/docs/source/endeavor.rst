@@ -96,6 +96,42 @@ deployment.
 
 Approved participants receive the complete technical contract during onboarding.
 
+******************
+ Reasoning effort
+******************
+
+For Endeavor 1.1 and the latest model alias, the API defaults to ``low`` reasoning
+effort when the client omits it. An explicitly supplied reasoning effort keeps its
+existing behavior and overrides this default. Endeavor 1.0 and older exact patch
+versions retain their existing behavior.
+
+The following Responses API example omits reasoning effort in the first request and
+explicitly overrides it with ``high`` in the second:
+
+.. code-block:: bash
+    :substitutions:
+
+    # Omitted effort defaults to low.
+    curl --fail-with-body -sS 'https://api.flower.ai/v1/responses' \
+      -H "Authorization: Bearer $FLOWER_API_KEY" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "model": "|endeavor_model|",
+        "input": "Explain this algorithm."
+      }'
+
+    # Explicit effort overrides the default.
+    curl --fail-with-body -sS 'https://api.flower.ai/v1/responses' \
+      -H "Authorization: Bearer $FLOWER_API_KEY" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "model": "|endeavor_model|",
+        "input": "Explain this algorithm.",
+        "reasoning": {"effort": "high"}
+      }'
+
+See :doc:`endeavor-api-key` to set ``FLOWER_API_KEY`` before running the example.
+
 ***************************
  Context window and limits
 ***************************
