@@ -279,6 +279,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="Fleet API type is not initialized.",
     ),
+    ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE: ApiErrorSpec(
+        http_status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        public_message="Space item endpoints are not implemented yet.",
+    ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="SuperNode authentication is enabled. "

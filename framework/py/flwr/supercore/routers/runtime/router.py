@@ -81,8 +81,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemsRequest,
+    SendSpaceItemsResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -93,6 +97,7 @@ from flwr.supercore.dependencies.runtime import (
     TaskDependency,
 )
 from flwr.supercore.dependencies.version import VersionDependency
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
@@ -288,6 +293,15 @@ def runtime_get_space_messages(
     return handlers.get_space_messages(request, state, task)
 
 
+@router.post("/get-space-items")
+def runtime_get_space_items(
+    _request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    _task: TaskDependency,
+) -> GetSpaceItemsResponse:
+    """Read items from the authenticated task's Space once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "GetSpaceItems pending")
+
+
 @router.post("/send-space-message")
 def runtime_send_space_message(
     request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
@@ -297,6 +311,15 @@ def runtime_send_space_message(
 ) -> SendSpaceMessageResponse:
     """Publish a message to the authenticated task's Space."""
     return handlers.send_space_message(request, state, task)
+
+
+@router.post("/send-space-items")
+def runtime_send_space_items(
+    _request: Annotated[SendSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    _task: TaskDependency,
+) -> SendSpaceItemsResponse:
+    """Publish message items to the authenticated task's Space once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItems pending")
 
 
 @router.post("/get-compacted-contexts")
