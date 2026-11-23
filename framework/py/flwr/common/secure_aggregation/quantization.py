@@ -20,9 +20,14 @@ import numpy as np
 from flwr.common import NDArrayFloat, NDArrayInt
 
 
-def _stochastic_round(arr: NDArrayFloat) -> NDArrayInt:
+def _stochastic_round(
+    arr: NDArrayFloat, rng: np.random.Generator | None = None
+) -> NDArrayInt:
     ret: NDArrayInt = np.ceil(arr).astype(np.int32)
-    rand_arr = np.random.rand(*ret.shape)
+    if rng is None:
+        rand_arr = np.random.rand(*ret.shape)
+    else:
+        rand_arr = rng.random(ret.shape)
     if len(ret.shape) == 0:
         if rand_arr < ret - arr:
             ret -= 1
@@ -32,9 +37,16 @@ def _stochastic_round(arr: NDArrayFloat) -> NDArrayInt:
 
 
 def quantize(
-    parameters: list[NDArrayFloat], clipping_range: float, target_range: int
+    parameters: list[NDArrayFloat],
+    clipping_range: float,
+    target_range: int,
+    rng: np.random.Generator | None = None,
 ) -> list[NDArrayInt]:
-    """Quantize float Numpy arrays to integer Numpy arrays."""
+    """Quantize float Numpy arrays to integer Numpy arrays.
+
+    If `rng` is given, the stochastic rounding draws from it. Otherwise it draws from
+    the NumPy global random state.
+    """
     quantized_list: list[NDArrayInt] = []
     quantizer = target_range / (2 * clipping_range)
     for arr in parameters:
@@ -42,7 +54,7 @@ def quantize(
         pre_quantized = (
             np.clip(arr, -clipping_range, clipping_range) + clipping_range
         ) * quantizer
-        quantized = _stochastic_round(pre_quantized)
+        quantized = _stochastic_round(pre_quantized, rng)
         quantized_list.append(quantized)
     return quantized_list
 
