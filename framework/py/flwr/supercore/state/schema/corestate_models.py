@@ -249,6 +249,7 @@ class Agent(FlwrBase):
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class AgentConfig(FlwrBase):
