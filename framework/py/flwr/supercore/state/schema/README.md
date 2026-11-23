@@ -204,6 +204,7 @@ erDiagram
   run {
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
+    BIGINT trigger_item_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
@@ -217,7 +218,6 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     BIGINT series_id "nullable"
-    VARCHAR trigger_item_type "nullable"
     VARCHAR usage_reported_at
   }
 
@@ -371,6 +371,7 @@ erDiagram
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
   agent ||--o{ run : agent_id
+  space_item ||--o{ run : trigger_item_id
   objects ||--o| run_objects : object_id
   space ||--o{ space_item : space_id
   agent ||--o{ space_item : agent_id
