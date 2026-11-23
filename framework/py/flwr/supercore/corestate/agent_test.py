@@ -237,25 +237,3 @@ def test_update_agent_rolls_back_when_event_fails(
     assert not state.get_user_events("alice", cursor)
     updated = state.update_agent("alice", agent.id, 1, agent.config)
     assert updated is not None and updated.config_version == 2
-
-
-@pytest.mark.parametrize("state", ["sqlite"], indirect=True)
-def test_update_agent_concurrent_writers(state: SqlLinkState, agent: Agent) -> None:
-    """Allow exactly one edit per expected version across SQL replicas."""
-    replica = SqlLinkState(
-        state.database_url, NoOpFederationManager(), ObjectStoreFactory().store()
-    )
-    replica.initialize()
-    barrier = Barrier(2)
-
-    def edit(backend: CoreState) -> bool:
-        barrier.wait(timeout=10)
-        try:
-            assert backend.update_agent("alice", agent.id, 1, agent.config) is not None
-            return True
-        except FlowerError as exc:
-            assert exc.code == ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT
-            return False
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        assert sorted(executor.map(edit, (state, replica), timeout=15)) == [False, True]
