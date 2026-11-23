@@ -396,6 +396,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.assert_called_once_with(
             task_type=TaskType.SIMULATION,
             run_id=123,
+            space_id=None,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -426,6 +427,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
                 self.state.create_task.assert_called_once_with(
                     task_type=TaskType.SIMULATION,
                     run_id=123,
+                    space_id=None,
                     fab_hash="fab-hash",
                     model_ref=None,
                     connector_ref=None,
@@ -522,6 +524,7 @@ class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.state.create_task.assert_called_once_with(
             task_type=TaskType.SIMULATION,
             run_id=123,
+            space_id=None,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
