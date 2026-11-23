@@ -420,6 +420,110 @@ def test_kfd_accessible_unknown_vendor_node_accessible_reports_vendor_only(
     assert "python -c 'import amdsmi'" not in output
 
 
+def test_kfd_mixed_unknown_vendor_accessible_and_denied_reports_accessible(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that an accessible unknown-vendor node is reported even when
+    another unknown-vendor node on the same host is permission-denied.
+
+    A restricted hybrid host can expose two render nodes with unreadable
+    sysfs: one AMD and accessible, one unrelated (e.g. Intel) and
+    permission-denied. The denied node must not win a plain `elif` and bury
+    the evidence that device access already works -- the actionable question
+    left is the accessible node's vendor, not permissions.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+
+    def _can_open(path: str) -> bool | None:
+        if path == "/dev/kfd":
+            return True
+        return path == "/dev/dri/renderD128"  # accessible; renderD129 is denied
+
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            side_effect=_can_open,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128", "/dev/dri/renderD129"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=None,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "opens successfully" in output
+    assert "renderD128" in output
+    assert "this process cannot open it" not in output
+    assert "permission-denied" not in output
+    assert "undetermined too" not in output
+
+
+def test_kfd_mixed_unknown_vendor_denied_and_inconclusive_reports_both(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that unknown-vendor denied and inconclusive nodes are reported
+    together, rather than a plain `elif` silently dropping one of them.
+
+    Neither outcome rules out the other: a permission fix for the denied
+    node would leave the inconclusive node still failing, and vice versa.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+
+    def _can_open(path: str) -> bool | None:
+        if path == "/dev/kfd":
+            return True
+        if path == "/dev/dri/renderD128":
+            return False  # denied
+        return None  # renderD129 inconclusive
+
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            side_effect=_can_open,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128", "/dev/dri/renderD129"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=None,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "Opening them also failed for two different reasons" in output
+    assert "renderD128" in output
+    assert "renderD129" in output
+    assert "opens successfully" not in output
+
+
 def test_multi_node_cluster_skips_driver_host_diagnostics(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

@@ -349,11 +349,15 @@ exported, silently leaving Ray's original import failure in place:
                     _trimmed_id="${_id#"${_id%%[!0]*}"}"
                     [ -z "$_trimmed_id" ] && _trimmed_id=0
                     _rocr_norm+=("$_trimmed_id")
-                elif [[ "$_id" =~ ^GPU-[0-9a-fA-F-]+$ ]]; then
+                elif [[ "$_id" =~ ^GPU-[0-9a-fA-F]+$ ]]; then
                     # ROCR_VISIBLE_DEVICES also accepts a `GPU-<hex>` UUID in
                     # place of a numeric ordinal; it still names exactly one
                     # device, so it is counted the same as a numeric entry,
-                    # just not leading-zero-normalized.
+                    # just not leading-zero-normalized. The character class
+                    # deliberately excludes `-`: allowing it throughout the
+                    # suffix (as an earlier version of this regex did) still
+                    # matches malformed values with no hex digits at all, such
+                    # as `GPU--`, and would count them as one real device too.
                     _rocr_norm+=("$_id")
                 else
                     # Neither a numeric ordinal nor the documented `GPU-<hex>`
