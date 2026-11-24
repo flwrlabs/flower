@@ -23,6 +23,7 @@ from collections.abc import Callable, Sequence
 from flwr.app import Context
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
+from flwr.supercore.constant import MAX_SPACE_PAGE_SIZE
 from flwr.supercore.typing import JSONObject
 
 # OpenResponses item types and streaming events used for run summaries.
@@ -148,7 +149,7 @@ class AgentGrid(ABC):
 
 
 class AgentSpace(ABC):
-    """Read and publish messages in the authenticated agent's Space."""
+    """Read and publish messages and items in the authenticated agent's Space."""
 
     @abstractmethod
     def get_messages(
@@ -183,6 +184,60 @@ class AgentSpace(ABC):
         Reads select the newest page by default. Every read advances the cursor
         through the newest returned message, including history reads.
         """
+
+    def get_items(
+        self,
+        *,
+        limit: int = MAX_SPACE_PAGE_SIZE,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> list[JSONObject]:
+        """Read SpaceItems and advance this agent's item read cursor.
+
+        Parameters
+        ----------
+        limit : int (default: 100)
+            Maximum number of items to return, between 1 and 100.
+        before_id : int | None (default: None)
+            Exclusive upper item ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower item ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after this agent's item read cursor.
+
+        Returns
+        -------
+        list[JSONObject]
+            Items in ascending ID order, with id, space_id, type, created_at,
+            and content. Message items also have an author containing either
+            flwr_aid or agent_id.
+
+        Notes
+        -----
+        Reads select the newest page by default and advance the item cursor
+        through the newest returned ID.
+        """
+        raise NotImplementedError("This AgentSpace does not support SpaceItems.")
+
+    def send_item(self, content: str) -> JSONObject:
+        """Publish a message item and return its server-assigned fields.
+
+        Parameters
+        ----------
+        content : str
+            Nonempty message text to publish.
+
+        Returns
+        -------
+        JSONObject
+            The created item, including its type and server-assigned fields.
+
+        Notes
+        -----
+        Only message items can be sent through the current Runtime endpoint.
+        """
+        raise NotImplementedError("This AgentSpace does not support SpaceItems.")
 
     @abstractmethod
     def tools(self) -> list[JSONObject]:
