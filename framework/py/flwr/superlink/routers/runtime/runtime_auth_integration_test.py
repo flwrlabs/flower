@@ -38,9 +38,11 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -307,25 +309,62 @@ def test_space_messages_use_authenticated_run(
         )
 
 
-@pytest.mark.parametrize(
-    "endpoint,payload",
-    [
-        ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-item", SendSpaceItemRequest(content="Hello")),
-    ],
-)
-def test_space_item_endpoints_not_available(
+def test_space_item_endpoints_use_authenticated_run(
     client: TestClient,
+    state: LinkState,
     agent: tuple[int, str, str],
-    endpoint: str,
-    payload: Message,
 ) -> None:
-    """Authenticate new routes while item persistence is pending."""
-    _, _, token = agent
-    assert _post(client, endpoint, payload).status_code == 401
-    response = _post(client, endpoint, payload, token=token)
-    assert response.status_code == 501
-    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+    """Read and publish items using the task's Space and agent identity."""
+    agent_id, space_id, token = agent
+    assert _post(client, "get-space-items", GetSpaceItemsRequest()).status_code == 401
+    assert (
+        _post(client, "send-space-item", SendSpaceItemRequest(content="Hi")).status_code
+        == 401
+    )
+    items = []
+    for content in ("First", "Second"):
+        response = _post(
+            client,
+            "send-space-item",
+            SendSpaceItemRequest(space_id="ignored", content=content),
+            token=token,
+        )
+        assert response.status_code == 200
+        items.append(SendSpaceItemResponse.FromString(response.content).item)
+    assert all(
+        item.space_id == space_id
+        and item.author == SpaceParticipant(agent_id=agent_id)
+        and item.type == "message"
+        for item in items
+    )
+    response = _post(
+        client,
+        "get-space-items",
+        GetSpaceItemsRequest(space_id="ignored", after_id=items[0].id),
+        token=token,
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    assert (
+        state.get_space_messages(UUID(space_id), SpaceParticipant(agent_id=agent_id))
+        == []
+    )
+    response = _post(
+        client,
+        "get-space-items",
+        GetSpaceItemsRequest(unread_only=True),
+        token=token,
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
+    for path, request in (
+        ("get-space-items", GetSpaceItemsRequest(limit=0)),
+        ("get-space-items", GetSpaceItemsRequest(limit=101)),
+        ("send-space-item", SendSpaceItemRequest(content="  ")),
+    ):
+        response = _post(client, path, request, token=token)
+        assert response.status_code == 400
+        assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
 
 
 def test_agent_connector_discovery_and_credentials(
