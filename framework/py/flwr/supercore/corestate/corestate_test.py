@@ -2814,7 +2814,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.store_space_item(
                 space_id, SpaceItemType.AUTOMATION, "scheduled", alice
             )
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.AUTOMATION, "scheduled", bob)
         self.assertEqual(state.get_space_items(space_id, alice), [])
+        with self.assertRaises(ValueError):
+            state.store_space_item(UUID(int=0), SpaceItemType.MESSAGE, "missing")
         self.assertIsNone(
             state.store_space_item(UUID(int=0), SpaceItemType.AUTOMATION, "missing")
         )

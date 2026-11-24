@@ -1291,13 +1291,7 @@ class InMemoryCoreState(
         author: SpaceParticipant | None = None,
     ) -> SpaceItem | None:
         """Store a typed item in a Space."""
-        _validate_space_item(item_type, content)
-        # Revisit author rules when SendSpaceItem accepts automation items.
-        if item_type == SpaceItemType.MESSAGE:
-            if author is None or not (author.flwr_aid or author.agent_id):
-                raise ValueError("Message items require an author")
-        elif author is not None:
-            raise ValueError("Only message items may have an author")
+        _validate_space_item(item_type, content, author)
         with self.lock_space_store:
             space = self.space_store.get(space_id)
             if space is None or (

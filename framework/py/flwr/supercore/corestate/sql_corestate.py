@@ -1613,9 +1613,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         author: SpaceParticipant | None = None,
     ) -> SpaceItem | None:
         """Authorize and store a typed item in one SQL statement."""
-        _validate_space_item(item_type, content)
-        if author is not None and not (author.flwr_aid or author.agent_id):
-            raise ValueError("SpaceItem author must have an identity")
+        _validate_space_item(item_type, content, author)
 
         flwr_aid = (author.flwr_aid or None) if author is not None else None
         agent_id = (author.agent_id or None) if author is not None else None

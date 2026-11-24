@@ -59,12 +59,20 @@ from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
 
 
-def _validate_space_item(item_type: SpaceItemType, content: str) -> None:
-    """Validate an item's type and content before storing."""
+def _validate_space_item(
+    item_type: SpaceItemType, content: str, author: SpaceParticipant | None
+) -> None:
+    """Validate an item's type, content, and author before storing."""
     if not isinstance(item_type, SpaceItemType):
         raise ValueError("Invalid SpaceItem type")
     if not content.strip():
         raise ValueError("SpaceItem content must be nonempty")
+    # Revisit author rules when SendSpaceItem accepts automation items.
+    if item_type == SpaceItemType.MESSAGE:
+        if author is None or not (author.flwr_aid or author.agent_id):
+            raise ValueError("Message items require an author")
+    elif author is not None:
+        raise ValueError("Only message items may have an author")
 
 
 class CoreState(ABC):  # pylint: disable=R0904
