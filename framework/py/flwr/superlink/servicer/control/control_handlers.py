@@ -306,16 +306,6 @@ def update_agent(
     request: UpdateAgentRequest, account: AuthenticatedUser, state: LinkState
 ) -> UpdateAgentResponse:
     """Publish an owned agent's replacement configuration with a version check."""
-    if not request.HasField("config"):
-        raise InvalidAgentRequestError("Agent configuration is required.")
-    if not 0 < request.agent_id <= INT64_MAX_VALUE:
-        raise InvalidAgentRequestError(
-            "Agent ID must be a positive signed 64-bit integer."
-        )
-    if not 0 < request.expected_config_version < INT64_MAX_VALUE:
-        raise InvalidAgentRequestError(
-            "Expected configuration version must allow an increment."
-        )
     try:
         agent = state.update_agent(
             flwr_aid=account.user_id,
