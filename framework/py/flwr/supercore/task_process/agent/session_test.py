@@ -54,10 +54,15 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutFileResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -260,6 +265,61 @@ def test_space_session_reads_messages() -> None:
         {"agent_id": 42},
     ]
     assert [message["id"] for message in messages] == [1, 2]
+
+
+def test_space_session_reads_items() -> None:
+    """Forward item filters and preserve typed and authorless inputs."""
+    stub = Mock()
+    stub.GetSpaceItems.return_value = GetSpaceItemsResponse(
+        items=[
+            SpaceItem(
+                id=1,
+                type="message",
+                author=SpaceParticipant(flwr_aid="alice"),
+                content="Hi",
+            ),
+            SpaceItem(id=2, type="automation", content="Run now"),
+        ]
+    )
+    agent = create_space_session(
+        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
+    )
+    assert agent.space is not None
+
+    items = agent.space.get_items(limit=2, before_id=3, after_id=0, unread_only=True)
+
+    stub.GetSpaceItems.assert_called_once_with(
+        GetSpaceItemsRequest(limit=2, before_id=3, after_id=0, unread_only=True)
+    )
+    assert [(item["id"], item["type"]) for item in items] == [
+        (1, "message"),
+        (2, "automation"),
+    ]
+    assert items[0]["author"] == {"flwr_aid": "alice"}
+    assert "author" not in items[1]
+
+
+def test_space_session_sends_item() -> None:
+    """Publish a message item without changing the legacy model tool."""
+    stub, events = Mock(), Mock()
+    stub.SendSpaceItem.return_value = SendSpaceItemResponse(
+        item=SpaceItem(
+            id=7,
+            type="message",
+            author=SpaceParticipant(agent_id=42),
+            content="Hello",
+        )
+    )
+    agent = create_space_session(
+        Mock(_runtime_client=stub), events, PullTaskInputResponse()
+    )
+    assert agent.space is not None
+
+    item = agent.space.send_item("Hello")
+
+    stub.SendSpaceItem.assert_called_once_with(SendSpaceItemRequest(content="Hello"))
+    assert item["type"] == "message" and item["author"] == {"agent_id": 42}
+    assert [tool["name"] for tool in agent.space.tools()] == ["send_space_message"]
 
 
 @pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
