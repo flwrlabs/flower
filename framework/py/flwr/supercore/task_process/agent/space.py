@@ -18,10 +18,14 @@ from typing import cast
 
 from flwr.agentapp import AgentEvents, AgentSpace
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
+    SendSpaceItemRequest,
     SendSpaceMessageRequest,
+    SpaceItem,
     SpaceMessage,
 )
+from flwr.supercore.constant import MAX_SPACE_PAGE_SIZE
 from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_process.connector.tool_schema import (
     function_tool,
@@ -45,6 +49,24 @@ def _message_to_json(message: SpaceMessage) -> JSONObject:
         "created_at": message.created_at,
         "content": message.content,
     }
+
+
+def _item_to_json(item: SpaceItem) -> JSONObject:
+    """Serialize a typed Space item without exposing protobufs to AgentApps."""
+    result: JSONObject = {
+        "id": item.id,
+        "space_id": item.space_id,
+        "type": item.type,
+        "created_at": item.created_at,
+        "content": item.content,
+    }
+    if item.HasField("author"):
+        result["author"] = (
+            {"agent_id": item.author.agent_id}
+            if item.author.HasField("agent_id")
+            else {"flwr_aid": item.author.flwr_aid}
+        )
+    return result
 
 
 class RuntimeAgentSpace(AgentSpace):
@@ -72,6 +94,30 @@ class RuntimeAgentSpace(AgentSpace):
             )
         )
         return [_message_to_json(message) for message in response.messages]
+
+    def get_items(
+        self,
+        *,
+        limit: int = MAX_SPACE_PAGE_SIZE,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> list[JSONObject]:
+        """Read typed items and advance the agent's item read cursor."""
+        response = self._stub.GetSpaceItems(
+            GetSpaceItemsRequest(
+                limit=limit,
+                before_id=before_id,
+                after_id=after_id,
+                unread_only=unread_only,
+            )
+        )
+        return [_item_to_json(item) for item in response.items]
+
+    def send_item(self, content: str) -> JSONObject:
+        """Publish a message item as this agent."""
+        response = self._stub.SendSpaceItem(SendSpaceItemRequest(content=content))
+        return _item_to_json(response.item)
 
     def tools(self) -> list[JSONObject]:
         """Return the send_space_message tool schema."""

@@ -2852,6 +2852,34 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.get_space_messages(space_id, alice, unread_only=True), [message]
         )
 
+    def test_space_item_read_cursors_are_independent(self) -> None:
+        """Each participant tracks read items separately in each Space."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        items = [
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, str(i), alice)
+            for i in range(3)
+        ]
+        self.assertEqual(
+            state.get_space_items(space_id, alice, unread_only=True, limit=2),
+            items[:2],
+        )
+        self.assertEqual(
+            state.get_space_items(space_id, alice, unread_only=True), items[2:]
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, unread_only=True), [])
+        self.assertEqual(state.get_space_items(space_id, bob, limit=1), items[-1:])
+        self.assertEqual(state.get_space_items(space_id, bob, unread_only=True), [])
+        other_id = UUID(state.create_space(participants=[alice]).id)
+        other = state.store_space_item(other_id, SpaceItemType.MESSAGE, "other", alice)
+        self.assertEqual(
+            state.get_space_items(other_id, alice, unread_only=True), [other]
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, before_id=3), items[:2])
+        self.assertEqual(state.get_space_items(space_id, alice, unread_only=True), [])
+
     def test_user_event_explicit_empty_recipients(self) -> None:
         """An empty recipient list delivers to nobody, even with a Space ID."""
         state = self.state_factory()
