@@ -350,3 +350,43 @@ class SendSpaceMessageResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
 
 global___SendSpaceMessageResponse = SendSpaceMessageResponse
+
+@typing.final
+class SendSpaceItemRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPACE_ID_FIELD_NUMBER: builtins.int
+    CONTENT_FIELD_NUMBER: builtins.int
+    space_id: builtins.str
+    """Required by Control. Runtime uses the authenticated task's Space."""
+    content: builtins.str
+    """When implemented, this becomes one message item.
+    The server supplies type = "message" and resolves the author;
+    other item types are not accepted.
+    """
+    def __init__(
+        self,
+        *,
+        space_id: builtins.str = ...,
+        content: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
+
+global___SendSpaceItemRequest = SendSpaceItemRequest
+
+@typing.final
+class SendSpaceItemResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEM_FIELD_NUMBER: builtins.int
+    @property
+    def item(self) -> global___SpaceItem: ...
+    def __init__(
+        self,
+        *,
+        item: global___SpaceItem | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["item", b"item"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["item", b"item"]) -> None: ...
+
+global___SendSpaceItemResponse = SendSpaceItemResponse

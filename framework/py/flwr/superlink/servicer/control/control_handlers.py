@@ -179,6 +179,7 @@ from flwr.supercore.constant import (
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
     ActionType,
     AutomationStatus,
+    DeviceAuthorizationError,
     RunTime,
     TaskType,
 )
@@ -1709,6 +1710,8 @@ def get_login_details(
         verification_uri_complete=details.verification_uri_complete,
         expires_in=details.expires_in,
         interval=details.interval,
+        verification_uri=details.verification_uri,
+        user_code=details.user_code,
     )
 
 
@@ -1722,16 +1725,15 @@ def get_auth_tokens(
             "ControlServicer initialized without account authentication.",
         )
 
-    # Get auth tokens
-    credentials = authn_plugin.get_auth_tokens(request.device_code)
-
-    # Return empty response if credentials is None
-    if credentials is None:
+    result = authn_plugin.get_auth_tokens(request.device_code)
+    if result is None:
         return GetAuthTokensResponse()
+    if isinstance(result, DeviceAuthorizationError):
+        return GetAuthTokensResponse(error=result.value)
 
     return GetAuthTokensResponse(
-        access_token=credentials.access_token,
-        refresh_token=credentials.refresh_token,
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
     )
 
 

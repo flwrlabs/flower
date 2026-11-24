@@ -114,15 +114,10 @@ class CoreState(ABC):  # pylint: disable=R0904
             A sequence of Run objects representing runs matching the specified filters.
         """
 
-    @abstractmethod
-    def _get_run_space_id(self, run_id: int) -> UUID | None:
-        """Return a run's locally stored Space ID without expiring tasks."""
-
     def _store_task_lifecycle_event(self, event_type: str, task: Task) -> None:
         """Store a task snapshot for participants of its Space."""
-        space_id = self._get_run_space_id(task.run_id)
-        if space_id is not None:
-            self.store_event(event_type, task, space_id=space_id)
+        if task.space_id:
+            self.store_event(event_type, task, space_id=UUID(task.space_id))
 
     @property
     @abstractmethod
@@ -324,6 +319,46 @@ class CoreState(ABC):  # pylint: disable=R0904
             timestamps as ISO-formatted strings, or None if the account ID, a
             required configuration field, or a set optional field is empty.
             Ownership is stored separately and is not part of the returned message.
+        """
+
+    @abstractmethod
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Replace configuration and publish a new snapshot atomically.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            Agent to update.
+        expected_config_version : int
+            Current configuration version, which must match to accept the update.
+        config : AgentConfig
+            Complete replacement configuration with a nonempty name and the
+            agent's existing app_spec. Absent or empty title and description clear
+            their presence; empty avatar and color reset them.
+
+        Returns
+        -------
+        Agent | None
+            Updated agent, or None if the agent is absent or belongs to another
+            account. Each accepted update creates a new immutable snapshot,
+            increments config_version, updates updated_at, and emits agent.updated.
+
+        Raises
+        ------
+        ValueError
+            If the name is blank or app_spec differs from the agent's existing
+            value.
+        FlowerError
+            With code ``ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT`` if the owned
+            agent's current version differs from expected_config_version.
         """
 
     @abstractmethod
@@ -1249,6 +1284,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -1263,6 +1299,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The executor type of the task to create.
         run_id : int
             The run ID this task belongs to.
+        space_id : Optional[UUID]
+            The run's Space ID, or None for a federation run.
         fab_hash : Optional[str] (default: None)
             FAB hash associated with the task, if applicable.
         model_ref : Optional[str] (default: None)
