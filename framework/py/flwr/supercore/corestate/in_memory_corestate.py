@@ -221,6 +221,7 @@ class InMemoryCoreState(
         self.space_item_id_counter = 0
         self.lock_space_store = RLock()
         self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
+        self.space_participant_item_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -1375,8 +1376,9 @@ class InMemoryCoreState(
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceItem] | None:
-        """Read a page of items for a Space participant."""
+        """Read items and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
@@ -1385,6 +1387,10 @@ class InMemoryCoreState(
             space = self.space_store.get(space_id)
             if space is None or participant not in space.participants:
                 return None
+            key = (space_id, participant.flwr_aid or participant.agent_id)
+            cursor = self.space_participant_item_cursors.get(key, 0)
+            if unread_only:
+                after_id = max(cursor, after_id or 0)
             items = [
                 item
                 for item in self.space_item_store[space_id]
@@ -1392,6 +1398,8 @@ class InMemoryCoreState(
                 and (after_id is None or item.id > after_id)
             ]
             page = items[:limit] if after_id is not None else items[-limit:]
+            if page:
+                self.space_participant_item_cursors[key] = max(cursor, page[-1].id)
             return page
 
     def get_space_messages(  # pylint: disable=too-many-arguments

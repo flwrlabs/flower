@@ -1749,8 +1749,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceItem] | None:
-        """Read a page of items for a Space participant."""
+        """Read items and advance the participant's read cursor."""
         if limit <= 0:
             raise ValueError("limit must be positive")
         if before_id is not None and after_id is not None and after_id >= before_id:
@@ -1760,10 +1761,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
         identity = participant.flwr_aid or participant.agent_id
         item_conditions = [SpaceItemModel.space_id == SpaceParticipantTable.c.space_id]
-        if before_id is not None:
+        if unread_only:
+            item_conditions.append(
+                SpaceItemModel.id > SpaceParticipantTable.c.read_through_item_id
+            )
+        if before_id is not None and before_id <= 2**63 - 1:
             item_conditions.append(SpaceItemModel.id < before_id)
         if after_id is not None:
-            item_conditions.append(SpaceItemModel.id > after_id)
+            item_conditions.append(SpaceItemModel.id > min(after_id, 2**63 - 1))
         query = (
             select(SpaceItemModel)
             .select_from(SpaceParticipantTable)
@@ -1774,7 +1779,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             .order_by(
                 SpaceItemModel.id.asc()
-                if after_id is not None
+                if unread_only or after_id is not None
                 else SpaceItemModel.id.desc()
             )
             .limit(limit)
@@ -1784,7 +1789,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             if not models:
                 return None
             items = [_space_item_from_model(model) for model in models if model]
-            return items if after_id is not None else items[::-1]
+            if items:
+                read_through = max(item.id for item in items)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_item_id < read_through,
+                    )
+                    .values(read_through_item_id=read_through)
+                )
+            return items if unread_only or after_id is not None else items[::-1]
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
