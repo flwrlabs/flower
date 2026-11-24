@@ -934,8 +934,31 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> Sequence[SpaceItem] | None:
         """Read a page of items for a Space participant.
 
-        Returns None if the Space or membership is absent. An after_id bound
-        selects the oldest matching page; otherwise the newest page is returned.
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the items.
+        participant : SpaceParticipant
+            User or agent reading the items.
+        limit : int (default: 50)
+            Maximum number of items to return.
+        before_id : int | None (default: None)
+            Exclusive upper item ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower item ID bound; selects the oldest matching page.
+
+        Returns
+        -------
+        Sequence[SpaceItem] | None
+            Items in ascending ID order, selecting the newest page by default.
+            An empty sequence if no items match.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or after_id >= before_id when both
+            bounds are provided.
         """
 
     @abstractmethod
