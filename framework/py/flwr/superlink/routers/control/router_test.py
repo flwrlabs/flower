@@ -74,6 +74,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     StreamRunEventsRequest,
     StreamRunEventsResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
@@ -103,7 +105,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
 )
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -431,8 +433,8 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
-    """Persist an agent through HTTP and list only the authenticated owner's agents."""
+def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None:
+    """Create, update, and list owned agents through authenticated protobuf HTTP."""
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
@@ -469,13 +471,55 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert SpaceParticipant(flwr_aid=_ACCOUNT.user_id) in spaces[0].participants
     assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
+    updated_config = AgentConfig(name="Updated Agent", app_spec=config.app_spec)
+    response = client.post(
+        "/v1/control/update-agent",
+        content=UpdateAgentRequest(
+            agent_id=agent.id,
+            expected_config_version=agent.config_version,
+            config=updated_config,
+        ).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    updated = UpdateAgentResponse.FromString(response.content).agent
+    assert updated.config_version == agent.config_version + 1
+    assert updated.config == updated_config
+
     response = client.post(
         "/v1/control/list-agents",
         content=ListAgentsRequest().SerializeToString(),
         headers=headers,
     )
     assert response.status_code == 200
-    assert ListAgentsResponse.FromString(response.content).agents == [agent]
+    assert ListAgentsResponse.FromString(response.content).agents == [updated]
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (None, 404),
+        (ValueError("Invalid configuration"), 400),
+        (FlowerError(ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT, "Conflict"), 409),
+    ],
+)
+def test_agent_update_translates_state_errors(
+    space_client: tuple[TestClient, LinkState],
+    error: Exception | None,
+    status_code: int,
+) -> None:
+    """Translate missing agents, invalid updates, and conflicts to HTTP errors."""
+    client, state = space_client
+    request = UpdateAgentRequest(
+        agent_id=1,
+        expected_config_version=1,
+        config=AgentConfig(name="Agent", app_spec="@test/app"),
+    )
+    with patch.object(state, "update_agent", return_value=None, side_effect=error):
+        response = client.post(
+            "/v1/control/update-agent", content=request.SerializeToString()
+        )
+    assert response.status_code == status_code
 
 
 @pytest.mark.parametrize(
@@ -686,6 +730,7 @@ def test_connector_route_returns_existing_structured_error() -> None:
     ("path", "protobuf_request", "handler_name"),
     [
         ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
+        ("/v1/control/update-agent", UpdateAgentRequest(), "update_agent"),
         ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",

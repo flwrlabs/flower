@@ -108,6 +108,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -202,6 +204,16 @@ def create_agent(
 ) -> CreateAgentResponse:
     """Create an agent and a Space containing the agent and its creator."""
     return control_handlers.create_agent(request, account, linkstate)
+
+
+@router.post("/update-agent")
+def update_agent(
+    request: Annotated[UpdateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateAgentResponse:
+    """Replace an owned agent's configuration using its current version."""
+    return control_handlers.update_agent(request, account, linkstate)
 
 
 @router.post("/list-agents")
