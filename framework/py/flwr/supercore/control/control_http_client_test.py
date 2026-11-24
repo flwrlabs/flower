@@ -25,6 +25,7 @@ _UNARY_UNARY_ENDPOINTS = (
     "bootstrap",
     "create-agent",
     "update-agent",
+    "delete-agent",
     "list-agents",
     "start-run",
     "stop-run",
