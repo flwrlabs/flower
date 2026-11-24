@@ -971,21 +971,26 @@ class StateTest(CoreStateTest):
                     .values(trigger_item_id=trigger_item_id + 1)
                 )
 
-    def test_get_run_filter_space_and_federation_runs(self) -> None:
-        """Distinguish unrestricted, empty, Space-only, and mixed filters."""
+    def test_get_run_filter_by_scope(self) -> None:
+        """Filter by Space, agent, and federation, combining filters with AND."""
         state = self.state_factory()
         federation_run_id = create_dummy_run(state)
-        space_id = UUID(state.create_space(participants=[]).id)
+        agent = state.create_agent(
+            "account", AgentConfig(name="Agent", app_spec="@flwr/test")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
         space_run_id = state.create_run(
             "flwr/test",
             "1.0",
-            "hash",
+            state.store_fab(Fab("", b"app", {})),
             {},
             None,
             None,
             "account",
             TaskType.AGENT_APP,
             space_id=space_id,
+            agent_id=agent.id,
             user_prompt="Hello",
         )
 
@@ -1000,6 +1005,12 @@ class StateTest(CoreStateTest):
             ),
             ({"space_ids": [space_id]}, {space_run_id}),
             ({"space_ids": []}, set()),
+            ({"agent_ids": []}, set()),
+            ({"agent_ids": [agent.id]}, {space_run_id}),
+            ({"agent_ids": [agent.id + 1]}, set()),
+            ({"agent_ids": [agent.id + 1, agent.id]}, {space_run_id}),
+            ({"agent_ids": [agent.id], "statuses": [Status.FINISHED]}, set()),
+            ({"agent_ids": [agent.id], "run_ids": [federation_run_id]}, set()),
             (
                 {"space_ids": [space_id], "federation_ids": [NOOP_FEDERATION_ID]},
                 set(),

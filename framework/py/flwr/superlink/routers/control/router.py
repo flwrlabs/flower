@@ -122,8 +122,8 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
-    SendSpaceItemsRequest,
-    SendSpaceItemsResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -301,13 +301,13 @@ def send_space_message(
     return control_handlers.send_space_message(request, account, linkstate)
 
 
-@router.post("/send-space-items")
-def send_space_items(
-    _request: Annotated[SendSpaceItemsRequest, Depends(get_protobuf_request)],
+@router.post("/send-space-item")
+def send_space_item(
+    _request: Annotated[SendSpaceItemRequest, Depends(get_protobuf_request)],
     _account: AccountDependency,
-) -> SendSpaceItemsResponse:
-    """Send message items once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItems pending")
+) -> SendSpaceItemResponse:
+    """Send a message item once supported."""
+    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItem pending")
 
 
 @router.post("/list-run-series")

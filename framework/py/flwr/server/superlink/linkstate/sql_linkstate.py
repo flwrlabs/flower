@@ -441,14 +441,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                # Serialize admission before checking for an open Run.
+                # Serialize admission with deletion before checking for an open Run.
                 session.execute(
-                    update(SpaceParticipantTable)
+                    update(AgentModel)
                     .where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == agent_id,
+                        AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                     )
-                    .values(agent_id=agent_id)
+                    .values(updated_at=AgentModel.updated_at)
                 )
                 open_run = (
                     select(RunModel.run_id)
@@ -469,6 +469,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                         ~open_run,
                     )
                     .execution_options(populate_existing=True)
@@ -598,6 +599,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -622,6 +624,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         if space_ids is not None:
             stmt = stmt.where(RunModel.space_id.in_(space_ids))
+
+        if agent_ids is not None:
+            stmt = stmt.where(RunModel.agent_id.in_(agent_ids))
 
         # Filter by statuses
         if statuses is not None:
@@ -658,9 +663,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             stmt = stmt.where(or_(*federation_conditions))
 
         if order_by is not None:
-            order_column = TaskModel.pending_at
             stmt = stmt.order_by(
-                order_column.asc() if ascending else order_column.desc(),
+                (
+                    TaskModel.pending_at.asc()
+                    if ascending
+                    else TaskModel.pending_at.desc()
+                ),
                 RunModel.run_id.asc() if ascending else RunModel.run_id.desc(),
             )
         if skip:
@@ -1012,7 +1020,7 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigM
             (AgentConfigModel.agent_id == AgentModel.agent_id)
             & (AgentConfigModel.version == AgentModel.config_version),
         )
-        .where(unread, ~open_run)
+        .where(unread, ~open_run, AgentModel.deleted_at.is_(None))
         .order_by(
             SpaceParticipantTable.c.space_id,
             AgentModel.agent_id,

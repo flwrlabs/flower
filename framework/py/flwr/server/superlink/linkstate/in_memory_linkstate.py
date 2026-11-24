@@ -390,10 +390,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if space_id is not None and agent_id is not None:
                 self._cleanup_expired_task_tokens_locked()
                 space = self.space_store[space_id]
-                if SpaceParticipant(
-                    agent_id=agent_id
-                ) not in space.participants or self._agent_has_open_run(
-                    space_id, agent_id
+                if (
+                    agent_id in self.deleted_agent_store
+                    or SpaceParticipant(agent_id=agent_id) not in space.participants
+                    or self._agent_has_open_run(space_id, agent_id)
                 ):
                     return 0
                 flwr_aid, agent = next(
@@ -535,6 +535,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 agent.id: agent
                 for owned in self.agent_store.values()
                 for agent in owned.values()
+                if agent.id not in self.deleted_agent_store
             }
             candidates = []
             for space_id, space in self.space_store.items():
@@ -561,6 +562,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -589,6 +591,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     run_id
                     for run_id in matched_run_ids
                     if self.run_ids[run_id].space_id in space_id_set
+                }
+
+            if agent_ids is not None:
+                agent_id_set = set(agent_ids)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self.run_ids[run_id].run.agent_id in agent_id_set
                 }
 
             # Filter by statuses

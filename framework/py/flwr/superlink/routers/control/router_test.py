@@ -81,12 +81,13 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
     GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
-    SendSpaceItemsRequest,
-    SendSpaceItemsResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceItem,
@@ -209,7 +210,7 @@ def test_space_routes(
     "endpoint,payload",
     [
         ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+        ("send-space-item", SendSpaceItemRequest(content="Hello")),
     ],
 )
 def test_space_item_endpoints_not_available(
@@ -224,24 +225,29 @@ def test_space_item_endpoints_not_available(
     assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
 
 
-def test_send_space_items_batch_wire_format() -> None:
-    """Preserve multiple message contents and created items on the wire."""
-    request = SendSpaceItemsRequest(contents=["First", "Second"])
-    response = SendSpaceItemsResponse(
+def test_send_space_item_wire_format() -> None:
+    """Preserve one message content and created item on the wire."""
+    request = SendSpaceItemRequest(content="First")
+    response = SendSpaceItemResponse(item=SpaceItem(content="First"))
+
+    assert (
+        SendSpaceItemRequest.FromString(request.SerializeToString()).content == "First"
+    )
+    assert (
+        SendSpaceItemResponse.FromString(response.SerializeToString()).item.content
+        == "First"
+    )
+
+
+def test_get_space_items_response_keeps_multiple_items() -> None:
+    """Keep batch reads while changing the send contract to one item."""
+    response = GetSpaceItemsResponse(
         items=[SpaceItem(content="First"), SpaceItem(content="Second")]
     )
 
-    assert list(
-        SendSpaceItemsRequest.FromString(request.SerializeToString()).contents
-    ) == [
-        "First",
-        "Second",
-    ]
     assert [
         item.content
-        for item in SendSpaceItemsResponse.FromString(
-            response.SerializeToString()
-        ).items
+        for item in GetSpaceItemsResponse.FromString(response.SerializeToString()).items
     ] == ["First", "Second"]
 
 
