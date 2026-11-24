@@ -206,23 +206,38 @@ def test_space_routes(
     assert not state.get_run_series() and not state.get_tasks()
 
 
-@pytest.mark.parametrize(
-    "endpoint,payload",
-    [
-        ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-item", SendSpaceItemRequest(content="Hello")),
-    ],
-)
-def test_space_item_endpoints_not_available(
-    space_client: tuple[TestClient, LinkState], endpoint: str, payload: Message
-) -> None:
-    """Expose the new routes without changing the active message path."""
-    client, _ = space_client
+def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
+    """Store message items and read pages without changing legacy messages."""
+    client, state = space_client
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
+    space_id = state.create_space(participants=[caller]).id
+    items = []
+    for content in ("First", "Second"):
+        response = client.post(
+            "/v1/control/send-space-item",
+            content=SendSpaceItemRequest(
+                space_id=space_id, content=content
+            ).SerializeToString(),
+        )
+        assert response.status_code == 200
+        items.append(SendSpaceItemResponse.FromString(response.content).item)
+    assert [item.content for item in items] == ["First", "Second"]
+    assert all(item.author == caller and item.type == "message" for item in items)
     response = client.post(
-        f"/v1/control/{endpoint}", content=payload.SerializeToString()
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(space_id=space_id, limit=1).SerializeToString(),
     )
-    assert response.status_code == 501
-    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, before_id=items[1].id
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    assert state.get_space_messages(UUID(space_id), caller) == []
 
 
 def test_send_space_item_wire_format() -> None:
@@ -314,7 +329,10 @@ def test_space_history_pagination(
     ]
 
 
-@pytest.mark.parametrize("endpoint", ["get-space-messages", "send-space-message"])
+@pytest.mark.parametrize(
+    "endpoint",
+    ["get-space-messages", "send-space-message", "get-space-items", "send-space-item"],
+)
 def test_space_unavailable_to_nonparticipants(
     space_client: tuple[TestClient, LinkState], endpoint: str
 ) -> None:
@@ -322,11 +340,16 @@ def test_space_unavailable_to_nonparticipants(
     client, state = space_client
     private = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
     for space_id in [private.id, str(uuid4())]:
-        request = (
-            GetSpaceMessagesRequest(space_id=space_id)
-            if endpoint == "get-space-messages"
-            else SendSpaceMessageRequest(space_id=space_id, content="No access")
-        )
+        request = {
+            "get-space-messages": GetSpaceMessagesRequest(space_id=space_id),
+            "send-space-message": SendSpaceMessageRequest(
+                space_id=space_id, content="No access"
+            ),
+            "get-space-items": GetSpaceItemsRequest(space_id=space_id),
+            "send-space-item": SendSpaceItemRequest(
+                space_id=space_id, content="No access"
+            ),
+        }[endpoint]
         response = client.post(
             f"/v1/control/{endpoint}", content=request.SerializeToString()
         )
@@ -345,20 +368,27 @@ def test_space_unavailable_to_nonparticipants(
         ("get-space-messages", {"space_id": "bad-uuid"}),
         ("get-space-messages", {"limit": 0}),
         ("get-space-messages", {"limit": 101}),
+        ("send-space-item", {"content": " \n"}),
+        ("send-space-item", {"content": "Hello", "space_id": "bad-uuid"}),
+        ("get-space-items", {"space_id": "bad-uuid"}),
+        ("get-space-items", {"limit": 0}),
+        ("get-space-items", {"limit": 101}),
+        ("get-space-items", {"unread_only": True}),
     ],
 )
 def test_invalid_space_request(
     space_client: tuple[TestClient, LinkState],
     endpoint: str,
-    fields: dict[str, str | int],
+    fields: dict[str, str | int | bool],
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
     client, _ = space_client
-    request_type = (
-        SendSpaceMessageRequest
-        if endpoint == "send-space-message"
-        else GetSpaceMessagesRequest
-    )
+    request_type = {
+        "send-space-message": SendSpaceMessageRequest,
+        "get-space-messages": GetSpaceMessagesRequest,
+        "send-space-item": SendSpaceItemRequest,
+        "get-space-items": GetSpaceItemsRequest,
+    }[endpoint]
     request = ParseDict({"space_id": str(uuid4()), **fields}, request_type())
     response = client.post(
         f"/v1/control/{endpoint}", content=request.SerializeToString()

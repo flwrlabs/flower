@@ -360,7 +360,7 @@ class SendSpaceItemRequest(google.protobuf.message.Message):
     space_id: builtins.str
     """Required by Control. Runtime uses the authenticated task's Space."""
     content: builtins.str
-    """When implemented, this becomes one message item.
+    """Each request creates one message item.
     The server supplies type = "message" and resolves the author;
     other item types are not accepted.
     """

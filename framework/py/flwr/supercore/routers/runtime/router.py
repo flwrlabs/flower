@@ -97,7 +97,6 @@ from flwr.supercore.dependencies.runtime import (
     TaskDependency,
 )
 from flwr.supercore.dependencies.version import VersionDependency
-from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.translation import PROTOBUF_REQUEST_DEPENDENCY
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
@@ -295,11 +294,13 @@ def runtime_get_space_messages(
 
 @router.post("/get-space-items")
 def runtime_get_space_items(
-    _request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    _task: TaskDependency,
+    request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
 ) -> GetSpaceItemsResponse:
-    """Read items from the authenticated task's Space once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "GetSpaceItems pending")
+    """Read items from the authenticated task's Space."""
+    return handlers.get_space_items(request, state, task)
 
 
 @router.post("/send-space-message")
@@ -315,11 +316,13 @@ def runtime_send_space_message(
 
 @router.post("/send-space-item")
 def runtime_send_space_item(
-    _request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    _task: TaskDependency,
+    request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
 ) -> SendSpaceItemResponse:
-    """Publish a message item to the task's Space once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItem pending")
+    """Publish a message item to the task's Space."""
+    return handlers.send_space_item(request, state, task)
 
 
 @router.post("/get-compacted-contexts")

@@ -70,8 +70,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -164,11 +168,29 @@ def get_space_messages(
     )
 
 
+def get_space_items(
+    request: GetSpaceItemsRequest, state: LinkState, task: Task
+) -> GetSpaceItemsResponse:
+    """Read items within the authenticated task's Space grant."""
+    return core_runtime_handlers.get_space_items(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
 def send_space_message(
     request: SendSpaceMessageRequest, state: LinkState, task: Task
 ) -> SendSpaceMessageResponse:
     """Publish with the primary AgentApp's server-bound agent identity."""
     return core_runtime_handlers.send_space_message(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, state: LinkState, task: Task
+) -> SendSpaceItemResponse:
+    """Publish a message item with the server-bound agent identity."""
+    return core_runtime_handlers.send_space_item(
         request, state, task, _get_task_run(state, task)
     )
 
