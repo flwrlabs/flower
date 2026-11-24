@@ -195,6 +195,8 @@ message GetAuthTokensRequest { string device_code = 1; }
 message GetAuthTokensResponse {
   string access_token = 1;
   string refresh_token = 2;
+  // OAuth device authorization error, if reported by the auth plugin.
+  string error = 3;
 }
 
 message RefreshAuthTokensRequest { string refresh_token = 1; }
