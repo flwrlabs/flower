@@ -81,6 +81,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -298,6 +300,22 @@ def create_agent(
             "Unable to create agent with the supplied values."
         )
     return CreateAgentResponse(agent=agent)
+
+
+def delete_agent(
+    request: DeleteAgentRequest, account: AuthenticatedUser, state: LinkState
+) -> DeleteAgentResponse:
+    """Delete an owned agent, including repeated deletion requests."""
+    if not 0 < request.agent_id <= INT64_MAX_VALUE:
+        raise InvalidAgentRequestError(
+            f"agent_id must be between 1 and {INT64_MAX_VALUE}."
+        )
+    if not state.delete_agent(account.user_id, request.agent_id):
+        raise FlowerError(
+            ApiErrorCode.AGENT_NOT_FOUND,
+            "Agent not found or account is not the owner.",
+        )
+    return DeleteAgentResponse()
 
 
 def list_agents(

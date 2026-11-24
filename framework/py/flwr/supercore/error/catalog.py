@@ -243,6 +243,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_409_CONFLICT,
         public_message="Agent configuration version precondition failed.",
     ),
+    ApiErrorCode.AGENT_NOT_FOUND: ApiErrorSpec(
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="Agent not found.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",
