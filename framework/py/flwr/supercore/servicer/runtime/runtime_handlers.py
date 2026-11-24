@@ -56,8 +56,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -65,10 +69,12 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import (
+    MAX_SPACE_PAGE_SIZE,
     TASK_TYPE_TO_COMMAND,
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -128,10 +134,11 @@ def get_space_messages(
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
     space_id, participant = authenticate_space_agent(task, run)
-    limit = request.limit if request.HasField("limit") else 100
-    if limit > 100:
+    limit = request.limit if request.HasField("limit") else MAX_SPACE_PAGE_SIZE
+    if limit > MAX_SPACE_PAGE_SIZE:
         raise FlowerError(
-            ApiErrorCode.INVALID_SPACE_REQUEST, "limit must be at most 100."
+            ApiErrorCode.INVALID_SPACE_REQUEST,
+            f"limit must be at most {MAX_SPACE_PAGE_SIZE}.",
         )
     try:
         messages = state.get_space_messages(
@@ -149,6 +156,33 @@ def get_space_messages(
     return GetSpaceMessagesResponse(messages=messages)
 
 
+def get_space_items(
+    request: GetSpaceItemsRequest, state: CoreState, task: Task, run: Run
+) -> GetSpaceItemsResponse:
+    """Read items within the authenticated task's Space grant."""
+    space_id, participant = authenticate_space_agent(task, run)
+    limit = request.limit if request.HasField("limit") else MAX_SPACE_PAGE_SIZE
+    if limit > MAX_SPACE_PAGE_SIZE:
+        raise FlowerError(
+            ApiErrorCode.INVALID_SPACE_REQUEST,
+            f"limit must be at most {MAX_SPACE_PAGE_SIZE}.",
+        )
+    try:
+        items = state.get_space_items(
+            space_id,
+            participant,
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+            after_id=request.after_id if request.HasField("after_id") else None,
+            unread_only=request.unread_only,
+        )
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if items is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space not found.")
+    return GetSpaceItemsResponse(items=items)
+
+
 def send_space_message(
     request: SendSpaceMessageRequest, state: CoreState, task: Task, run: Run
 ) -> SendSpaceMessageResponse:
@@ -161,6 +195,22 @@ def send_space_message(
     if message is None:
         raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space participant not found.")
     return SendSpaceMessageResponse(message=message)
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, state: CoreState, task: Task, run: Run
+) -> SendSpaceItemResponse:
+    """Publish a message item with the server-bound agent identity."""
+    space_id, participant = authenticate_space_agent(task, run)
+    try:
+        item = state.store_space_item(
+            space_id, SpaceItemType.MESSAGE, request.content, participant
+        )
+    except ValueError as exc:
+        raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc
+    if item is None:
+        raise FlowerError(ApiErrorCode.SPACE_NOT_FOUND, "Space participant not found.")
+    return SendSpaceItemResponse(item=item)
 
 
 def get_compacted_contexts(

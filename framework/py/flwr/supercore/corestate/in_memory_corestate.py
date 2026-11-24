@@ -60,6 +60,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -75,6 +76,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -82,7 +84,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import CoreState, _validate_space_item
 from .utils import (
     generate_rand_int_from_bytes,
     validate_event_cursor,
@@ -191,6 +193,7 @@ class InMemoryCoreState(
         self.lock_message_store = RLock()
         self.agent_store: dict[str, dict[int, Agent]] = {}
         self.agent_config_store: dict[tuple[int, int], AgentConfig] = {}
+        self.deleted_agent_store: dict[int, datetime] = {}
         self.agent_id_counter = 0
         self.lock_agent_store = RLock()
         self.event_store: dict[UUID, Event] = {}
@@ -214,8 +217,11 @@ class InMemoryCoreState(
         self.space_store: dict[UUID, Space] = {}
         self.space_message_store: dict[UUID, list[SpaceMessage]] = {}
         self.space_message_id_counter = 0
+        self.space_item_store: dict[UUID, list[SpaceItem]] = {}
+        self.space_item_id_counter = 0
         self.lock_space_store = RLock()
         self.space_participant_cursors: dict[tuple[UUID, str | int], int] = {}
+        self.space_participant_item_cursors: dict[tuple[UUID, str | int], int] = {}
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.compacted_context_store: dict[int, CompactedContext] = {}
@@ -622,6 +628,7 @@ class InMemoryCoreState(
                 space = Space(id=str(space_id), created_at=created_at)
                 self.space_store[space_id] = space
                 self.space_message_store[space_id] = []
+                self.space_item_store[space_id] = []
                 agent = Agent(
                     id=agent_id,
                     config=config,
@@ -651,6 +658,7 @@ class InMemoryCoreState(
                 self.agent_config_store.pop((agent_id, 1), None)
                 self.space_store.pop(space_id, None)
                 self.space_message_store.pop(space_id, None)
+                self.space_item_store.pop(space_id, None)
                 raise
             self.agent_id_counter = agent_id
             return agent
@@ -667,7 +675,7 @@ class InMemoryCoreState(
             raise ValueError("Agent name must be nonempty.")
         with self.lock_space_store, self.lock_agent_store:
             current = self.agent_store.get(flwr_aid, {}).get(agent_id)
-            if current is None:
+            if current is None or agent_id in self.deleted_agent_store:
                 return None
             if current.config.app_spec != config.app_spec:
                 raise ValueError("AgentApp specification cannot be changed.")
@@ -693,16 +701,58 @@ class InMemoryCoreState(
             self.agent_store[flwr_aid][agent_id] = agent
             return agent
 
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Archive an agent and clean up its activity and connectors under locks."""
+        with (
+            self.lock_task_store,
+            self.lock_automation_store,
+            self.lock_space_store,
+            self.lock_agent_store,
+        ):
+            current = self.agent_store.get(flwr_aid, {}).get(agent_id)
+            if current is None:
+                return False
+            if agent_id in self.deleted_agent_store:
+                return True
+            deleted_at = now()
+            agent = Agent()
+            agent.CopyFrom(current)
+            agent.updated_at = deleted_at.isoformat()
+            self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
+            self.deleted_agent_store[agent_id] = deleted_at
+            self.agent_store[flwr_aid][agent_id] = agent
+            for automation_id, record in self.automation_store.items():
+                if record.automation.agent_id == agent_id:
+                    self.stop_automation(automation_id)
+            for run in self.get_run(
+                agent_ids=[agent_id],
+                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+            ):
+                self.finish_task(
+                    cast(int, run.primary_task_id),
+                    SubStatus.STOPPED,
+                    "Agent was deleted",
+                )
+            for connector in self.get_agent_connectors(agent_id):
+                self.delete_connector(None, connector.connector_id, agent_id=agent_id)
+            return True
+
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+        """Return an owned active agent, or None if unavailable."""
         with self.lock_agent_store:
+            if agent_id in self.deleted_agent_store:
+                return None
             return self.agent_store.get(flwr_aid, {}).get(agent_id)
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID."""
+        """Return the default Space ID of an owned active agent."""
         with self.lock_agent_store:
             agent = self.agent_store.get(flwr_aid, {}).get(agent_id)
-            if agent is None or not agent.default_space_id:
+            if (
+                agent is None
+                or not agent.default_space_id
+                or agent_id in self.deleted_agent_store
+            ):
                 return None
             return UUID(agent.default_space_id)
 
@@ -712,7 +762,11 @@ class InMemoryCoreState(
             return []
         with self.lock_agent_store:
             return sorted(
-                self.agent_store.get(flwr_aid, {}).values(),
+                (
+                    agent
+                    for agent in self.agent_store.get(flwr_aid, {}).values()
+                    if agent.id not in self.deleted_agent_store
+                ),
                 key=lambda agent: agent.id,
             )
 
@@ -997,9 +1051,9 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if agent_id is not None and self.get_agent(created_by, agent_id) is None:
-            return None
-        with self.lock_connector_store:
+        with self.lock_agent_store, self.lock_connector_store:
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+                return None
             self.connector_id_counter += 1
             connector_id = self.connector_id_counter
             connector = ConnectorRecord(
@@ -1201,7 +1255,10 @@ class InMemoryCoreState(
                 members.append(participant)
         with self.lock_space_store, self.lock_agent_store:
             known_agent_ids = {
-                agent_id for agents in self.agent_store.values() for agent_id in agents
+                agent_id
+                for agents in self.agent_store.values()
+                for agent_id in agents
+                if agent_id not in self.deleted_agent_store
             }
             if any(
                 member.agent_id and member.agent_id not in known_agent_ids
@@ -1218,6 +1275,7 @@ class InMemoryCoreState(
             )
             self.space_store[space_id] = space
             self.space_message_store[space_id] = []
+            self.space_item_store[space_id] = []
             try:
                 self.store_event(
                     EventType.SPACE_CREATED,
@@ -1228,16 +1286,23 @@ class InMemoryCoreState(
             except Exception:
                 del self.space_store[space_id]
                 del self.space_message_store[space_id]
+                del self.space_item_store[space_id]
                 raise
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
         """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipant(flwr_aid=flwr_aid)
-        with self.lock_space_store:
+        with self.lock_space_store, self.lock_agent_store:
+            hidden_spaces = {
+                agent.default_space_id
+                for agents in self.agent_store.values()
+                for agent in agents.values()
+                if agent.id in self.deleted_agent_store
+            }
             spaces = []
             for space_id, space in self.space_store.items():
-                if viewer not in space.participants:
+                if viewer not in space.participants or space.id in hidden_spaces:
                     continue
                 result = Space()
                 result.CopyFrom(space)
@@ -1274,6 +1339,68 @@ class InMemoryCoreState(
             self.space_message_id_counter = message.id
             self.space_message_store[space_id].append(message)
             return message
+
+    def store_space_item(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        content: str,
+        author: SpaceParticipant | None = None,
+    ) -> SpaceItem | None:
+        """Store a typed item in a Space."""
+        _validate_space_item(item_type, content, author)
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or (
+                author is not None and author not in space.participants
+            ):
+                return None
+            item = SpaceItem(
+                id=self.space_item_id_counter + 1,
+                space_id=str(space_id),
+                created_at=now().isoformat(),
+                content=content,
+                type=item_type.value,
+            )
+            if author is not None:
+                item.author.CopyFrom(author)
+            self.space_item_store[space_id].append(item)
+            self.space_item_id_counter = item.id
+            return item
+
+    def get_space_items(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceItem] | None:
+        """Read items and advance the participant's read cursor."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        with self.lock_space_store:
+            space = self.space_store.get(space_id)
+            if space is None or participant not in space.participants:
+                return None
+            key = (space_id, participant.flwr_aid or participant.agent_id)
+            cursor = self.space_participant_item_cursors.get(key, 0)
+            if unread_only:
+                after_id = max(cursor, after_id or 0)
+            items = [
+                item
+                for item in self.space_item_store[space_id]
+                if (before_id is None or item.id < before_id)
+                and (after_id is None or item.id > after_id)
+            ]
+            page = items[:limit] if after_id is not None else items[-limit:]
+            if page:
+                self.space_participant_item_cursors[key] = max(cursor, page[-1].id)
+            return page
 
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
@@ -1494,10 +1621,9 @@ class InMemoryCoreState(
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
-        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
-            raise ValueError("Agent not found.")
-
         with self.lock_automation_store:
+            if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
+                raise ValueError("Agent not found.")
             current = now()
             automation_id = self._next_automation_id
             self._next_automation_id += 1

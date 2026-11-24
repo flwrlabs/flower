@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     CreateAgentRequest,
     CreateAgentResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     Event,
@@ -74,6 +76,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     StreamRunEventsRequest,
     StreamRunEventsResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
@@ -103,7 +107,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
 )
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -204,23 +208,62 @@ def test_space_routes(
     assert not state.get_run_series() and not state.get_tasks()
 
 
-@pytest.mark.parametrize(
-    "endpoint,payload",
-    [
-        ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-item", SendSpaceItemRequest(content="Hello")),
-    ],
-)
-def test_space_item_endpoints_not_available(
-    space_client: tuple[TestClient, LinkState], endpoint: str, payload: Message
-) -> None:
-    """Expose the new routes without changing the active message path."""
-    client, _ = space_client
+def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
+    """Store message items and read pages without changing legacy messages."""
+    client, state = space_client
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
+    space_id = state.create_space(participants=[caller]).id
+    items = []
+    for content in ("First", "Second"):
+        response = client.post(
+            "/v1/control/send-space-item",
+            content=SendSpaceItemRequest(
+                space_id=space_id, content=content
+            ).SerializeToString(),
+        )
+        assert response.status_code == 200
+        items.append(SendSpaceItemResponse.FromString(response.content).item)
+    assert [item.content for item in items] == ["First", "Second"]
+    assert all(item.author == caller and item.type == "message" for item in items)
     response = client.post(
-        f"/v1/control/{endpoint}", content=payload.SerializeToString()
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(space_id=space_id, limit=1).SerializeToString(),
     )
-    assert response.status_code == 501
-    assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, before_id=items[1].id
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert not GetSpaceItemsResponse.FromString(response.content).items
+    response = client.post(
+        "/v1/control/send-space-item",
+        content=SendSpaceItemRequest(
+            space_id=space_id, content="Third"
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    new_item = SendSpaceItemResponse.FromString(response.content).item
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == [new_item]
+    assert state.get_space_messages(UUID(space_id), caller) == []
 
 
 def test_send_space_item_wire_format() -> None:
@@ -312,7 +355,10 @@ def test_space_history_pagination(
     ]
 
 
-@pytest.mark.parametrize("endpoint", ["get-space-messages", "send-space-message"])
+@pytest.mark.parametrize(
+    "endpoint",
+    ["get-space-messages", "send-space-message", "get-space-items", "send-space-item"],
+)
 def test_space_unavailable_to_nonparticipants(
     space_client: tuple[TestClient, LinkState], endpoint: str
 ) -> None:
@@ -320,11 +366,16 @@ def test_space_unavailable_to_nonparticipants(
     client, state = space_client
     private = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
     for space_id in [private.id, str(uuid4())]:
-        request = (
-            GetSpaceMessagesRequest(space_id=space_id)
-            if endpoint == "get-space-messages"
-            else SendSpaceMessageRequest(space_id=space_id, content="No access")
-        )
+        request = {
+            "get-space-messages": GetSpaceMessagesRequest(space_id=space_id),
+            "send-space-message": SendSpaceMessageRequest(
+                space_id=space_id, content="No access"
+            ),
+            "get-space-items": GetSpaceItemsRequest(space_id=space_id),
+            "send-space-item": SendSpaceItemRequest(
+                space_id=space_id, content="No access"
+            ),
+        }[endpoint]
         response = client.post(
             f"/v1/control/{endpoint}", content=request.SerializeToString()
         )
@@ -343,20 +394,26 @@ def test_space_unavailable_to_nonparticipants(
         ("get-space-messages", {"space_id": "bad-uuid"}),
         ("get-space-messages", {"limit": 0}),
         ("get-space-messages", {"limit": 101}),
+        ("send-space-item", {"content": " \n"}),
+        ("send-space-item", {"content": "Hello", "space_id": "bad-uuid"}),
+        ("get-space-items", {"space_id": "bad-uuid"}),
+        ("get-space-items", {"limit": 0}),
+        ("get-space-items", {"limit": 101}),
     ],
 )
 def test_invalid_space_request(
     space_client: tuple[TestClient, LinkState],
     endpoint: str,
-    fields: dict[str, str | int],
+    fields: dict[str, str | int | bool],
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
     client, _ = space_client
-    request_type = (
-        SendSpaceMessageRequest
-        if endpoint == "send-space-message"
-        else GetSpaceMessagesRequest
-    )
+    request_type = {
+        "send-space-message": SendSpaceMessageRequest,
+        "get-space-messages": GetSpaceMessagesRequest,
+        "send-space-item": SendSpaceItemRequest,
+        "get-space-items": GetSpaceItemsRequest,
+    }[endpoint]
     request = ParseDict({"space_id": str(uuid4()), **fields}, request_type())
     response = client.post(
         f"/v1/control/{endpoint}", content=request.SerializeToString()
@@ -431,8 +488,8 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
-    """Persist an agent through HTTP and list only the authenticated owner's agents."""
+def test_agent_routes_create_update_list_and_delete_owned_agents(database: str) -> None:
+    """Create, update, list, and idempotently delete only owned agents."""
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
@@ -442,7 +499,8 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
         avatar="robot",
         color="sky",
     )
-    assert state.create_agent(flwr_aid="other-account", config=config) is not None
+    other = state.create_agent(flwr_aid="other-account", config=config)
+    assert other is not None
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     client = TestClient(app)
@@ -469,13 +527,78 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert SpaceParticipant(flwr_aid=_ACCOUNT.user_id) in spaces[0].participants
     assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
 
+    updated_config = AgentConfig(name="Updated Agent", app_spec=config.app_spec)
+    response = client.post(
+        "/v1/control/update-agent",
+        content=UpdateAgentRequest(
+            agent_id=agent.id,
+            expected_config_version=agent.config_version,
+            config=updated_config,
+        ).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    updated = UpdateAgentResponse.FromString(response.content).agent
+    assert updated.config_version == agent.config_version + 1
+    assert updated.config == updated_config
+
     response = client.post(
         "/v1/control/list-agents",
         content=ListAgentsRequest().SerializeToString(),
         headers=headers,
     )
     assert response.status_code == 200
-    assert ListAgentsResponse.FromString(response.content).agents == [agent]
+    assert ListAgentsResponse.FromString(response.content).agents == [updated]
+
+    for agent_id, expected_status in (
+        (0, 404),
+        (other.id, 404),
+        (agent.id + 1, 404),
+        (agent.id, 200),
+        (agent.id, 200),
+    ):
+        response = client.post(
+            "/v1/control/delete-agent",
+            content=DeleteAgentRequest(agent_id=agent_id).SerializeToString(),
+            headers=headers,
+        )
+        assert response.status_code == expected_status
+        if expected_status == 200:
+            assert (
+                DeleteAgentResponse.FromString(response.content)
+                == DeleteAgentResponse()
+            )
+        else:
+            assert response.json()["code"] == ApiErrorCode.AGENT_NOT_FOUND
+    assert not state.list_agents(_ACCOUNT.user_id)
+    assert state.get_agent("other-account", other.id) == other
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (None, 404),
+        (ValueError("Invalid configuration"), 400),
+        (FlowerError(ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT, "Conflict"), 409),
+    ],
+)
+def test_agent_update_translates_state_errors(
+    space_client: tuple[TestClient, LinkState],
+    error: Exception | None,
+    status_code: int,
+) -> None:
+    """Translate missing agents, invalid updates, and conflicts to HTTP errors."""
+    client, state = space_client
+    request = UpdateAgentRequest(
+        agent_id=1,
+        expected_config_version=1,
+        config=AgentConfig(name="Agent", app_spec="@test/app"),
+    )
+    with patch.object(state, "update_agent", return_value=None, side_effect=error):
+        response = client.post(
+            "/v1/control/update-agent", content=request.SerializeToString()
+        )
+    assert response.status_code == status_code
 
 
 @pytest.mark.parametrize(
@@ -686,6 +809,8 @@ def test_connector_route_returns_existing_structured_error() -> None:
     ("path", "protobuf_request", "handler_name"),
     [
         ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
+        ("/v1/control/update-agent", UpdateAgentRequest(), "update_agent"),
+        ("/v1/control/delete-agent", DeleteAgentRequest(agent_id=1), "delete_agent"),
         ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",

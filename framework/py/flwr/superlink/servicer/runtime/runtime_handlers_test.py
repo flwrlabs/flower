@@ -209,8 +209,9 @@ def test_space_run_input_and_output(backend: str, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("backend", ["memory", "sqlite"])
+@pytest.mark.parametrize("delete_at", [None, "before_input", "running"])
 def test_agent_task_input_includes_latest_identity(
-    backend: str, tmp_path: Path
+    backend: str, delete_at: str | None, tmp_path: Path
 ) -> None:
     """Supply current metadata for an agent run while retaining its fixed AgentApp."""
     database = (
@@ -262,12 +263,26 @@ def test_agent_task_input_includes_latest_identity(
         AcquireTaskRequest(agentapp_fab_hashes=[fab_hash]), state
     )
     assert acquired.task.run_id == run_id
+    if delete_at == "before_input":
+        assert state.delete_agent("alice", agent.id)
+        with pytest.raises(FlowerError) as error:
+            runtime_handlers.pull_task_input(
+                PullTaskInputRequest(), state, acquired.task
+            )
+        assert error.value.code == ApiErrorCode.RUNTIME_TASK_START_FAILED
+        return
     response = runtime_handlers.pull_task_input(
         PullTaskInputRequest(), state, acquired.task
     )
 
     assert response.agent == agent
     assert response.run.fab_hash == fab_hash
+    if delete_at == "running":
+        assert state.delete_agent("alice", agent.id)
+        assert state.get_agent("alice", agent.id) is None
+        task = state.get_tasks(task_ids=[acquired.task.task_id])[0]
+        assert task.status.sub_status == SubStatus.STOPPED
+        assert not state.finish_task(acquired.task.task_id, SubStatus.COMPLETED, "")
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

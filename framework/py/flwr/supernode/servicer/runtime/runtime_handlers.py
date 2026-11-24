@@ -67,8 +67,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -348,6 +352,16 @@ def get_space_messages(
     )
 
 
+def get_space_items(
+    request: GetSpaceItemsRequest, state: NodeState, task: Task
+) -> GetSpaceItemsResponse:
+    """Reject Space item reads on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space items are only available on SuperLink.",
+    )
+
+
 def send_space_message(
     request: SendSpaceMessageRequest, state: NodeState, task: Task
 ) -> SendSpaceMessageResponse:
@@ -355,6 +369,16 @@ def send_space_message(
     raise FlowerError(
         ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
         "Space messages are only available on SuperLink.",
+    )
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, state: NodeState, task: Task
+) -> SendSpaceItemResponse:
+    """Reject Space item publication on SuperNode."""
+    raise FlowerError(
+        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+        "Space items are only available on SuperLink.",
     )
 
 

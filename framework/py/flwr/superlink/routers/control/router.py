@@ -42,6 +42,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -108,6 +110,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -128,7 +132,6 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
-from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -204,6 +207,26 @@ def create_agent(
     return control_handlers.create_agent(request, account, linkstate)
 
 
+@router.post("/update-agent")
+def update_agent(
+    request: Annotated[UpdateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateAgentResponse:
+    """Replace an owned agent's configuration using its current version."""
+    return control_handlers.update_agent(request, account, linkstate)
+
+
+@router.post("/delete-agent")
+def delete_agent(
+    request: Annotated[DeleteAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DeleteAgentResponse:
+    """Delete an agent owned by the authenticated account."""
+    return control_handlers.delete_agent(request, account, linkstate)
+
+
 @router.post("/list-agents")
 def list_agents(
     request: Annotated[ListAgentsRequest, Depends(get_protobuf_request)],
@@ -272,11 +295,12 @@ def get_space_messages(
 
 @router.post("/get-space-items")
 def get_space_items(
-    _request: Annotated[GetSpaceItemsRequest, Depends(get_protobuf_request)],
-    _account: AccountDependency,
+    request: Annotated[GetSpaceItemsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
 ) -> GetSpaceItemsResponse:
-    """Get space items once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "GetSpaceItems pending")
+    """Get space items."""
+    return control_handlers.get_space_items(request, account, linkstate)
 
 
 @router.post("/send-space-message")
@@ -291,11 +315,12 @@ def send_space_message(
 
 @router.post("/send-space-item")
 def send_space_item(
-    _request: Annotated[SendSpaceItemRequest, Depends(get_protobuf_request)],
-    _account: AccountDependency,
+    request: Annotated[SendSpaceItemRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
 ) -> SendSpaceItemResponse:
-    """Send a message item once supported."""
-    raise FlowerError(ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE, "SendSpaceItem pending")
+    """Send a message item."""
+    return control_handlers.send_space_item(request, account, linkstate)
 
 
 @router.post("/list-run-series")

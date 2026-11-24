@@ -70,8 +70,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -164,11 +168,29 @@ def get_space_messages(
     )
 
 
+def get_space_items(
+    request: GetSpaceItemsRequest, state: LinkState, task: Task
+) -> GetSpaceItemsResponse:
+    """Read items within the authenticated task's Space grant."""
+    return core_runtime_handlers.get_space_items(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
 def send_space_message(
     request: SendSpaceMessageRequest, state: LinkState, task: Task
 ) -> SendSpaceMessageResponse:
     """Publish with the primary AgentApp's server-bound agent identity."""
     return core_runtime_handlers.send_space_message(
+        request, state, task, _get_task_run(state, task)
+    )
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, state: LinkState, task: Task
+) -> SendSpaceItemResponse:
+    """Publish a message item with the server-bound agent identity."""
+    return core_runtime_handlers.send_space_item(
         request, state, task, _get_task_run(state, task)
     )
 
@@ -438,7 +460,14 @@ def pull_task_input(
             context = create_run_context(run_id)
         elif run.series_id:
             context = state.get_run_series_context(run.series_id)
-    if run and fab and context and state.activate_task(task.task_id):
+    agent_available = run is not None and (run.agent_id is None or agent is not None)
+    if (
+        run
+        and fab
+        and context
+        and agent_available
+        and state.activate_task(task.task_id)
+    ):
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
             context=context_to_proto(context),

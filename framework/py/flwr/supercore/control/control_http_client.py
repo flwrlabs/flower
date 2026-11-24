@@ -39,6 +39,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -105,6 +107,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -159,6 +163,15 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=CreateAgentResponse,
         )
 
+    def DeleteAgent(self, request: DeleteAgentRequest) -> DeleteAgentResponse:
+        """Delete an agent."""
+        return self._unary_unary(
+            path="/v1/control/delete-agent",
+            rpc_method="/flwr.proto.Control/DeleteAgent",
+            request=request,
+            response_type=DeleteAgentResponse,
+        )
+
     def ListAgents(self, request: ListAgentsRequest) -> ListAgentsResponse:
         """List agents."""
         return self._unary_unary(
@@ -166,6 +179,15 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/ListAgents",
             request=request,
             response_type=ListAgentsResponse,
+        )
+
+    def UpdateAgent(self, request: UpdateAgentRequest) -> UpdateAgentResponse:
+        """Replace an agent's configuration using its current version."""
+        return self._unary_unary(
+            path="/v1/control/update-agent",
+            rpc_method="/flwr.proto.Control/UpdateAgent",
+            request=request,
+            response_type=UpdateAgentResponse,
         )
 
     def StartRun(self, request: StartRunRequest) -> StartRunResponse:

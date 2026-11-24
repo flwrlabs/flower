@@ -91,6 +91,9 @@ SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "api.flower.ai")
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 
+# Space API constants
+MAX_SPACE_PAGE_SIZE = 100
+
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
 APP_PUBLISH_INCLUDE_PATTERNS = (
@@ -239,6 +242,7 @@ class EventType(StrEnum):
 
     AGENT_CREATED = "agent.created"
     AGENT_UPDATED = "agent.updated"
+    AGENT_DELETED = "agent.deleted"
     SPACE_CREATED = "space.created"
     MESSAGE_CREATED = "message.created"
     RUN_CREATED = "run.created"

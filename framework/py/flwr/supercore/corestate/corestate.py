@@ -41,6 +41,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -54,8 +55,24 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
-from ..constant import AutomationStatus
+from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
+
+
+def _validate_space_item(
+    item_type: SpaceItemType, content: str, author: SpaceParticipant | None
+) -> None:
+    """Validate an item's type, content, and author before storing."""
+    if not isinstance(item_type, SpaceItemType):
+        raise ValueError("Invalid SpaceItem type")
+    if not content.strip():
+        raise ValueError("SpaceItem content must be nonempty")
+    # Revisit author rules when SendSpaceItem accepts automation items.
+    if item_type == SpaceItemType.MESSAGE:
+        if author is None or not (author.flwr_aid or author.agent_id):
+            raise ValueError("Message items require an author")
+    elif author is not None:
+        raise ValueError("Only message items may have an author")
 
 
 class CoreState(ABC):  # pylint: disable=R0904
@@ -71,6 +88,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -92,6 +110,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of run IDs to filter by.
         space_ids : Optional[Sequence[UUID]] (default: None)
             Sequence of Space IDs to filter by.
+        agent_ids : Optional[Sequence[int]] (default: None)
+            Sequence of agent IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
@@ -362,12 +382,35 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Soft-delete an owned agent.
+
+        Stop active automations and unfinished runs, prevent new runs, and remove
+        owned connectors and their credentials. Preserve historical agent data.
+        Deletion is idempotent and emits agent.deleted on the first successful
+        deletion.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            ID of the agent to delete.
+
+        Returns
+        -------
+        bool
+            True if the agent was deleted or already deleted;
+            False if absent or not owned by the account.
+        """
+
+    @abstractmethod
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account, or None if it does not exist."""
+        """Return an owned active agent, or None if unavailable."""
 
     @abstractmethod
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID, or None if unavailable."""
+        """Return an owned active agent's default Space ID, or None if unavailable."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
@@ -864,6 +907,68 @@ class CoreState(ABC):  # pylint: disable=R0904
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def store_space_item(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        content: str,
+        author: SpaceParticipant | None = None,
+    ) -> SpaceItem | None:
+        """Store an item, or return None if the Space or membership is absent.
+
+        Message items require an author in the Space. Other items have no author.
+        Blank content and invalid type or author combinations raise ValueError.
+        """
+
+    @abstractmethod
+    def get_space_items(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items and advance the participant's read cursor.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the items.
+        participant : SpaceParticipant
+            User or agent reading the items.
+        limit : int (default: 50)
+            Maximum number of items to return.
+        before_id : int | None (default: None)
+            Exclusive upper item ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower item ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceItem] | None
+            Items in ascending ID order, selecting the newest page by default.
+            An empty sequence if no items match.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or after_id >= before_id when both
+            bounds are provided.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
+        """
 
     @abstractmethod
     def get_space_messages(  # pylint: disable=too-many-arguments
