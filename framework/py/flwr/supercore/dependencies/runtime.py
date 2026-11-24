@@ -59,8 +59,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PutCompactedContextResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -82,7 +86,7 @@ class RuntimeStateFactory(Protocol):
 StateT_contra = TypeVar("StateT_contra", bound=CoreState, contravariant=True)
 
 
-class RuntimeHandlers(Protocol[StateT_contra]):
+class RuntimeHandlers(Protocol[StateT_contra]):  # pylint: disable=R0904
     """Component-specific handlers used by the shared Runtime API router."""
 
     def _get_agent_id(self, state: StateT_contra, task: Task) -> int:
@@ -177,10 +181,20 @@ class RuntimeHandlers(Protocol[StateT_contra]):
     ) -> GetSpaceMessagesResponse:
         """Read messages from the authenticated task's Space."""
 
+    def get_space_items(
+        self, request: GetSpaceItemsRequest, state: StateT_contra, task: Task
+    ) -> GetSpaceItemsResponse:
+        """Read items from the authenticated task's Space."""
+
     def send_space_message(
         self, request: SendSpaceMessageRequest, state: StateT_contra, task: Task
     ) -> SendSpaceMessageResponse:
         """Publish a message to the authenticated task's Space."""
+
+    def send_space_item(
+        self, request: SendSpaceItemRequest, state: StateT_contra, task: Task
+    ) -> SendSpaceItemResponse:
+        """Publish a message item to the authenticated task's Space."""
 
     def get_compacted_contexts(
         self, request: GetCompactedContextsRequest, state: StateT_contra, task: Task

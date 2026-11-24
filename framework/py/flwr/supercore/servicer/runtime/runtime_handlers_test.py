@@ -50,7 +50,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
     GetSpaceMessagesRequest,
+    SendSpaceItemRequest,
     SendSpaceMessageRequest,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -184,6 +186,7 @@ def test_file_revision_conflict(operation: str) -> None:
 
 
 @pytest.mark.parametrize("read", [False, True])
+@pytest.mark.parametrize("items", [False, True])
 @pytest.mark.parametrize(
     "task,agent_id",
     [
@@ -192,19 +195,25 @@ def test_file_revision_conflict(operation: str) -> None:
         (Task(task_id=1, run_id=123, type=TaskType.AGENT_APP), None),
     ],
 )
-def test_space_messages_require_bound_primary_agent(
-    task: Task, agent_id: int | None, read: bool
+def test_space_access_requires_bound_primary_agent(
+    task: Task, agent_id: int | None, read: bool, items: bool
 ) -> None:
-    """Reading and publishing require the Run's bound primary AgentApp task."""
+    """Space reads and writes require the Run's bound primary AgentApp task."""
     state = Mock(spec=CoreState)
     run = Run.create_empty(123)
     run.space_id = UUID("12345678-1234-5678-1234-567812345678")
     run.agent_id = agent_id
     run.primary_task_id = 1
     with pytest.raises(FlowerError) as error:
-        if read:
+        if read and items:
+            runtime_handlers.get_space_items(GetSpaceItemsRequest(), state, task, run)
+        elif read:
             runtime_handlers.get_space_messages(
                 GetSpaceMessagesRequest(), state, task, run
+            )
+        elif items:
+            runtime_handlers.send_space_item(
+                SendSpaceItemRequest(content="No"), state, task, run
             )
         else:
             runtime_handlers.send_space_message(
@@ -213,6 +222,8 @@ def test_space_messages_require_bound_primary_agent(
     assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
     state.get_space_messages.assert_not_called()
     state.create_space_message.assert_not_called()
+    state.get_space_items.assert_not_called()
+    state.store_space_item.assert_not_called()
 
 
 class TestRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0904

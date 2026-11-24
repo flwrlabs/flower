@@ -161,10 +161,14 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -178,6 +182,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
     HUB_APP_REFRESH_INTERVAL,
+    MAX_SPACE_PAGE_SIZE,
     NOOP_FEDERATION_ID,
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
@@ -185,6 +190,7 @@ from flwr.supercore.constant import (
     AutomationStatus,
     DeviceAuthorizationError,
     RunTime,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -1532,8 +1538,8 @@ def get_space_messages(
 ) -> GetSpaceMessagesResponse:
     """Read a participating user's message history with an exclusive ID cursor."""
     limit = request.limit if request.HasField("limit") else 50
-    if limit > 100:
-        raise InvalidSpaceRequestError("limit must be at most 100.")
+    if limit > MAX_SPACE_PAGE_SIZE:
+        raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
@@ -1550,6 +1556,32 @@ def get_space_messages(
             "Space not found or account is not a participant.",
         )
     return GetSpaceMessagesResponse(messages=messages)
+
+
+def get_space_items(
+    request: GetSpaceItemsRequest, account: AuthenticatedUser, state: LinkState
+) -> GetSpaceItemsResponse:
+    """Read a participating user's Space items with an exclusive ID cursor."""
+    if request.unread_only:
+        raise InvalidSpaceRequestError("Unread SpaceItems are not supported yet.")
+    limit = request.limit if request.HasField("limit") else 50
+    if limit > MAX_SPACE_PAGE_SIZE:
+        raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
+    try:
+        items = state.get_space_items(
+            UUID(request.space_id),
+            SpaceParticipant(flwr_aid=account.user_id),
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if items is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return GetSpaceItemsResponse(items=items)
 
 
 def send_space_message(
@@ -1570,6 +1602,27 @@ def send_space_message(
             "Space not found or account is not a participant.",
         )
     return SendSpaceMessageResponse(message=message)
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, account: AuthenticatedUser, state: LinkState
+) -> SendSpaceItemResponse:
+    """Persist a message item authored by the authenticated account."""
+    try:
+        item = state.store_space_item(
+            UUID(request.space_id),
+            SpaceItemType.MESSAGE,
+            request.content,
+            SpaceParticipant(flwr_aid=account.user_id),
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if item is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return SendSpaceItemResponse(item=item)
 
 
 def list_run_series(
