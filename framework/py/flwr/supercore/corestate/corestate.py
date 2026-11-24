@@ -931,8 +931,9 @@ class CoreState(ABC):  # pylint: disable=R0904
         limit: int = 50,
         before_id: int | None = None,
         after_id: int | None = None,
+        unread_only: bool = False,
     ) -> Sequence[SpaceItem] | None:
-        """Read a page of items for a Space participant.
+        """Read a page of items and advance the participant's read cursor.
 
         Parameters
         ----------
@@ -946,6 +947,9 @@ class CoreState(ABC):  # pylint: disable=R0904
             Exclusive upper item ID bound.
         after_id : int | None (default: None)
             Exclusive lower item ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
 
         Returns
         -------
@@ -959,6 +963,11 @@ class CoreState(ABC):  # pylint: disable=R0904
         ValueError
             If limit is not positive or after_id >= before_id when both
             bounds are provided.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
         """
 
     @abstractmethod

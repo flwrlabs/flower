@@ -161,11 +161,6 @@ def get_space_items(
 ) -> GetSpaceItemsResponse:
     """Read items within the authenticated task's Space grant."""
     space_id, participant = authenticate_space_agent(task, run)
-    if request.unread_only:
-        raise FlowerError(
-            ApiErrorCode.INVALID_SPACE_REQUEST,
-            "Unread SpaceItems are not supported yet.",
-        )
     limit = request.limit if request.HasField("limit") else MAX_SPACE_PAGE_SIZE
     if limit > MAX_SPACE_PAGE_SIZE:
         raise FlowerError(
@@ -179,6 +174,7 @@ def get_space_items(
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
             after_id=request.after_id if request.HasField("after_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise FlowerError(ApiErrorCode.INVALID_SPACE_REQUEST, str(exc)) from exc

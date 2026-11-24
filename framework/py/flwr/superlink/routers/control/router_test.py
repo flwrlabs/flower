@@ -239,6 +239,30 @@ def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
     )
     assert response.status_code == 200
     assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert not GetSpaceItemsResponse.FromString(response.content).items
+    response = client.post(
+        "/v1/control/send-space-item",
+        content=SendSpaceItemRequest(
+            space_id=space_id, content="Third"
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    new_item = SendSpaceItemResponse.FromString(response.content).item
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == [new_item]
     assert state.get_space_messages(UUID(space_id), caller) == []
 
 
@@ -375,7 +399,6 @@ def test_space_unavailable_to_nonparticipants(
         ("get-space-items", {"space_id": "bad-uuid"}),
         ("get-space-items", {"limit": 0}),
         ("get-space-items", {"limit": 101}),
-        ("get-space-items", {"unread_only": True}),
     ],
 )
 def test_invalid_space_request(
