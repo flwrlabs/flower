@@ -254,6 +254,44 @@ def _log_kfd_diagnostics() -> None:
             "`libamd_smi.so` symlink, rather than only a versioned "
             "`libamd_smi.so.<N>`.",
         )
+    elif (
+        amd_denied_render_nodes
+        and amd_inconclusive_render_nodes
+        and unknown_vendor_accessible_render_nodes
+    ):
+        # All three states can coexist across different render nodes. An
+        # accessible unknown-vendor node means device access already works
+        # for at least one GPU candidate on this host; if it turns out to be
+        # AMD-backed, a missing/unimportable `amdsmi` -- not either failing
+        # node below -- could be the real reason Ray reports zero GPUs, the
+        # same reasoning as the two-way `amd_denied`/`unknown_vendor_accessible`
+        # combo further down. Reporting only the two failing nodes, as the
+        # plain `amd_denied and amd_inconclusive` branch below would, hides
+        # that lead.
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd). "
+            "Opening the AMD-backed `/dev/dri/renderD*` node(s) on this host "
+            "failed for two different reasons: (%s) are permission-denied "
+            "(no read/write access -- the current user is likely missing "
+            "from the `render` (and `video`) group that owns these nodes, or "
+            "the container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`), while (%s) failed for a "
+            "reason other than permissions (e.g. a driver-level "
+            "`ENODEV`/`EIO`, or this process running out of file "
+            "descriptors). Separately, another `/dev/dri/renderD*` node (%s) "
+            "opens successfully but this host cannot determine its PCI "
+            "vendor ID (sysfs is missing or unreadable). If that accessible "
+            "node turns out to be AMD-backed (check with `cat "
+            "/sys/class/drm/<node>/device/vendor`, expecting `%s`), device "
+            "access already works for a GPU and a missing or unimportable "
+            "`amdsmi` could still explain Ray reporting zero GPUs -- fixing "
+            "the two failing nodes above is not the only possible fix.",
+            ", ".join(amd_denied_render_nodes),
+            ", ".join(amd_inconclusive_render_nodes),
+            ", ".join(unknown_vendor_accessible_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
     elif amd_denied_render_nodes and amd_inconclusive_render_nodes:
         # Neither outcome rules out the other: a permission fix for the
         # denied node(s) would leave the inconclusive node(s) still failing,
@@ -303,6 +341,31 @@ def _log_kfd_diagnostics() -> None:
             "reporting zero GPUs -- see the check above. Do not assume fixing "
             "permissions on the denied node is the only thing needed.",
             ", ".join(amd_denied_render_nodes),
+            ", ".join(unknown_vendor_accessible_render_nodes),
+            _AMD_PCI_VENDOR_ID,
+        )
+    elif amd_inconclusive_render_nodes and unknown_vendor_accessible_render_nodes:
+        # Mirrors the `amd_denied`/`unknown_vendor_accessible` combo above:
+        # the plain `amd_inconclusive_render_nodes` branch below sends the
+        # user to file-descriptor/kernel diagnosis only, which would miss the
+        # real fix if the accessible unknown-vendor node turns out to be
+        # AMD-backed and a missing/unimportable `amdsmi` is what's actually
+        # behind Ray's zero-GPU report.
+        log(
+            WARNING,
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd). "
+            "Opening a confirmed AMD-backed `/dev/dri/renderD*` node (%s) "
+            "failed for a reason other than permissions (e.g. a "
+            "driver-level `ENODEV`/`EIO`, or this process running out of "
+            "file descriptors). Separately, another `/dev/dri/renderD*` "
+            "node (%s) opens successfully but this host cannot determine "
+            "its PCI vendor ID (sysfs is missing or unreadable). If that "
+            "accessible node turns out to be AMD-backed (check with `cat "
+            "/sys/class/drm/<node>/device/vendor`, expecting `%s`), device "
+            "access already works for a GPU and a missing or unimportable "
+            "`amdsmi` could still explain Ray reporting zero GPUs -- do not "
+            "assume the failing node above is the only lead.",
+            ", ".join(amd_inconclusive_render_nodes),
             ", ".join(unknown_vendor_accessible_render_nodes),
             _AMD_PCI_VENDOR_ID,
         )

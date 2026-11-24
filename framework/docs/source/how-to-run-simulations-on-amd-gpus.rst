@@ -340,6 +340,8 @@ exported, silently leaving Ray's original import failure in place:
             IFS=',' read -ra _rocr_ids <<<"$ROCR_VISIBLE_DEVICES"
             _rocr_norm=()
             _rocr_bad_id=0
+            _rocr_has_numeric=0
+            _rocr_has_uuid=0
             for _id in "${_rocr_ids[@]}"; do
                 if [[ "$_id" =~ ^[0-9]+$ ]]; then
                     # ROCr treats `0` and `00` as the same ordinal, but they
@@ -349,6 +351,7 @@ exported, silently leaving Ray's original import failure in place:
                     _trimmed_id="${_id#"${_id%%[!0]*}"}"
                     [ -z "$_trimmed_id" ] && _trimmed_id=0
                     _rocr_norm+=("$_trimmed_id")
+                    _rocr_has_numeric=1
                 elif [[ "$_id" =~ ^GPU-[0-9a-fA-F]+$ ]]; then
                     # ROCR_VISIBLE_DEVICES also accepts a `GPU-<hex>` UUID in
                     # place of a numeric ordinal; it still names exactly one
@@ -364,6 +367,7 @@ exported, silently leaving Ray's original import failure in place:
                     # device by the duplicate check below, the same way
                     # leading zeros are normalized for numeric ordinals above.
                     _rocr_norm+=("${_id,,}")
+                    _rocr_has_uuid=1
                 else
                     # Neither a numeric ordinal nor the documented `GPU-<hex>`
                     # UUID syntax -- for example a typo like `bogus`. Counting
@@ -380,6 +384,23 @@ exported, silently leaving Ray's original import failure in place:
                      "UUID -- the number of devices it exposes cannot be" \
                      "derived from it. Fix ROCR_VISIBLE_DEVICES itself and" \
                      "re-run this snippet." >&2
+            elif [ "$_rocr_has_numeric" -eq 1 ] && [ "$_rocr_has_uuid" -eq 1 ]; then
+                # A numeric ordinal and a GPU-<hex> UUID are unrelated strings
+                # to this snippet -- it has no way to resolve the UUID back to
+                # a physical device and check whether it names the same GPU as
+                # one of the numeric entries (e.g. `0,GPU-<uuid-of-0>`). If
+                # they do name the same device, ROCr's filtered set still
+                # contains it only once, yet counting both forms as distinct
+                # would still synthesize a second, no-ROCr-visible-ordinal
+                # slot in HIP_VISIBLE_DEVICES below. Leave `_n` unset instead
+                # of guessing.
+                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES mixes" \
+                     "numeric ordinals and GPU-<hex> UUIDs -- this snippet" \
+                     "cannot tell whether an ordinal and a UUID name the same" \
+                     "physical GPU, so the number of distinct devices it" \
+                     "exposes cannot be derived from it. Resolve every entry" \
+                     "to the same identifier form (all ordinals or all UUIDs)" \
+                     "and re-run this snippet." >&2
             else
                 _rocr_dup=$(printf '%s\n' "${_rocr_norm[@]}" | sort | uniq -d)
                 if [ -n "$_rocr_dup" ]; then
@@ -402,7 +423,8 @@ exported, silently leaving Ray's original import failure in place:
                     _n=${#_rocr_ids[@]}
                 fi
             fi
-            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id
+            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
+                _rocr_has_numeric _rocr_has_uuid
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
