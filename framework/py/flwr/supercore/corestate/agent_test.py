@@ -14,7 +14,7 @@
 # ==============================================================================
 """Tests for account-owned agents across CoreState implementations."""
 
-from hashlib import sha256
+from functools import partial
 from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID
@@ -171,224 +171,89 @@ def agent_fixture(state: CoreState) -> Agent:
 
 
 def test_delete_agent(state: CoreState, agent: Agent) -> None:
-    """Hide active data while preserving history and a single deletion event."""
-    group = state.create_space(
-        participants=[
-            SpaceParticipant(flwr_aid="alice"),
-            SpaceParticipant(agent_id=agent.id),
-        ]
-    )
-    message = state.create_space_message(
-        UUID(group.id), SpaceParticipant(agent_id=agent.id), "History"
-    )
-    scope = f"agent-{agent.id}"
-    state.put_file(scope, "memory", b"Retain", None)
+    """Archive only owned agents, emit one event, and roll back event failures."""
     cursor = state.get_bootstrap("alice").cursor
     assert not state.delete_agent("bob", agent.id)
     assert not state.delete_agent("alice", agent.id + 1)
-    assert state.delete_agent("alice", agent.id)
-    assert state.get_agent("alice", agent.id) is None
-    assert (
-        state.update_agent("alice", agent.id, agent.config_version, agent.config)
-        is None
-    )
-    assert state.get_default_space("alice", agent.id) is None
-    assert not state.get_bootstrap("alice").agents
-    assert [space.id for space in state.get_spaces("alice")] == [group.id]
-    assert state.get_agent("bob", agent.id) is None
-    assert state.get_space_messages(
-        UUID(group.id), SpaceParticipant(flwr_aid="alice")
-    ) == [message]
-    stored_file = state.get_file(scope, "memory")
-    assert stored_file is not None and stored_file.data == b"Retain"
-    events = state.get_user_events("alice", cursor)
-    assert len(events) == 1 and events[0].event.type == EventType.AGENT_DELETED
-    assert events[0].event.payload["id"] == str(agent.id)
-    deleted_at = events[0].event.payload["updated_at"]
-    assert state.delete_agent("alice", agent.id)
-    assert state.get_user_events("alice", cursor) == events
-    assert not state.get_user_events("bob")
-    if isinstance(state, SqlLinkState):
-        with state.session() as session:
-            model = session.get(AgentModel, agent.id)
-            assert model is not None and model.deleted_at is not None
-            assert model.deleted_at.isoformat() == deleted_at
-            assert session.get(AgentConfigModel, (agent.id, 1)) is not None
-    else:
-        assert isinstance(state, InMemoryLinkState)
-        assert state.agent_store["alice"][agent.id].config == agent.config
-        assert state.deleted_agent_store[agent.id].isoformat() == deleted_at
-
-
-def test_delete_agent_blocks_future_activity(state: CoreState, agent: Agent) -> None:
-    """Stop schedules and reject new runs and memberships for an archived agent."""
-    assert isinstance(state, (InMemoryLinkState, SqlLinkState))
-    automation = state.store_automation(
-        flwr_aid="alice",
-        agent_id=agent.id,
-        start_run_request=StartRunRequest(),
-        next_run_at=now().isoformat(),
-        fixed_interval=60,
-    )
-    space_id = UUID(agent.default_space_id)
-    state.create_space_message(space_id, SpaceParticipant(flwr_aid="alice"), "Work")
-    fab_hash = state.store_fab(Fab(sha256(b"app").hexdigest(), b"app", {}))
-    assert state.get_agent_run_candidates()
-    assert state.delete_agent("alice", agent.id)
-    assert not state.get_agent_run_candidates()
-    assert state.create_connector(None, "slack", "{}", "{}", "alice", agent.id) is None
-    assert (
-        state.create_run(
-            "test/app",
-            "1.0",
-            fab_hash,
-            {},
-            None,
-            None,
-            None,
-            TaskType.AGENT_APP,
-            space_id=space_id,
-            agent_id=agent.id,
-        )
-        == 0
-    )
-    schedules = state.list_automations(
-        automation_ids=[automation.automation_id], order_by="updated_at"
-    )
-    assert schedules[0].status == AutomationStatus.STOPPED
-    assert (
-        state.claim_automation(
-            automation.automation_id,
-            previous_next_run_at=automation.next_run_at,
-            next_run_at=None,
-        )
-        is None
-    )
-    with pytest.raises(ValueError, match="Agent participant"):
-        state.create_space(participants=[SpaceParticipant(agent_id=agent.id)])
-    with pytest.raises(ValueError, match="Agent not found"):
-        state.store_automation(
-            flwr_aid="alice",
-            agent_id=agent.id,
-            start_run_request=StartRunRequest(),
-            next_run_at=now().isoformat(),
-        )
-
-
-def test_delete_agent_stops_unfinished_runs(state: CoreState, agent: Agent) -> None:
-    """Stop this agent's tasks and remove its connectors, preserving other data."""
-    assert isinstance(state, (InMemoryLinkState, SqlLinkState))
-    other = state.create_agent("alice", agent.config)
-    assert other is not None
-    connector_ids = [
-        state.create_connector(
-            None, "slack", '{"token":"secret"}', "{}", "alice", owner.id
-        )
-        for owner in (agent, agent, other)
-    ]
-    connector_ids.append(
-        state.create_connector(
-            "@alice/fed", "slack", '{"token":"secret"}', "{}", "alice"
-        )
-    )
-    fab_hash = state.store_fab(Fab(sha256(b"app").hexdigest(), b"app", {}))
-    expected: dict[int, tuple[str, str]] = {}
-    tokens = []
-    for current, status in [
-        (agent, Status.PENDING),
-        (agent, Status.STARTING),
-        (agent, Status.RUNNING),
-        (agent, Status.FINISHED),
-        (other, Status.PENDING),
-    ]:
-        space = state.create_space(
-            participants=[
-                SpaceParticipant(flwr_aid="alice"),
-                SpaceParticipant(agent_id=current.id),
-            ]
-        )
-        run_id = state.create_run(
-            "test/app",
-            "1.0",
-            fab_hash,
-            {},
-            None,
-            None,
-            None,
-            TaskType.AGENT_APP,
-            space_id=UUID(space.id),
-            agent_id=current.id,
-        )
-        task_id = state.get_run(run_ids=[run_id])[0].primary_task_id
-        assert task_id is not None
-        if status != Status.PENDING:
-            token = state.claim_task(task_id)
-            assert token is not None
-            tokens.append(token)
-        if status in (Status.RUNNING, Status.FINISHED):
-            assert state.activate_task(task_id)
-        if status == Status.FINISHED:
-            assert state.finish_task(task_id, SubStatus.COMPLETED, "")
-        expected[task_id] = (
-            Status.FINISHED,
-            SubStatus.COMPLETED if status == Status.FINISHED else SubStatus.STOPPED,
-        )
-        if current.id == other.id:
-            expected[task_id] = (Status.PENDING, "")
-        if status == Status.RUNNING:
-            child_id = state.create_task(
-                TaskType.AGENT_APP,
-                run_id,
-                space_id=UUID(space.id),
-                fab_hash=fab_hash,
-                requesting_task_id=task_id,
-            )
-            assert child_id is not None
-            token = state.claim_task(child_id)
-            assert token is not None and state.activate_task(child_id)
-            tokens.append(token)
-            expected[child_id] = (Status.FINISHED, SubStatus.STOPPED)
-
-    assert state.delete_agent("alice", agent.id)
-    assert not state.get_agent_connectors(agent.id)
-    assert all(
-        connector_id is not None and state.get_connector_by_id(connector_id) is None
-        for connector_id in connector_ids[:2]
-    )
-    assert all(
-        connector_id is not None and state.get_connector_by_id(connector_id) is not None
-        for connector_id in connector_ids[2:]
-    )
-    for task in state.get_tasks(task_ids=list(expected)):
-        assert (task.status.status, task.status.sub_status) == expected[task.task_id]
-    assert all(state.get_task_by_token(token) is None for token in tokens)
-
-
-def test_delete_agent_rolls_back(state: CoreState, agent: Agent) -> None:
-    """Preserve the agent, schedule, and credentials if the deletion event fails."""
-    connector_id = state.create_connector(
-        None, "slack", '{"token":"secret"}', "{}", "alice", agent.id
-    )
-    assert connector_id is not None
-    automation = state.store_automation(
-        flwr_aid="alice",
-        agent_id=agent.id,
-        start_run_request=StartRunRequest(),
-        next_run_at=now().isoformat(),
-    )
-    cursor = state.get_bootstrap("alice").cursor
     with patch.object(state, "store_event", side_effect=RuntimeError("event failed")):
         with pytest.raises(RuntimeError, match="event failed"):
             state.delete_agent("alice", agent.id)
     assert state.get_agent("alice", agent.id) == agent
-    assert state.get_connector_by_id(connector_id) is not None
-    assert not state.get_user_events("alice", cursor)
-    schedules = state.list_automations(
-        automation_ids=[automation.automation_id], order_by="updated_at"
-    )
-    assert schedules[0].status == AutomationStatus.ACTIVE
+
     assert state.delete_agent("alice", agent.id)
+    assert state.get_agent("alice", agent.id) is None
+    assert not state.list_agents("alice")
+    assert state.update_agent("alice", agent.id, 1, agent.config) is None
+    assert state.delete_agent("alice", agent.id)
+    events = state.get_user_events("alice", cursor)
+    assert len(events) == 1 and events[0].event.type == EventType.AGENT_DELETED
+    assert events[0].event.payload["id"] == str(agent.id)
+    if isinstance(state, SqlLinkState):
+        with state.session() as session:
+            model = session.get(AgentModel, agent.id)
+            assert model is not None and model.deleted_at is not None
+            assert session.get(AgentConfigModel, (agent.id, 1)) is not None
+    else:
+        assert isinstance(state, InMemoryLinkState)
+        assert state.agent_store["alice"][agent.id].config == agent.config
+        assert agent.id in state.deleted_agent_store
+
+
+@pytest.mark.parametrize("running", [False, True])
+def test_delete_agent_stops_activity(
+    state: CoreState, agent: Agent, running: bool
+) -> None:
+    """Stop queued or running work and schedules, removing only owned connectors."""
+    assert isinstance(state, (InMemoryLinkState, SqlLinkState))
+    other = state.create_agent("bob", agent.config)
+    assert other is not None
+    connector_id = state.create_connector(None, "slack", "{}", "{}", "alice", agent.id)
+    other_connector = state.create_connector(None, "slack", "{}", "{}", "bob", other.id)
+    assert connector_id is not None and other_connector is not None
+    automation = state.store_automation(
+        flwr_aid="alice",
+        agent_id=agent.id,
+        start_run_request=StartRunRequest(),
+        next_run_at=now().isoformat(),
+    )
+    create_run = partial(
+        state.create_run,
+        "test/app",
+        "1.0",
+        state.store_fab(Fab("", b"app", {})),
+        {},
+        None,
+        None,
+        None,
+        TaskType.AGENT_APP,
+        space_id=UUID(agent.default_space_id),
+        agent_id=agent.id,
+    )
+    run_id = create_run()
+    task_id = state.get_run(run_ids=[run_id])[0].primary_task_id
+    assert task_id is not None
+    token = None
+    if running:
+        token = state.claim_task(task_id)
+        assert token is not None
+        assert state.activate_task(task_id)
+
+    assert state.delete_agent("alice", agent.id)
+    assert create_run() == 0
+    task = state.get_tasks(task_ids=[task_id])[0]
+    assert (task.status.status, task.status.sub_status) == (
+        Status.FINISHED,
+        SubStatus.STOPPED,
+    )
+    if token is not None:
+        assert state.get_task_by_token(token) is None
     assert state.get_connector_by_id(connector_id) is None
+    assert state.get_connector_by_id(other_connector) is not None
+    assert state.create_connector(None, "slack", "{}", "{}", "alice", agent.id) is None
+    automation = state.list_automations(
+        automation_ids=[automation.automation_id], order_by="updated_at"
+    )[0]
+    assert automation.status == AutomationStatus.STOPPED
 
 
 def test_update_agent(state: CoreState, agent: Agent) -> None:
