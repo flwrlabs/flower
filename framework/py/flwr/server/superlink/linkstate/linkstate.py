@@ -338,8 +338,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_agent_run_candidates(
         self, *, limit: int | None = None
-    ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run.
+    ) -> Sequence[tuple[UUID, Agent, int]]:
+        """Find agents with unread items and no open Run.
 
         Parameters
         ----------
@@ -348,8 +348,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
 
         Returns
         -------
-        Sequence[tuple[UUID, Agent]]
-            Eligible Space IDs and agents. This does not advance read cursors.
+        Sequence[tuple[UUID, Agent, int]]
+            Eligible Space IDs, agents, and triggering item IDs. This does not
+            advance read cursors.
         """
 
     @abc.abstractmethod
