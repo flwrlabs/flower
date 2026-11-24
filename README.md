@@ -15,7 +15,7 @@
 
 [![GitHub license](https://img.shields.io/github/license/flwrlabs/flower)](https://github.com/flwrlabs/flower/blob/main/LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/flwrlabs/flower/blob/main/CONTRIBUTING.md)
-![Build](https://github.com/flwrlabs/flower/actions/workflows/framework.yml/badge.svg)
+![Build](https://github.com/flwrlabs/flower/actions/workflows/framework-test.yml/badge.svg)
 [![Downloads](https://static.pepy.tech/badge/flwr)](https://pepy.tech/project/flwr)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-flwr-blue)](https://hub.docker.com/u/flwr)
 [![Slack](https://img.shields.io/badge/Chat-Slack-red)](https://flower.ai/join-slack)

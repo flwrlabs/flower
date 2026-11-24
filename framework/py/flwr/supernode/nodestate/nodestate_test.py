@@ -116,6 +116,11 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
             ({"space_ids": [UUID(int=1)]}, [3]),
             ({"space_ids": []}, []),
             ({"space_ids": [UUID(int=1)], "flwr_aids": ["bob"]}, []),
+            ({"agent_ids": []}, []),
+            ({"agent_ids": [42]}, [3]),
+            ({"agent_ids": [43]}, []),
+            ({"agent_ids": [43, 42]}, [3]),
+            ({"agent_ids": [42], "statuses": [Status.PENDING]}, []),
             ({"statuses": [Status.RUNNING]}, [2, 3]),
             ({"statuses": []}, []),
             ({"flwr_aids": ["alice"]}, [1, 3]),
@@ -143,6 +148,7 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
             run.flwr_aid = owner
             run.federation_id = federation
             run.space_id = None if federation else UUID(int=1)
+            run.agent_id = 42 if not federation else None
             run.status.status = status
             run.pending_at = f"2026-01-01T00:00:0{run_id}+00:00"
             self.state.store_run(run)

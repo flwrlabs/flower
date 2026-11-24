@@ -438,7 +438,14 @@ def pull_task_input(
             context = create_run_context(run_id)
         elif run.series_id:
             context = state.get_run_series_context(run.series_id)
-    if run and fab and context and state.activate_task(task.task_id):
+    agent_available = run is not None and (run.agent_id is None or agent is not None)
+    if (
+        run
+        and fab
+        and context
+        and agent_available
+        and state.activate_task(task.task_id)
+    ):
         log(INFO, "Started task %d of run %d", task.task_id, run_id)
         return PullTaskInputResponse(
             context=context_to_proto(context),
