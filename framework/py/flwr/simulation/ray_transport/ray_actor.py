@@ -228,7 +228,12 @@ def _access_failure_notes(denied: list[str], inconclusive: list[str]) -> str:
     return joiner + " ".join(notes) if len(notes) > 1 else "Opening " + notes[0]
 
 
-def _amd_access_message(denied: list[str], inconclusive: list[str]) -> str | None:
+def _amd_access_message(
+    denied: list[str],
+    inconclusive: list[str],
+    *,
+    has_accessible_unknown_vendor: bool,
+) -> str | None:
     """Build the message for confirmed-AMD render node(s) that fail to open."""
     if not denied and not inconclusive:
         return None
@@ -248,7 +253,16 @@ def _amd_access_message(denied: list[str], inconclusive: list[str]) -> str | Non
             "check this process's open-file limit and the kernel/dmesg log "
             "for driver errors instead."
         )
-    message += " Ray and the ML framework will keep reporting zero GPUs until this is fixed."
+    # An accessible unknown-vendor node is a live counter-lead: if it turns
+    # out to be AMD-backed, device access already works and a missing
+    # `amdsmi` -- not this failing node -- explains Ray's zero-GPU result, so
+    # the categorical "zero GPUs until this is fixed" claim must not be made
+    # until that candidate is ruled out.
+    if not has_accessible_unknown_vendor:
+        message += (
+            " Ray and the ML framework will keep reporting zero GPUs until "
+            "this is fixed."
+        )
     return message
 
 
@@ -360,12 +374,17 @@ def _fallback_message(buckets: _RenderNodeBuckets) -> str | None:
             f"and a `/dev/dri/renderD*` node exists ({', '.join(buckets.other_vendor)}), "
             f"but it is not AMD-backed (its PCI vendor ID is not "
             f"`{_AMD_PCI_VENDOR_ID}`) -- ROCm cannot use it regardless of "
-            "whether it can be opened. This usually means the AMD GPU's "
-            "own render node is missing or permission-denied on this host "
-            "or container, not that `amdsmi`/ROCM_PATH needs adjusting: "
-            "check that `--device=/dev/dri --group-add render` passes "
-            "through and grants access to the AMD device specifically, not "
-            "just any render node."
+            "whether it can be opened. Every render node found is "
+            "vendor-classified before being opened, so a permission-denied "
+            "AMD node would have been reported as such rather than landing "
+            "here -- the AMD GPU's own render node is simply absent from "
+            "this host or container, not that `amdsmi`/ROCM_PATH needs "
+            "adjusting or that a `--group-add render` permission fix would "
+            "help: check that the AMD device itself is passed through at "
+            "all (e.g. a container started with `--device=/dev/kfd` but "
+            "without the AMD GPU's specific `/dev/dri/renderD*` node), and "
+            "that the host's `amdgpu` driver has actually created a render "
+            "node for it (`ls /dev/dri`)."
         )
     return None
 
@@ -445,7 +464,11 @@ def _log_kfd_diagnostics() -> None:
     # other-vendor): device access already works there, so burying it behind
     # a message about a *different*, less informative node would hide the
     # fact that the only open question left for it is the vendor, not access.
-    amd_text = _amd_access_message(buckets.amd_denied, buckets.amd_inconclusive)
+    amd_text = _amd_access_message(
+        buckets.amd_denied,
+        buckets.amd_inconclusive,
+        has_accessible_unknown_vendor=bool(buckets.unknown_vendor_accessible),
+    )
     accessible_unknown_text = (
         _accessible_unknown_vendor_message(
             buckets.unknown_vendor_accessible, standalone=amd_text is None

@@ -457,11 +457,16 @@ exported, silently leaving Ray's original import failure in place:
                         _phys_n=""
                         if [ -d /sys/class/kfd/kfd/topology/nodes ]; then
                             _phys_n=0
-                            for _node_props in \
-                                /sys/class/kfd/kfd/topology/nodes/*/properties; do
-                                [ -r "$_node_props" ] || continue
-                                _gpu_id=$(grep -m1 '^gpu_id ' "$_node_props" |
-                                    awk '{print $2}')
+                            for _node_dir in \
+                                /sys/class/kfd/kfd/topology/nodes/*/; do
+                                # The GPU ID lives in the sibling `gpu_id`
+                                # file, not as a `gpu_id` row inside
+                                # `properties` -- a CPU-only node reports
+                                # `gpu_id` 0, so only non-zero IDs count as a
+                                # physical GPU.
+                                _gpu_id_file="${_node_dir}gpu_id"
+                                [ -r "$_gpu_id_file" ] || continue
+                                _gpu_id=$(cat "$_gpu_id_file")
                                 if [ -n "$_gpu_id" ] && [ "$_gpu_id" != "0" ]; then
                                     _phys_n=$((_phys_n + 1))
                                 fi
@@ -507,8 +512,8 @@ exported, silently leaving Ray's original import failure in place:
                 fi
             fi
             unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
-                _rocr_has_numeric _rocr_has_uuid _phys_n _node_props _gpu_id \
-                _bad_ordinal
+                _rocr_has_numeric _rocr_has_uuid _phys_n _node_dir \
+                _gpu_id_file _gpu_id _bad_ordinal
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
