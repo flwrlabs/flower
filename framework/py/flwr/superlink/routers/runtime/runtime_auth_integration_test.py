@@ -354,7 +354,7 @@ def test_space_item_endpoints_use_authenticated_run(
         client, "get-space-items", GetSpaceItemsRequest(unread_only=True), token=token
     )
     assert response.status_code == 200
-    assert list(GetSpaceItemsResponse.FromString(response.content).items) == []
+    assert not GetSpaceItemsResponse.FromString(response.content).items
     assert (
         state.get_space_messages(UUID(space_id), SpaceParticipant(agent_id=agent_id))
         == []

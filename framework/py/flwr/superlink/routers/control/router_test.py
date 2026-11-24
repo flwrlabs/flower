@@ -246,7 +246,7 @@ def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
         ).SerializeToString(),
     )
     assert response.status_code == 200
-    assert list(GetSpaceItemsResponse.FromString(response.content).items) == []
+    assert not GetSpaceItemsResponse.FromString(response.content).items
     response = client.post(
         "/v1/control/send-space-item",
         content=SendSpaceItemRequest(
