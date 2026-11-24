@@ -653,8 +653,9 @@ class InMemoryCoreState(
             return agent
 
     def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
-        """Archive an agent and stop future scheduled activity under state locks."""
+        """Archive an agent and clean up its activity and connectors under locks."""
         with (
+            self.lock_task_store,
             self.lock_automation_store,
             self.lock_space_store,
             self.lock_agent_store,
@@ -674,6 +675,18 @@ class InMemoryCoreState(
             for automation_id, record in self.automation_store.items():
                 if record.automation.agent_id == agent_id:
                     self.stop_automation(automation_id)
+            for run in self.get_run(
+                flwr_aids=[flwr_aid],
+                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+            ):
+                if run.agent_id == agent_id:
+                    self.finish_task(
+                        cast(int, run.primary_task_id),
+                        SubStatus.STOPPED,
+                        "Agent was deleted",
+                    )
+            for connector in self.get_agent_connectors(agent_id):
+                self.delete_connector(None, connector.connector_id, agent_id=agent_id)
             return True
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
@@ -990,9 +1003,9 @@ class InMemoryCoreState(
             or (agent_id is not None and agent_id <= 0)
         ):
             return None
-        if agent_id is not None and self.get_agent(created_by, agent_id) is None:
-            return None
-        with self.lock_connector_store:
+        with self.lock_agent_store, self.lock_connector_store:
+            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
+                return None
             self.connector_id_counter += 1
             connector_id = self.connector_id_counter
             connector = ConnectorRecord(

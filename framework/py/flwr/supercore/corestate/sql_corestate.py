@@ -790,7 +790,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return agent
 
     def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
-        """Archive an agent and stop future scheduled activity atomically."""
+        """Archive an agent and clean up its activity and connectors atomically."""
         deleted_at = now()
         with self.session() as session:
             model = session.scalar(
@@ -825,6 +825,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 )
             )
             self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
+            for run in self.get_run(
+                flwr_aids=[flwr_aid],
+                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+            ):
+                if run.agent_id == agent_id:
+                    self.finish_task(
+                        cast(int, run.primary_task_id),
+                        SubStatus.STOPPED,
+                        "Agent was deleted",
+                    )
+            for connector in self.get_agent_connectors(agent_id):
+                self.delete_connector(None, connector.connector_id, agent_id=agent_id)
             return True
 
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
@@ -1262,8 +1274,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
-                return None
+            if agent_id is not None:
+                # Serialize with agent deletion before inserting credentials.
+                active_agent_id = session.scalar(
+                    update(AgentModel)
+                    .where(
+                        AgentModel.agent_id == agent_id,
+                        AgentModel.flwr_aid == created_by,
+                        AgentModel.deleted_at.is_(None),
+                    )
+                    .values(updated_at=AgentModel.updated_at)
+                    .returning(AgentModel.agent_id)
+                )
+                if active_agent_id is None:
+                    return None
             return session.scalar(stmt)
 
     def get_connectors_by_ref(

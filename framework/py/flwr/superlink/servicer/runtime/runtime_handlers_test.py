@@ -295,7 +295,9 @@ def test_agent_task_input_includes_latest_identity(
     if delete_at == "running":
         assert state.delete_agent("alice", agent.id)
         assert state.get_agent("alice", agent.id) is None
-        assert state.finish_task(acquired.task.task_id, SubStatus.COMPLETED, "")
+        task = state.get_tasks(task_ids=[acquired.task.task_id])[0]
+        assert task.status.sub_status == SubStatus.STOPPED
+        assert not state.finish_task(acquired.task.task_id, SubStatus.COMPLETED, "")
 
 
 def test_push_empty_messages_returns_empty_response() -> None:

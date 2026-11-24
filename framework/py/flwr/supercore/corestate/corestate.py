@@ -328,26 +328,25 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
-        """Archive an owned agent, preserving its identity and historical records.
+        """Soft-delete an owned agent.
 
-        Stop its active automations and publish agent.deleted atomically. Running
-        work can finish; queued work cannot start. Future runs and use as a new
-        Space participant are rejected. Archived agents and their default Spaces
-        disappear from listings. Repeated deletion succeeds without changing the
-        original deletion timestamp or publishing another event.
+        Stop active automations and unfinished runs, prevent new runs, and remove
+        owned connectors and their credentials. Preserve historical agent data.
+        Deletion is idempotent and emits agent.deleted on the first successful
+        deletion.
 
         Parameters
         ----------
         flwr_aid : str
-            Account ID owning the agent and performing the deletion.
+            Account ID owning the agent.
         agent_id : int
-            Agent to archive.
+            ID of the agent to delete.
 
         Returns
         -------
         bool
-            True if the owned agent is now archived, including repeated deletion;
-            False if absent or owned by another account.
+            True if the agent was deleted or already deleted;
+            False if absent or not owned by the account.
         """
 
     @abstractmethod
