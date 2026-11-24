@@ -22,6 +22,7 @@ import os
 import threading
 from abc import ABC
 from collections.abc import Callable
+from dataclasses import dataclass, fields
 from logging import DEBUG, ERROR, WARNING
 from typing import Any
 
@@ -136,7 +137,239 @@ def _can_open_device(path: str) -> bool | None:
     return True
 
 
-# pylint: disable-next=too-many-branches
+@dataclass
+class _RenderNodeBuckets:
+    """Render nodes classified by PCI vendor and open(2) access state."""
+
+    amd_accessible: list[str]
+    amd_denied: list[str]
+    amd_inconclusive: list[str]
+    unknown_vendor_accessible: list[str]
+    unknown_vendor_denied: list[str]
+    unknown_vendor_inconclusive: list[str]
+    other_vendor: list[str]
+
+    def any_found(self) -> bool:
+        """Whether any render node was classified into any bucket at all."""
+        return any(getattr(self, f.name) for f in fields(self))
+
+
+def _classify_render_nodes(render_nodes: list[str]) -> _RenderNodeBuckets:
+    """Bucket each render node by PCI vendor, then by open(2) access state.
+
+    Vendor is classified before access state, for every node, not just the
+    accessible ones: `_is_amd_render_node` reads a sysfs file and does not
+    require the render node itself to be openable. A hybrid host or
+    container can expose an accessible-but-non-AMD node (e.g. an integrated
+    Intel GPU's renderD128) alongside an AMD-backed node that fails to open
+    (permission-denied or ENODEV/EIO); only the AMD node's state is actually
+    relevant to ROCm GPU discovery. A node whose vendor cannot be determined
+    (sysfs missing) is neither confirmed AMD nor confirmed otherwise, so it
+    gets its own bucket rather than being folded into either certainty.
+    """
+    buckets = _RenderNodeBuckets([], [], [], [], [], [], [])
+    for node in render_nodes:
+        is_amd = _is_amd_render_node(node)
+        if is_amd is False:
+            buckets.other_vendor.append(node)
+            continue
+        # `_can_open_device` is tri-state: a `None` (inconclusive) result
+        # must not collapse into "not accessible" via plain truthiness. This
+        # is probed for an unknown-vendor node (`is_amd is None`) too, not
+        # just a confirmed-AMD one: an unreadable sysfs file does not imply
+        # the node itself fails to open, and a concrete permission/driver
+        # error on a node that might still be AMD-backed is actionable and
+        # must not be hidden behind a generic "vendor undetermined" message.
+        openable = _can_open_device(node)
+        if is_amd is None:
+            target = (
+                buckets.unknown_vendor_accessible
+                if openable is True
+                else (
+                    buckets.unknown_vendor_denied
+                    if openable is False
+                    else buckets.unknown_vendor_inconclusive
+                )
+            )
+        else:
+            target = (
+                buckets.amd_accessible
+                if openable is True
+                else buckets.amd_denied if openable is False else buckets.amd_inconclusive
+            )
+        target.append(node)
+    return buckets
+
+
+def _access_failure_notes(denied: list[str], inconclusive: list[str]) -> str:
+    """Describe why node(s) failed to open, covering either or both reasons.
+
+    Composing independent notes for whichever reason(s) are actually present
+    -- rather than hand-writing one paragraph per denied/inconclusive/both
+    combination -- means a third reason never needs a fourth combination
+    spelled out by hand.
+    """
+    notes = []
+    if denied:
+        notes.append(
+            f"({', '.join(denied)}) are permission-denied (no read/write "
+            "access -- the current user is likely missing from the "
+            "`render` (and `video`) group that owns these nodes, or the "
+            "container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`)."
+        )
+    if inconclusive:
+        notes.append(
+            f"({', '.join(inconclusive)}) failed for a reason other than "
+            "permissions (e.g. a driver-level `ENODEV`/`EIO`, or this "
+            "process running out of file descriptors)."
+        )
+    joiner = " Separately, opening " if denied and inconclusive else "Opening "
+    return joiner + " ".join(notes) if len(notes) > 1 else "Opening " + notes[0]
+
+
+def _amd_access_message(denied: list[str], inconclusive: list[str]) -> str | None:
+    """Build the message for confirmed-AMD render node(s) that fail to open."""
+    if not denied and not inconclusive:
+        return None
+    message = (
+        "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
+        + _access_failure_notes(denied, inconclusive)
+    )
+    if denied:
+        message += (
+            " This is a permissions issue, not a missing or unimportable "
+            "`amdsmi`; fixing `amdsmi`/ROCM_PATH configuration will not help "
+            "the permission-denied node(s)."
+        )
+    if inconclusive:
+        message += (
+            " The inconclusive node(s) are not a group-membership issue; "
+            "check this process's open-file limit and the kernel/dmesg log "
+            "for driver errors instead."
+        )
+    message += " Ray and the ML framework will keep reporting zero GPUs until this is fixed."
+    return message
+
+
+def _accessible_unknown_vendor_message(nodes: list[str], *, standalone: bool) -> str:
+    """Build the message for an accessible render node of undetermined vendor.
+
+    `standalone` selects between this being the only finding (its own
+    complete warning) or a disclaimer appended after an AMD-confirmed
+    access-failure message: either way, an accessible unknown-vendor node
+    means device access already works for at least one GPU candidate on
+    this host, so if it turns out to be AMD-backed, a missing or
+    unimportable `amdsmi` -- not a failing AMD node reported elsewhere --
+    could be the real reason Ray reports zero GPUs.
+    """
+    vendor_check = (
+        "check with `cat /sys/class/drm/<node>/device/vendor`, expecting "
+        f"`{_AMD_PCI_VENDOR_ID}`"
+    )
+    if standalone:
+        return (
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), "
+            f"and a `/dev/dri/renderD*` node exists and opens successfully "
+            f"({', '.join(nodes)}), but this host cannot determine its PCI "
+            "vendor ID (sysfs is missing or unreadable, as in some "
+            "restricted containers) -- it is therefore unclear whether this "
+            "node is AMD-backed or an unrelated GPU (e.g. an integrated "
+            f"Intel GPU's renderD128) that ROCm cannot use. Check the "
+            f"node's vendor manually if possible ({vendor_check}) before "
+            "assuming `amdsmi`/ROCM_PATH is the issue -- it is not if this "
+            "node turns out not to be AMD's."
+        )
+    return (
+        f"Separately, another `/dev/dri/renderD*` node ({', '.join(nodes)}) "
+        "opens successfully but this host cannot determine its PCI vendor "
+        f"ID (sysfs is missing or unreadable). If that node turns out to be "
+        f"AMD-backed ({vendor_check}), device access already works for a "
+        "GPU and a missing or unimportable `amdsmi` could still explain Ray "
+        "reporting zero GPUs -- do not assume the AMD-node issue above is "
+        "the only lead."
+    )
+
+
+def _unknown_vendor_access_notes(denied: list[str], inconclusive: list[str]) -> str:
+    """Describe access failures for render node(s) of undetermined vendor.
+
+    Phrased distinctly from `_access_failure_notes` (used for confirmed-AMD
+    nodes): here the vendor is also unknown, so each variant below says so
+    explicitly rather than implying the node is AMD's.
+    """
+    if denied and inconclusive:
+        return (
+            "Opening them also failed for two different reasons: "
+            f"({', '.join(denied)}) are permission-denied (no read/write "
+            "access -- the current user is likely missing from the "
+            "`render` (and `video`) group that owns these nodes, or the "
+            "container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`), while "
+            f"({', '.join(inconclusive)}) failed for a reason other than "
+            "permissions (e.g. a driver-level `ENODEV`/`EIO`, or this "
+            "process running out of file descriptors). Fixing group "
+            "membership or container device pass-through alone will not "
+            "necessarily restore GPU discovery: it addresses the "
+            "permission-denied node(s) but not the inconclusive one(s)."
+        )
+    if denied:
+        return (
+            "Separately, this process cannot open it (no read/write "
+            "access): the current user is likely missing from the "
+            "`render` (and `video`) group that owns it, or the container "
+            "was started without `--device=/dev/dri --group-add render "
+            "--group-add video`. Fix that regardless, but also check the "
+            "node's vendor manually before assuming the access fix alone "
+            "will restore GPU discovery."
+        )
+    return (
+        "and whether it can even be opened is undetermined too (e.g. a "
+        "driver-level `ENODEV`/`EIO`, or this process running out of "
+        "file descriptors)."
+    )
+
+
+def _fallback_message(buckets: _RenderNodeBuckets) -> str | None:
+    """Build a message from the remaining, lower-priority buckets.
+
+    Only consulted once neither a confirmed-AMD access failure nor an
+    accessible unknown-vendor node was found -- those two take priority, as
+    handled by the caller.
+    """
+    if buckets.unknown_vendor_denied or buckets.unknown_vendor_inconclusive:
+        vendor_check = (
+            "check each node's vendor manually if possible (`cat "
+            f"/sys/class/drm/<node>/device/vendor`, expecting `{_AMD_PCI_VENDOR_ID}` "
+            "for AMD) before assuming either fix applies to the AMD device, if any"
+        )
+        return (
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), "
+            "and `/dev/dri/renderD*` node(s) exist, but this host cannot "
+            "determine its PCI vendor ID (sysfs is missing or unreadable) "
+            "-- it is therefore unclear whether any of them is AMD-backed. "
+            + _unknown_vendor_access_notes(
+                buckets.unknown_vendor_denied, buckets.unknown_vendor_inconclusive
+            )
+            + f" Fixing either issue alone will not necessarily restore GPU "
+            f"discovery; {vendor_check}."
+        )
+    if buckets.other_vendor:
+        return (
+            "The ROCm kernel driver is loaded and accessible (/dev/kfd), "
+            f"and a `/dev/dri/renderD*` node exists ({', '.join(buckets.other_vendor)}), "
+            f"but it is not AMD-backed (its PCI vendor ID is not "
+            f"`{_AMD_PCI_VENDOR_ID}`) -- ROCm cannot use it regardless of "
+            "whether it can be opened. This usually means the AMD GPU's "
+            "own render node is missing or permission-denied on this host "
+            "or container, not that `amdsmi`/ROCM_PATH needs adjusting: "
+            "check that `--device=/dev/dri --group-add render` passes "
+            "through and grants access to the AMD device specifically, not "
+            "just any render node."
+        )
+    return None
+
+
 def _log_kfd_diagnostics() -> None:
     """Log a hint about AMD GPU device-node access, if `/dev/kfd` is present.
 
@@ -184,58 +417,9 @@ def _log_kfd_diagnostics() -> None:
     # permission) independently of /dev/kfd. If no such node is usable, fixing
     # `amdsmi`/ROCM_PATH -- the fix for the common case below -- would not help
     # at all.
-    render_nodes = glob.glob("/dev/dri/renderD*")
-    # Vendor is classified before access state, for every node, not just the
-    # accessible ones: `_is_amd_render_node` reads a sysfs file and does not
-    # require the render node itself to be openable. A hybrid host or
-    # container can expose an accessible-but-non-AMD node (e.g. an integrated
-    # Intel GPU's renderD128) alongside an AMD-backed node that fails to open
-    # (permission-denied or ENODEV/EIO); only the AMD node's state is actually
-    # relevant to ROCm GPU discovery. Bucketing by access state first -- and
-    # only checking vendor on nodes that happened to open -- would let that
-    # unrelated node's permission issue win over the AMD node's (possibly
-    # inconclusive) access failure. A node whose vendor cannot be determined
-    # (sysfs missing) is neither confirmed AMD nor confirmed otherwise, so it
-    # gets its own inconclusive branch rather than being folded into either
-    # certainty.
-    amd_accessible_render_nodes = []
-    amd_denied_render_nodes = []
-    amd_inconclusive_render_nodes = []
-    unknown_vendor_accessible_render_nodes = []
-    unknown_vendor_denied_render_nodes = []
-    unknown_vendor_inconclusive_render_nodes = []
-    other_vendor_render_nodes = []
-    for node in render_nodes:
-        is_amd = _is_amd_render_node(node)
-        if is_amd is False:
-            other_vendor_render_nodes.append(node)
-            continue
-        # `_can_open_device` is tri-state: a `None` (inconclusive) result must
-        # not collapse into "not accessible" via plain truthiness, the same
-        # way the `/dev/kfd` branches above distinguish it from a confirmed
-        # `False`. This is probed for an unknown-vendor node (`is_amd is
-        # None`) too, not just a confirmed-AMD one: an unreadable sysfs file
-        # does not imply the node itself fails to open, and a concrete
-        # permission/driver error on a node that might still be AMD-backed is
-        # actionable and must not be hidden behind a generic "vendor
-        # undetermined" message.
-        openable = _can_open_device(node)
-        if is_amd is None:
-            if openable is True:
-                unknown_vendor_accessible_render_nodes.append(node)
-            elif openable is False:
-                unknown_vendor_denied_render_nodes.append(node)
-            else:
-                unknown_vendor_inconclusive_render_nodes.append(node)
-            continue
-        if openable is True:
-            amd_accessible_render_nodes.append(node)
-        elif openable is False:
-            amd_denied_render_nodes.append(node)
-        else:
-            amd_inconclusive_render_nodes.append(node)
+    buckets = _classify_render_nodes(glob.glob("/dev/dri/renderD*"))
 
-    if amd_accessible_render_nodes:
+    if buckets.amd_accessible:
         log(
             WARNING,
             "The ROCm kernel driver is loaded (/dev/kfd exists), so "
@@ -254,271 +438,34 @@ def _log_kfd_diagnostics() -> None:
             "`libamd_smi.so` symlink, rather than only a versioned "
             "`libamd_smi.so.<N>`.",
         )
-    elif (
-        amd_denied_render_nodes
-        and amd_inconclusive_render_nodes
-        and unknown_vendor_accessible_render_nodes
-    ):
-        # All three states can coexist across different render nodes. An
-        # accessible unknown-vendor node means device access already works
-        # for at least one GPU candidate on this host; if it turns out to be
-        # AMD-backed, a missing/unimportable `amdsmi` -- not either failing
-        # node below -- could be the real reason Ray reports zero GPUs, the
-        # same reasoning as the two-way `amd_denied`/`unknown_vendor_accessible`
-        # combo further down. Reporting only the two failing nodes, as the
-        # plain `amd_denied and amd_inconclusive` branch below would, hides
-        # that lead.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd). "
-            "Opening the AMD-backed `/dev/dri/renderD*` node(s) on this host "
-            "failed for two different reasons: (%s) are permission-denied "
-            "(no read/write access -- the current user is likely missing "
-            "from the `render` (and `video`) group that owns these nodes, or "
-            "the container was started without `--device=/dev/dri "
-            "--group-add render --group-add video`), while (%s) failed for a "
-            "reason other than permissions (e.g. a driver-level "
-            "`ENODEV`/`EIO`, or this process running out of file "
-            "descriptors). Separately, another `/dev/dri/renderD*` node (%s) "
-            "opens successfully but this host cannot determine its PCI "
-            "vendor ID (sysfs is missing or unreadable). If that accessible "
-            "node turns out to be AMD-backed (check with `cat "
-            "/sys/class/drm/<node>/device/vendor`, expecting `%s`), device "
-            "access already works for a GPU and a missing or unimportable "
-            "`amdsmi` could still explain Ray reporting zero GPUs -- fixing "
-            "the two failing nodes above is not the only possible fix.",
-            ", ".join(amd_denied_render_nodes),
-            ", ".join(amd_inconclusive_render_nodes),
-            ", ".join(unknown_vendor_accessible_render_nodes),
-            _AMD_PCI_VENDOR_ID,
+        return
+
+    # Below, an accessible unknown-vendor node takes priority over the
+    # lower-confidence fallback buckets (unknown-vendor denied/inconclusive,
+    # other-vendor): device access already works there, so burying it behind
+    # a message about a *different*, less informative node would hide the
+    # fact that the only open question left for it is the vendor, not access.
+    amd_text = _amd_access_message(buckets.amd_denied, buckets.amd_inconclusive)
+    accessible_unknown_text = (
+        _accessible_unknown_vendor_message(
+            buckets.unknown_vendor_accessible, standalone=amd_text is None
         )
-    elif amd_denied_render_nodes and amd_inconclusive_render_nodes:
-        # Neither outcome rules out the other: a permission fix for the
-        # denied node(s) would leave the inconclusive node(s) still failing,
-        # and vice versa -- reporting only one via a plain `elif` would mask
-        # the other and point at an incomplete fix.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
-            "opening the AMD-backed `/dev/dri/renderD*` node(s) on this host "
-            "failed for two different reasons: (%s) are permission-denied "
-            "(no read/write access -- the current user is likely missing "
-            "from the `render` (and `video`) group that owns these nodes, or "
-            "the container was started without `--device=/dev/dri "
-            "--group-add render --group-add video`), while (%s) failed for a "
-            "reason other than permissions (e.g. a driver-level "
-            "`ENODEV`/`EIO`, or this process running out of file "
-            "descriptors). Fixing group membership or container device "
-            "pass-through alone will not necessarily restore GPU discovery: "
-            "it addresses the permission-denied node(s) but not the "
-            "inconclusive one(s), which may need a file-descriptor-limit "
-            "check or a kernel/dmesg inspection instead.",
-            ", ".join(amd_denied_render_nodes),
-            ", ".join(amd_inconclusive_render_nodes),
-        )
-    elif amd_denied_render_nodes and unknown_vendor_accessible_render_nodes:
-        # An accessible unknown-vendor node means device access already works
-        # for at least one GPU candidate on this host. If that node turns out
-        # to be AMD-backed, the plain `amd_denied_render_nodes` branch below --
-        # which claims Ray and the ML framework will both stay at zero GPUs
-        # until permissions are fixed, and that `amdsmi` cannot help -- would
-        # be wrong: a missing/unimportable `amdsmi` could still explain a
-        # zero-GPU report from Ray even though access already works.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd). A "
-            "confirmed AMD-backed `/dev/dri/renderD*` node (%s) is "
-            "permission-denied (no read/write access -- the current user is "
-            "likely missing from the `render` (and `video`) group that owns "
-            "it, or the container was started without `--device=/dev/dri "
-            "--group-add render --group-add video`). Separately, another "
-            "`/dev/dri/renderD*` node (%s) opens successfully but this host "
-            "cannot determine its PCI vendor ID (sysfs is missing or "
-            "unreadable). If that accessible node turns out to be AMD-backed "
-            "(check with `cat /sys/class/drm/<node>/device/vendor`, "
-            "expecting `%s`), device access already works for a GPU and a "
-            "missing or unimportable `amdsmi` could still explain Ray "
-            "reporting zero GPUs -- see the check above. Do not assume fixing "
-            "permissions on the denied node is the only thing needed.",
-            ", ".join(amd_denied_render_nodes),
-            ", ".join(unknown_vendor_accessible_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif amd_inconclusive_render_nodes and unknown_vendor_accessible_render_nodes:
-        # Mirrors the `amd_denied`/`unknown_vendor_accessible` combo above:
-        # the plain `amd_inconclusive_render_nodes` branch below sends the
-        # user to file-descriptor/kernel diagnosis only, which would miss the
-        # real fix if the accessible unknown-vendor node turns out to be
-        # AMD-backed and a missing/unimportable `amdsmi` is what's actually
-        # behind Ray's zero-GPU report.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd). "
-            "Opening a confirmed AMD-backed `/dev/dri/renderD*` node (%s) "
-            "failed for a reason other than permissions (e.g. a "
-            "driver-level `ENODEV`/`EIO`, or this process running out of "
-            "file descriptors). Separately, another `/dev/dri/renderD*` "
-            "node (%s) opens successfully but this host cannot determine "
-            "its PCI vendor ID (sysfs is missing or unreadable). If that "
-            "accessible node turns out to be AMD-backed (check with `cat "
-            "/sys/class/drm/<node>/device/vendor`, expecting `%s`), device "
-            "access already works for a GPU and a missing or unimportable "
-            "`amdsmi` could still explain Ray reporting zero GPUs -- do not "
-            "assume the failing node above is the only lead.",
-            ", ".join(amd_inconclusive_render_nodes),
-            ", ".join(unknown_vendor_accessible_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif amd_denied_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
-            "this process cannot open the AMD-backed `/dev/dri/renderD*` "
-            "node(s) (%s) (no read/write access). This is a permissions "
-            "issue, not a missing or unimportable `amdsmi`: the current user "
-            "is likely missing from the `render` (and `video`) group that "
-            "owns these nodes, or the container was started without "
-            "`--device=/dev/dri --group-add render --group-add video`. Ray "
-            "and the ML framework will both keep reporting zero GPUs until "
-            "device access is fixed; fixing `amdsmi`/ROCM_PATH configuration "
-            "will not help.",
-            ", ".join(amd_denied_render_nodes),
-        )
-    elif amd_inconclusive_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
-            "opening the AMD-backed `/dev/dri/renderD*` node(s) (%s) failed "
-            "for a reason other than a permissions problem (e.g. a "
-            "driver-level `ENODEV`/`EIO`, or this process running out of "
-            "file descriptors). This is inconclusive: it is not the common "
-            "group-membership/container `--device` issue, so adding "
-            "`--device=/dev/dri --group-add render` or adjusting "
-            "`amdsmi`/ROCM_PATH will not necessarily help. Check this "
-            "process's open-file limit and the kernel/dmesg log for driver "
-            "errors on these nodes.",
-            ", ".join(amd_inconclusive_render_nodes),
-        )
-    elif unknown_vendor_accessible_render_nodes:
-        # An accessible unknown-vendor node takes priority over any denied or
-        # inconclusive unknown-vendor nodes found on other render nodes, the
-        # same way `amd_accessible_render_nodes` takes priority above: device
-        # access already works here, so burying this node behind a denied/
-        # inconclusive message for a *different* node would hide the fact
-        # that the only open question left is the vendor, not permissions.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and a `/dev/dri/renderD*` node exists and "
-            "opens successfully (%s), but this host cannot determine "
-            "its PCI vendor ID (sysfs is missing or unreadable, as in "
-            "some restricted containers) -- it is therefore unclear "
-            "whether this node is AMD-backed or an unrelated GPU (e.g. "
-            "an integrated Intel GPU's renderD128) that ROCm cannot "
-            "use. Check the node's vendor manually if possible (`cat "
-            "/sys/class/drm/<node>/device/vendor`, expecting `%s` for "
-            "AMD) before assuming `amdsmi`/ROCM_PATH is the issue -- "
-            "it is not if this node turns out not to be AMD's.",
-            ", ".join(unknown_vendor_accessible_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif (
-        unknown_vendor_denied_render_nodes and unknown_vendor_inconclusive_render_nodes
-    ):
-        # Neither outcome rules out the other, the same way the AMD-confirmed
-        # denied+inconclusive combo above is reported jointly rather than
-        # letting a plain `elif` silently drop one of them.
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and `/dev/dri/renderD*` node(s) exist whose PCI "
-            "vendor ID this host cannot determine (sysfs is missing or "
-            "unreadable, as in some restricted containers) -- it is "
-            "therefore unclear whether any of them is AMD-backed or an "
-            "unrelated GPU (e.g. an integrated Intel GPU's renderD128) "
-            "that ROCm cannot use. Opening them also failed for two "
-            "different reasons: (%s) are permission-denied (no "
-            "read/write access -- the current user is likely missing "
-            "from the `render` (and `video`) group that owns these "
-            "nodes, or the container was started without "
-            "`--device=/dev/dri --group-add render --group-add video`), "
-            "while (%s) failed for a reason other than permissions "
-            "(e.g. a driver-level `ENODEV`/`EIO`, or this process "
-            "running out of file descriptors). Fixing group membership "
-            "or container device pass-through alone will not "
-            "necessarily restore GPU discovery: it addresses the "
-            "permission-denied node(s) but not the inconclusive one(s). "
-            "Check each node's vendor manually if possible (`cat "
-            "/sys/class/drm/<node>/device/vendor`, expecting `%s` for "
-            "AMD) before assuming either fix applies to the AMD device, "
-            "if any.",
-            ", ".join(unknown_vendor_denied_render_nodes),
-            ", ".join(unknown_vendor_inconclusive_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif unknown_vendor_denied_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and a `/dev/dri/renderD*` node exists (%s), "
-            "but this host cannot determine its PCI vendor ID (sysfs "
-            "is missing or unreadable, as in some restricted "
-            "containers) -- it is therefore unclear whether this node "
-            "is AMD-backed or an unrelated GPU (e.g. an integrated "
-            "Intel GPU's renderD128) that ROCm cannot use. Separately, "
-            "this process cannot open it (no read/write access): the "
-            "current user is likely missing from the `render` (and "
-            "`video`) group that owns it, or the container was started "
-            "without `--device=/dev/dri --group-add render --group-add "
-            "video`. Fix that regardless, but also check the node's "
-            "vendor manually if possible (`cat "
-            "/sys/class/drm/<node>/device/vendor`, expecting `%s` for "
-            "AMD): if this node turns out not to be AMD's, fixing its "
-            "access will not help, and the actual AMD node (if any) "
-            "needs to be found instead.",
-            ", ".join(unknown_vendor_denied_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif unknown_vendor_inconclusive_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and a `/dev/dri/renderD*` node exists (%s), "
-            "but this host cannot determine its PCI vendor ID (sysfs "
-            "is missing or unreadable, as in some restricted "
-            "containers) -- it is therefore unclear whether this node "
-            "is AMD-backed or an unrelated GPU (e.g. an integrated "
-            "Intel GPU's renderD128) that ROCm cannot use, and whether "
-            "it can even be opened is undetermined too (e.g. a "
-            "driver-level `ENODEV`/`EIO`, or this process running out "
-            "of file descriptors). Check the node's vendor manually if "
-            "possible (`cat /sys/class/drm/<node>/device/vendor`, "
-            "expecting `%s` for AMD) before assuming `amdsmi`/ROCM_PATH "
-            "is the issue -- it is not if this node turns out not to "
-            "be AMD's.",
-            ", ".join(unknown_vendor_inconclusive_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    elif other_vendor_render_nodes:
-        log(
-            WARNING,
-            "The ROCm kernel driver is loaded and accessible "
-            "(/dev/kfd), and a `/dev/dri/renderD*` node exists (%s), "
-            "but it is not AMD-backed (its PCI vendor ID is not "
-            "`%s`) -- ROCm cannot use it regardless of whether it can "
-            "be opened. This usually means the AMD GPU's own render "
-            "node is missing or permission-denied on this host or "
-            "container, not that `amdsmi`/ROCM_PATH needs adjusting: "
-            "check that `--device=/dev/dri --group-add render` passes "
-            "through and grants access to the AMD device specifically, "
-            "not just any render node.",
-            ", ".join(other_vendor_render_nodes),
-            _AMD_PCI_VENDOR_ID,
-        )
-    else:
-        # Every node found above is classified into exactly one of the seven
-        # buckets handled by the branches above, so this is only reached when
-        # `render_nodes` itself is empty.
+        if buckets.unknown_vendor_accessible
+        else None
+    )
+
+    if amd_text:
+        if accessible_unknown_text:
+            amd_text += " " + accessible_unknown_text
+        log(WARNING, amd_text)
+    elif accessible_unknown_text:
+        log(WARNING, accessible_unknown_text)
+    elif fallback_text := _fallback_message(buckets):
+        log(WARNING, fallback_text)
+    elif not buckets.any_found():
+        # Every node found is classified into exactly one bucket, so an empty
+        # fallback with nothing else populated means `render_nodes` itself
+        # was empty.
         log(
             WARNING,
             "The ROCm kernel driver is loaded and accessible "

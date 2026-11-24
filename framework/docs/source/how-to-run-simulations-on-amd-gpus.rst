@@ -420,11 +420,95 @@ exported, silently leaving Ray's original import failure in place:
                          "exposes cannot be derived from it. Fix" \
                          "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
                 else
-                    _n=${#_rocr_ids[@]}
+                    # A syntactically well-formed, deduplicated entry can
+                    # still name a device that does not exist on this host --
+                    # e.g. ROCR_VISIBLE_DEVICES=7 on a one-GPU host, or a
+                    # well-formed but nonexistent GPU-<hex> UUID. ROCr itself
+                    # exposes zero devices for such an entry, but nothing
+                    # above catches it: it already passed every syntax/mix/
+                    # duplicate check. Trusting ${#_rocr_ids[@]}` regardless
+                    # would still synthesize HIP_VISIBLE_DEVICES=0 below, and
+                    # Ray can size a schedulable GPU slot from that mask and
+                    # the host's physical device count even though ROCr never
+                    # actually exposes anything for the bad entry.
+                    if [ "$_rocr_has_uuid" -eq 1 ]; then
+                        # A GPU-<hex> UUID names one specific physical
+                        # device, but this snippet has no tool-free,
+                        # version-stable way to resolve it back to a host's
+                        # KFD topology (the on-disk `unique_id` encoding is
+                        # not guaranteed stable across ROCm versions), so it
+                        # can neither confirm nor rule out that the UUID
+                        # exists. Leave `_n` unset rather than guessing.
+                        echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                             "names a GPU-<hex> UUID -- this snippet cannot" \
+                             "verify it corresponds to a physical AMD GPU on" \
+                             "this host, so the number of devices it exposes" \
+                             "cannot be safely derived from it. Confirm the" \
+                             "UUID with \`rocm-smi --showuniqueid\` (or" \
+                             "equivalent) before trusting HIP_VISIBLE_DEVICES" \
+                             "below, or switch ROCR_VISIBLE_DEVICES to numeric" \
+                             "ordinals and re-run this snippet." >&2
+                    else
+                        # Numeric ordinals can be checked against the host's
+                        # actual AMD GPU count from KFD topology sysfs -- the
+                        # same kind of sysfs read Flower's own diagnostics use
+                        # to classify render nodes, and no less reliable here
+                        # than trusting the raw entry count.
+                        _phys_n=""
+                        if [ -d /sys/class/kfd/kfd/topology/nodes ]; then
+                            _phys_n=0
+                            for _node_props in \
+                                /sys/class/kfd/kfd/topology/nodes/*/properties; do
+                                [ -r "$_node_props" ] || continue
+                                _gpu_id=$(grep -m1 '^gpu_id ' "$_node_props" |
+                                    awk '{print $2}')
+                                if [ -n "$_gpu_id" ] && [ "$_gpu_id" != "0" ]; then
+                                    _phys_n=$((_phys_n + 1))
+                                fi
+                            done
+                        fi
+                        if [ -z "$_phys_n" ]; then
+                            # Cannot verify at all (e.g. a container without
+                            # KFD topology mounted) -- same "bound unknown"
+                            # treatment as a missing ROCR_VISIBLE_DEVICES.
+                            echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                                 "is syntactically well-formed, but" \
+                                 "/sys/class/kfd/kfd/topology/nodes is missing" \
+                                 "on this host (e.g. a container without KFD" \
+                                 "topology mounted), so its entries cannot be" \
+                                 "confirmed to name real AMD GPUs. The number" \
+                                 "of devices it exposes cannot be safely" \
+                                 "derived from it; verify manually if" \
+                                 "ClientApps see no usable GPU." >&2
+                        else
+                            _bad_ordinal=0
+                            for _trimmed_id in "${_rocr_norm[@]}"; do
+                                if [ "${#_trimmed_id}" -gt "${#_phys_n}" ] ||
+                                    { [ "${#_trimmed_id}" -eq "${#_phys_n}" ] &&
+                                        [ "$_trimmed_id" -ge "$_phys_n" ]; }; then
+                                    _bad_ordinal=1
+                                fi
+                            done
+                            if [ "$_bad_ordinal" -eq 1 ]; then
+                                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                                     "names an ordinal that does not" \
+                                     "correspond to any of the $_phys_n AMD" \
+                                     "GPU(s) this host exposes (per" \
+                                     "/sys/class/kfd/kfd/topology/nodes) --" \
+                                     "the number of devices it exposes cannot" \
+                                     "be derived from it. Fix" \
+                                     "ROCR_VISIBLE_DEVICES itself and re-run" \
+                                     "this snippet." >&2
+                            else
+                                _n=${#_rocr_ids[@]}
+                            fi
+                        fi
+                    fi
                 fi
             fi
             unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
-                _rocr_has_numeric _rocr_has_uuid
+                _rocr_has_numeric _rocr_has_uuid _phys_n _node_props _gpu_id \
+                _bad_ordinal
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
