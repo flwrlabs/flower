@@ -41,6 +41,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -54,8 +55,24 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
-from ..constant import AutomationStatus
+from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
+
+
+def _validate_space_item(
+    item_type: SpaceItemType, content: str, author: SpaceParticipant | None
+) -> None:
+    """Validate an item's type, content, and author before storing."""
+    if not isinstance(item_type, SpaceItemType):
+        raise ValueError("Invalid SpaceItem type")
+    if not content.strip():
+        raise ValueError("SpaceItem content must be nonempty")
+    # Revisit author rules when SendSpaceItem accepts automation items.
+    if item_type == SpaceItemType.MESSAGE:
+        if author is None or not (author.flwr_aid or author.agent_id):
+            raise ValueError("Message items require an author")
+    elif author is not None:
+        raise ValueError("Only message items may have an author")
 
 
 class CoreState(ABC):  # pylint: disable=R0904
@@ -890,6 +907,59 @@ class CoreState(ABC):  # pylint: disable=R0904
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def store_space_item(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        content: str,
+        author: SpaceParticipant | None = None,
+    ) -> SpaceItem | None:
+        """Store an item, or return None if the Space or membership is absent.
+
+        Message items require an author in the Space. Other items have no author.
+        Blank content and invalid type or author combinations raise ValueError.
+        """
+
+    @abstractmethod
+    def get_space_items(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items for a Space participant.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the items.
+        participant : SpaceParticipant
+            User or agent reading the items.
+        limit : int (default: 50)
+            Maximum number of items to return.
+        before_id : int | None (default: None)
+            Exclusive upper item ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower item ID bound; selects the oldest matching page.
+
+        Returns
+        -------
+        Sequence[SpaceItem] | None
+            Items in ascending ID order, selecting the newest page by default.
+            An empty sequence if no items match.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or after_id >= before_id when both
+            bounds are provided.
+        """
 
     @abstractmethod
     def get_space_messages(  # pylint: disable=too-many-arguments
