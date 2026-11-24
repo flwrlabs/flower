@@ -185,6 +185,7 @@ class AgentSpace(ABC):
         through the newest returned message, including history reads.
         """
 
+    @abstractmethod
     def get_items(
         self,
         *,
@@ -218,8 +219,8 @@ class AgentSpace(ABC):
         Reads select the newest page by default and advance the item cursor
         through the newest returned ID.
         """
-        raise NotImplementedError("This AgentSpace does not support SpaceItems.")
 
+    @abstractmethod
     def send_item(self, content: str) -> JSONObject:
         """Publish a message item and return its server-assigned fields.
 
@@ -237,7 +238,6 @@ class AgentSpace(ABC):
         -----
         Only message items can be sent through the current Runtime endpoint.
         """
-        raise NotImplementedError("This AgentSpace does not support SpaceItems.")
 
     @abstractmethod
     def tools(self) -> list[JSONObject]:
