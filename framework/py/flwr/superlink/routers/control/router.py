@@ -42,6 +42,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -213,6 +215,16 @@ def update_agent(
 ) -> UpdateAgentResponse:
     """Replace an owned agent's configuration using its current version."""
     return control_handlers.update_agent(request, account, linkstate)
+
+
+@router.post("/delete-agent")
+def delete_agent(
+    request: Annotated[DeleteAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DeleteAgentResponse:
+    """Delete an agent owned by the authenticated account."""
+    return control_handlers.delete_agent(request, account, linkstate)
 
 
 @router.post("/list-agents")

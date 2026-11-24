@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     CreateAgentRequest,
     CreateAgentResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     Event,
@@ -486,8 +488,8 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None:
-    """Create, update, and list owned agents through authenticated protobuf HTTP."""
+def test_agent_routes_create_update_list_and_delete_owned_agents(database: str) -> None:
+    """Create, update, list, and idempotently delete only owned agents."""
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
@@ -497,7 +499,8 @@ def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None
         avatar="robot",
         color="sky",
     )
-    assert state.create_agent(flwr_aid="other-account", config=config) is not None
+    other = state.create_agent(flwr_aid="other-account", config=config)
+    assert other is not None
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     client = TestClient(app)
@@ -546,6 +549,29 @@ def test_agent_routes_create_update_and_list_owned_agents(database: str) -> None
     )
     assert response.status_code == 200
     assert ListAgentsResponse.FromString(response.content).agents == [updated]
+
+    for agent_id, expected_status in (
+        (0, 404),
+        (other.id, 404),
+        (agent.id + 1, 404),
+        (agent.id, 200),
+        (agent.id, 200),
+    ):
+        response = client.post(
+            "/v1/control/delete-agent",
+            content=DeleteAgentRequest(agent_id=agent_id).SerializeToString(),
+            headers=headers,
+        )
+        assert response.status_code == expected_status
+        if expected_status == 200:
+            assert (
+                DeleteAgentResponse.FromString(response.content)
+                == DeleteAgentResponse()
+            )
+        else:
+            assert response.json()["code"] == ApiErrorCode.AGENT_NOT_FOUND
+    assert not state.list_agents(_ACCOUNT.user_id)
+    assert state.get_agent("other-account", other.id) == other
 
 
 @pytest.mark.parametrize(
@@ -784,6 +810,7 @@ def test_connector_route_returns_existing_structured_error() -> None:
     [
         ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
         ("/v1/control/update-agent", UpdateAgentRequest(), "update_agent"),
+        ("/v1/control/delete-agent", DeleteAgentRequest(agent_id=1), "delete_agent"),
         ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",
