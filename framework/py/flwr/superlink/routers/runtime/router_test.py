@@ -55,6 +55,7 @@ from flwr.supercore.protobuf.translation import (
     ProtobufTranslationMiddleware,
 )
 from flwr.supercore.routers.runtime import router
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.superlink.servicer.runtime import runtime_handlers
 
 _SUPEREXEC_PATHS = {
@@ -241,7 +242,7 @@ def test_get_compacted_contexts_delegates_with_authenticated_task(
     request = GetCompactedContextsRequest()
     expected = GetCompactedContextsResponse()
     handler = Mock(return_value=expected)
-    monkeypatch.setattr(runtime_handlers, "get_compacted_contexts", handler)
+    monkeypatch.setattr(core_runtime_handlers, "get_compacted_contexts", handler)
 
     response = _post(client, "/v1/runtime/get-compacted-contexts", request)
 
@@ -261,7 +262,7 @@ def test_put_compacted_context_delegates_with_authenticated_task(
         context=CompactedContext(through_event_id=9, text="Summary")
     )
     handler = Mock(return_value=PutCompactedContextResponse())
-    monkeypatch.setattr(runtime_handlers, "put_compacted_context", handler)
+    monkeypatch.setattr(core_runtime_handlers, "put_compacted_context", handler)
 
     response = _post(client, "/v1/runtime/put-compacted-context", request)
 

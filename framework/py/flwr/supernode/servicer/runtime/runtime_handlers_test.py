@@ -54,6 +54,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.run import Run
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 
 from . import runtime_handlers
 
@@ -76,7 +77,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.state.get_compacted_contexts.return_value = []
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
-        runtime_handlers.get_compacted_contexts(
+        core_runtime_handlers.get_compacted_contexts(
             GetCompactedContextsRequest(), self.state, task
         )
 
@@ -97,7 +98,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             )
         )
 
-        runtime_handlers.put_compacted_context(
+        core_runtime_handlers.put_compacted_context(
             request,
             self.state,
             Task(task_id=1, run_id=123, type=TaskType.AGENT_APP),
@@ -115,7 +116,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_compacted_contexts(
+            core_runtime_handlers.get_compacted_contexts(
                 GetCompactedContextsRequest(), self.state, task
             )
         self.assertEqual(
@@ -123,7 +124,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
 
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.put_compacted_context(
+            core_runtime_handlers.put_compacted_context(
                 PutCompactedContextRequest(), self.state, task
             )
         self.assertEqual(

@@ -44,18 +44,12 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
-    GetCompactedContextsRequest,
-    GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    GetSpaceEventsRequest,
-    GetSpaceEventsResponse,
     ListAgentConnectorsRequest,
     ListAgentConnectorsResponse,
     PullAppMessagesRequest,
@@ -66,18 +60,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-    PutCompactedContextRequest,
-    PutCompactedContextResponse,
-)
-from flwr.proto.space_pb2 import (  # pylint: disable=E0611
-    GetSpaceItemsRequest,
-    GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
-    SendSpaceItemRequest,
-    SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -87,7 +69,6 @@ from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
-from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.json_utils import connector_display_name
@@ -100,6 +81,13 @@ from flwr.superlink.servicer.control.control_handlers import (
 from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
+
+get_space_events = core_runtime_handlers.get_space_events
+get_space_messages = core_runtime_handlers.get_space_messages
+get_space_items = core_runtime_handlers.get_space_items
+send_space_message = core_runtime_handlers.send_space_message
+send_space_item = core_runtime_handlers.send_space_item
+create_task = core_runtime_handlers.create_task
 
 
 def get_run_series_events(
@@ -127,102 +115,6 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
-
-
-def get_space_events(
-    request: GetSpaceEventsRequest,
-    state: LinkState,
-    task: Task,
-) -> GetSpaceEventsResponse:
-    """Get events from the authenticated task's Space."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    space_id = runs[0].space_id
-    if space_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "This endpoint is only available to Space tasks.",
-        )
-    return core_runtime_handlers.get_space_events(request, state, space_id)
-
-
-def _get_task_run(state: LinkState, task: Task) -> Run:
-    """Resolve the authenticated task's Run."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    return runs[0]
-
-
-def get_space_messages(
-    request: GetSpaceMessagesRequest, state: LinkState, task: Task
-) -> GetSpaceMessagesResponse:
-    """Read messages within the authenticated task's Space grant."""
-    return core_runtime_handlers.get_space_messages(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def get_space_items(
-    request: GetSpaceItemsRequest, state: LinkState, task: Task
-) -> GetSpaceItemsResponse:
-    """Read items within the authenticated task's Space grant."""
-    return core_runtime_handlers.get_space_items(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def send_space_message(
-    request: SendSpaceMessageRequest, state: LinkState, task: Task
-) -> SendSpaceMessageResponse:
-    """Publish with the primary AgentApp's server-bound agent identity."""
-    return core_runtime_handlers.send_space_message(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def send_space_item(
-    request: SendSpaceItemRequest, state: LinkState, task: Task
-) -> SendSpaceItemResponse:
-    """Publish a message item with the server-bound agent identity."""
-    return core_runtime_handlers.send_space_item(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: LinkState, task: Task
-) -> GetCompactedContextsResponse:
-    """Get summaries for the agent."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
-    return core_runtime_handlers.get_compacted_contexts(
-        request, state, participant.agent_id
-    )
-
-
-def put_compacted_context(
-    request: PutCompactedContextRequest, state: LinkState, task: Task
-) -> PutCompactedContextResponse:
-    """Store a summary for the agent."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
-    return core_runtime_handlers.put_compacted_context(
-        request, state, participant.agent_id
-    )
-
-
-def _get_agent_id(state: LinkState, task: Task) -> int:
-    """Resolve the authenticated task's agent ID for file scoping."""
-    runs = state.get_run(run_ids=[task.run_id])
-    return core_runtime_handlers.require_agent_id(
-        runs[0] if runs else None, task.run_id
-    )
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
@@ -338,21 +230,11 @@ def pull_messages(  # pylint: disable=R0914
     )
 
 
-def create_task(
-    request: CreateTaskRequest, state: LinkState, task: Task
-) -> CreateTaskResponse:
-    """Create a child task using the authenticated task's Run."""
-    return core_runtime_handlers.create_task(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
 def list_agent_connectors(
     request: ListAgentConnectorsRequest, state: LinkState, task: Task
 ) -> ListAgentConnectorsResponse:
     """Return connection metadata for the primary Space AgentApp."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    _, participant = core_runtime_handlers.authenticate_space_agent(state, task)
     connectors = []
     for connector in state.get_agent_connectors(participant.agent_id):
         flow = connector_registry.OAUTH_FLOWS.get(connector.connector_ref)

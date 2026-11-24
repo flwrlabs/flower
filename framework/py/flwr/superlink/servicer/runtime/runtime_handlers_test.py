@@ -459,7 +459,9 @@ def test_get_compacted_contexts_uses_authenticated_agent() -> None:
     state.get_compacted_contexts.return_value = []
     task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
-    runtime_handlers.get_compacted_contexts(GetCompactedContextsRequest(), state, task)
+    core_runtime_handlers.get_compacted_contexts(
+        GetCompactedContextsRequest(), state, task
+    )
 
     state.get_compacted_contexts.assert_called_once_with(
         789, limit=1, before_context_id=None
@@ -476,7 +478,7 @@ def test_put_compacted_context_uses_authenticated_agent() -> None:
         context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
     )
 
-    runtime_handlers.put_compacted_context(
+    core_runtime_handlers.put_compacted_context(
         request, state, Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
     )
 
@@ -497,11 +499,11 @@ def test_compacted_contexts_require_primary_agent(
 
     with pytest.raises(FlowerError) as error:
         if operation == "get":
-            runtime_handlers.get_compacted_contexts(
+            core_runtime_handlers.get_compacted_contexts(
                 GetCompactedContextsRequest(), state, task
             )
         else:
-            runtime_handlers.put_compacted_context(
+            core_runtime_handlers.put_compacted_context(
                 PutCompactedContextRequest(), state, task
             )
 
