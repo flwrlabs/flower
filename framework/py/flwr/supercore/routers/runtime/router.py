@@ -274,11 +274,10 @@ def get_run_series_events(
 def get_space_events(
     request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    return handlers.get_space_events(request, state, task)
+    return core_runtime_handlers.get_space_events(request, state, task)
 
 
 @router.post("/get-space-messages")

@@ -409,7 +409,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
         event_types=["message"],
     )
 
-    response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
+    response = core_runtime_handlers.get_space_events(request, state, Task(run_id=123))
 
     assert response == GetSpaceEventsResponse(events=[expected_event])
     state.get_run.assert_called_once_with(run_ids=[123])
@@ -428,7 +428,7 @@ def test_get_space_events_rejects_non_space_run() -> None:
     state.get_run.return_value = [Mock(space_id=None)]
 
     with pytest.raises(FlowerError) as error:
-        runtime_handlers.get_space_events(
+        core_runtime_handlers.get_space_events(
             GetSpaceEventsRequest(), state, Task(run_id=123)
         )
 
@@ -442,7 +442,7 @@ def test_get_space_events_rejects_unknown_run() -> None:
     state.get_run.return_value = []
 
     with pytest.raises(FlowerError) as error:
-        runtime_handlers.get_space_events(
+        core_runtime_handlers.get_space_events(
             GetSpaceEventsRequest(), state, Task(run_id=123)
         )
 

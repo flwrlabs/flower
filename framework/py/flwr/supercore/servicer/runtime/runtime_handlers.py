@@ -83,13 +83,12 @@ from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
-def get_task_run(state: CoreState, task: Task, *, on_supernode: bool = False) -> Run:
+def get_task_run(state: CoreState, task: Task) -> Run:
     """Resolve the authenticated task's Run."""
     runs = state.get_run(run_ids=[task.run_id])
     if not runs:
-        location = " in NodeState" if on_supernode else ""
         raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found{location}."
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
         )
     return runs[0]
 
@@ -98,11 +97,9 @@ def get_space_events(
     request: GetSpaceEventsRequest,
     state: CoreState,
     task: Task,
-    *,
-    on_supernode: bool = False,
 ) -> GetSpaceEventsResponse:
     """Get locally stored events for a Space."""
-    space_id = get_task_run(state, task, on_supernode=on_supernode).space_id
+    space_id = get_task_run(state, task).space_id
     if space_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
@@ -317,23 +314,9 @@ def create_task(
     request: CreateTaskRequest,
     state: CoreState,
     task: Task,
-    *,
-    on_supernode: bool = False,
 ) -> CreateTaskResponse:
     """Validate and create a child task within the authenticated Run."""
-    run = get_task_run(state, task, on_supernode=on_supernode)
-    if (
-        on_supernode
-        and request.type == TaskType.CONNECTOR
-        and (
-            request.HasField("connector_id")
-            or not connector_registry.has_builtin_connector(request.connector_ref)
-        )
-    ):
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-            "Stored connections are only available on SuperLink.",
-        )
+    run = get_task_run(state, task)
     log(DEBUG, "Runtime.CreateTask")
     _validate_create_task_request(request, task)
     connector_ref = request.connector_ref or None

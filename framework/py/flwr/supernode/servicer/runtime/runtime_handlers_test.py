@@ -440,7 +440,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             after_event_id=5, last_n=1, event_types=["message"]
         )
 
-        response = runtime_handlers.get_space_events(
+        response = core_runtime_handlers.get_space_events(
             request, self.state, Task(run_id=10)
         )
 
@@ -458,7 +458,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """A federation task cannot read Space events."""
         self.state.get_run.return_value = [Run.create_empty(run_id=10)]
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_space_events(
+            core_runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
             )
 
@@ -471,7 +471,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """An unknown authenticated run cannot read Space events."""
         self.state.get_run.return_value = []
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_space_events(
+            core_runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
             )
 

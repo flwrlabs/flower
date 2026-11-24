@@ -82,7 +82,6 @@ from flwr.superlink.servicer.control.control_handlers import (
     start_automation as start_control_automation,
 )
 
-get_space_events = core_runtime_handlers.get_space_events
 get_space_messages = core_runtime_handlers.get_space_messages
 get_space_items = core_runtime_handlers.get_space_items
 send_space_message = core_runtime_handlers.send_space_message

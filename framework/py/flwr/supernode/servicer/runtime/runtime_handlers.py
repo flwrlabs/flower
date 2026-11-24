@@ -49,8 +49,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    GetSpaceEventsRequest,
-    GetSpaceEventsResponse,
     ListAgentConnectorsRequest,
     ListAgentConnectorsResponse,
     PullAppMessagesRequest,
@@ -78,6 +76,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
+from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supernode.nodestate import NodeState
 
 
@@ -97,7 +96,7 @@ def pull_task_input(
     run_id = task.run_id
 
     # Retrieve run, context, and FAB for this run
-    run = core_runtime_handlers.get_task_run(state, task, on_supernode=True)
+    run = core_runtime_handlers.get_task_run(state, task)
     series_context = state.get_run_series_context(run.series_id)
     if series_context is None:
         raise FlowerError(
@@ -272,7 +271,7 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get locally available AgentApp events from the authenticated run series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
-    run = core_runtime_handlers.get_task_run(state, task, on_supernode=True)
+    run = core_runtime_handlers.get_task_run(state, task)
     agent_task_ids = []
     for candidate in state.get_tasks():
         if candidate.type != TaskType.AGENT_APP:
@@ -293,17 +292,6 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
-
-
-def get_space_events(
-    request: GetSpaceEventsRequest,
-    state: NodeState,
-    task: Task,
-) -> GetSpaceEventsResponse:
-    """Get locally available events from the authenticated task's Space."""
-    return core_runtime_handlers.get_space_events(
-        request, state, task, on_supernode=True
-    )
 
 
 def get_space_messages(
@@ -363,7 +351,17 @@ def create_task(
     request: CreateTaskRequest, state: NodeState, task: Task
 ) -> CreateTaskResponse:
     """Create a child task without access to stored connector credentials."""
-    return core_runtime_handlers.create_task(request, state, task, on_supernode=True)
+    if request.type == TaskType.CONNECTOR and (
+        request.HasField("connector_id")
+        or not connector_registry.has_builtin_connector(request.connector_ref)
+    ):
+        # Report a missing Run before rejecting the connector.
+        core_runtime_handlers.get_task_run(state, task)
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
+            "Stored connections are only available on SuperLink.",
+        )
+    return core_runtime_handlers.create_task(request, state, task)
 
 
 def list_agent_connectors(

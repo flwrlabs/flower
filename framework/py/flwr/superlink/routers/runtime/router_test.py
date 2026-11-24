@@ -221,7 +221,7 @@ def test_get_space_events_delegates_with_authenticated_task(
     task = Task(task_id=123)
     expected = GetSpaceEventsResponse()
     handler = Mock(return_value=expected)
-    monkeypatch.setattr(runtime_handlers, "get_space_events", handler)
+    monkeypatch.setattr(core_runtime_handlers, "get_space_events", handler)
     client = TestClient(_create_app(state, task=task))
     request = GetSpaceEventsRequest()
 
