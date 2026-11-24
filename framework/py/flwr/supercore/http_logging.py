@@ -47,7 +47,7 @@ ROUTINE_ACCESS_PATHS = frozenset(
         "/v1/runtime/push-task-message",
         "/v1/runtime/put-file",
         "/v1/runtime/record-task-usage",
-        "/v1/runtime/send-space-items",
+        "/v1/runtime/send-space-item",
         "/v1/runtime/send-task-heartbeat",
         "/v1/runtime/pull-messages",
         "/v1/runtime/pull-object",

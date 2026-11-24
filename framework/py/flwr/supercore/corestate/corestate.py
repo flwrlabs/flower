@@ -339,6 +339,46 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Replace configuration and publish a new snapshot atomically.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            Agent to update.
+        expected_config_version : int
+            Current configuration version, which must match to accept the update.
+        config : AgentConfig
+            Complete replacement configuration with a nonempty name and the
+            agent's existing app_spec. Absent or empty title and description clear
+            their presence; empty avatar and color reset them.
+
+        Returns
+        -------
+        Agent | None
+            Updated agent, or None if the agent is absent or belongs to another
+            account. Each accepted update creates a new immutable snapshot,
+            increments config_version, updates updated_at, and emits agent.updated.
+
+        Raises
+        ------
+        ValueError
+            If the name is blank or app_spec differs from the agent's existing
+            value.
+        FlowerError
+            With code ``ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT`` if the owned
+            agent's current version differs from expected_config_version.
+        """
+
+    @abstractmethod
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
         """Return an agent owned by the account, or None if it does not exist."""
 

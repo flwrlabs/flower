@@ -37,7 +37,7 @@ _UNARY_UNARY_ENDPOINTS = (
     "get-space-messages",
     "get-space-items",
     "send-space-message",
-    "send-space-items",
+    "send-space-item",
     "get-run-series",
     "update-run-series-description",
     "list-run-series-events",

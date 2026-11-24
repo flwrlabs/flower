@@ -79,12 +79,13 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
     GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
-    SendSpaceItemsRequest,
-    SendSpaceItemsResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceItem,
@@ -97,7 +98,11 @@ from flwr.supercore.auth.typing import (
     AccountAuthLoginDetails,
     AuthenticatedUser,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION_ID,
+    DeviceAuthorizationError,
+)
 from flwr.supercore.error import ApiErrorCode, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
@@ -203,7 +208,7 @@ def test_space_routes(
     "endpoint,payload",
     [
         ("get-space-items", GetSpaceItemsRequest()),
-        ("send-space-items", SendSpaceItemsRequest(contents=["Hello", "Again"])),
+        ("send-space-item", SendSpaceItemRequest(content="Hello")),
     ],
 )
 def test_space_item_endpoints_not_available(
@@ -218,24 +223,29 @@ def test_space_item_endpoints_not_available(
     assert response.json()["code"] == ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE
 
 
-def test_send_space_items_batch_wire_format() -> None:
-    """Preserve multiple message contents and created items on the wire."""
-    request = SendSpaceItemsRequest(contents=["First", "Second"])
-    response = SendSpaceItemsResponse(
+def test_send_space_item_wire_format() -> None:
+    """Preserve one message content and created item on the wire."""
+    request = SendSpaceItemRequest(content="First")
+    response = SendSpaceItemResponse(item=SpaceItem(content="First"))
+
+    assert (
+        SendSpaceItemRequest.FromString(request.SerializeToString()).content == "First"
+    )
+    assert (
+        SendSpaceItemResponse.FromString(response.SerializeToString()).item.content
+        == "First"
+    )
+
+
+def test_get_space_items_response_keeps_multiple_items() -> None:
+    """Keep batch reads while changing the send contract to one item."""
+    response = GetSpaceItemsResponse(
         items=[SpaceItem(content="First"), SpaceItem(content="Second")]
     )
 
-    assert list(
-        SendSpaceItemsRequest.FromString(request.SerializeToString()).contents
-    ) == [
-        "First",
-        "Second",
-    ]
     assert [
         item.content
-        for item in SendSpaceItemsResponse.FromString(
-            response.SerializeToString()
-        ).items
+        for item in GetSpaceItemsResponse.FromString(response.SerializeToString()).items
     ] == ["First", "Second"]
 
 
@@ -775,44 +785,33 @@ def test_get_login_details_does_not_require_bearer_authentication(
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
 
 
-def test_get_auth_tokens_preserves_polling_semantics() -> None:
-    """Return an empty response while pending and tokens after authorization."""
+@pytest.mark.parametrize(
+    "result",
+    [None, *DeviceAuthorizationError, AccountAuthCredentials("access", "refresh")],
+)
+def test_get_auth_tokens_preserves_polling_semantics(
+    result: AccountAuthCredentials | DeviceAuthorizationError | None,
+) -> None:
+    """Relay plugin outcomes and preserve the legacy empty pending response."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.get_auth_tokens.side_effect = [
-        None,
-        AccountAuthCredentials(
-            access_token="access-token",
-            refresh_token="refresh-token",
-        ),
-    ]
-    client = TestClient(_create_app(authn_plugin))
-    request = GetAuthTokensRequest(device_code="device-code")
-
-    pending_response = client.post(
+    authn_plugin.get_auth_tokens.return_value = result
+    response = TestClient(_create_app(authn_plugin)).post(
         "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-    completed_response = client.post(
-        "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
+        content=GetAuthTokensRequest(device_code="device-code").SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
 
-    assert pending_response.status_code == 200
-    assert pending_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(pending_response.content) == (
-        GetAuthTokensResponse()
-    )
-    assert completed_response.status_code == 200
-    assert completed_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(completed_response.content) == (
-        GetAuthTokensResponse(
-            access_token="access-token",
-            refresh_token="refresh-token",
+    expected = GetAuthTokensResponse()
+    if isinstance(result, AccountAuthCredentials):
+        expected.access_token, expected.refresh_token = (
+            result.access_token,
+            result.refresh_token,
         )
-    )
+    elif isinstance(result, DeviceAuthorizationError):
+        expected.error = result.value
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert GetAuthTokensResponse.FromString(response.content) == expected
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
 
 
