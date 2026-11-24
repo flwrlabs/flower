@@ -41,8 +41,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
@@ -60,23 +58,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.space_pb2 import (  # pylint: disable=E0611
-    GetSpaceItemsRequest,
-    GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
-    SendSpaceItemRequest,
-    SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
-)
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
 from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supernode.nodestate import NodeState
 
 
@@ -294,46 +281,6 @@ def get_run_series_events(
     return GetRunSeriesEventsResponse(events=events)
 
 
-def get_space_messages(
-    request: GetSpaceMessagesRequest, state: NodeState, task: Task
-) -> GetSpaceMessagesResponse:
-    """Reject Space message reads on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space messages are only available on SuperLink.",
-    )
-
-
-def get_space_items(
-    request: GetSpaceItemsRequest, state: NodeState, task: Task
-) -> GetSpaceItemsResponse:
-    """Reject Space item reads on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space items are only available on SuperLink.",
-    )
-
-
-def send_space_message(
-    request: SendSpaceMessageRequest, state: NodeState, task: Task
-) -> SendSpaceMessageResponse:
-    """Reject Space message publication on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space messages are only available on SuperLink.",
-    )
-
-
-def send_space_item(
-    request: SendSpaceItemRequest, state: NodeState, task: Task
-) -> SendSpaceItemResponse:
-    """Reject Space item publication on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space items are only available on SuperLink.",
-    )
-
-
 def start_automation(
     request: StartAutomationRequest,
     state: NodeState,
@@ -345,23 +292,6 @@ def start_automation(
         ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         "Only AgentApp and ServerApp tasks can create automations.",
     )
-
-
-def create_task(
-    request: CreateTaskRequest, state: NodeState, task: Task
-) -> CreateTaskResponse:
-    """Create a child task without access to stored connector credentials."""
-    if request.type == TaskType.CONNECTOR and (
-        request.HasField("connector_id")
-        or not connector_registry.has_builtin_connector(request.connector_ref)
-    ):
-        # Report a missing Run before rejecting the connector.
-        core_runtime_handlers.get_task_run(state, task)
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-            "Stored connections are only available on SuperLink.",
-        )
-    return core_runtime_handlers.create_task(request, state, task)
 
 
 def list_agent_connectors(

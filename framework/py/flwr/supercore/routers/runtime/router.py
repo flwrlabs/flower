@@ -221,11 +221,10 @@ def confirm_message_received(
 def create_task(
     request: Annotated[CreateTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> CreateTaskResponse:
     """Create a task."""
-    return handlers.create_task(request, state, task)
+    return core_runtime_handlers.create_task(request, state, task)
 
 
 @router.post("/start-automation")
@@ -284,44 +283,40 @@ def get_space_events(
 def runtime_get_space_messages(
     request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceMessagesResponse:
     """Read messages from the authenticated task's Space."""
-    return handlers.get_space_messages(request, state, task)
+    return core_runtime_handlers.get_space_messages(request, state, task)
 
 
 @router.post("/get-space-items")
 def runtime_get_space_items(
     request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceItemsResponse:
     """Read items from the authenticated task's Space."""
-    return handlers.get_space_items(request, state, task)
+    return core_runtime_handlers.get_space_items(request, state, task)
 
 
 @router.post("/send-space-message")
 def runtime_send_space_message(
     request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> SendSpaceMessageResponse:
     """Publish a message to the authenticated task's Space."""
-    return handlers.send_space_message(request, state, task)
+    return core_runtime_handlers.send_space_message(request, state, task)
 
 
 @router.post("/send-space-item")
 def runtime_send_space_item(
     request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> SendSpaceItemResponse:
     """Publish a message item to the task's Space."""
-    return handlers.send_space_item(request, state, task)
+    return core_runtime_handlers.send_space_item(request, state, task)
 
 
 @router.post("/get-compacted-contexts")

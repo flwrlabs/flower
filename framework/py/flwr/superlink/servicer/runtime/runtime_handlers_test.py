@@ -843,7 +843,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
-        response = runtime_handlers.create_task(
+        response = core_runtime_handlers.create_task(
             CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
             self.state,
             self._auth_task,
