@@ -42,7 +42,6 @@ from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
 from sqlalchemy.dialects.sqlite import Insert as SQLiteInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.elements import ColumnElement
 
 from flwr.app import Context, Message, RecordDict
 from flwr.app.message import make_message
@@ -1618,38 +1617,25 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if author is not None and not (author.flwr_aid or author.agent_id):
             raise ValueError("SpaceItem author must have an identity")
 
-        if author is None:
-            source_table = SpaceModel.__table__
-            source_space_id: ColumnElement[Any] = source_table.c.id
-            source_flwr_aid: ColumnElement[Any] = literal(None)
-            source_agent_id: ColumnElement[Any] = literal(None)
-            source_conditions: tuple[ColumnElement[bool], ...] = (
-                SpaceModel.id == space_id,
+        flwr_aid = (author.flwr_aid or None) if author is not None else None
+        agent_id = (author.agent_id or None) if author is not None else None
+        source = select(
+            SpaceModel.id,
+            literal(item_type.value),
+            literal(flwr_aid),
+            literal(agent_id),
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(SpaceModel.id == space_id)
+        if author is not None:
+            field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+            source = source.where(
+                exists().where(
+                    SpaceParticipantTable.c.space_id == SpaceModel.id,
+                    SpaceParticipantTable.c[field]
+                    == (author.flwr_aid or author.agent_id),
+                )
             )
-        else:
-            source_table = SpaceParticipantTable
-            source_space_id = SpaceParticipantTable.c.space_id
-            source_flwr_aid = SpaceParticipantTable.c.flwr_aid
-            source_agent_id = SpaceParticipantTable.c.agent_id
-            source_conditions = (
-                SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c[
-                    "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
-                ]
-                == (author.flwr_aid or author.agent_id),
-            )
-        source = (
-            select(
-                source_space_id,
-                literal(item_type.value),
-                source_flwr_aid,
-                source_agent_id,
-                literal(now(), type_=UTCDateTime()),
-                literal(content),
-            )
-            .select_from(source_table)
-            .where(*source_conditions)
-        )
         try:
             with self.session() as session:
                 model = session.scalars(
