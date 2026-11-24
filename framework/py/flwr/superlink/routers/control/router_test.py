@@ -106,6 +106,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
+    SpaceItemType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -186,7 +187,6 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
-    space.latest_user_message = message.content
     listed = client.post(
         "/v1/control/list-spaces",
         content=ListSpacesRequest().SerializeToString(),
@@ -1556,8 +1556,11 @@ def test_bootstrap_uses_authenticated_account(
     state.create_agent(_ACCOUNT.user_id, config)
     state.create_agent("other-account", config)
     space = state.get_spaces(_ACCOUNT.user_id)[0]
-    state.create_space_message(
-        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.user_id), "Latest prompt"
+    state.store_space_item(
+        UUID(space.id),
+        SpaceItemType.MESSAGE,
+        "Latest prompt",
+        SpaceParticipant(flwr_aid=_ACCOUNT.user_id),
     )
     response = client.post(
         "/v1/control/bootstrap",
@@ -1569,7 +1572,7 @@ def test_bootstrap_uses_authenticated_account(
     assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
     assert snapshot.spaces[0].latest_user_message == "Latest prompt"
-    assert snapshot.cursor == 3
+    assert snapshot.cursor == 2
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
