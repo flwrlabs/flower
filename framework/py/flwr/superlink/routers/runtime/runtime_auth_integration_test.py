@@ -340,23 +340,25 @@ def test_space_item_endpoints_use_authenticated_run(
     response = _post(
         client,
         "get-space-items",
-        GetSpaceItemsRequest(space_id="ignored", after_id=items[0].id),
+        GetSpaceItemsRequest(unread_only=True, limit=1),
         token=token,
     )
     assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    response = _post(
+        client, "get-space-items", GetSpaceItemsRequest(unread_only=True), token=token
+    )
+    assert response.status_code == 200
     assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    response = _post(
+        client, "get-space-items", GetSpaceItemsRequest(unread_only=True), token=token
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == []
     assert (
         state.get_space_messages(UUID(space_id), SpaceParticipant(agent_id=agent_id))
         == []
     )
-    response = _post(
-        client,
-        "get-space-items",
-        GetSpaceItemsRequest(unread_only=True),
-        token=token,
-    )
-    assert response.status_code == 400
-    assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
     for path, request in (
         ("get-space-items", GetSpaceItemsRequest(limit=0)),
         ("get-space-items", GetSpaceItemsRequest(limit=101)),

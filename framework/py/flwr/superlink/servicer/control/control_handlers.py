@@ -1548,8 +1548,6 @@ def get_space_items(
     request: GetSpaceItemsRequest, account: AuthenticatedUser, state: LinkState
 ) -> GetSpaceItemsResponse:
     """Read a participating user's Space items with an exclusive ID cursor."""
-    if request.unread_only:
-        raise InvalidSpaceRequestError("Unread SpaceItems are not supported yet.")
     limit = request.limit if request.HasField("limit") else 50
     if limit > MAX_SPACE_PAGE_SIZE:
         raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
@@ -1559,6 +1557,7 @@ def get_space_items(
             SpaceParticipant(flwr_aid=account.user_id),
             limit=limit,
             before_id=request.before_id if request.HasField("before_id") else None,
+            unread_only=request.unread_only,
         )
     except ValueError as exc:
         raise InvalidSpaceRequestError(str(exc)) from exc
