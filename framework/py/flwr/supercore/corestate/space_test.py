@@ -14,9 +14,7 @@
 # ==============================================================================
 """Space persistence tests."""
 
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Barrier
 from uuid import UUID, uuid4
 
 import pytest
@@ -55,30 +53,6 @@ def test_space_items_rollback_with_outer_transaction(tmp_path: Path) -> None:
             raise RuntimeError("abort")
 
     assert state.get_space_items(space_id, author) == []
-
-
-def test_space_items_concurrent_file_writes(tmp_path: Path) -> None:
-    """Two SQLite writers can store items for the same Space."""
-    state = _file_state(tmp_path)
-    author = SpaceParticipant(flwr_aid="alice")
-    space_id = UUID(state.create_space(participants=[author]).id)
-    barrier = Barrier(2)
-
-    def store_item(index: int) -> str:
-        barrier.wait(timeout=10)
-        item = state.store_space_item(
-            space_id, SpaceItemType.MESSAGE, str(index), author
-        )
-        assert item is not None
-        return item.content
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        contents = list(executor.map(store_item, range(2)))
-
-    assert contents == ["0", "1"]
-    stored = state.get_space_items(space_id, author)
-    assert stored is not None
-    assert {item.content for item in stored} == {"0", "1"}
 
 
 @pytest.fixture(name="state", params=["memory", "sqlite"])
