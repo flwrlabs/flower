@@ -84,7 +84,7 @@ from flwr.supercore.fab import Fab
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, _validate_space_item_batch
+from .corestate import CoreState, _validate_space_item
 from .utils import (
     generate_rand_int_from_bytes,
     validate_event_cursor,
@@ -1283,16 +1283,16 @@ class InMemoryCoreState(
             self.space_message_store[space_id].append(message)
             return message
 
-    def store_space_items(
+    def store_space_item(
         self,
         space_id: UUID,
         item_type: SpaceItemType,
-        contents: Sequence[str],
+        content: str,
         author: SpaceParticipant | None = None,
-    ) -> Sequence[SpaceItem] | None:
-        """Store a batch of typed items in a Space."""
-        _validate_space_item_batch(item_type, contents)
-        # Revisit author rules when SendSpaceItems accepts automation items.
+    ) -> SpaceItem | None:
+        """Store a typed item in a Space."""
+        _validate_space_item(item_type, content)
+        # Revisit author rules when SendSpaceItem accepts automation items.
         if item_type == SpaceItemType.MESSAGE:
             if author is None or not (author.flwr_aid or author.agent_id):
                 raise ValueError("Message items require an author")
@@ -1304,23 +1304,18 @@ class InMemoryCoreState(
                 author is not None and author not in space.participants
             ):
                 return None
-            created_at = now().isoformat()
-            items = [
-                SpaceItem(
-                    id=self.space_item_id_counter + index + 1,
-                    space_id=str(space_id),
-                    created_at=created_at,
-                    content=content,
-                    type=item_type.value,
-                )
-                for index, content in enumerate(contents)
-            ]
+            item = SpaceItem(
+                id=self.space_item_id_counter + 1,
+                space_id=str(space_id),
+                created_at=now().isoformat(),
+                content=content,
+                type=item_type.value,
+            )
             if author is not None:
-                for item in items:
-                    item.author.CopyFrom(author)
-            self.space_item_store[space_id].extend(items)
-            self.space_item_id_counter += len(items)
-            return items
+                item.author.CopyFrom(author)
+            self.space_item_store[space_id].append(item)
+            self.space_item_id_counter = item.id
+            return item
 
     def get_space_items(  # pylint: disable=too-many-arguments
         self,

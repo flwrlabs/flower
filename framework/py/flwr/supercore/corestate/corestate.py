@@ -58,21 +58,13 @@ from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
 
-# Stay below SQLite's compound SELECT and legacy bind-parameter limits.
-MAX_SPACE_ITEM_BATCH_SIZE = 400
 
-
-def _validate_space_item_batch(
-    item_type: SpaceItemType,
-    contents: Sequence[str],
-) -> None:
-    """Validate item type, content, and batch size before storing."""
+def _validate_space_item(item_type: SpaceItemType, content: str) -> None:
+    """Validate an item's type and content before storing."""
     if not isinstance(item_type, SpaceItemType):
         raise ValueError("Invalid SpaceItem type")
-    if not contents or any(not content.strip() for content in contents):
-        raise ValueError("SpaceItem contents must be nonempty")
-    if len(contents) > MAX_SPACE_ITEM_BATCH_SIZE:
-        raise ValueError("SpaceItem batch is too large")
+    if not content.strip():
+        raise ValueError("SpaceItem content must be nonempty")
 
 
 class CoreState(ABC):  # pylint: disable=R0904
@@ -883,18 +875,17 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Store a participant's message, or return None if membership is absent."""
 
     @abstractmethod
-    def store_space_items(
+    def store_space_item(
         self,
         space_id: UUID,
         item_type: SpaceItemType,
-        contents: Sequence[str],
+        content: str,
         author: SpaceParticipant | None = None,
-    ) -> Sequence[SpaceItem] | None:
-        """Store an ordered batch of items atomically, or return None if unauthorized.
+    ) -> SpaceItem | None:
+        """Store an item, or return None if the Space or membership is absent.
 
         Message items require an author in the Space. Other items have no author.
-        Empty batches, batches over 400 items, blank content, and invalid type or
-        author combinations raise ValueError. A missing Space returns None.
+        Blank content and invalid type or author combinations raise ValueError.
         """
 
     @abstractmethod

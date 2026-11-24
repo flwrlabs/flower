@@ -36,8 +36,6 @@ from sqlalchemy import (
     literal,
     or_,
     select,
-    true,
-    union_all,
     update,
 )
 from sqlalchemy.dialects.postgresql import Insert as PostgresInsert
@@ -163,7 +161,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, _validate_space_item_batch
+from .corestate import CoreState, _validate_space_item
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -1608,15 +1606,15 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
-    def store_space_items(
+    def store_space_item(
         self,
         space_id: UUID,
         item_type: SpaceItemType,
-        contents: Sequence[str],
+        content: str,
         author: SpaceParticipant | None = None,
-    ) -> Sequence[SpaceItem] | None:
-        """Store a batch of typed items in a Space atomically."""
-        _validate_space_item_batch(item_type, contents)
+    ) -> SpaceItem | None:
+        """Authorize and store a typed item in one SQL statement."""
+        _validate_space_item(item_type, content)
         if author is not None and not (author.flwr_aid or author.agent_id):
             raise ValueError("SpaceItem author must have an identity")
 
@@ -1640,15 +1638,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 ]
                 == (author.flwr_aid or author.agent_id),
             )
-        input_items = union_all(
-            *(
-                select(
-                    literal(position).label("position"),
-                    literal(content).label("content"),
-                )
-                for position, content in enumerate(contents)
-            )
-        ).subquery("input_items")
         source = (
             select(
                 source_space_id,
@@ -1656,35 +1645,29 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 source_flwr_aid,
                 source_agent_id,
                 literal(now(), type_=UTCDateTime()),
-                input_items.c.content,
+                literal(content),
             )
-            .select_from(source_table.join(input_items, true()))
+            .select_from(source_table)
             .where(*source_conditions)
-            .order_by(input_items.c.position)
         )
         try:
             with self.session() as session:
-                models = list(
-                    session.scalars(
-                        insert(SpaceItemModel)
-                        .from_select(
-                            [
-                                "space_id",
-                                "type",
-                                "flwr_aid",
-                                "agent_id",
-                                "created_at",
-                                "content",
-                            ],
-                            source,
-                        )
-                        .returning(SpaceItemModel)
+                model = session.scalars(
+                    insert(SpaceItemModel)
+                    .from_select(
+                        [
+                            "space_id",
+                            "type",
+                            "flwr_aid",
+                            "agent_id",
+                            "created_at",
+                            "content",
+                        ],
+                        source,
                     )
-                )
-                if not models:
-                    return None
-                models.sort(key=lambda model: model.id)
-                return [_space_item_from_model(model) for model in models]
+                    .returning(SpaceItemModel)
+                ).one_or_none()
+                return _space_item_from_model(model) if model is not None else None
         except IntegrityError as exc:
             raise ValueError("Invalid SpaceItem") from exc
 

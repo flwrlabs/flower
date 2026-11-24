@@ -44,43 +44,41 @@ def _file_state(tmp_path: Path) -> SqlLinkState:
 
 
 def test_space_items_rollback_with_outer_transaction(tmp_path: Path) -> None:
-    """A later failure rolls back a batch stored inside an outer session."""
+    """A later failure rolls back an item stored inside an outer session."""
     state = _file_state(tmp_path)
     author = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[author]).id)
 
     with pytest.raises(RuntimeError, match="abort"):
         with state.session():
-            state.store_space_items(
-                space_id, SpaceItemType.MESSAGE, ["first", "second"], author
-            )
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", author)
             raise RuntimeError("abort")
 
     assert state.get_space_items(space_id, author) == []
 
 
 def test_space_items_concurrent_file_writes(tmp_path: Path) -> None:
-    """Two SQLite writers can store batches for the same Space."""
+    """Two SQLite writers can store items for the same Space."""
     state = _file_state(tmp_path)
     author = SpaceParticipant(flwr_aid="alice")
     space_id = UUID(state.create_space(participants=[author]).id)
     barrier = Barrier(2)
 
-    def store_batch(index: int) -> list[str]:
+    def store_item(index: int) -> str:
         barrier.wait(timeout=10)
-        items = state.store_space_items(
-            space_id, SpaceItemType.MESSAGE, [f"{index}-a", f"{index}-b"], author
+        item = state.store_space_item(
+            space_id, SpaceItemType.MESSAGE, str(index), author
         )
-        assert items is not None
-        return [item.content for item in items]
+        assert item is not None
+        return item.content
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        batches = list(executor.map(store_batch, range(2)))
+        contents = list(executor.map(store_item, range(2)))
 
-    assert batches == [["0-a", "0-b"], ["1-a", "1-b"]]
+    assert contents == ["0", "1"]
     stored = state.get_space_items(space_id, author)
     assert stored is not None
-    assert {item.content for item in stored} == {"0-a", "0-b", "1-a", "1-b"}
+    assert {item.content for item in stored} == {"0", "1"}
 
 
 @pytest.fixture(name="state", params=["memory", "sqlite"])

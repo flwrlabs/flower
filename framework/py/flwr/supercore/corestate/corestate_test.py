@@ -2752,17 +2752,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         alice = SpaceParticipant(flwr_aid="alice")
         bob = SpaceParticipant(flwr_aid="bob")
         space_id = UUID(state.create_space(participants=[alice, bob]).id)
-        messages = state.store_space_items(
-            space_id, SpaceItemType.MESSAGE, ["first", "second"], alice
+        first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", alice)
+        second = state.store_space_item(
+            space_id, SpaceItemType.MESSAGE, "second", alice
         )
-        automation = state.store_space_items(
-            space_id, SpaceItemType.AUTOMATION, ["scheduled"]
+        automation = state.store_space_item(
+            space_id, SpaceItemType.AUTOMATION, "scheduled"
         )
-        assert messages is not None and automation is not None
-        self.assertEqual([item.id for item in [*messages, *automation]], [1, 2, 3])
-        self.assertEqual([item.type for item in messages], ["message", "message"])
-        self.assertEqual(automation[0].type, "automation")
-        self.assertFalse(automation[0].HasField("author"))
+        assert first is not None and second is not None and automation is not None
+        self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
+        self.assertEqual([first.type, second.type], ["message", "message"])
+        self.assertEqual(automation.type, "automation")
+        self.assertFalse(automation.HasField("author"))
         self.assertEqual(
             [item.id for item in state.get_space_items(space_id, alice, limit=2) or []],
             [2, 3],
@@ -2791,39 +2792,31 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(state.get_space_items(space_id, alice, after_id=3), [])
 
-    def test_space_items_authorization_and_atomic_batch(self) -> None:
-        """Reject invalid writes without persisting part of a batch."""
+    def test_space_item_authorization_and_validation(self) -> None:
+        """Reject unauthorized and invalid items without persisting them."""
         state = self.state_factory()
         alice = SpaceParticipant(flwr_aid="alice")
         bob = SpaceParticipant(flwr_aid="bob")
         space_id = UUID(state.create_space(participants=[alice]).id)
         self.assertIsNone(
-            state.store_space_items(space_id, SpaceItemType.MESSAGE, ["secret"], bob)
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "secret", bob)
         )
         self.assertIsNone(state.get_space_items(space_id, bob))
         with self.assertRaises(ValueError):
-            state.store_space_items(
-                space_id, SpaceItemType.MESSAGE, ["valid", "  "], alice
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "  ", alice)
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "message")
+        with self.assertRaises(ValueError):
+            state.store_space_item(
+                space_id, SpaceItemType.MESSAGE, "message", SpaceParticipant()
             )
         with self.assertRaises(ValueError):
-            state.store_space_items(space_id, SpaceItemType.MESSAGE, ["message"])
-        with self.assertRaises(ValueError):
-            state.store_space_items(
-                space_id, SpaceItemType.MESSAGE, ["message"], SpaceParticipant()
-            )
-        with self.assertRaises(ValueError):
-            state.store_space_items(space_id, SpaceItemType.AUTOMATION, [])
-        with self.assertRaises(ValueError):
-            state.store_space_items(
-                space_id, SpaceItemType.MESSAGE, ["item"] * 401, alice
-            )
-        with self.assertRaises(ValueError):
-            state.store_space_items(
-                space_id, SpaceItemType.AUTOMATION, ["scheduled"], alice
+            state.store_space_item(
+                space_id, SpaceItemType.AUTOMATION, "scheduled", alice
             )
         self.assertEqual(state.get_space_items(space_id, alice), [])
         self.assertIsNone(
-            state.store_space_items(UUID(int=0), SpaceItemType.AUTOMATION, ["missing"])
+            state.store_space_item(UUID(int=0), SpaceItemType.AUTOMATION, "missing")
         )
 
     def test_space_items_accept_agent_author(self) -> None:
@@ -2835,23 +2828,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert agent is not None
         space_id = UUID(agent.default_space_id)
         author = SpaceParticipant(agent_id=agent.id)
-        items = state.store_space_items(
-            space_id, SpaceItemType.MESSAGE, ["reply"], author
-        )
-        assert items is not None
-        self.assertEqual(items[0].author, author)
-        self.assertEqual(state.get_space_items(space_id, author), items)
-
-    def test_space_items_accept_maximum_batch(self) -> None:
-        """The largest supported batch fits the SQL insert."""
-        state = self.state_factory()
-        space_id = UUID(state.create_space(participants=[]).id)
-        items = state.store_space_items(
-            space_id, SpaceItemType.AUTOMATION, [str(i) for i in range(400)]
-        )
-        assert items is not None
-        self.assertEqual(len(items), 400)
-        self.assertEqual([items[0].content, items[-1].content], ["0", "399"])
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "reply", author)
+        assert item is not None
+        self.assertEqual(item.author, author)
+        self.assertEqual(state.get_space_items(space_id, author), [item])
 
     def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
         """Reading items does not mark legacy messages as read."""
@@ -2860,10 +2840,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         space_id = UUID(state.create_space(participants=[alice]).id)
         message = state.create_space_message(space_id, alice, "legacy")
         assert message is not None
-        items = state.store_space_items(space_id, SpaceItemType.MESSAGE, ["new"], alice)
-        assert items is not None
-        self.assertEqual(state.get_space_items(space_id, alice), items)
-        self.assertEqual(state.get_space_items(space_id, alice), items)
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "new", alice)
+        assert item is not None
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
         self.assertEqual(
             state.get_space_messages(space_id, alice, unread_only=True), [message]
         )
