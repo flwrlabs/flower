@@ -2791,6 +2791,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [1, 2],
         )
         self.assertEqual(state.get_space_items(space_id, alice, after_id=3), [])
+        self.assertEqual(
+            state.get_space_items(space_id, alice, before_id=2**64 - 1, limit=2),
+            [second, automation],
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, after_id=2**64 - 1), [])
 
     def test_space_item_authorization_and_validation(self) -> None:
         """Reject unauthorized and invalid items without persisting them."""

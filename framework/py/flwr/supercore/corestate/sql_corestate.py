@@ -1760,10 +1760,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
         identity = participant.flwr_aid or participant.agent_id
         item_conditions = [SpaceItemModel.space_id == SpaceParticipantTable.c.space_id]
-        if before_id is not None:
+        # Larger protobuf uint64 bounds include every supported BIGINT item ID.
+        if before_id is not None and before_id <= 2**63 - 1:
             item_conditions.append(SpaceItemModel.id < before_id)
         if after_id is not None:
-            item_conditions.append(SpaceItemModel.id > after_id)
+            item_conditions.append(SpaceItemModel.id > min(after_id, 2**63 - 1))
         query = (
             select(SpaceItemModel)
             .select_from(SpaceParticipantTable)
