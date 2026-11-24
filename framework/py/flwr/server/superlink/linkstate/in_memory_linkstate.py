@@ -562,6 +562,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -590,6 +591,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     run_id
                     for run_id in matched_run_ids
                     if self.run_ids[run_id].space_id in space_id_set
+                }
+
+            if agent_ids is not None:
+                agent_id_set = set(agent_ids)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self.run_ids[run_id].run.agent_id in agent_id_set
                 }
 
             # Filter by statuses

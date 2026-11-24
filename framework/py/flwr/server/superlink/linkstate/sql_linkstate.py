@@ -599,6 +599,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -623,6 +624,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         if space_ids is not None:
             stmt = stmt.where(RunModel.space_id.in_(space_ids))
+
+        if agent_ids is not None:
+            stmt = stmt.where(RunModel.agent_id.in_(agent_ids))
 
         # Filter by statuses
         if statuses is not None:
@@ -659,9 +663,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             stmt = stmt.where(or_(*federation_conditions))
 
         if order_by is not None:
-            order_column = TaskModel.pending_at
             stmt = stmt.order_by(
-                order_column.asc() if ascending else order_column.desc(),
+                (
+                    TaskModel.pending_at.asc()
+                    if ascending
+                    else TaskModel.pending_at.desc()
+                ),
                 RunModel.run_id.asc() if ascending else RunModel.run_id.desc(),
             )
         if skip:

@@ -71,6 +71,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -92,6 +93,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of run IDs to filter by.
         space_ids : Optional[Sequence[UUID]] (default: None)
             Sequence of Space IDs to filter by.
+        agent_ids : Optional[Sequence[int]] (default: None)
+            Sequence of agent IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)

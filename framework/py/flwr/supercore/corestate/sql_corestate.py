@@ -875,15 +875,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
             self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
             for run in self.get_run(
-                flwr_aids=[flwr_aid],
+                agent_ids=[agent_id],
                 statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
             ):
-                if run.agent_id == agent_id:
-                    self.finish_task(
-                        cast(int, run.primary_task_id),
-                        SubStatus.STOPPED,
-                        "Agent was deleted",
-                    )
+                self.finish_task(
+                    cast(int, run.primary_task_id),
+                    SubStatus.STOPPED,
+                    "Agent was deleted",
+                )
             for connector in self.get_agent_connectors(agent_id):
                 self.delete_connector(None, connector.connector_id, agent_id=agent_id)
             return True
