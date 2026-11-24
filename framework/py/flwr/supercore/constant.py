@@ -206,6 +206,15 @@ class NodeStatus:
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 
 
+class DeviceAuthorizationError(StrEnum):
+    """OAuth device authorization errors reported while polling for tokens."""
+
+    AUTHORIZATION_PENDING = "authorization_pending"
+    SLOW_DOWN = "slow_down"
+    ACCESS_DENIED = "access_denied"
+    EXPIRED_TOKEN = "expired_token"
+
+
 class InvitationStatus(StrEnum):
     """Status of a federation invitation."""
 
@@ -229,6 +238,7 @@ class EventType(StrEnum):
     """Application events delivered through user feeds."""
 
     AGENT_CREATED = "agent.created"
+    AGENT_UPDATED = "agent.updated"
     SPACE_CREATED = "space.created"
     MESSAGE_CREATED = "message.created"
     RUN_CREATED = "run.created"

@@ -207,6 +207,31 @@ class UpdateAgentResponse(google.protobuf.message.Message):
 global___UpdateAgentResponse = UpdateAgentResponse
 
 @typing.final
+class DeleteAgentRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AGENT_ID_FIELD_NUMBER: builtins.int
+    agent_id: builtins.int
+    def __init__(
+        self,
+        *,
+        agent_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id"]) -> None: ...
+
+global___DeleteAgentRequest = DeleteAgentRequest
+
+@typing.final
+class DeleteAgentResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___DeleteAgentResponse = DeleteAgentResponse
+
+@typing.final
 class StartRunRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -826,11 +851,16 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
     VERIFICATION_URI_COMPLETE_FIELD_NUMBER: builtins.int
     EXPIRES_IN_FIELD_NUMBER: builtins.int
     INTERVAL_FIELD_NUMBER: builtins.int
+    VERIFICATION_URI_FIELD_NUMBER: builtins.int
+    USER_CODE_FIELD_NUMBER: builtins.int
     authn_type: builtins.str
     device_code: builtins.str
     verification_uri_complete: builtins.str
     expires_in: builtins.int
     interval: builtins.int
+    verification_uri: builtins.str
+    """Used with user_code when the provider omits verification_uri_complete."""
+    user_code: builtins.str
     def __init__(
         self,
         *,
@@ -839,8 +869,10 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
         verification_uri_complete: builtins.str = ...,
         expires_in: builtins.int = ...,
         interval: builtins.int = ...,
+        verification_uri: builtins.str = ...,
+        user_code: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["authn_type", b"authn_type", "device_code", b"device_code", "expires_in", b"expires_in", "interval", b"interval", "verification_uri_complete", b"verification_uri_complete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["authn_type", b"authn_type", "device_code", b"device_code", "expires_in", b"expires_in", "interval", b"interval", "user_code", b"user_code", "verification_uri", b"verification_uri", "verification_uri_complete", b"verification_uri_complete"]) -> None: ...
 
 global___GetLoginDetailsResponse = GetLoginDetailsResponse
 
@@ -865,15 +897,19 @@ class GetAuthTokensResponse(google.protobuf.message.Message):
 
     ACCESS_TOKEN_FIELD_NUMBER: builtins.int
     REFRESH_TOKEN_FIELD_NUMBER: builtins.int
+    ERROR_FIELD_NUMBER: builtins.int
     access_token: builtins.str
     refresh_token: builtins.str
+    error: builtins.str
+    """OAuth device authorization error, if reported by the auth plugin."""
     def __init__(
         self,
         *,
         access_token: builtins.str = ...,
         refresh_token: builtins.str = ...,
+        error: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "refresh_token", b"refresh_token"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["access_token", b"access_token", "error", b"error", "refresh_token", b"refresh_token"]) -> None: ...
 
 global___GetAuthTokensResponse = GetAuthTokensResponse
 

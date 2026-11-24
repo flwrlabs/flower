@@ -32,6 +32,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensResponse,
 )
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
+from flwr.supercore.constant import DeviceAuthorizationError
 from flwr.supercore.control import ControlHttpClient
 from flwr.supercore.credential_store import get_credential_store
 
@@ -73,37 +74,50 @@ class OidcCliPlugin(CliAuthPlugin):
         Raises
         ------
         LoginError
-            If authentication times out.
+            If verification details are incomplete or device authorization fails.
         """
-        # Prompt user to login via browser
-        webbrowser.open(login_details.verification_uri_complete)
+        deadline = time.monotonic() + login_details.expires_in
+        verification_uri = login_details.verification_uri_complete
+        if not verification_uri:
+            verification_uri = login_details.verification_uri
+            if not verification_uri or not login_details.user_code:
+                raise LoginError(
+                    "The provider did not return a verification URL and code."
+                )
+            typer.secho(
+                f"Enter this code on the sign-in page: {login_details.user_code}",
+                fg=typer.colors.BLUE,
+            )
+
+        webbrowser.open(verification_uri)
         typer.secho(
             "A browser window has been opened for you to "
             "log into your Flower account.\n"
             "If it did not open automatically, use this URL:\n"
-            f"{login_details.verification_uri_complete}",
+            f"{verification_uri}",
             fg=typer.colors.BLUE,
         )
 
-        # Wait for user to complete login
-        start_time = time.time()
-        time.sleep(login_details.interval)
-
-        while (time.time() - start_time) < login_details.expires_in:
+        interval = login_details.interval if login_details.interval > 0 else 5
+        while (remaining := deadline - time.monotonic()) > 0:
+            time.sleep(min(interval, remaining))
+            if time.monotonic() >= deadline:
+                break
             res: GetAuthTokensResponse = control_client.GetAuthTokens(
                 GetAuthTokensRequest(device_code=login_details.device_code)
             )
-
-            access_token = res.access_token
-            refresh_token = res.refresh_token
-
-            if access_token and refresh_token:
-                return AccountAuthCredentials(
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                )
-
-            time.sleep(login_details.interval)
+            if res.error == DeviceAuthorizationError.SLOW_DOWN:
+                interval += 5
+            elif res.error == DeviceAuthorizationError.ACCESS_DENIED:
+                raise LoginError("Device authorization was denied.")
+            elif res.error == DeviceAuthorizationError.EXPIRED_TOKEN:
+                raise LoginError("The device code has expired. Run flwr login again.")
+            elif res.error == DeviceAuthorizationError.AUTHORIZATION_PENDING:
+                continue
+            elif res.error:
+                raise LoginError("Device authorization failed.")
+            elif res.access_token and res.refresh_token:
+                return AccountAuthCredentials(res.access_token, res.refresh_token)
 
         raise LoginError("Process timed out.")
 
