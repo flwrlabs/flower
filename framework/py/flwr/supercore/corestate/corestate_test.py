@@ -57,6 +57,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -2744,6 +2745,112 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
         self.assertEqual(entries[1].event.payload["id"], str(message.id))
+
+    def test_space_items_order_and_pagination(self) -> None:
+        """Typed items share one order and support participant-scoped reads."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", alice)
+        second = state.store_space_item(
+            space_id, SpaceItemType.MESSAGE, "second", alice
+        )
+        automation = state.store_space_item(
+            space_id, SpaceItemType.AUTOMATION, "scheduled"
+        )
+        assert first is not None and second is not None and automation is not None
+        self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
+        self.assertEqual([first.type, second.type], ["message", "message"])
+        self.assertEqual(automation.type, "automation")
+        self.assertFalse(automation.HasField("author"))
+        self.assertEqual(
+            [item.id for item in state.get_space_items(space_id, alice, limit=2) or []],
+            [2, 3],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, bob, after_id=0, limit=2)
+                or []
+            ],
+            [1, 2],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, bob, after_id=2) or []
+            ],
+            [3],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, alice, before_id=3) or []
+            ],
+            [1, 2],
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, after_id=3), [])
+
+    def test_space_item_authorization_and_validation(self) -> None:
+        """Reject unauthorized and invalid items without persisting them."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice]).id)
+        self.assertIsNone(
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "secret", bob)
+        )
+        self.assertIsNone(state.get_space_items(space_id, bob))
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "  ", alice)
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "message")
+        with self.assertRaises(ValueError):
+            state.store_space_item(
+                space_id, SpaceItemType.MESSAGE, "message", SpaceParticipant()
+            )
+        with self.assertRaises(ValueError):
+            state.store_space_item(
+                space_id, SpaceItemType.AUTOMATION, "scheduled", alice
+            )
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.AUTOMATION, "scheduled", bob)
+        self.assertEqual(state.get_space_items(space_id, alice), [])
+        with self.assertRaises(ValueError):
+            state.store_space_item(UUID(int=0), SpaceItemType.MESSAGE, "missing")
+        self.assertIsNone(
+            state.store_space_item(UUID(int=0), SpaceItemType.AUTOMATION, "missing")
+        )
+
+    def test_space_items_accept_agent_author(self) -> None:
+        """An agent participant can author a message item."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
+        author = SpaceParticipant(agent_id=agent.id)
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "reply", author)
+        assert item is not None
+        self.assertEqual(item.author, author)
+        self.assertEqual(state.get_space_items(space_id, author), [item])
+
+    def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
+        """Reading items does not mark legacy messages as read."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        space_id = UUID(state.create_space(participants=[alice]).id)
+        message = state.create_space_message(space_id, alice, "legacy")
+        assert message is not None
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "new", alice)
+        assert item is not None
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
+        self.assertEqual(
+            state.get_space_messages(space_id, alice, unread_only=True), [message]
+        )
 
     def test_user_event_explicit_empty_recipients(self) -> None:
         """An empty recipient list delivers to nobody, even with a Space ID."""
