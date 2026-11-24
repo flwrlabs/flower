@@ -810,6 +810,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.app_spec == config.app_spec,
                     AgentModel.config_version == expected_config_version,
+                    AgentModel.deleted_at.is_(None),
                 )
                 .values(config_version=AgentModel.config_version + 1, updated_at=now())
                 .returning(AgentModel)
@@ -840,8 +841,57 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(EventType.AGENT_UPDATED, agent, [flwr_aid])
             return agent
 
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Archive an agent and clean up its activity and connectors atomically."""
+        deleted_at = now()
+        with self.session() as session:
+            model = session.scalar(
+                update(AgentModel)
+                .where(
+                    AgentModel.agent_id == agent_id,
+                    AgentModel.flwr_aid == flwr_aid,
+                    AgentModel.deleted_at.is_(None),
+                )
+                .values(
+                    deleted_at=deleted_at,
+                    updated_at=deleted_at,
+                )
+                .returning(AgentModel)
+            )
+            if model is None:
+                current = session.get(AgentModel, agent_id)
+                return current is not None and current.flwr_aid == flwr_aid
+            snapshot = session.get(AgentConfigModel, (agent_id, model.config_version))
+            assert snapshot is not None
+            agent = _agent_from_model(model, snapshot)
+            session.execute(
+                update(AutomationModel)
+                .where(
+                    AutomationModel.agent_id == agent_id,
+                    AutomationModel.status == AutomationStatus.ACTIVE,
+                )
+                .values(
+                    status=AutomationStatus.STOPPED,
+                    stopped_at=deleted_at,
+                    updated_at=deleted_at,
+                )
+            )
+            self.store_event(EventType.AGENT_DELETED, agent, [flwr_aid])
+            for run in self.get_run(
+                agent_ids=[agent_id],
+                statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
+            ):
+                self.finish_task(
+                    cast(int, run.primary_task_id),
+                    SubStatus.STOPPED,
+                    "Agent was deleted",
+                )
+            for connector in self.get_agent_connectors(agent_id):
+                self.delete_connector(None, connector.connector_id, agent_id=agent_id)
+            return True
+
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account."""
+        """Return an owned active agent, or None if unavailable."""
         with self.session() as session:
             row = session.execute(
                 select(AgentModel, AgentConfigModel)
@@ -853,17 +903,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 .where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
+                    AgentModel.deleted_at.is_(None),
                 )
+                .execution_options(populate_existing=True)
             ).one_or_none()
             return _agent_from_model(*row) if row is not None else None
 
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID."""
+        """Return the default Space ID of an owned active agent."""
         with self.session() as session:
             return session.scalar(
                 select(AgentModel.default_space_id).where(
                     AgentModel.flwr_aid == flwr_aid,
                     AgentModel.agent_id == agent_id,
+                    AgentModel.deleted_at.is_(None),
                 )
             )
 
@@ -878,7 +931,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 (AgentConfigModel.agent_id == AgentModel.agent_id)
                 & (AgentConfigModel.version == AgentModel.config_version),
             )
-            .where(AgentModel.flwr_aid == flwr_aid)
+            .where(
+                AgentModel.flwr_aid == flwr_aid,
+                AgentModel.deleted_at.is_(None),
+            )
             .order_by(AgentModel.agent_id)
         )
         with self.session() as session:
@@ -1269,8 +1325,20 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .returning(ConnectorModel.connector_id)
         )
         with self.session() as session:
-            if agent_id is not None and self.get_agent(created_by, agent_id) is None:
-                return None
+            if agent_id is not None:
+                # Serialize with agent deletion before inserting credentials.
+                active_agent_id = session.scalar(
+                    update(AgentModel)
+                    .where(
+                        AgentModel.agent_id == agent_id,
+                        AgentModel.flwr_aid == created_by,
+                        AgentModel.deleted_at.is_(None),
+                    )
+                    .values(updated_at=AgentModel.updated_at)
+                    .returning(AgentModel.agent_id)
+                )
+                if active_agent_id is None:
+                    return None
             return session.scalar(stmt)
 
     def get_connectors_by_ref(
@@ -1490,6 +1558,18 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 members.append(participant)
         try:
             with self.session() as session:
+                agent_ids = {member.agent_id for member in members if member.agent_id}
+                if agent_ids:
+                    active_ids = set(
+                        session.scalars(
+                            select(AgentModel.agent_id).where(
+                                AgentModel.agent_id.in_(agent_ids),
+                                AgentModel.deleted_at.is_(None),
+                            )
+                        )
+                    )
+                    if active_ids != agent_ids:
+                        raise ValueError("Agent participant does not exist")
                 model = session.scalars(
                     insert(SpaceModel)
                     .values(id=uuid4(), title="", created_at=now())
@@ -1545,7 +1625,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 SpaceParticipantTable,
                 SpaceParticipantTable.c.space_id == SpaceModel.id,
             )
-            .where(viewer.c.flwr_aid == flwr_aid)
+            .where(
+                viewer.c.flwr_aid == flwr_aid,
+                ~exists().where(
+                    AgentModel.default_space_id == SpaceModel.id,
+                    AgentModel.deleted_at.is_not(None),
+                ),
+            )
             .order_by(SpaceModel.created_at.desc())
             .execution_options(populate_existing=True)
         )
@@ -2010,9 +2096,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
-        if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
-            raise ValueError("Agent not found.")
-
         current = now()
         stmt = (
             insert(AutomationModel)
@@ -2034,6 +2117,19 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         try:
             with self.session() as session:
+                if agent_id is not None:
+                    active_id = session.scalar(
+                        update(AgentModel)
+                        .where(
+                            AgentModel.agent_id == agent_id,
+                            AgentModel.flwr_aid == flwr_aid,
+                            AgentModel.deleted_at.is_(None),
+                        )
+                        .values(updated_at=AgentModel.updated_at)
+                        .returning(AgentModel.agent_id)
+                    )
+                    if active_id is None:
+                        raise ValueError("Agent not found.")
                 automation = session.scalars(stmt).one()
                 return _automation_from_model(automation)
         except IntegrityError as exc:

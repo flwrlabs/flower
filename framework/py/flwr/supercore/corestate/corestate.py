@@ -88,6 +88,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         *,
         run_ids: Sequence[int] | None = None,
         space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -109,6 +110,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Sequence of run IDs to filter by.
         space_ids : Optional[Sequence[UUID]] (default: None)
             Sequence of Space IDs to filter by.
+        agent_ids : Optional[Sequence[int]] (default: None)
+            Sequence of agent IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of run status values to filter by.
         flwr_aids : Optional[Sequence[str]] (default: None)
@@ -379,12 +382,35 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Soft-delete an owned agent.
+
+        Stop active automations and unfinished runs, prevent new runs, and remove
+        owned connectors and their credentials. Preserve historical agent data.
+        Deletion is idempotent and emits agent.deleted on the first successful
+        deletion.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            ID of the agent to delete.
+
+        Returns
+        -------
+        bool
+            True if the agent was deleted or already deleted;
+            False if absent or not owned by the account.
+        """
+
+    @abstractmethod
     def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
-        """Return an agent owned by the account, or None if it does not exist."""
+        """Return an owned active agent, or None if unavailable."""
 
     @abstractmethod
     def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
-        """Return the owned agent's default Space ID, or None if unavailable."""
+        """Return an owned active agent's default Space ID, or None if unavailable."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
