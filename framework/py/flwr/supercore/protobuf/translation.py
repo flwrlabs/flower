@@ -70,6 +70,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamRunEventsRequest,
     UnregisterNodeRequest,
+    UpdateAgentRequest,
     UpdateRunSeriesDescriptionRequest,
 )
 from flwr.proto.fab_pb2 import GetFabRequest  # pylint: disable=E0611
@@ -152,6 +153,7 @@ PROTOBUF_REQUEST_TYPES: dict[RouteKey, type[Message]] = {
     ("POST", "/v1/fleet/pull-object"): PullObjectRequest,
     ("POST", "/v1/fleet/confirm-message-received"): ConfirmMessageReceivedRequest,
     ("POST", "/v1/control/create-agent"): CreateAgentRequest,
+    ("POST", "/v1/control/update-agent"): UpdateAgentRequest,
     ("POST", "/v1/control/delete-agent"): DeleteAgentRequest,
     ("POST", "/v1/control/list-agents"): ListAgentsRequest,
     ("POST", "/v1/control/create-space"): CreateSpaceRequest,

@@ -149,6 +149,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -300,6 +302,24 @@ def create_agent(
             "Unable to create agent with the supplied values."
         )
     return CreateAgentResponse(agent=agent)
+
+
+def update_agent(
+    request: UpdateAgentRequest, account: AuthenticatedUser, state: LinkState
+) -> UpdateAgentResponse:
+    """Publish an owned agent's replacement configuration with a version check."""
+    try:
+        agent = state.update_agent(
+            flwr_aid=account.user_id,
+            agent_id=request.agent_id,
+            expected_config_version=request.expected_config_version,
+            config=request.config,
+        )
+    except ValueError as exc:
+        raise InvalidAgentRequestError(str(exc)) from exc
+    if agent is None:
+        raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
+    return UpdateAgentResponse(agent=agent)
 
 
 def delete_agent(
