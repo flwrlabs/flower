@@ -1798,6 +1798,7 @@ def get_login_details(
         interval=details.interval,
         verification_uri=details.verification_uri,
         user_code=details.user_code,
+        supports_cli_signup=details.supports_cli_signup,
     )
 
 
