@@ -457,9 +457,11 @@ exported, silently leaving Ray's original import failure in place:
                         _phys_n=""
                         if [ -d /sys/class/kfd/kfd/topology/nodes ]; then
                             _phys_n=0
-                            _phys_n_verified=0
+                            _phys_n_total=0
+                            _phys_n_read=0
                             for _node_dir in \
                                 /sys/class/kfd/kfd/topology/nodes/*/; do
+                                _phys_n_total=$((_phys_n_total + 1))
                                 # The GPU ID lives in the sibling `gpu_id`
                                 # file, not as a `gpu_id` row inside
                                 # `properties` -- a CPU-only node reports
@@ -467,19 +469,24 @@ exported, silently leaving Ray's original import failure in place:
                                 # physical GPU.
                                 _gpu_id_file="${_node_dir}gpu_id"
                                 [ -r "$_gpu_id_file" ] || continue
-                                _phys_n_verified=1
+                                _phys_n_read=$((_phys_n_read + 1))
                                 _gpu_id=$(cat "$_gpu_id_file")
                                 if [ -n "$_gpu_id" ] && [ "$_gpu_id" != "0" ]; then
                                     _phys_n=$((_phys_n + 1))
                                 fi
                             done
-                            if [ "$_phys_n_verified" -eq 0 ]; then
-                                # Every per-node `gpu_id` file was hidden or
-                                # unreadable (e.g. a restricted container with
-                                # a partial sysfs mount) -- this is not the
-                                # same as a verified zero-GPU topology, so the
-                                # bound must stay unknown rather than falsely
-                                # confirming zero GPUs and rejecting an
+                            if [ "$_phys_n_total" -eq 0 ] ||
+                                [ "$_phys_n_read" -ne "$_phys_n_total" ]; then
+                                # Either no node directories were found, or at
+                                # least one node's gpu_id file was hidden or
+                                # unreadable while another's was not (e.g. a
+                                # restricted container that hides only the
+                                # assigned GPU node's file but leaves the CPU
+                                # node's readable) -- a partial read is not a
+                                # verified topology either: it undercounts
+                                # just as surely as a fully unreadable one, so
+                                # the bound must stay unknown rather than
+                                # falsely confirming a count and rejecting an
                                 # otherwise-valid mask like
                                 # ROCR_VISIBLE_DEVICES=0.
                                 _phys_n=""
@@ -530,8 +537,8 @@ exported, silently leaving Ray's original import failure in place:
                 fi
             fi
             unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
-                _rocr_has_numeric _rocr_has_uuid _phys_n _phys_n_verified \
-                _node_dir _gpu_id_file _gpu_id _bad_ordinal
+                _rocr_has_numeric _rocr_has_uuid _phys_n _phys_n_total \
+                _phys_n_read _node_dir _gpu_id_file _gpu_id _bad_ordinal
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then

@@ -412,11 +412,16 @@ def _log_kfd_diagnostics() -> None:
             "the same group and likely affected too -- or "
             "the container was started without `--device=/dev/kfd "
             "--device=/dev/dri --group-add render --group-add video`. "
-            "Both Ray and the ML framework will report zero AMD/ROCm GPUs "
-            "until device access is fixed (an NVIDIA/CUDA GPU on the same "
-            "host, if any, is discovered independently of `/dev/kfd` and "
-            "is unaffected by this); fixing `amdsmi`/ROCM_PATH "
-            "configuration will not help.",
+            "The ML framework opens `/dev/kfd` directly for compute, so it "
+            "will not be able to use this AMD GPU until device access is "
+            "fixed (an NVIDIA/CUDA GPU on the same host, if any, is "
+            "discovered independently of `/dev/kfd` and is unaffected by "
+            "this). Ray's own GPU count, however, comes from the `amdsmi` "
+            "package rather than opening `/dev/kfd` directly, so fixing "
+            "this access issue alone will not necessarily make Ray stop "
+            "reporting zero GPUs -- a concurrently missing or unimportable "
+            "`amdsmi` is a separate, still-possible cause that this check "
+            "does not rule out.",
         )
         return
     if kfd_openable is None:
