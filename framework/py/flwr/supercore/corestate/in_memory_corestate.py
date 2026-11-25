@@ -1308,9 +1308,10 @@ class InMemoryCoreState(
                 result.CopyFrom(space)
                 result.latest_user_message = next(
                     (
-                        message.content
-                        for message in reversed(self.space_message_store[space_id])
-                        if message.author.HasField("flwr_aid")
+                        item.content
+                        for item in reversed(self.space_item_store[space_id])
+                        if item.type == SpaceItemType.MESSAGE.value
+                        and item.author.HasField("flwr_aid")
                     ),
                     "",
                 )
@@ -1629,6 +1630,8 @@ class InMemoryCoreState(
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and not start_run_request.user_prompt.strip():
+            raise ValueError("Agent automation prompt must be nonempty")
         with self.lock_automation_store:
             if agent_id is not None and self.get_agent(flwr_aid, agent_id) is None:
                 raise ValueError("Agent not found.")
@@ -1679,6 +1682,51 @@ class InMemoryCoreState(
             ):
                 return None
             return request, flwr_aid
+
+    def claim_agent_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> SpaceItem | None:
+        """Claim an occurrence and append its item under the same locks."""
+        with self.lock_automation_store, self.lock_space_store, self.lock_agent_store:
+            record = self.automation_store.get(automation_id)
+            if record is None or not record.automation.HasField("agent_id"):
+                return None
+            agent = self.get_agent(
+                record.automation.flwr_aid, record.automation.agent_id
+            )
+            if agent is None:
+                return None
+            space_id = UUID(agent.default_space_id)
+            if space_id not in self.space_store:
+                return None
+            content = record.start_run_request.user_prompt
+            if not content.strip():
+                raise ValueError("Agent automation prompt must be nonempty")
+            item = SpaceItem(
+                id=self.space_item_id_counter + 1,
+                space_id=agent.default_space_id,
+                type=SpaceItemType.AUTOMATION.value,
+                created_at=now().isoformat(),
+                content=content,
+            )
+            if not self.advance_automation(
+                automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+            self.space_item_store[space_id].append(item)
+            self.space_item_id_counter = item.id
+            if (
+                record.automation.HasField("remaining_runs")
+                and record.automation.remaining_runs == 0
+            ):
+                self.finish_automation(automation_id, status=AutomationStatus.COMPLETED)
+            return item
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-boolean-expressions
         self,
@@ -1751,7 +1799,8 @@ class InMemoryCoreState(
                 automations.sort(key=lambda automation: automation.next_run_at)
             if limit is not None:
                 automations = automations[:limit]
-            return automations
+            # Keep later claims from changing the due times seen by this caller.
+            return [deepcopy(automation) for automation in automations]
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""

@@ -65,6 +65,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -123,16 +124,20 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         )
 
     def test_process_pending_agent_runs(self) -> None:
-        """Resolve an AgentApp and create one Run for an unread user message."""
+        """Resolve an AgentApp and create one Run for an unread user item."""
         agent = self.state.create_agent(
             self.account.user_id,
             AgentConfig(name="Agent", app_spec="@publisher/app"),
         )
         assert agent is not None
         space_id = UUID(self.state.get_spaces(self.account.user_id)[0].id)
-        self.state.create_space_message(
-            space_id, SpaceParticipant(flwr_aid=self.account.user_id), "User message"
+        item = self.state.store_space_item(
+            space_id,
+            SpaceItemType.MESSAGE,
+            "User message",
+            SpaceParticipant(flwr_aid=self.account.user_id),
         )
+        assert item is not None
         config = {
             "project": {"name": "app", "version": "1.0"},
             "tool": {
@@ -155,6 +160,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         resolve.assert_called_once_with(agent.config.app_spec)
         runs = self.state.get_run()
         assert len(runs) == 1 and runs[0].agent_id == agent.id
+        assert runs[0].trigger_item_id == item.id
 
     def test_list_runs_defaults_to_twenty(self) -> None:
         """Apply default pagination to an empty page without a caller handle."""

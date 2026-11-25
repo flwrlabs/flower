@@ -1603,12 +1603,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """List spaces newest first, including latest user and agent messages."""
         viewer = SpaceParticipantTable.alias("viewer")
         latest_user_message = (
-            select(SpaceMessageModel.content)
+            select(SpaceItemModel.content)
             .where(
-                SpaceMessageModel.space_id == SpaceModel.id,
-                SpaceMessageModel.flwr_aid.is_not(None),
+                SpaceItemModel.space_id == SpaceModel.id,
+                SpaceItemModel.type == SpaceItemType.MESSAGE.value,
+                SpaceItemModel.flwr_aid.is_not(None),
             )
-            .order_by(SpaceMessageModel.id.desc())
+            .order_by(SpaceItemModel.id.desc())
             .limit(1)
             .correlate(SpaceModel)
             .scalar_subquery()
@@ -2130,6 +2131,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             )
         ):
             raise ValueError("Provide agent_id or both federation_id and series_id.")
+        if agent_id is not None and not start_run_request.user_prompt.strip():
+            raise ValueError("Agent automation prompt must be nonempty")
         current = now()
         stmt = (
             insert(AutomationModel)
@@ -2206,6 +2209,57 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             request = StartRunRequest()
             request.ParseFromString(start_run_request)
             return request, flwr_aid
+
+    def claim_agent_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> SpaceItem | None:
+        """Claim an occurrence and insert its item in one transaction."""
+        with self.session() as session:
+            row = session.execute(
+                select(
+                    AutomationModel.start_run_request,
+                    AutomationModel.remaining_runs,
+                    AgentModel.default_space_id,
+                )
+                .join(AgentModel, AgentModel.agent_id == AutomationModel.agent_id)
+                .where(
+                    AutomationModel.automation_id == automation_id,
+                    AutomationModel.status == AutomationStatus.ACTIVE,
+                    AutomationModel.next_run_at
+                    == datetime.fromisoformat(previous_next_run_at),
+                    AutomationModel.start_run_request.is_not(None),
+                    or_(
+                        AutomationModel.remaining_runs.is_(None),
+                        AutomationModel.remaining_runs > 0,
+                    ),
+                    AgentModel.deleted_at.is_(None),
+                )
+            ).one_or_none()
+            if row is None:
+                return None
+            start_run_request, remaining_runs, space_id = row
+            request = StartRunRequest()
+            request.ParseFromString(start_run_request)
+            if not request.user_prompt.strip():
+                raise ValueError("Agent automation prompt must be nonempty")
+            if not self.advance_automation(
+                automation_id,
+                previous_next_run_at=previous_next_run_at,
+                next_run_at=next_run_at,
+            ):
+                return None
+            item = self.store_space_item(
+                space_id, SpaceItemType.AUTOMATION, request.user_prompt
+            )
+            if item is None:
+                raise ValueError("Agent default Space not found")
+            if remaining_runs == 1:
+                self.finish_automation(automation_id, status=AutomationStatus.COMPLETED)
+            return item
 
     def list_automations(  # pylint: disable=too-many-arguments,too-many-locals,too-many-boolean-expressions
         self,

@@ -54,6 +54,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.run import Run
+from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 
 from . import runtime_handlers
 
@@ -76,7 +77,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         self.state.get_compacted_contexts.return_value = []
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
-        runtime_handlers.get_compacted_contexts(
+        core_runtime_handlers.get_compacted_contexts(
             GetCompactedContextsRequest(), self.state, task
         )
 
@@ -97,7 +98,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             )
         )
 
-        runtime_handlers.put_compacted_context(
+        core_runtime_handlers.put_compacted_context(
             request,
             self.state,
             Task(task_id=1, run_id=123, type=TaskType.AGENT_APP),
@@ -115,7 +116,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_compacted_contexts(
+            core_runtime_handlers.get_compacted_contexts(
                 GetCompactedContextsRequest(), self.state, task
             )
         self.assertEqual(
@@ -123,7 +124,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         )
 
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.put_compacted_context(
+            core_runtime_handlers.put_compacted_context(
                 PutCompactedContextRequest(), self.state, task
             )
         self.assertEqual(
@@ -439,7 +440,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
             after_event_id=5, last_n=1, event_types=["message"]
         )
 
-        response = runtime_handlers.get_space_events(
+        response = core_runtime_handlers.get_space_events(
             request, self.state, Task(run_id=10)
         )
 
@@ -457,7 +458,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """A federation task cannot read Space events."""
         self.state.get_run.return_value = [Run.create_empty(run_id=10)]
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_space_events(
+            core_runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
             )
 
@@ -470,7 +471,7 @@ class TestSuperNodeRuntimeHandlers(unittest.TestCase):
         """An unknown authenticated run cannot read Space events."""
         self.state.get_run.return_value = []
         with self.assertRaises(FlowerError) as error:
-            runtime_handlers.get_space_events(
+            core_runtime_handlers.get_space_events(
                 GetSpaceEventsRequest(), self.state, Task(run_id=10)
             )
 
