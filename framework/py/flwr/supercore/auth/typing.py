@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class AccountAuthLoginDetails:
+class AccountAuthLoginDetails:  # pylint: disable=too-many-instance-attributes
     """Account authentication login details."""
 
     authn_type: str
@@ -29,6 +29,7 @@ class AccountAuthLoginDetails:
     interval: int
     verification_uri: str = ""
     user_code: str = ""
+    supports_cli_signup: bool = False
 
 
 @dataclass

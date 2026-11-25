@@ -221,11 +221,10 @@ def confirm_message_received(
 def create_task(
     request: Annotated[CreateTaskRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> CreateTaskResponse:
     """Create a task."""
-    return handlers.create_task(request, state, task)
+    return core_runtime_handlers.create_task(request, state, task)
 
 
 @router.post("/start-automation")
@@ -274,77 +273,70 @@ def get_run_series_events(
 def get_space_events(
     request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    return handlers.get_space_events(request, state, task)
+    return core_runtime_handlers.get_space_events(request, state, task)
 
 
 @router.post("/get-space-messages")
 def runtime_get_space_messages(
     request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceMessagesResponse:
     """Read messages from the authenticated task's Space."""
-    return handlers.get_space_messages(request, state, task)
+    return core_runtime_handlers.get_space_messages(request, state, task)
 
 
 @router.post("/get-space-items")
 def runtime_get_space_items(
     request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceItemsResponse:
     """Read items from the authenticated task's Space."""
-    return handlers.get_space_items(request, state, task)
+    return core_runtime_handlers.get_space_items(request, state, task)
 
 
 @router.post("/send-space-message")
 def runtime_send_space_message(
     request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> SendSpaceMessageResponse:
     """Publish a message to the authenticated task's Space."""
-    return handlers.send_space_message(request, state, task)
+    return core_runtime_handlers.send_space_message(request, state, task)
 
 
 @router.post("/send-space-item")
 def runtime_send_space_item(
     request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> SendSpaceItemResponse:
     """Publish a message item to the task's Space."""
-    return handlers.send_space_item(request, state, task)
+    return core_runtime_handlers.send_space_item(request, state, task)
 
 
 @router.post("/get-compacted-contexts")
 def get_compacted_contexts(
     request: Annotated[GetCompactedContextsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetCompactedContextsResponse:
     """Get summaries from the authenticated task's run series."""
-    return handlers.get_compacted_contexts(request, state, task)
+    return core_runtime_handlers.get_compacted_contexts(request, state, task)
 
 
 @router.post("/put-compacted-context")
 def put_compacted_context(
     request: Annotated[PutCompactedContextRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PutCompactedContextResponse:
     """Store a summary in the authenticated task's run series."""
-    return handlers.put_compacted_context(request, state, task)
+    return core_runtime_handlers.put_compacted_context(request, state, task)
 
 
 @router.post("/pull-task-message")
@@ -433,52 +425,40 @@ def get_nodes(
 
 
 @router.post("/put-file")
-def put_file(  # pylint: disable=protected-access
+def put_file(
     request: Annotated[PutFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PutFileResponse:
     """Store a file."""
-    return core_runtime_handlers.put_file(
-        request, state, handlers._get_agent_id(state, task)
-    )
+    return core_runtime_handlers.put_file(request, state, task)
 
 
 @router.post("/get-file")
-def get_file(  # pylint: disable=protected-access
+def get_file(
     request: Annotated[GetFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetFileResponse:
     """Get a file."""
-    return core_runtime_handlers.get_file(
-        request, state, handlers._get_agent_id(state, task)
-    )
+    return core_runtime_handlers.get_file(request, state, task)
 
 
 @router.post("/list-files")
-def list_files(  # pylint: disable=protected-access
+def list_files(
     request: Annotated[ListFilesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> ListFilesResponse:
     """List file metadata."""
-    return core_runtime_handlers.list_files(
-        request, state, handlers._get_agent_id(state, task)
-    )
+    return core_runtime_handlers.list_files(request, state, task)
 
 
 @router.post("/delete-file")
-def delete_file(  # pylint: disable=protected-access
+def delete_file(
     request: Annotated[DeleteFileRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> DeleteFileResponse:
     """Delete a file."""
-    return core_runtime_handlers.delete_file(
-        request, state, handlers._get_agent_id(state, task)
-    )
+    return core_runtime_handlers.delete_file(request, state, task)
