@@ -409,7 +409,7 @@ def test_get_space_events_uses_authenticated_task_space() -> None:
         event_types=["message"],
     )
 
-    response = runtime_handlers.get_space_events(request, state, Task(run_id=123))
+    response = core_runtime_handlers.get_space_events(request, state, Task(run_id=123))
 
     assert response == GetSpaceEventsResponse(events=[expected_event])
     state.get_run.assert_called_once_with(run_ids=[123])
@@ -428,7 +428,7 @@ def test_get_space_events_rejects_non_space_run() -> None:
     state.get_run.return_value = [Mock(space_id=None)]
 
     with pytest.raises(FlowerError) as error:
-        runtime_handlers.get_space_events(
+        core_runtime_handlers.get_space_events(
             GetSpaceEventsRequest(), state, Task(run_id=123)
         )
 
@@ -442,7 +442,7 @@ def test_get_space_events_rejects_unknown_run() -> None:
     state.get_run.return_value = []
 
     with pytest.raises(FlowerError) as error:
-        runtime_handlers.get_space_events(
+        core_runtime_handlers.get_space_events(
             GetSpaceEventsRequest(), state, Task(run_id=123)
         )
 
@@ -459,7 +459,9 @@ def test_get_compacted_contexts_uses_authenticated_agent() -> None:
     state.get_compacted_contexts.return_value = []
     task = Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
 
-    runtime_handlers.get_compacted_contexts(GetCompactedContextsRequest(), state, task)
+    core_runtime_handlers.get_compacted_contexts(
+        GetCompactedContextsRequest(), state, task
+    )
 
     state.get_compacted_contexts.assert_called_once_with(
         789, limit=1, before_context_id=None
@@ -476,7 +478,7 @@ def test_put_compacted_context_uses_authenticated_agent() -> None:
         context=CompactedContext(through_event_id=9, text="Summary", token_count=123)
     )
 
-    runtime_handlers.put_compacted_context(
+    core_runtime_handlers.put_compacted_context(
         request, state, Task(task_id=1, run_id=123, type=TaskType.AGENT_APP)
     )
 
@@ -497,11 +499,11 @@ def test_compacted_contexts_require_primary_agent(
 
     with pytest.raises(FlowerError) as error:
         if operation == "get":
-            runtime_handlers.get_compacted_contexts(
+            core_runtime_handlers.get_compacted_contexts(
                 GetCompactedContextsRequest(), state, task
             )
         else:
-            runtime_handlers.put_compacted_context(
+            core_runtime_handlers.put_compacted_context(
                 PutCompactedContextRequest(), state, task
             )
 
@@ -841,7 +843,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
-        response = runtime_handlers.create_task(
+        response = core_runtime_handlers.create_task(
             CreateTaskRequest(type=TaskType.SIMULATION, fab_hash="fab-hash"),
             self.state,
             self._auth_task,
