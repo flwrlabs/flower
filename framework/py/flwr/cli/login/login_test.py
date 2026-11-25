@@ -121,7 +121,8 @@ def test_login_completes_advertised_signup(
     requests: list[tuple[str, dict[str, str] | None]] = []
 
     def send(request: httpx.Request) -> httpx.Response:
-        assert request.url == "https://control.example:8443/v1/user/signup"
+        resource = {"GET": "handle", "POST": "signup"}[request.method]
+        assert request.url == f"https://control.example:8443/v1/user/{resource}"
         assert request.headers["Authorization"] == "Bearer access-token"
         auth_plugin.store_tokens.assert_not_called()
         payload = json.loads(request.content) if request.content else None

@@ -40,7 +40,8 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
         ) from None
     if connection.insecure or not origin.host or origin.userinfo:
         raise click.ClickException("Signup requires a valid HTTPS SuperLink address.")
-    url = origin.copy_with(path="/v1/user/signup", query=None, fragment=None)
+    handle_url = origin.copy_with(path="/v1/user/handle", query=None, fragment=None)
+    signup_url = origin.copy_with(path="/v1/user/signup", query=None, fragment=None)
 
     verify: ssl.SSLContext | bool = True
     if root_certificates := load_certificate_in_connection(connection):
@@ -53,7 +54,7 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
             follow_redirects=False,
             headers={"Authorization": f"Bearer {access_token}"},
         ) as client:
-            if _read_handle(client.get(url)) is not None:
+            if _read_handle(client.get(handle_url)) is not None:
                 return
 
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -64,7 +65,7 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
 
             while True:
                 handle = prompt_text("Choose a handle for your Flower account")
-                response = client.post(url, json={"handle": handle})
+                response = client.post(signup_url, json={"handle": handle})
                 if response.status_code == httpx.codes.CONFLICT:
                     typer.echo(
                         "That handle is already in use. Choose another.", err=True
