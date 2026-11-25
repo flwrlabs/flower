@@ -79,6 +79,7 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -127,6 +128,31 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_agent_run_candidates_use_unread_items(self) -> None:
+        """Select the first unread item not authored by the agent."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
+        alice = SpaceParticipant(flwr_aid="alice")
+        agent_author = SpaceParticipant(agent_id=agent.id)
+        state.create_space_message(space_id, alice, "Legacy message")
+        state.store_space_item(space_id, SpaceItemType.MESSAGE, "Own", agent_author)
+        assert not state.get_agent_run_candidates()
+        first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "First", alice)
+        state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
+        assert first is not None
+        assert state.get_agent_run_candidates() == [(space_id, agent, first.id)]
+        state.get_space_items(space_id, agent_author, unread_only=True)
+        assert not state.get_agent_run_candidates()
+        next_item = state.store_space_item(
+            space_id, SpaceItemType.AUTOMATION, "Next scheduled"
+        )
+        assert next_item is not None
+        assert state.get_agent_run_candidates() == [(space_id, agent, next_item.id)]
 
     def test_store_messages_policy_results_keep_input_order(self) -> None:
         """Reject individual endpoints without rejecting the rest of a batch."""
@@ -2594,7 +2620,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         return self.states
 
     def test_agent_run_admission_is_atomic(self) -> None:
-        """Two replicas admit one Run even after the triggering message is read."""
+        """Two replicas admit one Run even after the triggering item is read."""
         with tempfile.TemporaryDirectory() as tmpdir:
             states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
             state = states[0]
@@ -2605,11 +2631,15 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             space_id = UUID(state.get_spaces("alice")[0].id)
             fab_hash = state.store_fab(Fab("", b"fab", {}))
             assert not state.get_agent_run_candidates()
-            state.create_space_message(
-                space_id, SpaceParticipant(flwr_aid="alice"), "User message"
+            item = state.store_space_item(
+                space_id,
+                SpaceItemType.MESSAGE,
+                "User message",
+                SpaceParticipant(flwr_aid="alice"),
             )
-            assert state.get_agent_run_candidates() == [(space_id, agent)]
-            state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
+            assert item is not None
+            assert state.get_agent_run_candidates() == [(space_id, agent, item.id)]
+            state.get_space_items(space_id, SpaceParticipant(agent_id=agent.id))
             assert not state.get_agent_run_candidates()
             barrier = Barrier(2)
 
@@ -2626,6 +2656,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                     primary_task_type=TaskType.AGENT_APP,
                     space_id=space_id,
                     agent_id=agent.id,
+                    trigger_item_id=item.id,
                 )
 
             with ThreadPoolExecutor(max_workers=2) as pool:

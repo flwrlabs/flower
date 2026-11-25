@@ -1316,7 +1316,7 @@ def process_pending_agent_runs(
     """Resolve eligible AgentApps and attempt to open execution windows."""
     created = 0
     # Scan eligible agents; limit successful admissions rather than candidates.
-    for space_id, agent in state.get_agent_run_candidates():
+    for space_id, agent, trigger_item_id in state.get_agent_run_candidates():
         if created >= limit:
             break
         try:
@@ -1345,8 +1345,7 @@ def process_pending_agent_runs(
                 primary_task_type=TaskType.AGENT_APP,
                 space_id=space_id,
                 agent_id=agent.id,
-                # SpaceMessages have no SpaceItem ID until they enter the item stream.
-                trigger_item_id=None,
+                trigger_item_id=trigger_item_id,
             )
             if run_id:
                 created += 1

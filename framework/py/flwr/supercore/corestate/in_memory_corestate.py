@@ -1308,9 +1308,10 @@ class InMemoryCoreState(
                 result.CopyFrom(space)
                 result.latest_user_message = next(
                     (
-                        message.content
-                        for message in reversed(self.space_message_store[space_id])
-                        if message.author.HasField("flwr_aid")
+                        item.content
+                        for item in reversed(self.space_item_store[space_id])
+                        if item.type == SpaceItemType.MESSAGE.value
+                        and item.author.HasField("flwr_aid")
                     ),
                     "",
                 )
