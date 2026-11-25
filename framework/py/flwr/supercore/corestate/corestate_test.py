@@ -2846,10 +2846,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert first is not None and second is not None and automation is not None
         events = state.get_user_events("bob", cursor)
         self.assertEqual(
-            [entry.event.type for entry in events], ["message.created"] * 2
+            [entry.event.type for entry in events], ["message.created"] * 3
         )
         self.assertEqual(
-            [entry.event.payload["content"] for entry in events], ["first", "second"]
+            [entry.event.payload["content"] for entry in events],
+            ["first", "second", "scheduled"],
         )
         self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
         self.assertEqual([first.type, second.type], ["message", "message"])
