@@ -457,6 +457,7 @@ exported, silently leaving Ray's original import failure in place:
                         _phys_n=""
                         if [ -d /sys/class/kfd/kfd/topology/nodes ]; then
                             _phys_n=0
+                            _phys_n_verified=0
                             for _node_dir in \
                                 /sys/class/kfd/kfd/topology/nodes/*/; do
                                 # The GPU ID lives in the sibling `gpu_id`
@@ -466,25 +467,42 @@ exported, silently leaving Ray's original import failure in place:
                                 # physical GPU.
                                 _gpu_id_file="${_node_dir}gpu_id"
                                 [ -r "$_gpu_id_file" ] || continue
+                                _phys_n_verified=1
                                 _gpu_id=$(cat "$_gpu_id_file")
                                 if [ -n "$_gpu_id" ] && [ "$_gpu_id" != "0" ]; then
                                     _phys_n=$((_phys_n + 1))
                                 fi
                             done
+                            if [ "$_phys_n_verified" -eq 0 ]; then
+                                # Every per-node `gpu_id` file was hidden or
+                                # unreadable (e.g. a restricted container with
+                                # a partial sysfs mount) -- this is not the
+                                # same as a verified zero-GPU topology, so the
+                                # bound must stay unknown rather than falsely
+                                # confirming zero GPUs and rejecting an
+                                # otherwise-valid mask like
+                                # ROCR_VISIBLE_DEVICES=0.
+                                _phys_n=""
+                            fi
                         fi
                         if [ -z "$_phys_n" ]; then
                             # Cannot verify at all (e.g. a container without
-                            # KFD topology mounted) -- same "bound unknown"
-                            # treatment as a missing ROCR_VISIBLE_DEVICES.
+                            # KFD topology mounted, or with it mounted but
+                            # every per-node gpu_id file hidden/unreadable) --
+                            # same "bound unknown" treatment as a missing
+                            # ROCR_VISIBLE_DEVICES.
                             echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
                                  "is syntactically well-formed, but" \
-                                 "/sys/class/kfd/kfd/topology/nodes is missing" \
-                                 "on this host (e.g. a container without KFD" \
-                                 "topology mounted), so its entries cannot be" \
-                                 "confirmed to name real AMD GPUs. The number" \
-                                 "of devices it exposes cannot be safely" \
-                                 "derived from it; verify manually if" \
-                                 "ClientApps see no usable GPU." >&2
+                                 "/sys/class/kfd/kfd/topology/nodes is" \
+                                 "missing, or its per-node gpu_id files are" \
+                                 "hidden/unreadable, on this host (e.g. a" \
+                                 "container without KFD topology mounted, or" \
+                                 "with a partial/restricted sysfs mount), so" \
+                                 "its entries cannot be confirmed to name" \
+                                 "real AMD GPUs. The number of devices it" \
+                                 "exposes cannot be safely derived from it;" \
+                                 "verify manually if ClientApps see no usable" \
+                                 "GPU." >&2
                         else
                             _bad_ordinal=0
                             for _trimmed_id in "${_rocr_norm[@]}"; do
@@ -512,8 +530,8 @@ exported, silently leaving Ray's original import failure in place:
                 fi
             fi
             unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
-                _rocr_has_numeric _rocr_has_uuid _phys_n _node_dir \
-                _gpu_id_file _gpu_id _bad_ordinal
+                _rocr_has_numeric _rocr_has_uuid _phys_n _phys_n_verified \
+                _node_dir _gpu_id_file _gpu_id _bad_ordinal
         fi
     fi
     if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then

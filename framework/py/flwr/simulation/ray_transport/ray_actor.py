@@ -260,8 +260,9 @@ def _amd_access_message(
     # until that candidate is ruled out.
     if not has_accessible_unknown_vendor:
         message += (
-            " Ray and the ML framework will keep reporting zero GPUs until "
-            "this is fixed."
+            " Ray and the ML framework will keep reporting zero AMD/ROCm "
+            "GPUs until this is fixed (an NVIDIA/CUDA GPU on the same host, "
+            "if any, is discovered independently of this and is unaffected)."
         )
     return message
 
@@ -329,18 +330,18 @@ def _unknown_vendor_access_notes(denied: list[str], inconclusive: list[str]) -> 
         )
     if denied:
         return (
-            "Separately, this process cannot open it (no read/write "
-            "access): the current user is likely missing from the "
-            "`render` (and `video`) group that owns it, or the container "
-            "was started without `--device=/dev/dri --group-add render "
-            "--group-add video`. Fix that regardless, but also check the "
-            "node's vendor manually before assuming the access fix alone "
-            "will restore GPU discovery."
+            f"Separately, this process cannot open ({', '.join(denied)}) "
+            "(no read/write access): the current user is likely missing "
+            "from the `render` (and `video`) group that owns it, or the "
+            "container was started without `--device=/dev/dri "
+            "--group-add render --group-add video`. Fix that regardless, "
+            "but also check the node's vendor manually before assuming "
+            "the access fix alone will restore GPU discovery."
         )
     return (
-        "and whether it can even be opened is undetermined too (e.g. a "
-        "driver-level `ENODEV`/`EIO`, or this process running out of "
-        "file descriptors)."
+        f"and whether ({', '.join(inconclusive)}) can even be opened is "
+        "undetermined too (e.g. a driver-level `ENODEV`/`EIO`, or this "
+        "process running out of file descriptors)."
     )
 
 
@@ -509,7 +510,9 @@ def _log_kfd_diagnostics() -> None:
             "all. ROCm reaches the GPU through both `/dev/kfd` and a "
             "render node, so fixing `amdsmi`/ROCM_PATH will not help "
             "here -- Ray and the ML framework will both keep reporting "
-            "zero GPUs until the render node itself exists. Unlike a "
+            "zero AMD/ROCm GPUs until the render node itself exists "
+            "(an NVIDIA/CUDA GPU on the same host, if any, is discovered "
+            "independently of this and is unaffected). Unlike a "
             "permission-denied node, this is not a group-membership "
             "issue -- there is no node for `--group-add render` to "
             "grant access to. Check that the device is passed through "
