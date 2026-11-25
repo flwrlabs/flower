@@ -30,6 +30,7 @@ message Space {
   string created_at = 3;
   repeated SpaceParticipant participants = 4;
   string latest_user_message = 5;
+  string latest_agent_message = 6;
 }
 
 message CreateSpaceRequest { repeated SpaceParticipant participants = 1; }

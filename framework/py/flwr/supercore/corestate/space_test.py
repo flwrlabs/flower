@@ -106,6 +106,27 @@ def test_latest_user_message(state: CoreState) -> None:
     ]
 
 
+def test_latest_agent_message(state: CoreState) -> None:
+    """Bootstrap retains the latest reply when a newer user prompt arrives."""
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@flower/research")
+    )
+    assert agent is not None
+    space = state.get_spaces("alice")[0]
+    assert space.latest_agent_message == ""
+    space_id = UUID(space.id)
+    author = SpaceParticipant(agent_id=agent.id)
+    state.create_space_message(space_id, author, "First reply")
+    state.create_space_message(space_id, author, "Latest reply")
+    state.create_space_message(
+        space_id, SpaceParticipant(flwr_aid="alice"), "Next prompt"
+    )
+    snapshot = state.get_bootstrap("alice")
+    restored = type(snapshot).FromString(snapshot.SerializeToString())
+    assert restored.spaces[0].latest_agent_message == "Latest reply"
+    assert restored.spaces[0].latest_user_message == "Next prompt"
+
+
 def test_participation_controls_message_access(state: CoreState) -> None:
     """Only initial participants can read and publish space messages."""
     bob = SpaceParticipant(flwr_aid="bob")

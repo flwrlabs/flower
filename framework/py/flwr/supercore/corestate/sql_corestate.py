@@ -1600,7 +1600,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces with their latest user message, newest first."""
+        """List spaces newest first, including latest user and agent messages."""
         viewer = SpaceParticipantTable.alias("viewer")
         latest_user_message = (
             select(SpaceMessageModel.content)
@@ -1613,10 +1613,23 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             .correlate(SpaceModel)
             .scalar_subquery()
         )
+        # Keep agent replies available without loading each Space history.
+        latest_agent_message = (
+            select(SpaceMessageModel.content)
+            .where(
+                SpaceMessageModel.space_id == SpaceModel.id,
+                SpaceMessageModel.agent_id.is_not(None),
+            )
+            .order_by(SpaceMessageModel.id.desc())
+            .limit(1)
+            .correlate(SpaceModel)
+            .scalar_subquery()
+        )
         query = (
             select(
                 SpaceModel,
                 latest_user_message,
+                latest_agent_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1637,12 +1650,17 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
-                query
-            ):
+            for (
+                model,
+                prompt,
+                reply,
+                member_flwr_aid,
+                member_agent_id,
+            ) in session.execute(query):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
                     spaces[model.id].latest_user_message = prompt or ""
+                    spaces[model.id].latest_agent_message = reply or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)

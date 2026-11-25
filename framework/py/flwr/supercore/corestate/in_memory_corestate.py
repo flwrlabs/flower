@@ -1291,7 +1291,7 @@ class InMemoryCoreState(
             return space
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces with their latest user message, newest first."""
+        """List spaces newest first, including latest user and agent messages."""
         viewer = SpaceParticipant(flwr_aid=flwr_aid)
         with self.lock_space_store, self.lock_agent_store:
             hidden_spaces = {
@@ -1311,6 +1311,14 @@ class InMemoryCoreState(
                         message.content
                         for message in reversed(self.space_message_store[space_id])
                         if message.author.HasField("flwr_aid")
+                    ),
+                    "",
+                )
+                result.latest_agent_message = next(
+                    (
+                        message.content
+                        for message in reversed(self.space_message_store[space_id])
+                        if message.author.HasField("agent_id")
                     ),
                     "",
                 )

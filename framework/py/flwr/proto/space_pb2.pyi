@@ -55,10 +55,12 @@ class Space(google.protobuf.message.Message):
     CREATED_AT_FIELD_NUMBER: builtins.int
     PARTICIPANTS_FIELD_NUMBER: builtins.int
     LATEST_USER_MESSAGE_FIELD_NUMBER: builtins.int
+    LATEST_AGENT_MESSAGE_FIELD_NUMBER: builtins.int
     id: builtins.str
     title: builtins.str
     created_at: builtins.str
     latest_user_message: builtins.str
+    latest_agent_message: builtins.str
     @property
     def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceParticipant]: ...
     def __init__(
@@ -69,8 +71,9 @@ class Space(google.protobuf.message.Message):
         created_at: builtins.str = ...,
         participants: collections.abc.Iterable[global___SpaceParticipant] | None = ...,
         latest_user_message: builtins.str = ...,
+        latest_agent_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "latest_user_message", b"latest_user_message", "participants", b"participants", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "latest_agent_message", b"latest_agent_message", "latest_user_message", b"latest_user_message", "participants", b"participants", "title", b"title"]) -> None: ...
 
 global___Space = Space
 
