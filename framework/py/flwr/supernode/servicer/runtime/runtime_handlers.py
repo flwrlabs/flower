@@ -41,18 +41,12 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
-    GetCompactedContextsRequest,
-    GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    GetSpaceEventsRequest,
-    GetSpaceEventsResponse,
     ListAgentConnectorsRequest,
     ListAgentConnectorsResponse,
     PullAppMessagesRequest,
@@ -63,18 +57,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-    PutCompactedContextRequest,
-    PutCompactedContextResponse,
-)
-from flwr.proto.space_pb2 import (  # pylint: disable=E0611
-    GetSpaceItemsRequest,
-    GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
-    SendSpaceItemRequest,
-    SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore import log
@@ -82,16 +64,7 @@ from flwr.supercore.constant import TaskType
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
-from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supernode.nodestate import NodeState
-
-
-def _get_agent_id(state: NodeState, task: Task) -> int:
-    """Resolve the authenticated task's agent ID for file scoping."""
-    runs = state.get_run(run_ids=[task.run_id])
-    return core_runtime_handlers.require_agent_id(
-        runs[0] if runs else None, task.run_id
-    )
 
 
 def acquire_task(request: AcquireTaskRequest, state: NodeState) -> AcquireTaskResponse:
@@ -110,13 +83,7 @@ def pull_task_input(
     run_id = task.run_id
 
     # Retrieve run, context, and FAB for this run
-    runs = state.get_run(run_ids=[run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND,
-            f"Run {run_id} not found in NodeState.",
-        )
-    run = runs[0]
+    run = core_runtime_handlers.get_task_run(state, task)
     series_context = state.get_run_series_context(run.series_id)
     if series_context is None:
         raise FlowerError(
@@ -291,14 +258,7 @@ def get_run_series_events(
 ) -> GetRunSeriesEventsResponse:
     """Get locally available AgentApp events from the authenticated run series."""
     log(DEBUG, "Runtime.GetRunSeriesEvents")
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND,
-            f"Run {task.run_id} not found in NodeState.",
-        )
-
-    run = runs[0]
+    run = core_runtime_handlers.get_task_run(state, task)
     agent_task_ids = []
     for candidate in state.get_tasks():
         if candidate.type != TaskType.AGENT_APP:
@@ -321,97 +281,6 @@ def get_run_series_events(
     return GetRunSeriesEventsResponse(events=events)
 
 
-def get_space_events(
-    request: GetSpaceEventsRequest,
-    state: NodeState,
-    task: Task,
-) -> GetSpaceEventsResponse:
-    """Get locally available events from the authenticated task's Space."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND,
-            f"Run {task.run_id} not found in NodeState.",
-        )
-    run = runs[0]
-    if run.space_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "This endpoint is only available to Space tasks.",
-        )
-    return core_runtime_handlers.get_space_events(request, state, run.space_id)
-
-
-def get_space_messages(
-    request: GetSpaceMessagesRequest, state: NodeState, task: Task
-) -> GetSpaceMessagesResponse:
-    """Reject Space message reads on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space messages are only available on SuperLink.",
-    )
-
-
-def get_space_items(
-    request: GetSpaceItemsRequest, state: NodeState, task: Task
-) -> GetSpaceItemsResponse:
-    """Reject Space item reads on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space items are only available on SuperLink.",
-    )
-
-
-def send_space_message(
-    request: SendSpaceMessageRequest, state: NodeState, task: Task
-) -> SendSpaceMessageResponse:
-    """Reject Space message publication on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space messages are only available on SuperLink.",
-    )
-
-
-def send_space_item(
-    request: SendSpaceItemRequest, state: NodeState, task: Task
-) -> SendSpaceItemResponse:
-    """Reject Space item publication on SuperNode."""
-    raise FlowerError(
-        ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-        "Space items are only available on SuperLink.",
-    )
-
-
-def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: NodeState, task: Task
-) -> GetCompactedContextsResponse:
-    """Get summaries for the agent."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, runs[0])
-    return core_runtime_handlers.get_compacted_contexts(
-        request, state, participant.agent_id
-    )
-
-
-def put_compacted_context(
-    request: PutCompactedContextRequest, state: NodeState, task: Task
-) -> PutCompactedContextResponse:
-    """Store a summary for the agent."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, runs[0])
-    return core_runtime_handlers.put_compacted_context(
-        request, state, participant.agent_id
-    )
-
-
 def start_automation(
     request: StartAutomationRequest,
     state: NodeState,
@@ -423,26 +292,6 @@ def start_automation(
         ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
         "Only AgentApp and ServerApp tasks can create automations.",
     )
-
-
-def create_task(
-    request: CreateTaskRequest, state: NodeState, task: Task
-) -> CreateTaskResponse:
-    """Create a child task without access to stored connector credentials."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found in NodeState."
-        )
-    if request.type == TaskType.CONNECTOR and (
-        request.HasField("connector_id")
-        or not connector_registry.has_builtin_connector(request.connector_ref)
-    ):
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_CONNECTOR_NOT_AVAILABLE,
-            "Stored connections are only available on SuperLink.",
-        )
-    return core_runtime_handlers.create_task(request, state, task, runs[0])
 
 
 def list_agent_connectors(
