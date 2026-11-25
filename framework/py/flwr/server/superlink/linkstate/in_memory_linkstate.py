@@ -520,8 +520,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def get_agent_run_candidates(
         self, *, limit: int | None = None
-    ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run."""
+    ) -> Sequence[tuple[UUID, Agent, int]]:
+        """Find participating agents with unread items and no open Run."""
         if limit is not None and limit <= 0:
             return []
         with (
@@ -544,15 +544,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         space_id, member.agent_id
                     ):
                         continue
-                    cursor = self.space_participant_cursors.get(
+                    cursor = self.space_participant_item_cursors.get(
                         (space_id, member.agent_id), 0
                     )
-                    if any(
-                        message.id > cursor
-                        and message.author.agent_id != member.agent_id
-                        for message in self.space_message_store[space_id]
-                    ):
-                        candidates.append((space_id, agents[member.agent_id]))
+                    trigger_item_id = next(
+                        (
+                            item.id
+                            for item in self.space_item_store[space_id]
+                            if item.id > cursor
+                            and item.author.agent_id != member.agent_id
+                        ),
+                        None,
+                    )
+                    if trigger_item_id is not None:
+                        candidates.append(
+                            (space_id, agents[member.agent_id], trigger_item_id)
+                        )
                         if limit is not None and len(candidates) == limit:
                             return candidates
             return candidates

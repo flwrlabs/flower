@@ -22,6 +22,7 @@ from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
+from flwr.supercore.constant import SpaceItemType
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -74,7 +75,7 @@ def test_create_and_list_spaces(state: CoreState) -> None:
 
 
 def test_latest_user_message(state: CoreState) -> None:
-    """Summarize each space's newest user message without consuming history."""
+    """Summarize each space's newest user message item without consuming history."""
     agent = state.create_agent(
         "alice", AgentConfig(name="Agent", app_spec="@flower/research")
     )
@@ -84,24 +85,33 @@ def test_latest_user_message(state: CoreState) -> None:
     alice = SpaceParticipant(flwr_aid="alice")
     bob = SpaceParticipant(flwr_aid="bob")
     author = SpaceParticipant(agent_id=agent.id)
-    state.create_space_message(UUID(personal.id), author, "Agent-only space")
+    state.store_space_item(
+        UUID(personal.id), SpaceItemType.MESSAGE, "Agent-only space", author
+    )
     shared = state.create_space(participants=[alice, bob, author])
     space_id = UUID(shared.id)
-    first = state.create_space_message(space_id, alice, "First prompt")
+    state.create_space_message(space_id, alice, "Legacy prompt")
+    assert state.get_spaces("bob")[0].latest_user_message == ""
+    first = state.store_space_item(
+        space_id, SpaceItemType.MESSAGE, "First prompt", alice
+    )
     previous = state.get_spaces("bob")[0]
     prompt = "  Follow up: €100.\nNext line.  "
-    latest = state.create_space_message(space_id, bob, prompt)
-    reply = state.create_space_message(space_id, author, "Agent reply")
+    latest = state.store_space_item(space_id, SpaceItemType.MESSAGE, prompt, bob)
+    automation = state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
+    reply = state.store_space_item(
+        space_id, SpaceItemType.MESSAGE, "Agent reply", author
+    )
     other = state.create_space(participants=[alice])
-    state.create_space_message(UUID(other.id), alice, "Other space")
-    expected = {personal.id: "", shared.id: prompt, other.id: "Other space"}
+    state.store_space_item(UUID(other.id), SpaceItemType.MESSAGE, "Other space", alice)
     assert {
         space.id: space.latest_user_message for space in state.get_spaces("alice")
-    } == expected
+    } == {personal.id: "", shared.id: prompt, other.id: "Other space"}
     assert previous.latest_user_message == "First prompt"
-    assert state.get_space_messages(space_id, alice, unread_only=True) == [
+    assert state.get_space_items(space_id, alice, unread_only=True) == [
         first,
         latest,
+        automation,
         reply,
     ]
 
