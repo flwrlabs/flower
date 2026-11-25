@@ -98,6 +98,7 @@ MAX_SPACE_PAGE_SIZE = 100
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
 APP_PUBLISH_INCLUDE_PATTERNS = (
     "**/*.py",
+    "**/*.m",
     "**/*.toml",
     "**/*.md",
     "**/*.yaml",
