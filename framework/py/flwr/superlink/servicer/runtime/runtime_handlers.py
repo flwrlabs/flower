@@ -16,7 +16,7 @@
 
 # pylint: disable=unused-argument
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
@@ -442,7 +442,17 @@ def _resolve_agent_automation_schedule(
 
     if max_runs == 1:
         fixed_interval = None
-    return start_at.astimezone(UTC).isoformat(), fixed_interval, max_runs
+    try:
+        start_at = start_at.astimezone(UTC)
+        if fixed_interval is not None:
+            occurrences = max_runs - 1 if max_runs is not None else 1
+            _ = start_at + timedelta(seconds=fixed_interval * occurrences)
+    except OverflowError as exc:
+        error = "The next automation occurrence is outside the supported date range."
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST, error, public_details=error
+        ) from exc
+    return start_at.isoformat(), fixed_interval, max_runs
 
 
 def start_automation(

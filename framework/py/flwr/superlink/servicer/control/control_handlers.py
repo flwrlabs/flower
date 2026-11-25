@@ -1374,10 +1374,20 @@ def process_due_automations(
     )
 
     for automation in due_automations:
-        next_run_at = (
-            datetime.fromisoformat(automation.next_run_at)
-            + timedelta(seconds=automation.fixed_interval)
-        ).isoformat()
+        if automation.HasField("remaining_runs") and automation.remaining_runs == 1:
+            next_run_at = None
+        else:
+            try:
+                next_run_at = (
+                    datetime.fromisoformat(automation.next_run_at)
+                    + timedelta(seconds=automation.fixed_interval)
+                ).isoformat()
+            except (OverflowError, ValueError) as exc:
+                log(ERROR, "Failing automation %d: %s", automation.automation_id, exc)
+                state.finish_automation(
+                    automation.automation_id, status=AutomationStatus.FAILED
+                )
+                continue
         if automation.HasField("agent_id"):
             try:
                 state.claim_agent_automation(

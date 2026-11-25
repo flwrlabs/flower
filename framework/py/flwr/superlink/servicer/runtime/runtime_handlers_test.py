@@ -790,6 +790,18 @@ def test_start_agent_automation_from_space_run(backend: str, tmp_path: Path) -> 
             start_run_request=StartRunRequest(user_prompt="Do work"),
             start_at="2030-07-10T04:00:00",
         ),
+        StartAutomationRequest(
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            start_at="2030-07-10T09:00:00Z",
+            fixed_interval=10**12,
+            max_runs=2,
+        ),
+        StartAutomationRequest(
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            start_at="2030-07-10T09:00:00Z",
+            fixed_interval=150_000_000_000,
+            max_runs=3,
+        ),
     ):
         with pytest.raises(FlowerError) as error:
             runtime_handlers.start_automation(invalid, state, task)
@@ -920,6 +932,48 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             automation_ids=[automation.automation_id], order_by="updated_at"
         )[0]
         self.assertEqual(stored.status, AutomationStatus.COMPLETED)
+
+    def test_acquire_task_skips_unrepresentable_automation(self) -> None:
+        """Fail a bad schedule without blocking later due automations."""
+        agent = self.state.create_agent(
+            NOOP_FLWR_AID, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        due_at = datetime.now(tz=UTC).isoformat()
+        invalid = self.state.store_automation(
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(user_prompt="Invalid"),
+            next_run_at=due_at,
+            fixed_interval=10**12,
+            max_runs=2,
+            agent_id=agent.id,
+        )
+        final = self.state.store_automation(
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(user_prompt="One shot"),
+            next_run_at=due_at,
+            fixed_interval=10**12,
+            max_runs=1,
+            agent_id=agent.id,
+        )
+
+        with patch.object(runtime_handlers, "process_pending_agent_runs"):
+            runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+            runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+
+        stored = self.state.list_automations(
+            automation_ids=[invalid.automation_id, final.automation_id],
+            order_by="updated_at",
+        )
+        assert {item.automation_id: item.status for item in stored} == {
+            invalid.automation_id: AutomationStatus.FAILED,
+            final.automation_id: AutomationStatus.COMPLETED,
+        }
+        items = self.state.get_space_items(
+            UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+        )
+        assert items is not None
+        self.assertEqual([item.content for item in items], ["One shot"])
 
     def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
         """An empty acquisition still triggers scheduled automations."""
