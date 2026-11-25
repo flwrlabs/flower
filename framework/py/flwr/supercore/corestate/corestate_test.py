@@ -1574,7 +1574,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
 
     def test_claim_agent_automation_stores_each_occurrence(self) -> None:
-        """Claim each due occurrence once and append an automation item."""
+        """Claim each due occurrence once, including with overlapping polls."""
         state = self.state_factory()
         agent = state.create_agent(
             "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
@@ -1597,6 +1597,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 next_run_at=None,
             )
         )
+        other_poll = state.list_automations(
+            statuses=[AutomationStatus.ACTIVE],
+            due_before=now(),
+            order_by="next_run_at",
+            limit=1,
+        )[0]
         first = state.claim_agent_automation(
             automation.automation_id,
             previous_next_run_at=first_due,
@@ -1610,10 +1616,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(
             state.claim_agent_automation(
                 automation.automation_id,
-                previous_next_run_at=first_due,
+                previous_next_run_at=other_poll.next_run_at,
                 next_run_at=second_due,
             )
         )
+        self.assertEqual(other_poll.next_run_at, first_due)
         second = state.claim_agent_automation(
             automation.automation_id,
             previous_next_run_at=second_due,

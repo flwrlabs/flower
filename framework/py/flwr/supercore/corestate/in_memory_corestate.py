@@ -1791,7 +1791,8 @@ class InMemoryCoreState(
                 automations.sort(key=lambda automation: automation.next_run_at)
             if limit is not None:
                 automations = automations[:limit]
-            return automations
+            # Keep later claims from changing the due times seen by this caller.
+            return [deepcopy(automation) for automation in automations]
 
     def stop_automation(self, automation_id: int) -> bool:
         """Stop an active automation."""
