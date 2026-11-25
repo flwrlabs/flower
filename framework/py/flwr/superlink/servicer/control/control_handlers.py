@@ -1378,13 +1378,27 @@ def process_due_automations(
             datetime.fromisoformat(automation.next_run_at)
             + timedelta(seconds=automation.fixed_interval)
         ).isoformat()
-
-        dispatch_automation(
-            state,
-            automation.automation_id,
-            previous_next_run_at=automation.next_run_at,
-            next_run_at=next_run_at,
-        )
+        if automation.HasField("agent_id"):
+            try:
+                state.claim_agent_automation(
+                    automation.automation_id,
+                    previous_next_run_at=automation.next_run_at,
+                    next_run_at=next_run_at,
+                )
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                log(
+                    ERROR,
+                    "Unable to enqueue agent automation %d: %s",
+                    automation.automation_id,
+                    exc,
+                )
+        else:
+            dispatch_automation(
+                state,
+                automation.automation_id,
+                previous_next_run_at=automation.next_run_at,
+                next_run_at=next_run_at,
+            )
 
 
 def list_automations(

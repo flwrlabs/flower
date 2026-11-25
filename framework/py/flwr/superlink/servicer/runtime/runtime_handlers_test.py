@@ -73,6 +73,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushTaskOutputResponse,
     PutCompactedContextRequest,
 )
+from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -81,6 +82,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     AutomationStatus,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -814,6 +816,33 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             order_by="updated_at",
         )
         self.assertEqual(active, [])
+
+    def test_acquire_task_adds_due_agent_automation_item(self) -> None:
+        """A due agent automation enters its default Space once."""
+        agent = self.state.create_agent(
+            NOOP_FLWR_AID, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        automation = self.state.store_automation(
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(user_prompt="Summarize today"),
+            next_run_at=datetime.now(tz=UTC).isoformat(),
+            max_runs=1,
+            agent_id=agent.id,
+        )
+        with patch.object(runtime_handlers, "process_pending_agent_runs"):
+            runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+            runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+        items = self.state.get_space_items(
+            UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+        )
+        assert items is not None and len(items) == 1
+        self.assertEqual(items[0].type, SpaceItemType.AUTOMATION.value)
+        self.assertEqual(items[0].content, "Summarize today")
+        stored = self.state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.COMPLETED)
 
     def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
         """An empty acquisition still triggers scheduled automations."""

@@ -67,7 +67,7 @@ from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
-from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceItem, SpaceParticipant  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
@@ -2664,6 +2664,86 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             assert sum(bool(run_id) for run_id in run_ids) == 1
             assert len(state.get_run()) == 1
             assert not state.get_agent_run_candidates()
+
+    def test_agent_automation_claim_is_atomic(self) -> None:
+        """Two SQL replicas create one item for the same due occurrence."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
+            state = states[0]
+            agent = state.create_agent(
+                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+            )
+            assert agent is not None
+            due_at = now().isoformat()
+            automation = state.store_automation(
+                flwr_aid="alice",
+                start_run_request=StartRunRequest(user_prompt="Do work"),
+                next_run_at=due_at,
+                max_runs=1,
+                agent_id=agent.id,
+            )
+            barrier = Barrier(2)
+
+            def claim(backend: LinkState) -> SpaceItem | None:
+                barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
+                return backend.claim_agent_automation(
+                    automation.automation_id,
+                    previous_next_run_at=due_at,
+                    next_run_at=None,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(claim, states))
+            self.assertEqual(sum(item is not None for item in results), 1)
+            self.assertEqual(
+                state.get_space_items(
+                    UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+                ),
+                [item for item in results if item is not None],
+            )
+
+    def test_agent_automation_item_failure_rolls_back_claim(self) -> None:
+        """A failed SQL item insert leaves the occurrence available to retry."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        due_at = now().isoformat()
+        automation = state.store_automation(
+            flwr_aid="alice",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=due_at,
+            max_runs=1,
+            agent_id=agent.id,
+        )
+        with patch.object(
+            state, "store_space_item", side_effect=RuntimeError("failed")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "failed"):
+                state.claim_agent_automation(
+                    automation.automation_id,
+                    previous_next_run_at=due_at,
+                    next_run_at=None,
+                )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.ACTIVE)
+        self.assertEqual(stored.remaining_runs, 1)
+        self.assertEqual(
+            state.get_space_items(
+                UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+            ),
+            [],
+        )
+        self.assertIsNotNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=due_at,
+                next_run_at=None,
+            )
+        )
 
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""
