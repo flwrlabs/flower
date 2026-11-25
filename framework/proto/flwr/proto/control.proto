@@ -106,7 +106,8 @@ message Automation {
 }
 message ListAutomationsRequest {
   string federation = 1;
-  // When set, list this owned Agent's automations instead of federation automations.
+  // When set, list this owned Agent's automations instead of federation
+  // automations.
   optional uint64 agent_id = 2;
 }
 message ListAutomationsResponse { repeated Automation automations = 1; }

@@ -444,7 +444,9 @@ class ListAutomationsRequest(google.protobuf.message.Message):
     AGENT_ID_FIELD_NUMBER: builtins.int
     federation: builtins.str
     agent_id: builtins.int
-    """When set, list this owned Agent's automations instead of federation automations."""
+    """When set, list this owned Agent's automations instead of federation
+    automations.
+    """
     def __init__(
         self,
         *,
