@@ -81,6 +81,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -147,6 +149,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -157,10 +161,14 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -174,6 +182,7 @@ from flwr.supercore.constant import (
     FLOWER_AGENT_APP_ID,
     FLWR_SUPERGRID_API_URL,
     HUB_APP_REFRESH_INTERVAL,
+    MAX_SPACE_PAGE_SIZE,
     NOOP_FEDERATION_ID,
     OAUTH_SESSION_TTL,
     RUN_SERIES_DESCRIPTION_MAX_LENGTH,
@@ -181,6 +190,7 @@ from flwr.supercore.constant import (
     AutomationStatus,
     DeviceAuthorizationError,
     RunTime,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -298,6 +308,36 @@ def create_agent(
             "Unable to create agent with the supplied values."
         )
     return CreateAgentResponse(agent=agent)
+
+
+def update_agent(
+    request: UpdateAgentRequest, account: AuthenticatedUser, state: LinkState
+) -> UpdateAgentResponse:
+    """Publish an owned agent's replacement configuration with a version check."""
+    try:
+        agent = state.update_agent(
+            flwr_aid=account.user_id,
+            agent_id=request.agent_id,
+            expected_config_version=request.expected_config_version,
+            config=request.config,
+        )
+    except ValueError as exc:
+        raise InvalidAgentRequestError(str(exc)) from exc
+    if agent is None:
+        raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
+    return UpdateAgentResponse(agent=agent)
+
+
+def delete_agent(
+    request: DeleteAgentRequest, account: AuthenticatedUser, state: LinkState
+) -> DeleteAgentResponse:
+    """Delete an owned agent, including repeated deletion requests."""
+    if not state.delete_agent(account.user_id, request.agent_id):
+        raise FlowerError(
+            ApiErrorCode.AGENT_NOT_FOUND,
+            "Agent not found or account is not the owner.",
+        )
+    return DeleteAgentResponse()
 
 
 def list_agents(
@@ -1498,8 +1538,8 @@ def get_space_messages(
 ) -> GetSpaceMessagesResponse:
     """Read a participating user's message history with an exclusive ID cursor."""
     limit = request.limit if request.HasField("limit") else 50
-    if limit > 100:
-        raise InvalidSpaceRequestError("limit must be at most 100.")
+    if limit > MAX_SPACE_PAGE_SIZE:
+        raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
     try:
         messages = state.get_space_messages(
             UUID(request.space_id),
@@ -1516,6 +1556,31 @@ def get_space_messages(
             "Space not found or account is not a participant.",
         )
     return GetSpaceMessagesResponse(messages=messages)
+
+
+def get_space_items(
+    request: GetSpaceItemsRequest, account: AuthenticatedUser, state: LinkState
+) -> GetSpaceItemsResponse:
+    """Read a participating user's Space items with an exclusive ID cursor."""
+    limit = request.limit if request.HasField("limit") else 50
+    if limit > MAX_SPACE_PAGE_SIZE:
+        raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
+    try:
+        items = state.get_space_items(
+            UUID(request.space_id),
+            SpaceParticipant(flwr_aid=account.user_id),
+            limit=limit,
+            before_id=request.before_id if request.HasField("before_id") else None,
+            unread_only=request.unread_only,
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if items is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return GetSpaceItemsResponse(items=items)
 
 
 def send_space_message(
@@ -1536,6 +1601,27 @@ def send_space_message(
             "Space not found or account is not a participant.",
         )
     return SendSpaceMessageResponse(message=message)
+
+
+def send_space_item(
+    request: SendSpaceItemRequest, account: AuthenticatedUser, state: LinkState
+) -> SendSpaceItemResponse:
+    """Persist a message item authored by the authenticated account."""
+    try:
+        item = state.store_space_item(
+            UUID(request.space_id),
+            SpaceItemType.MESSAGE,
+            request.content,
+            SpaceParticipant(flwr_aid=account.user_id),
+        )
+    except ValueError as exc:
+        raise InvalidSpaceRequestError(str(exc)) from exc
+    if item is None:
+        raise FlowerError(
+            ApiErrorCode.SPACE_NOT_FOUND,
+            "Space not found or account is not a participant.",
+        )
+    return SendSpaceItemResponse(item=item)
 
 
 def list_run_series(

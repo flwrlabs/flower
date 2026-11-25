@@ -80,6 +80,7 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -95,6 +96,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
 )
 from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -139,6 +141,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.corestate_models import (
     SpaceMessage as SpaceMessageModel,
 )
@@ -157,7 +160,7 @@ from flwr.supercore.state.schema.types import UTCDateTime
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
+from .corestate import CoreState, _validate_space_item
 from .utils import (
     context_from_bytes,
     context_to_bytes,
@@ -1688,6 +1691,117 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
             return message
 
+    def store_space_item(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        content: str,
+        author: SpaceParticipant | None = None,
+    ) -> SpaceItem | None:
+        """Authorize and store a typed item in one SQL statement."""
+        _validate_space_item(item_type, content, author)
+
+        flwr_aid = (author.flwr_aid or None) if author is not None else None
+        agent_id = (author.agent_id or None) if author is not None else None
+        source = select(
+            SpaceModel.id,
+            literal(item_type.value),
+            literal(flwr_aid),
+            literal(agent_id),
+            literal(now(), type_=UTCDateTime()),
+            literal(content),
+        ).where(SpaceModel.id == space_id)
+        if author is not None:
+            field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
+            source = source.where(
+                exists().where(
+                    SpaceParticipantTable.c.space_id == SpaceModel.id,
+                    SpaceParticipantTable.c[field]
+                    == (author.flwr_aid or author.agent_id),
+                )
+            )
+        try:
+            with self.session() as session:
+                model = session.scalars(
+                    insert(SpaceItemModel)
+                    .from_select(
+                        [
+                            "space_id",
+                            "type",
+                            "flwr_aid",
+                            "agent_id",
+                            "created_at",
+                            "content",
+                        ],
+                        source,
+                    )
+                    .returning(SpaceItemModel)
+                ).one_or_none()
+                return _space_item_from_model(model) if model is not None else None
+        except IntegrityError as exc:
+            raise ValueError("Invalid SpaceItem") from exc
+
+    def get_space_items(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceItem] | None:
+        """Read items and advance the participant's read cursor."""
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if before_id is not None and after_id is not None and after_id >= before_id:
+            raise ValueError("after_id must be less than before_id")
+        if not (participant.flwr_aid or participant.agent_id):
+            return None
+        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
+        identity = participant.flwr_aid or participant.agent_id
+        item_conditions = [SpaceItemModel.space_id == SpaceParticipantTable.c.space_id]
+        if unread_only:
+            item_conditions.append(
+                SpaceItemModel.id > SpaceParticipantTable.c.read_through_item_id
+            )
+        if before_id is not None and before_id <= 2**63 - 1:
+            item_conditions.append(SpaceItemModel.id < before_id)
+        if after_id is not None:
+            item_conditions.append(SpaceItemModel.id > min(after_id, 2**63 - 1))
+        query = (
+            select(SpaceItemModel)
+            .select_from(SpaceParticipantTable)
+            .outerjoin(SpaceItemModel, and_(*item_conditions))
+            .where(
+                SpaceParticipantTable.c.space_id == space_id,
+                SpaceParticipantTable.c[field] == identity,
+            )
+            .order_by(
+                SpaceItemModel.id.asc()
+                if unread_only or after_id is not None
+                else SpaceItemModel.id.desc()
+            )
+            .limit(limit)
+        )
+        with self.session() as session:
+            models = list(session.scalars(query))
+            if not models:
+                return None
+            items = [_space_item_from_model(model) for model in models if model]
+            if items:
+                read_through = max(item.id for item in items)
+                session.execute(
+                    update(SpaceParticipantTable)
+                    .where(
+                        SpaceParticipantTable.c.space_id == space_id,
+                        SpaceParticipantTable.c[field] == identity,
+                        SpaceParticipantTable.c.read_through_item_id < read_through,
+                    )
+                    .values(read_through_item_id=read_through)
+                )
+            return items if unread_only or after_id is not None else items[::-1]
+
     def get_space_messages(  # pylint: disable=too-many-arguments
         self,
         space_id: UUID,
@@ -3057,6 +3171,22 @@ def _space_message_from_model(
         created_at=model.created_at.isoformat(),
         content=model.content,
     )
+
+
+def _space_item_from_model(model: SpaceItemModel) -> SpaceItem:
+    """Convert a persisted SpaceItem to its API representation."""
+    item = SpaceItem(
+        id=model.id,
+        space_id=str(model.space_id),
+        created_at=model.created_at.isoformat(),
+        content=model.content,
+        type=model.type,
+    )
+    if model.flwr_aid is not None:
+        item.author.flwr_aid = model.flwr_aid
+    elif model.agent_id is not None:
+        item.author.agent_id = model.agent_id
+    return item
 
 
 def _run_series_from_model(model: RunSeriesModel) -> RunSeries:
