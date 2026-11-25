@@ -2247,6 +2247,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        agent_ids: Sequence[int] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -2259,6 +2260,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             limit == 0
             or (automation_ids is not None and not automation_ids)
+            or (agent_ids is not None and not agent_ids)
             or (federations is not None and not federations)
             or (statuses is not None and not statuses)
         ):
@@ -2267,6 +2269,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         query = select(AutomationModel)
         if automation_ids is not None:
             query = query.where(AutomationModel.automation_id.in_(automation_ids))
+        if agent_ids is not None:
+            query = query.where(AutomationModel.agent_id.in_(agent_ids))
         if federations is not None:
             query = query.where(AutomationModel.federation_id.in_(federations))
         if statuses is not None:
