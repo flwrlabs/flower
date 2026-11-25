@@ -1374,30 +1374,32 @@ def process_due_automations(
     )
 
     for automation in due_automations:
-        next_run_at = (
-            datetime.fromisoformat(automation.next_run_at)
-            + timedelta(seconds=automation.fixed_interval)
-        ).isoformat()
-        if automation.HasField("agent_id"):
-            try:
+        try:
+            if automation.HasField("remaining_runs") and automation.remaining_runs == 1:
+                next_run_at = None
+            else:
+                next_run_at = (
+                    datetime.fromisoformat(automation.next_run_at)
+                    + timedelta(seconds=automation.fixed_interval)
+                ).isoformat()
+
+            if automation.HasField("agent_id"):
                 state.claim_agent_automation(
                     automation.automation_id,
                     previous_next_run_at=automation.next_run_at,
                     next_run_at=next_run_at,
                 )
-            except Exception as exc:  # pylint: disable=broad-exception-caught
-                log(
-                    ERROR,
-                    "Unable to enqueue agent automation %d: %s",
+            else:
+                dispatch_automation(
+                    state,
                     automation.automation_id,
-                    exc,
+                    previous_next_run_at=automation.next_run_at,
+                    next_run_at=next_run_at,
                 )
-        else:
-            dispatch_automation(
-                state,
-                automation.automation_id,
-                previous_next_run_at=automation.next_run_at,
-                next_run_at=next_run_at,
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            log(ERROR, "Failing automation %d: %s", automation.automation_id, exc)
+            state.finish_automation(
+                automation.automation_id, status=AutomationStatus.FAILED
             )
 
 

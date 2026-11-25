@@ -16,6 +16,7 @@
 
 # pylint: disable=unused-argument
 
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
@@ -32,6 +33,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     StartAutomationRequest,
     StartAutomationResponse,
+    StartRunRequest,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -67,6 +69,7 @@ from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
@@ -389,6 +392,69 @@ def push_task_output(
     return PushTaskOutputResponse()
 
 
+def _resolve_agent_automation_schedule(
+    request: StartAutomationRequest,
+) -> tuple[str, int | None, int | None]:
+    """Validate and normalize an agent automation's schedule."""
+    # shortcut: Legacy Control creation uses the same rules until it is retired.
+    try:
+        start_at = (
+            datetime.fromisoformat(request.start_at)
+            if request.HasField("start_at")
+            else now()
+        )
+        if start_at.tzinfo is None:
+            raise ValueError("Timezone is required.")
+    except ValueError as exc:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Invalid automation start_at value: {request.start_at}",
+            public_details=(
+                "The automation start_at value must be a valid ISO 8601 "
+                "timestamp with a timezone."
+            ),
+        ) from exc
+
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1 if fixed_interval is None else None
+    )
+    if max_runs is not None and max_runs < 1:
+        error = "`max_runs` must be greater than zero."
+    elif fixed_interval is not None and fixed_interval < 1:
+        error = "`fixed_interval` must be greater than zero."
+    elif fixed_interval is not None and fixed_interval >= 2**63:
+        error = "`fixed_interval` must be less than 2**63."
+    elif fixed_interval is None and (max_runs is None or max_runs > 1):
+        error = "`fixed_interval` is required for automations with multiple runs."
+    else:
+        error = None
+    if error is not None:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            error,
+            public_details=error,
+        )
+
+    if max_runs == 1:
+        fixed_interval = None
+    try:
+        start_at = start_at.astimezone(UTC)
+        if fixed_interval is not None:
+            occurrences = max_runs - 1 if max_runs is not None else 1
+            _ = start_at + timedelta(seconds=fixed_interval * occurrences)
+    except OverflowError as exc:
+        error = "The next automation occurrence is outside the supported date range."
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST, error, public_details=error
+        ) from exc
+    return start_at.isoformat(), fixed_interval, max_runs
+
+
 def start_automation(
     request: StartAutomationRequest,
     state: LinkState,
@@ -402,6 +468,40 @@ def start_automation(
         )
 
     run = state.get_run(run_ids=[task.run_id])[0]
+    if run.space_id is not None:
+        if task.type != TaskType.AGENT_APP or run.agent_id is None:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
+                "Only Space AgentApps can create agent automations.",
+            )
+        prompt = request.start_run_request.user_prompt.strip()
+        if not prompt:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                "Agent automation prompt must be nonempty.",
+                public_details="The automation prompt must be nonempty.",
+            )
+        next_run_at, fixed_interval, max_runs = _resolve_agent_automation_schedule(
+            request
+        )
+        try:
+            automation = state.store_automation(
+                flwr_aid=run.flwr_aid,
+                agent_id=run.agent_id,
+                start_run_request=StartRunRequest(user_prompt=prompt),
+                next_run_at=next_run_at,
+                fixed_interval=fixed_interval,
+                max_runs=max_runs,
+            )
+        except ValueError as exc:
+            raise FlowerError(
+                ApiErrorCode.FAILED_TO_CREATE_RUN,
+                f"Failed to create automation for agent_id={run.agent_id}.",
+            ) from exc
+        return StartAutomationResponse(
+            automation_id=automation.automation_id,
+            next_run_at=automation.next_run_at,
+        )
     if not run.federation_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
