@@ -124,6 +124,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.protobuf.constants import (
+    CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE,
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
@@ -260,7 +261,7 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         """Parse the protobuf request and serialize the protobuf handler result."""
         request_type = PROTOBUF_REQUEST_TYPES.get((request.method, request.url.path))
         if request_type is not None:
-            self._check_request_media_type(request)
+            self._check_request_media_type(request, request_type)
             request.state.protobuf_request = self._parse_request(
                 await request.body(), request_type
             )
@@ -302,14 +303,20 @@ class ProtobufTranslationMiddleware(BaseHTTPMiddleware):
         return protobuf_response
 
     @staticmethod
-    def _check_request_media_type(request: Request) -> None:
+    def _check_request_media_type(
+        request: Request, request_type: type[Message]
+    ) -> None:
         content_type = request.headers.get("content-type", "")
         media_type = content_type.partition(";")[0].strip().lower()
-        if media_type != PROTOBUF_MEDIA_TYPE:
-            raise FlowerError(
-                ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
-                f"Unsupported Content-Type: {content_type!r}",
-            )
+        if media_type == PROTOBUF_MEDIA_TYPE or (
+            request_type is CreateFederationRequest
+            and media_type == CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE
+        ):
+            return
+        raise FlowerError(
+            ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
+            f"Unsupported Content-Type: {content_type!r}",
+        )
 
     @staticmethod
     def _parse_request(body: bytes, request_type: type[Message]) -> Message:

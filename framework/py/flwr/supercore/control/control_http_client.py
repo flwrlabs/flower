@@ -16,6 +16,8 @@
 
 from collections.abc import Generator
 
+import httpx
+
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
@@ -127,6 +129,16 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     SendSpaceMessageResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
+from flwr.supercore.protobuf.constants import (
+    CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE,
+    PROTOBUF_MEDIA_TYPE,
+)
+
+_CREATE_FEDERATION_PATH = "/v1/control/create-federation"
+_NAMESPACE_UNSUPPORTED = (
+    "The SuperLink did not confirm support for explicit federation namespaces. "
+    "Use an updated SuperLink that exposes its OpenAPI schema."
+)
 
 
 # Match the Control API method names, including HTTP-only token refresh.
@@ -536,14 +548,47 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
         )
 
     def CreateFederation(
-        self, request: CreateFederationRequest
+        self,
+        request: CreateFederationRequest,
+        *,
+        require_namespace_support: bool = False,
     ) -> CreateFederationResponse:
         """Create a federation."""
-        return self._unary_unary(
-            path="/v1/control/create-federation",
-            rpc_method="/flwr.proto.Control/CreateFederation",
-            request=request,
-            response_type=CreateFederationResponse,
+        content_type = PROTOBUF_MEDIA_TYPE
+        if require_namespace_support:
+            if not self._supports_create_federation_namespace():
+                raise ValueError(_NAMESPACE_UNSUPPORTED)
+            # An older server may receive the POST during a rolling upgrade.
+            content_type = CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE
+
+        try:
+            return self._unary_unary(
+                path=_CREATE_FEDERATION_PATH,
+                rpc_method="/flwr.proto.Control/CreateFederation",
+                request=request,
+                response_type=CreateFederationResponse,
+                content_type=content_type,
+            )
+        except httpx.HTTPStatusError as exc:
+            if (
+                require_namespace_support
+                and exc.response.status_code == httpx.codes.UNSUPPORTED_MEDIA_TYPE
+            ):
+                raise ValueError(_NAMESPACE_UNSUPPORTED) from exc
+            raise
+
+    def _supports_create_federation_namespace(self) -> bool:
+        response = self._client.get(f"{self._base_url}/openapi.json")
+        if not response.is_success:
+            return False
+        try:
+            operation = response.json()["paths"][_CREATE_FEDERATION_PATH]["post"]
+            content = operation["requestBody"]["content"]
+        except (KeyError, TypeError, ValueError):
+            return False
+        return (
+            isinstance(content, dict)
+            and CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE in content
         )
 
     def ArchiveFederation(

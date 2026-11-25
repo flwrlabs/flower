@@ -163,6 +163,7 @@ class ProtobufClient:
         request: Message,
         response_type: type[ResponseT],
         timeout: float | None = None,
+        content_type: str = PROTOBUF_MEDIA_TYPE,
     ) -> ResponseT:
         """Send a unary request and parse its unary protobuf response."""
         path = path if path.startswith("/") else f"/{path}"
@@ -174,7 +175,7 @@ class ProtobufClient:
                 url=f"{self._base_url}{path}",
                 content=content,
                 headers={
-                    "content-type": PROTOBUF_MEDIA_TYPE,
+                    "content-type": content_type,
                     "accept": PROTOBUF_MEDIA_TYPE,
                 },
                 timeout=self._client.timeout if timeout is None else timeout,

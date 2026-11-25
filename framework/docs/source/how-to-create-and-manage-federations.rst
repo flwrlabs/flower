@@ -180,6 +180,12 @@ Create federations:
         --description "<federation-description>" \
         --simulation
 
+With a federation name alone, the SuperLink uses your personal namespace. To select a
+namespace explicitly, use ``flwr federation create @<namespace>/<federation-name>
+supergrid``. The CLI checks the SuperLink's OpenAPI schema for namespace selection
+support before sending an explicit create request. If the schema is unavailable or lacks
+support, the command stops before creation.
+
 List federations and show federation details:
 
 .. code-block:: shell
