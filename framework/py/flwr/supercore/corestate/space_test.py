@@ -128,8 +128,11 @@ def test_latest_agent_message(state: CoreState) -> None:
     author = SpaceParticipant(agent_id=agent.id)
     state.create_space_message(space_id, author, "First reply")
     state.create_space_message(space_id, author, "Latest reply")
-    state.create_space_message(
-        space_id, SpaceParticipant(flwr_aid="alice"), "Next prompt"
+    state.store_space_item(
+        space_id,
+        SpaceItemType.MESSAGE,
+        "Next prompt",
+        SpaceParticipant(flwr_aid="alice"),
     )
     snapshot = state.get_bootstrap("alice")
     restored = type(snapshot).FromString(snapshot.SerializeToString())
