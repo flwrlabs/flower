@@ -213,7 +213,7 @@ def test_delete_agent_stops_activity(
     automation = state.store_automation(
         flwr_aid="alice",
         agent_id=agent.id,
-        start_run_request=StartRunRequest(),
+        start_run_request=StartRunRequest(user_prompt="Do work"),
         next_run_at=now().isoformat(),
     )
     create_run = partial(

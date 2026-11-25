@@ -1573,6 +1573,89 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored.agent_id, agent.id)
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
 
+    def test_claim_agent_automation_stores_each_occurrence(self) -> None:
+        """Claim each due occurrence once, including with overlapping polls."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        first_due = now().isoformat()
+        second_due = (now() + timedelta(seconds=60)).isoformat()
+        automation = state.store_automation(
+            flwr_aid="alice",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=first_due,
+            fixed_interval=60,
+            max_runs=2,
+            agent_id=agent.id,
+        )
+        self.assertIsNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=first_due,
+                next_run_at=None,
+            )
+        )
+        other_poll = state.list_automations(
+            statuses=[AutomationStatus.ACTIVE],
+            due_before=now(),
+            order_by="next_run_at",
+            limit=1,
+        )[0]
+        first = state.claim_agent_automation(
+            automation.automation_id,
+            previous_next_run_at=first_due,
+            next_run_at=second_due,
+        )
+        assert first is not None
+        self.assertEqual(first.type, SpaceItemType.AUTOMATION.value)
+        self.assertEqual(first.space_id, agent.default_space_id)
+        self.assertEqual(first.content, "Do work")
+        self.assertFalse(first.HasField("author"))
+        self.assertIsNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=other_poll.next_run_at,
+                next_run_at=second_due,
+            )
+        )
+        self.assertEqual(other_poll.next_run_at, first_due)
+        second = state.claim_agent_automation(
+            automation.automation_id,
+            previous_next_run_at=second_due,
+            next_run_at=None,
+        )
+        assert second is not None
+        self.assertGreater(second.id, first.id)
+        self.assertEqual(
+            state.get_space_items(
+                UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+            ),
+            [first, second],
+        )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.COMPLETED)
+        self.assertEqual(stored.remaining_runs, 0)
+
+    def test_agent_automation_requires_prompt(self) -> None:
+        """Reject agent automations that cannot produce an item."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        with self.assertRaisesRegex(ValueError, "prompt must be nonempty"):
+            state.store_automation(
+                flwr_aid="alice",
+                start_run_request=StartRunRequest(),
+                next_run_at=now().isoformat(),
+                max_runs=1,
+                agent_id=agent.id,
+            )
+
     def test_store_automation_requires_one_owner(self) -> None:
         """Reject missing, partial, or mixed automation ownership."""
         state = self.state_factory()
