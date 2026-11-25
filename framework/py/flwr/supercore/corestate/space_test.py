@@ -14,15 +14,17 @@
 # ==============================================================================
 """Space persistence tests."""
 
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
+from google.protobuf.json_format import MessageToDict
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
-from flwr.supercore.constant import SpaceItemType
+from flwr.supercore.constant import EventType, SpaceItemType
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -114,6 +116,63 @@ def test_latest_user_message(state: CoreState) -> None:
         automation,
         reply,
     ]
+
+
+@pytest.mark.parametrize("author_kind", ["user", "agent"])
+def test_message_items_publish_user_events(state: CoreState, author_kind: str) -> None:
+    """Deliver message items to all user participants for live updates."""
+    agent = state.create_agent(
+        "alice", AgentConfig(name="Agent", app_spec="@flower/research")
+    )
+    assert agent is not None
+    alice = SpaceParticipant(flwr_aid="alice")
+    bob = SpaceParticipant(flwr_aid="bob")
+    agent_author = SpaceParticipant(agent_id=agent.id)
+    space_id = UUID(state.create_space(participants=[alice, bob, agent_author]).id)
+    cursors = {user: state.get_bootstrap(user).cursor for user in ("alice", "bob")}
+    assert (
+        state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
+        is not None
+    )
+    author = alice if author_kind == "user" else agent_author
+    item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "Hello", author)
+    assert item is not None
+
+    events = []
+    for user, cursor in cursors.items():
+        entries = state.get_user_events(user, cursor)
+        assert len(entries) == 1
+        assert entries[0].seq == cursor + 1
+        events.append(entries[0].event)
+    assert events[0] == events[1]
+    event = events[0]
+    assert event.type == EventType.MESSAGE_CREATED
+    assert event.space_id == str(space_id)
+    assert MessageToDict(event.payload) == {
+        "id": str(item.id),
+        "space_id": str(space_id),
+        "author": (
+            {"flwr_aid": "alice"}
+            if author_kind == "user"
+            else {"agent_id": str(agent.id)}
+        ),
+        "created_at": item.created_at,
+        "content": "Hello",
+        "type": "message",
+    }
+    assert state.get_user_events("outsider") == []
+
+
+def test_message_item_event_failure(state: CoreState) -> None:
+    """Keep message storage and publication atomic when event storage fails."""
+    author = SpaceParticipant(flwr_aid="alice")
+    space_id = UUID(state.create_space(participants=[author]).id)
+    cursor = state.get_bootstrap("alice").cursor
+    with patch.object(state, "store_event", side_effect=RuntimeError("failed")):
+        with pytest.raises(RuntimeError, match="failed"):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "Hello", author)
+    assert state.get_space_items(space_id, author) == []
+    assert state.get_user_events("alice", cursor) == []
 
 
 def test_participation_controls_message_access(state: CoreState) -> None:

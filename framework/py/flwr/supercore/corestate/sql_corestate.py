@@ -967,7 +967,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1738,7 +1738,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .returning(SpaceItemModel)
                 ).one_or_none()
-                return _space_item_from_model(model) if model is not None else None
+                if model is None:
+                    return None
+                item = _space_item_from_model(model)
+                if item_type == SpaceItemType.MESSAGE:
+                    self.store_event(EventType.MESSAGE_CREATED, item, space_id=space_id)
+                return item
         except IntegrityError as exc:
             raise ValueError("Invalid SpaceItem") from exc
 

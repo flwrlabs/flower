@@ -793,7 +793,7 @@ class InMemoryCoreState(
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1365,6 +1365,8 @@ class InMemoryCoreState(
             )
             if author is not None:
                 item.author.CopyFrom(author)
+            if item_type == SpaceItemType.MESSAGE:
+                self.store_event(EventType.MESSAGE_CREATED, item, space_id=space_id)
             self.space_item_store[space_id].append(item)
             self.space_item_id_counter = item.id
             return item
