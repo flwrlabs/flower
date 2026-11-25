@@ -1603,12 +1603,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return participating spaces with their latest user message, newest first."""
         viewer = SpaceParticipantTable.alias("viewer")
         latest_user_message = (
-            select(SpaceMessageModel.content)
+            select(SpaceItemModel.content)
             .where(
-                SpaceMessageModel.space_id == SpaceModel.id,
-                SpaceMessageModel.flwr_aid.is_not(None),
+                SpaceItemModel.space_id == SpaceModel.id,
+                SpaceItemModel.type == SpaceItemType.MESSAGE.value,
+                SpaceItemModel.flwr_aid.is_not(None),
             )
-            .order_by(SpaceMessageModel.id.desc())
+            .order_by(SpaceItemModel.id.desc())
             .limit(1)
             .correlate(SpaceModel)
             .scalar_subquery()
