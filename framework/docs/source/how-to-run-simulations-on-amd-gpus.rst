@@ -926,9 +926,13 @@ what else it can detect about device access:
 - If every render node found is confirmed not AMD-backed -- for example a hybrid host or
   container exposing only an integrated Intel GPU's ``renderD128``, in any access
   state -- Flower reports that vendor mismatch instead, again stating that ``ROCM_PATH``
-  will not help. Fix render-node pass-through/permissions so that an AMD-backed node
-  specifically (identified by its sysfs PCI vendor ID) is accessible, not just any
-  render node.
+  will not help. Every node's vendor is determined before it is opened, so a
+  permission-denied AMD node would already have been reported as such rather than
+  landing in this case -- a permissions fix cannot make an absent AMD render node
+  appear. Instead, check that the AMD device itself is passed through at all (for
+  example a container started with ``--device=/dev/kfd`` but without the AMD GPU's
+  specific ``/dev/dri/renderD*`` node), and that the host's ``amdgpu`` driver actually
+  created a render node for it (``ls /dev/dri``).
 - If no render node is confirmed AMD-backed, but this host cannot determine at least one
   node's PCI vendor ID at all -- sysfs is missing or unreadable, as in some restricted
   containers -- Flower reports the vendor as undetermined rather than guessing either

@@ -420,17 +420,17 @@ def test_kfd_accessible_unknown_vendor_node_accessible_reports_vendor_only(
     assert "python -c 'import amdsmi'" not in output
 
 
-def test_kfd_mixed_unknown_vendor_accessible_and_denied_reports_accessible(
+def test_kfd_mixed_unknown_vendor_accessible_and_denied_reports_both(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that an accessible unknown-vendor node is reported even when
-    another unknown-vendor node on the same host is permission-denied.
+    """Test that an accessible unknown-vendor node's message also surfaces a
+    denied unknown-vendor node on the same host, instead of suppressing it.
 
     A restricted hybrid host can expose two render nodes with unreadable
-    sysfs: one AMD and accessible, one unrelated (e.g. Intel) and
-    permission-denied. The denied node must not win a plain `elif` and bury
-    the evidence that device access already works -- the actionable question
-    left is the accessible node's vendor, not permissions.
+    sysfs: one opens (e.g. an unrelated Intel GPU) while the other is
+    permission-denied -- and the denied one could be the actual AMD GPU.
+    Reporting only the accessible node would leave no path to the real
+    access problem once the user finds the open node is not AMD's.
     """
     client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
 
@@ -468,8 +468,7 @@ def test_kfd_mixed_unknown_vendor_accessible_and_denied_reports_accessible(
     output = caplog.text
     assert "opens successfully" in output
     assert "renderD128" in output
-    assert "this process cannot open it" not in output
-    assert "permission-denied" not in output
+    assert "this process cannot open it" in output
     assert "undetermined too" not in output
 
 

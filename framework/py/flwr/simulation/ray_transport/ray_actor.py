@@ -411,8 +411,10 @@ def _log_kfd_diagnostics() -> None:
             "the same group and likely affected too -- or "
             "the container was started without `--device=/dev/kfd "
             "--device=/dev/dri --group-add render --group-add video`. "
-            "Both Ray and the ML framework will report zero GPUs until "
-            "device access is fixed; fixing `amdsmi`/ROCM_PATH "
+            "Both Ray and the ML framework will report zero AMD/ROCm GPUs "
+            "until device access is fixed (an NVIDIA/CUDA GPU on the same "
+            "host, if any, is discovered independently of `/dev/kfd` and "
+            "is unaffected by this); fixing `amdsmi`/ROCM_PATH "
             "configuration will not help.",
         )
         return
@@ -476,6 +478,17 @@ def _log_kfd_diagnostics() -> None:
         if buckets.unknown_vendor_accessible
         else None
     )
+    # An accessible unknown-vendor node answers only the "does a GPU
+    # candidate open?" question, not "is the AMD GPU itself accessible?" --
+    # a denied/inconclusive unknown-vendor node elsewhere could be the AMD
+    # GPU hiding behind the one that opened. Append its failure notes rather
+    # than letting this branch suppress them outright.
+    if accessible_unknown_text and (
+        buckets.unknown_vendor_denied or buckets.unknown_vendor_inconclusive
+    ):
+        accessible_unknown_text += " " + _unknown_vendor_access_notes(
+            buckets.unknown_vendor_denied, buckets.unknown_vendor_inconclusive
+        )
 
     if amd_text:
         if accessible_unknown_text:
