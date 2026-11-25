@@ -114,9 +114,7 @@ class _SpaceAgentConnectors(RuntimeAgentConnectors):
         )
         tools: list[JSONObject] = []
         for name in dict.fromkeys(names):
-            if name == START_AUTOMATION_TOOL_NAME:
-                continue
-            if has_builtin_connector(name):
+            if name == START_AUTOMATION_TOOL_NAME or has_builtin_connector(name):
                 tools.extend(
                     self._agent_runtime.get_connector_tools(name, refresh=refresh)
                 )
@@ -155,9 +153,9 @@ class _SpaceAgentConnectors(RuntimeAgentConnectors):
     def call(self, tool_call: JSONObject) -> JSONObject:
         """Route advertised tools to their connection and reject federation tools."""
         name = cast(str, tool_call["name"]).strip().lower()
-        if name == START_AUTOMATION_TOOL_NAME:
-            raise NotImplementedError("Space sessions do not support automations.")
-        if has_builtin_connector(get_connector_ref(name)):
+        if name == START_AUTOMATION_TOOL_NAME or has_builtin_connector(
+            get_connector_ref(name)
+        ):
             return super().call(tool_call)
         if name not in self._tool_calls:
             raise ValueError(f"Tool '{name}' is not available in this Space session.")
