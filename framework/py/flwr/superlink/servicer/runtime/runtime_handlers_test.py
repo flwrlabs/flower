@@ -975,6 +975,33 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert items is not None
         self.assertEqual([item.content for item in items], ["One shot"])
 
+    def test_acquire_task_fails_automation_when_claim_raises(self) -> None:
+        """Mark a due automation as failed when its claim raises."""
+        agent = self.state.create_agent(
+            NOOP_FLWR_AID, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        automation = self.state.store_automation(
+            flwr_aid=NOOP_FLWR_AID,
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=datetime.now(tz=UTC).isoformat(),
+            max_runs=1,
+            agent_id=agent.id,
+        )
+
+        with (
+            patch.object(
+                self.state, "claim_agent_automation", side_effect=RuntimeError("failed")
+            ),
+            patch.object(runtime_handlers, "process_pending_agent_runs"),
+        ):
+            runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
+
+        stored = self.state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.FAILED)
+
     def test_acquire_task_processes_due_automations_without_capacity(self) -> None:
         """An empty acquisition still triggers scheduled automations."""
         with patch.object(runtime_handlers, "process_due_automations") as process_due:
