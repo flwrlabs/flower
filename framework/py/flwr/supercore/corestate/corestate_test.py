@@ -2835,6 +2835,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         alice = SpaceParticipant(flwr_aid="alice")
         bob = SpaceParticipant(flwr_aid="bob")
         space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        cursor = state.get_bootstrap("bob").cursor
         first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", alice)
         second = state.store_space_item(
             space_id, SpaceItemType.MESSAGE, "second", alice
@@ -2843,6 +2844,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             space_id, SpaceItemType.AUTOMATION, "scheduled"
         )
         assert first is not None and second is not None and automation is not None
+        events = state.get_user_events("bob", cursor)
+        self.assertEqual(
+            [entry.event.type for entry in events], ["message.created"] * 2
+        )
+        self.assertEqual(
+            [entry.event.payload["content"] for entry in events], ["first", "second"]
+        )
         self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
         self.assertEqual([first.type, second.type], ["message", "message"])
         self.assertEqual(automation.type, "automation")
@@ -2919,6 +2927,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert item is not None
         self.assertEqual(item.author, author)
         self.assertEqual(state.get_space_items(space_id, author), [item])
+        event = state.get_user_events("alice")[-1].event
+        self.assertEqual(event.type, EventType.MESSAGE_CREATED)
+        self.assertEqual(event.payload["id"], str(item.id))
+        self.assertEqual(event.space_id, str(space_id))
 
     def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
         """Reading items does not mark legacy messages as read."""
