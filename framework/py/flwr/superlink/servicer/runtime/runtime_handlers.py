@@ -486,6 +486,7 @@ def start_automation(
         )
         try:
             automation = state.store_automation(
+                title=request.title,
                 flwr_aid=run.flwr_aid,
                 agent_id=run.agent_id,
                 start_run_request=StartRunRequest(user_prompt=prompt),

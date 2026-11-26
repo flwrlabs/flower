@@ -551,6 +551,9 @@ class AgentRuntime:
         }
         self.push_run_events([function_call])
         try:
+            title = arguments.get("title")
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError("Automation title must be a non-empty string.")
             input_value = arguments.get("input")
             if not isinstance(input_value, str) or not input_value.strip():
                 raise ValueError("Automation input must be a non-empty string.")
@@ -565,6 +568,7 @@ class AgentRuntime:
                     start_run_request=self._start_run_request,
                 ),
             )
+            request.title = title.strip()
             request.start_run_request.user_prompt = input_value.strip()
             response = self._stub.StartAutomation(request)
             output: JSONObject = {

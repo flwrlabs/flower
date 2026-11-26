@@ -657,7 +657,8 @@ class TestAlembicRun(unittest.TestCase):
                     connection.execute(
                         text(
                             """
-                            SELECT created_at, updated_at, next_run_at, stopped_at
+                            SELECT created_at, updated_at, next_run_at,
+                                   stopped_at, title
                             FROM automation
                             WHERE federation_id = :federation_id
                             """
@@ -672,6 +673,7 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(automation["updated_at"], "2026-08-10 10:01:00+00:00")
             self.assertEqual(automation["next_run_at"], "2026-08-10 10:02:00+00:00")
             self.assertEqual(automation["stopped_at"], "2026-08-10 10:03:00+00:00")
+            self.assertEqual(automation["title"], "")
         finally:
             engine.dispose()
 

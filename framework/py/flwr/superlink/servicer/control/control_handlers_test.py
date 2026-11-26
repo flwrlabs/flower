@@ -930,6 +930,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
+            title="Daily summary",
             start_at="2026-07-10T04:00:00-05:00",
             fixed_interval=60,
             max_runs=3,
@@ -947,6 +948,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             automation_ids=[response.automation_id],
             order_by="updated_at",
         )[0]
+        self.assertEqual(automation.title, "Daily summary")
         self.assertEqual(
             (
                 automation.series_id,
@@ -984,6 +986,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
+        self.assertEqual(listed_automation.title, "")
 
     def test_start_automation_stores_hub_app_without_fab(self) -> None:
         """Store Hub automations by app ID so dispatch fetches the latest FAB."""

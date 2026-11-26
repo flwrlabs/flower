@@ -1245,6 +1245,7 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
         automation = state.store_automation(
+            title=request.title,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=stored_start_run_request,

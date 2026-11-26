@@ -447,6 +447,9 @@ class Automation(FlwrBase):
     automation_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True, nullable=False
     )
+    title: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("''")
+    )
     federation_id: Mapped[str | None] = mapped_column(String, nullable=True)
     flwr_aid: Mapped[str] = mapped_column(String, nullable=False)
     agent_id: Mapped[int | None] = mapped_column(

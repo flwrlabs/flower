@@ -758,6 +758,7 @@ def test_start_agent_automation_from_space_run(backend: str, tmp_path: Path) -> 
     task = Task(run_id=run_id, type=TaskType.AGENT_APP)
 
     request = StartAutomationRequest(
+        title="Daily summary",
         start_run_request=StartRunRequest(user_prompt="  Do work  "),
         start_at="2030-07-10T04:00:00-05:00",
         fixed_interval=60,
@@ -776,6 +777,7 @@ def test_start_agent_automation_from_space_run(backend: str, tmp_path: Path) -> 
         0,
     )
     assert (stored.fixed_interval, stored.remaining_runs) == (60, 2)
+    assert stored.title == "Daily summary"
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.start_automation(

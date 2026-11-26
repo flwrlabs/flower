@@ -76,7 +76,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_loads
 
 from .files import RuntimeAgentFiles
@@ -619,10 +619,10 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     )
 
 
-def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
+def test_start_automation_tool_exposes_title_input_and_schedule() -> None:
     """Keep the embedded run request out of the model-facing schema."""
     # Prepare
-    expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
+    expected_properties = {"title", "input", "start_at", "fixed_interval", "max_runs"}
 
     # Execute
     parameters = connector_registry.get_connector_tools(START_AUTOMATION_TOOL_NAME)[0][
@@ -634,7 +634,7 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     properties = parameters["properties"]
     assert isinstance(properties, dict)
     assert set(properties) == expected_properties
-    assert parameters["required"] == ["input", "start_at"]
+    assert parameters["required"] == ["title", "input", "start_at"]
 
 
 def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
@@ -699,6 +699,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         events=Mock(),
     )
     arguments: JSONObject = {
+        "title": "  Daily summary  ",
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",
         "fixed_interval": 60,
@@ -712,6 +713,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     # Assert
     request = stub.StartAutomation.call_args.args[0]
     assert request == StartAutomationRequest(
+        title="Daily summary",
         start_at="2026-07-28T12:00:00Z",
         fixed_interval=60,
         max_runs=3,
@@ -731,6 +733,31 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     assert items[0]["name"] == START_AUTOMATION_TOOL_NAME
 
 
+@pytest.mark.parametrize("title", [None, "", "   ", 123])
+def test_call_automation_rejects_invalid_title(title: JSONValue) -> None:
+    """Reject missing, blank, and non-string titles before creating a schedule."""
+    stub, events = Mock(), Mock()
+    runtime = AgentRuntime(
+        stub=stub,
+        run_id=123,
+        task_id=789,
+        start_run_request=StartRunRequest(),
+        events=events,
+    )
+    arguments: JSONObject = {
+        "input": "Do work",
+        "start_at": "2026-07-28T12:00:00Z",
+    }
+    if title is not None:
+        arguments["title"] = title
+
+    with pytest.raises(ValueError, match="Automation title must be a non-empty string"):
+        runtime.call_automation_with_events(call_id="call-1", arguments=arguments)
+
+    stub.StartAutomation.assert_not_called()
+    assert events.emit.call_args.args[0]["type"] == "function_call_output"
+
+
 def test_space_session_creates_automation() -> None:
     """Expose automation creation without a federation run request."""
     stub, events = Mock(), Mock()
@@ -748,12 +775,17 @@ def test_space_session_creates_automation() -> None:
         {
             "name": START_AUTOMATION_TOOL_NAME,
             "call_id": "call-1",
-            "arguments": {"input": "Do work", "start_at": "2026-07-28T12:00:00Z"},
+            "arguments": {
+                "title": "Daily summary",
+                "input": "Do work",
+                "start_at": "2026-07-28T12:00:00Z",
+            },
         }
     )
 
     stub.StartAutomation.assert_called_once_with(
         StartAutomationRequest(
+            title="Daily summary",
             start_at="2026-07-28T12:00:00Z",
             start_run_request=StartRunRequest(user_prompt="Do work"),
         )
