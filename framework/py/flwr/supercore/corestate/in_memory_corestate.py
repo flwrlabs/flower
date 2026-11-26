@@ -1763,10 +1763,7 @@ class InMemoryCoreState(
                 automation = record.automation
 
                 # Apply agent and federation filters.
-                if (
-                    agent_ids is not None
-                    and automation.agent_id not in agent_ids
-                ) or (
+                if (agent_ids is not None and automation.agent_id not in agent_ids) or (
                     federation_set is not None
                     and automation.federation not in federation_set
                 ):
