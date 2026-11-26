@@ -1572,6 +1572,22 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(automation.agent_id, agent.id)
         self.assertEqual(stored.agent_id, agent.id)
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
+        self.assertEqual(
+            [
+                item.automation_id
+                for item in state.list_automations(
+                    agent_ids=[agent.id], order_by="updated_at"
+                )
+            ],
+            [automation.automation_id],
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[], order_by="updated_at"), []
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[agent.id + 1], order_by="updated_at"),
+            [],
+        )
 
     def test_claim_agent_automation_stores_each_occurrence(self) -> None:
         """Claim each due occurrence once, including with overlapping polls."""
