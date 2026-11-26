@@ -49,10 +49,16 @@ group:
     ls -l /dev/kfd   # e.g. crw-rw---- 1 root render ...
     id -nG           # must list the owning group
 
-If your account is not in that group, nothing below will help: your ML framework and Ray
-will *both* report zero GPUs. Add yourself to the ``render`` and ``video`` groups with
-``sudo usermod -aG render,video "$USER"``, then start a new login session. If you run
-Flower in a container, pass the devices through instead:
+If your account is not in that group, your ML framework cannot use the GPU: it opens
+``/dev/kfd`` directly for compute, and no ``ROCM_PATH``/``HIP_VISIBLE_DEVICES``
+configuration covered later in this guide changes that -- only group membership or
+device pass-through will. Ray's own GPU count works differently: it comes from the
+``amdsmi`` package rather than opening ``/dev/kfd`` directly, so Ray may still report
+the GPU as present even while your ``ClientApp`` cannot use it -- a non-zero Ray GPU
+count does not mean this group-membership issue does not apply to you. Add yourself to
+the ``render`` and ``video`` groups with ``sudo usermod -aG render,video "$USER"``, then
+start a new login session. If you run Flower in a container, pass the devices through
+instead:
 
 .. code-block:: shell
 

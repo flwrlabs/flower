@@ -228,6 +228,30 @@ def _access_failure_notes(denied: list[str], inconclusive: list[str]) -> str:
     return joiner + " ".join(notes) if len(notes) > 1 else "Opening " + notes[0]
 
 
+def _amd_access_failure_caveats(denied: list[str], inconclusive: list[str]) -> str:
+    """Build caveat sentence(s) for confirmed-AMD node(s) that fail to open.
+
+    Shared between `_amd_access_message` (no accessible AMD node at all) and
+    the `amd_accessible` branch of `_log_kfd_diagnostics` (some AMD node(s)
+    open, but not all of them) -- the "why did this fail" caveats are the
+    same in both cases.
+    """
+    caveats = ""
+    if denied:
+        caveats += (
+            " This is a permissions issue, not a missing or unimportable "
+            "`amdsmi`; fixing `amdsmi`/ROCM_PATH configuration will not help "
+            "the permission-denied node(s)."
+        )
+    if inconclusive:
+        caveats += (
+            " The inconclusive node(s) are not a group-membership issue; "
+            "check this process's open-file limit and the kernel/dmesg log "
+            "for driver errors instead."
+        )
+    return caveats
+
+
 def _amd_access_message(
     denied: list[str],
     inconclusive: list[str],
@@ -241,18 +265,7 @@ def _amd_access_message(
         "The ROCm kernel driver is loaded and accessible (/dev/kfd), but "
         + _access_failure_notes(denied, inconclusive)
     )
-    if denied:
-        message += (
-            " This is a permissions issue, not a missing or unimportable "
-            "`amdsmi`; fixing `amdsmi`/ROCM_PATH configuration will not help "
-            "the permission-denied node(s)."
-        )
-    if inconclusive:
-        message += (
-            " The inconclusive node(s) are not a group-membership issue; "
-            "check this process's open-file limit and the kernel/dmesg log "
-            "for driver errors instead."
-        )
+    message += _amd_access_failure_caveats(denied, inconclusive)
     # An accessible unknown-vendor node is a live counter-lead: if it turns
     # out to be AMD-backed, device access already works and a missing
     # `amdsmi` -- not this failing node -- explains Ray's zero-GPU result, so
@@ -447,8 +460,7 @@ def _log_kfd_diagnostics() -> None:
     buckets = _classify_render_nodes(glob.glob("/dev/dri/renderD*"))
 
     if buckets.amd_accessible:
-        log(
-            WARNING,
+        message = (
             "The ROCm kernel driver is loaded (/dev/kfd exists), so "
             "an AMD GPU is likely present on this host. If Ray's GPU "
             "resources were not limited deliberately, check that Ray "
@@ -463,8 +475,30 @@ def _log_kfd_diagnostics() -> None:
             "wheel; the pip wheel also needs ROCM_HOME or ROCM_PATH "
             "pointing at a root containing the unversioned "
             "`libamd_smi.so` symlink, rather than only a versioned "
-            "`libamd_smi.so.<N>`.",
+            "`libamd_smi.so.<N>`."
         )
+        # On a multi-GPU host, one AMD render node opening does not mean
+        # every AMD render node is usable: `ROCR_VISIBLE_DEVICES` /
+        # `HIP_VISIBLE_DEVICES` can allocate a ClientApp to a *different*
+        # AMD node that fails to open, and fixing Ray's `amdsmi`
+        # enumeration above would not make that node usable. Report the
+        # failed node(s) too rather than letting the accessible one hide
+        # them.
+        if buckets.amd_denied or buckets.amd_inconclusive:
+            message += (
+                " This host also has AMD render node(s) that do not open: "
+                + _access_failure_notes(buckets.amd_denied, buckets.amd_inconclusive)
+            )
+            message += _amd_access_failure_caveats(
+                buckets.amd_denied, buckets.amd_inconclusive
+            )
+            message += (
+                " If `ROCR_VISIBLE_DEVICES`/`HIP_VISIBLE_DEVICES` assigns a "
+                "`ClientApp` to one of these failed node(s) instead of the "
+                "accessible one, fixing Ray's `amdsmi` enumeration alone "
+                "will not make that `ClientApp`'s device usable."
+            )
+        log(WARNING, message)
         return
 
     # Below, an accessible unknown-vendor node takes priority over the

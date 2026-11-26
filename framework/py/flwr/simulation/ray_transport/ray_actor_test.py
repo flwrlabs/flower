@@ -212,6 +212,57 @@ def test_kfd_present_and_accessible_points_at_amdsmi(
     assert "no accessible `/dev/dri/renderD*` node" not in output
 
 
+def test_kfd_accessible_amd_node_with_denied_sibling_reports_both(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test that an accessible AMD render node does not hide a denied AMD
+    sibling, instead of discarding it before `_amd_access_message` can run.
+
+    A single-node multi-GPU host can have one confirmed-AMD render node that
+    opens while `ROCR_VISIBLE_DEVICES`/`HIP_VISIBLE_DEVICES` allocates a
+    `ClientApp` to a different, permission-denied AMD node. Pointing only at
+    `amdsmi` would leave that allocated device's own failure unreported.
+    """
+    client_resources: dict[str, int | float] = {"num_cpus": 2, "num_gpus": 0.25}
+
+    def _can_open(path: str) -> bool | None:
+        if path == "/dev/kfd":
+            return True
+        return path == "/dev/dri/renderD128"  # accessible; renderD129 is denied
+
+    with (
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.ray.nodes",
+            return_value=[{"Resources": {"CPU": 8}}],  # CPUs aplenty, no GPU
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.os.path.exists",
+            return_value=True,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._can_open_device",
+            side_effect=_can_open,
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor.glob.glob",
+            return_value=["/dev/dri/renderD128", "/dev/dri/renderD129"],
+        ),
+        patch(
+            "flwr.simulation.ray_transport.ray_actor._is_amd_render_node",
+            return_value=True,
+        ),
+    ):
+        with caplog.at_level(logging.WARNING, logger="flwr"):
+            with pytest.raises(ValueError):
+                pool_size_from_resources(client_resources)
+
+    output = caplog.text
+    assert "python -c 'import amdsmi'" in output
+    assert "renderD129" in output
+    assert "permission-denied" in output
+    assert "ROCR_VISIBLE_DEVICES" in output
+
+
 def test_kfd_accessible_render_node_non_amd_reports_vendor_mismatch(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
