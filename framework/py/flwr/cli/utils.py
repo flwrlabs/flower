@@ -357,13 +357,7 @@ def init_http_client_from_connection(
         """Refresh and return the account credentials."""
         if http_client is None:
             raise RuntimeError("HTTP client is not initialized")
-        response = http_client.RefreshAuthTokens(
-            RefreshAuthTokensRequest(refresh_token=refresh_token)
-        )
-        return AccountAuthCredentials(
-            access_token=response.access_token,
-            refresh_token=response.refresh_token,
-        )
+        return refresh_account_auth_tokens(http_client, refresh_token)
 
     # Keep version compatibility and account authentication consistent for every
     # Control API request made through this client.
@@ -378,6 +372,19 @@ def init_http_client_from_connection(
         ],
     )
     return http_client
+
+
+def refresh_account_auth_tokens(
+    control_client: ControlHttpClient, refresh_token: str
+) -> AccountAuthCredentials:
+    """Exchange a refresh token for a new account credential pair."""
+    response = control_client.RefreshAuthTokens(
+        RefreshAuthTokensRequest(refresh_token=refresh_token)
+    )
+    return AccountAuthCredentials(
+        access_token=response.access_token,
+        refresh_token=response.refresh_token,
+    )
 
 
 @contextmanager  # docsig: disable=SIG503

@@ -24,7 +24,11 @@ from typer.testing import CliRunner
 
 from flwr.cli.app import app
 from flwr.cli.typing import SuperLinkConnection
-from flwr.proto.control_pb2 import GetLoginDetailsResponse  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    GetLoginDetailsResponse,
+    RefreshAuthTokensRequest,
+    RefreshAuthTokensResponse,
+)
 from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 
 
@@ -101,6 +105,17 @@ def test_login_uses_control_http_client() -> None:
         ([(200, None)], None, "interactive terminal"),
         ([(403, None)], "", "SuperLink denied signup"),
         ([(307, None)], "", "HTTP 307"),
+        ([(401, None), (200, "alice")], None, None),
+        (
+            [(200, None), (401, None), (200, "alice")],
+            "alice\n",
+            None,
+        ),
+        (
+            [(200, None), (401, None), (401, None)],
+            "alice\n",
+            "SuperLink denied signup",
+        ),
     ],
 )
 def test_login_completes_advertised_signup(
@@ -115,23 +130,39 @@ def test_login_completes_advertised_signup(
     control_client.GetLoginDetails.return_value = GetLoginDetailsResponse(
         authn_type="oidc", supports_cli_signup=True
     )
+    refreshed = AccountAuthCredentials("new-access-token", "new-refresh-token")
+    control_client.RefreshAuthTokens.return_value = RefreshAuthTokensResponse(
+        access_token=refreshed.access_token, refresh_token=refreshed.refresh_token
+    )
     auth_plugin = Mock()
     auth_plugin.login.return_value = credentials
     expected_responses = iter(replies)
     requests: list[tuple[str, dict[str, str] | None]] = []
+    retry_at = next(
+        (index + 1 for index, (status, _) in enumerate(replies) if status == 401),
+        None,
+    )
 
     def send(request: httpx.Request) -> httpx.Response:
         resource = {"GET": "handle", "POST": "signup"}[request.method]
         assert request.url == f"https://control.example:8443/v1/user/{resource}"
-        assert request.headers["Authorization"] == "Bearer access-token"
+        expected = (
+            refreshed
+            if retry_at is not None and len(requests) >= retry_at
+            else credentials
+        )
+        assert request.headers["Authorization"] == f"Bearer {expected.access_token}"
         auth_plugin.store_tokens.assert_not_called()
         payload = json.loads(request.content) if request.content else None
         requests.append((request.method, payload))
         status, handle = next(expected_responses)
+        headers = {"Location": "https://other.example/v1/user/signup"}
+        if status == 401:
+            headers["WWW-Authenticate"] = "Bearer"
         return httpx.Response(
             status,
             json={"handle": handle},
-            headers={"Location": "https://other.example/v1/user/signup"},
+            headers=headers,
         )
 
     with (
@@ -159,10 +190,18 @@ def test_login_completes_advertised_signup(
         signup_sys.stdout.isatty.return_value = input_text is not None
         result = CliRunner().invoke(app, ["login", "remote"], input=input_text)
 
-    assert requests == [
+    expected_requests = [
         ("GET", None),
         *[("POST", {"handle": handle}) for handle in (input_text or "").splitlines()],
     ]
+    if retry_at is not None:
+        expected_requests.insert(retry_at, expected_requests[retry_at - 1])
+        control_client.RefreshAuthTokens.assert_called_once_with(
+            RefreshAuthTokensRequest(refresh_token=credentials.refresh_token)
+        )
+    else:
+        control_client.RefreshAuthTokens.assert_not_called()
+    assert requests == expected_requests
     if expected_error:
         assert result.exit_code == 1
         assert expected_error in result.output
@@ -170,4 +209,6 @@ def test_login_completes_advertised_signup(
     else:
         assert result.exit_code == 0
         assert "Login successful" in result.output
-        auth_plugin.store_tokens.assert_called_once_with(credentials)
+        auth_plugin.store_tokens.assert_called_once_with(
+            refreshed if retry_at is not None else credentials
+        )
