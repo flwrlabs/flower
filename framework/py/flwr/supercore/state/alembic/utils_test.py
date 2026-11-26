@@ -42,7 +42,6 @@ from sqlalchemy.exc import IntegrityError
 
 from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
-from flwr.supercore.date import now
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
