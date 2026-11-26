@@ -31,6 +31,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
     CreateTaskRequest,
+    CreateTaskResponse,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
@@ -126,10 +127,10 @@ def test_runtime_flower_error_is_translated(
     assert response.json()["code"] == ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST
 
 
-def test_create_task_rejects_run_bound_connector(
+def test_create_task_uses_run_bound_connector(
     client: TestClient, state: NodeState, valid_token: str
 ) -> None:
-    """Deny stored connections even when the local run has an explicit grant."""
+    """Create a child task with the stored connector granted to its Run."""
     connector_id = state.create_connector("federation", "slack", "{}", "{}", "account")
     assert connector_id is not None
     assert state.bind_connectors_to_run(99, [connector_id])
@@ -139,8 +140,9 @@ def test_create_task_rejects_run_bound_connector(
         CreateTaskRequest(type=TaskType.CONNECTOR, connector_id=connector_id),
         token=valid_token,
     )
-    assert response.status_code == 403
-    assert len(state.get_tasks()) == 1
+    assert response.status_code == 200
+    task_id = CreateTaskResponse.FromString(response.content).task_id
+    assert state.get_tasks(task_ids=[task_id])[0].connector_id == connector_id
 
 
 def test_pull_object_denied_without_metadata_token(client: TestClient) -> None:

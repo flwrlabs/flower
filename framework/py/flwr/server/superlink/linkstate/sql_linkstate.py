@@ -58,9 +58,7 @@ from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
 from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
-from flwr.supercore.state.schema.corestate_models import (
-    SpaceMessage as SpaceMessageModel,
-)
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
@@ -581,15 +579,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def get_agent_run_candidates(
         self, *, limit: int | None = None
-    ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run."""
+    ) -> Sequence[tuple[UUID, Agent, int]]:
+        """Find participating agents with unread items and no open Run."""
         if limit is not None and limit <= 0:
             return []
         self._cleanup_expired_task_tokens()
         with self.session() as session:
             return [
-                (space_id, _agent_from_model(agent, config))
-                for space_id, agent, config in session.execute(
+                (space_id, _agent_from_model(agent, config), trigger_item_id)
+                for space_id, agent, config, trigger_item_id in session.execute(
                     _agent_run_candidates_query().limit(limit)
                 )
             ]
@@ -981,19 +979,23 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
     )
 
 
-def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigModel]]:
-    """Select participating agents with unread messages and no open primary Task."""
-    unread = (
-        select(SpaceMessageModel.id)
+def _agent_run_candidates_query() -> (
+    Select[tuple[UUID, AgentModel, AgentConfigModel, int]]
+):
+    """Select participating agents with unread items and no open primary Task."""
+    trigger_item_id = (
+        select(SpaceItemModel.id)
         .where(
-            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
-            SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
+            SpaceItemModel.space_id == SpaceParticipantTable.c.space_id,
+            SpaceItemModel.id > SpaceParticipantTable.c.read_through_item_id,
             or_(
-                SpaceMessageModel.agent_id.is_(None),
-                SpaceMessageModel.agent_id != SpaceParticipantTable.c.agent_id,
+                SpaceItemModel.agent_id.is_(None),
+                SpaceItemModel.agent_id != SpaceParticipantTable.c.agent_id,
             ),
         )
-        .exists()
+        .order_by(SpaceItemModel.id)
+        .limit(1)
+        .scalar_subquery()
     )
     open_run = (
         select(RunModel.run_id)
@@ -1010,7 +1012,12 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigM
         .exists()
     )
     return (
-        select(SpaceParticipantTable.c.space_id, AgentModel, AgentConfigModel)
+        select(
+            SpaceParticipantTable.c.space_id,
+            AgentModel,
+            AgentConfigModel,
+            trigger_item_id,
+        )
         .join(
             AgentModel,
             AgentModel.agent_id == SpaceParticipantTable.c.agent_id,
@@ -1020,7 +1027,7 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel, AgentConfigM
             (AgentConfigModel.agent_id == AgentModel.agent_id)
             & (AgentConfigModel.version == AgentModel.config_version),
         )
-        .where(unread, ~open_run, AgentModel.deleted_at.is_(None))
+        .where(trigger_item_id.is_not(None), ~open_run, AgentModel.deleted_at.is_(None))
         .order_by(
             SpaceParticipantTable.c.space_id,
             AgentModel.agent_id,

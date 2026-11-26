@@ -106,6 +106,7 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
+    SpaceItemType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -186,7 +187,6 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
-    space.latest_user_message = message.content
     listed = client.post(
         "/v1/control/list-spaces",
         content=ListSpacesRequest().SerializeToString(),
@@ -866,14 +866,14 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
 
 
 @pytest.mark.parametrize(
-    ("complete_uri", "verification_uri", "user_code"),
+    ("complete_uri", "verification_uri", "user_code", "supports_cli_signup"),
     [
-        ("https://example.test/verify", "", ""),
-        ("", "https://example.test/verify-code", "ABCD-EFGH"),
+        ("https://example.test/verify", "", "", False),
+        ("", "https://example.test/verify-code", "ABCD-EFGH", True),
     ],
 )
 def test_get_login_details_does_not_require_bearer_authentication(
-    complete_uri: str, verification_uri: str, user_code: str
+    complete_uri: str, verification_uri: str, user_code: str, supports_cli_signup: bool
 ) -> None:
     """Return login details without validating an access token."""
     authn_plugin = Mock(spec=ControlAuthnPlugin)
@@ -886,6 +886,7 @@ def test_get_login_details_does_not_require_bearer_authentication(
         interval=5,
         verification_uri=verification_uri,
         user_code=user_code,
+        supports_cli_signup=supports_cli_signup,
     )
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -905,6 +906,7 @@ def test_get_login_details_does_not_require_bearer_authentication(
             interval=5,
             verification_uri=verification_uri,
             user_code=user_code,
+            supports_cli_signup=supports_cli_signup,
         )
     )
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
@@ -1556,8 +1558,11 @@ def test_bootstrap_uses_authenticated_account(
     state.create_agent(_ACCOUNT.user_id, config)
     state.create_agent("other-account", config)
     space = state.get_spaces(_ACCOUNT.user_id)[0]
-    state.create_space_message(
-        UUID(space.id), SpaceParticipant(flwr_aid=_ACCOUNT.user_id), "Latest prompt"
+    state.store_space_item(
+        UUID(space.id),
+        SpaceItemType.MESSAGE,
+        "Latest prompt",
+        SpaceParticipant(flwr_aid=_ACCOUNT.user_id),
     )
     response = client.post(
         "/v1/control/bootstrap",
@@ -1569,7 +1574,7 @@ def test_bootstrap_uses_authenticated_account(
     assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
     assert snapshot.spaces[0].latest_user_message == "Latest prompt"
-    assert snapshot.cursor == 3
+    assert snapshot.cursor == 2
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])

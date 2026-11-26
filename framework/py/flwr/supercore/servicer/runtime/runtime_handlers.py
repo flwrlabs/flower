@@ -83,10 +83,28 @@ from flwr.supercore.run import Run
 from flwr.supercore.task_process.connector import registry as connector_registry
 
 
+def get_task_run(state: CoreState, task: Task) -> Run:
+    """Resolve the authenticated task's Run."""
+    runs = state.get_run(run_ids=[task.run_id])
+    if not runs:
+        raise FlowerError(
+            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
+        )
+    return runs[0]
+
+
 def get_space_events(
-    request: GetSpaceEventsRequest, state: CoreState, space_id: UUID
+    request: GetSpaceEventsRequest,
+    state: CoreState,
+    task: Task,
 ) -> GetSpaceEventsResponse:
     """Get locally stored events for a Space."""
+    space_id = get_task_run(state, task).space_id
+    if space_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint is only available to Space tasks.",
+        )
     log(DEBUG, "Runtime.GetSpaceEvents")
     events = state.get_task_events(
         space_id=space_id,
@@ -102,20 +120,11 @@ def get_space_events(
     return GetSpaceEventsResponse(events=events)
 
 
-def require_agent_id(run: Run | None, run_id: int) -> int:
-    """Return the agent ID of a Run, or reject a missing or unbound Run."""
-    if run is None:
-        raise FlowerError(ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {run_id} not found.")
-    if run.agent_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "This endpoint requires a Run bound to an agent.",
-        )
-    return run.agent_id
-
-
-def authenticate_space_agent(task: Task, run: Run) -> tuple[UUID, SpaceParticipant]:
+def authenticate_space_agent(
+    state: CoreState, task: Task
+) -> tuple[UUID, SpaceParticipant]:
     """Require the primary AgentApp task of a Run bound to a Space and agent."""
+    run = get_task_run(state, task)
     if run.space_id is None or run.agent_id is None:
         raise FlowerError(
             ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
@@ -130,10 +139,10 @@ def authenticate_space_agent(task: Task, run: Run) -> tuple[UUID, SpaceParticipa
 
 
 def get_space_messages(
-    request: GetSpaceMessagesRequest, state: CoreState, task: Task, run: Run
+    request: GetSpaceMessagesRequest, state: CoreState, task: Task
 ) -> GetSpaceMessagesResponse:
     """Read messages within the authenticated task's Space grant."""
-    space_id, participant = authenticate_space_agent(task, run)
+    space_id, participant = authenticate_space_agent(state, task)
     limit = request.limit if request.HasField("limit") else MAX_SPACE_PAGE_SIZE
     if limit > MAX_SPACE_PAGE_SIZE:
         raise FlowerError(
@@ -157,10 +166,10 @@ def get_space_messages(
 
 
 def get_space_items(
-    request: GetSpaceItemsRequest, state: CoreState, task: Task, run: Run
+    request: GetSpaceItemsRequest, state: CoreState, task: Task
 ) -> GetSpaceItemsResponse:
     """Read items within the authenticated task's Space grant."""
-    space_id, participant = authenticate_space_agent(task, run)
+    space_id, participant = authenticate_space_agent(state, task)
     limit = request.limit if request.HasField("limit") else MAX_SPACE_PAGE_SIZE
     if limit > MAX_SPACE_PAGE_SIZE:
         raise FlowerError(
@@ -184,10 +193,10 @@ def get_space_items(
 
 
 def send_space_message(
-    request: SendSpaceMessageRequest, state: CoreState, task: Task, run: Run
+    request: SendSpaceMessageRequest, state: CoreState, task: Task
 ) -> SendSpaceMessageResponse:
     """Publish with the primary AgentApp's server-bound agent identity."""
-    space_id, participant = authenticate_space_agent(task, run)
+    space_id, participant = authenticate_space_agent(state, task)
     try:
         message = state.create_space_message(space_id, participant, request.content)
     except ValueError as exc:
@@ -198,10 +207,10 @@ def send_space_message(
 
 
 def send_space_item(
-    request: SendSpaceItemRequest, state: CoreState, task: Task, run: Run
+    request: SendSpaceItemRequest, state: CoreState, task: Task
 ) -> SendSpaceItemResponse:
     """Publish a message item with the server-bound agent identity."""
-    space_id, participant = authenticate_space_agent(task, run)
+    space_id, participant = authenticate_space_agent(state, task)
     try:
         item = state.store_space_item(
             space_id, SpaceItemType.MESSAGE, request.content, participant
@@ -214,9 +223,10 @@ def send_space_item(
 
 
 def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: CoreState, agent_id: int
+    request: GetCompactedContextsRequest, state: CoreState, task: Task
 ) -> GetCompactedContextsResponse:
     """Get compacted contexts for the agent."""
+    _, participant = authenticate_space_agent(state, task)
     limit = request.limit if request.HasField("limit") else 1
     if limit == 0:
         raise FlowerError(
@@ -224,7 +234,7 @@ def get_compacted_contexts(
             "Limit must be positive.",
         )
     contexts = state.get_compacted_contexts(
-        agent_id,
+        participant.agent_id,
         limit=limit,
         before_context_id=(
             request.before_context_id if request.HasField("before_context_id") else None
@@ -234,9 +244,11 @@ def get_compacted_contexts(
 
 
 def put_compacted_context(
-    request: PutCompactedContextRequest, state: CoreState, agent_id: int
+    request: PutCompactedContextRequest, state: CoreState, task: Task
 ) -> PutCompactedContextResponse:
     """Store a compacted context for the agent."""
+    _, participant = authenticate_space_agent(state, task)
+    agent_id = participant.agent_id
     if not request.HasField("context") or not request.context.text:
         raise FlowerError(
             ApiErrorCode.RUNTIME_INVALID_COMPACTED_CONTEXT_REQUEST,
@@ -298,9 +310,9 @@ def create_task(
     request: CreateTaskRequest,
     state: CoreState,
     task: Task,
-    run: Run,
 ) -> CreateTaskResponse:
     """Validate and create a child task within the authenticated Run."""
+    run = get_task_run(state, task)
     log(DEBUG, "Runtime.CreateTask")
     _validate_create_task_request(request, task)
     connector_ref = request.connector_ref or None
@@ -422,10 +434,9 @@ def push_logs(
     return PushLogsResponse()
 
 
-def put_file(
-    request: PutFileRequest, state: CoreState, agent_id: int
-) -> PutFileResponse:
+def put_file(request: PutFileRequest, state: CoreState, task: Task) -> PutFileResponse:
     """Store a file in the authenticated task's agent scope."""
+    scope = _file_scope(state, task)
     log(DEBUG, "Runtime.PutFile")
     if not request.key.strip():
         raise FlowerError(
@@ -433,7 +444,7 @@ def put_file(
             "File key must not be empty or whitespace-only.",
         )
     revision = state.put_file(
-        scope=_file_scope(agent_id),
+        scope=scope,
         key=request.key,
         data=request.data,
         expected_revision=(
@@ -443,28 +454,26 @@ def put_file(
     return PutFileResponse(revision=revision)
 
 
-def get_file(
-    request: GetFileRequest, state: CoreState, agent_id: int
-) -> GetFileResponse:
+def get_file(request: GetFileRequest, state: CoreState, task: Task) -> GetFileResponse:
     """Get a file from the authenticated task's agent scope."""
+    scope = _file_scope(state, task)
     log(DEBUG, "Runtime.GetFile")
-    return GetFileResponse(
-        file=state.get_file(scope=_file_scope(agent_id), key=request.key)
-    )
+    return GetFileResponse(file=state.get_file(scope=scope, key=request.key))
 
 
 def list_files(
-    request: ListFilesRequest, state: CoreState, agent_id: int
+    request: ListFilesRequest, state: CoreState, task: Task
 ) -> ListFilesResponse:
     """List file metadata in the authenticated task's agent scope.
 
     When a limit is set, fetch one extra entry to check for another page.
     Return the last included key as the cursor only if more files remain.
     """
+    scope = _file_scope(state, task)
     log(DEBUG, "Runtime.ListFiles")
     limit = request.limit if request.HasField("limit") else None
     files = state.list_files(
-        scope=_file_scope(agent_id),
+        scope=scope,
         prefix=request.prefix,
         start_after=request.start_after,
         limit=limit + 1 if limit else limit,
@@ -476,21 +485,28 @@ def list_files(
 
 
 def delete_file(
-    request: DeleteFileRequest, state: CoreState, agent_id: int
+    request: DeleteFileRequest, state: CoreState, task: Task
 ) -> DeleteFileResponse:
     """Delete a file in the authenticated task's agent scope."""
+    scope = _file_scope(state, task)
     log(DEBUG, "Runtime.DeleteFile")
     state.delete_file(
-        scope=_file_scope(agent_id),
+        scope=scope,
         key=request.key,
         expected_revision=request.expected_revision,
     )
     return DeleteFileResponse()
 
 
-def _file_scope(agent_id: int) -> str:
-    """Return the file namespace for an agent."""
-    return f"agent-{agent_id}"
+def _file_scope(state: CoreState, task: Task) -> str:
+    """Return the file namespace for the authenticated task's agent."""
+    run = get_task_run(state, task)
+    if run.agent_id is None:
+        raise FlowerError(
+            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
+            "This endpoint requires a Run bound to an agent.",
+        )
+    return f"agent-{run.agent_id}"
 
 
 def _validate_create_task_request(

@@ -16,6 +16,7 @@
 
 # pylint: disable=unused-argument
 
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 from logging import DEBUG, ERROR, INFO
 
@@ -32,6 +33,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     StartAutomationRequest,
     StartAutomationResponse,
+    StartRunRequest,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -44,18 +46,12 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
-    GetCompactedContextsRequest,
-    GetCompactedContextsResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
-    GetSpaceEventsRequest,
-    GetSpaceEventsResponse,
     ListAgentConnectorsRequest,
     ListAgentConnectorsResponse,
     PullAppMessagesRequest,
@@ -66,18 +62,6 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-    PutCompactedContextRequest,
-    PutCompactedContextResponse,
-)
-from flwr.proto.space_pb2 import (  # pylint: disable=E0611
-    GetSpaceItemsRequest,
-    GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
-    SendSpaceItemRequest,
-    SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
@@ -85,9 +69,9 @@ from flwr.server.superlink.linkstate.utils import create_run_context
 from flwr.supercore import log
 from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.constant import AUTOMATION_BATCH_LIMIT, TaskType
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.object_store import NoObjectInStoreError
-from flwr.supercore.run import Run
 from flwr.supercore.servicer.runtime import runtime_handlers as core_runtime_handlers
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.json_utils import connector_display_name
@@ -127,102 +111,6 @@ def get_run_series_events(
         last_n=request.last_n or None,
     )
     return GetRunSeriesEventsResponse(events=events)
-
-
-def get_space_events(
-    request: GetSpaceEventsRequest,
-    state: LinkState,
-    task: Task,
-) -> GetSpaceEventsResponse:
-    """Get events from the authenticated task's Space."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    space_id = runs[0].space_id
-    if space_id is None:
-        raise FlowerError(
-            ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE,
-            "This endpoint is only available to Space tasks.",
-        )
-    return core_runtime_handlers.get_space_events(request, state, space_id)
-
-
-def _get_task_run(state: LinkState, task: Task) -> Run:
-    """Resolve the authenticated task's Run."""
-    runs = state.get_run(run_ids=[task.run_id])
-    if not runs:
-        raise FlowerError(
-            ApiErrorCode.RUN_ID_NOT_FOUND, f"Run {task.run_id} not found."
-        )
-    return runs[0]
-
-
-def get_space_messages(
-    request: GetSpaceMessagesRequest, state: LinkState, task: Task
-) -> GetSpaceMessagesResponse:
-    """Read messages within the authenticated task's Space grant."""
-    return core_runtime_handlers.get_space_messages(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def get_space_items(
-    request: GetSpaceItemsRequest, state: LinkState, task: Task
-) -> GetSpaceItemsResponse:
-    """Read items within the authenticated task's Space grant."""
-    return core_runtime_handlers.get_space_items(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def send_space_message(
-    request: SendSpaceMessageRequest, state: LinkState, task: Task
-) -> SendSpaceMessageResponse:
-    """Publish with the primary AgentApp's server-bound agent identity."""
-    return core_runtime_handlers.send_space_message(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def send_space_item(
-    request: SendSpaceItemRequest, state: LinkState, task: Task
-) -> SendSpaceItemResponse:
-    """Publish a message item with the server-bound agent identity."""
-    return core_runtime_handlers.send_space_item(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
-def get_compacted_contexts(
-    request: GetCompactedContextsRequest, state: LinkState, task: Task
-) -> GetCompactedContextsResponse:
-    """Get summaries for the agent."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
-    return core_runtime_handlers.get_compacted_contexts(
-        request, state, participant.agent_id
-    )
-
-
-def put_compacted_context(
-    request: PutCompactedContextRequest, state: LinkState, task: Task
-) -> PutCompactedContextResponse:
-    """Store a summary for the agent."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
-    return core_runtime_handlers.put_compacted_context(
-        request, state, participant.agent_id
-    )
-
-
-def _get_agent_id(state: LinkState, task: Task) -> int:
-    """Resolve the authenticated task's agent ID for file scoping."""
-    runs = state.get_run(run_ids=[task.run_id])
-    return core_runtime_handlers.require_agent_id(
-        runs[0] if runs else None, task.run_id
-    )
 
 
 def acquire_task(request: AcquireTaskRequest, state: LinkState) -> AcquireTaskResponse:
@@ -338,21 +226,11 @@ def pull_messages(  # pylint: disable=R0914
     )
 
 
-def create_task(
-    request: CreateTaskRequest, state: LinkState, task: Task
-) -> CreateTaskResponse:
-    """Create a child task using the authenticated task's Run."""
-    return core_runtime_handlers.create_task(
-        request, state, task, _get_task_run(state, task)
-    )
-
-
 def list_agent_connectors(
     request: ListAgentConnectorsRequest, state: LinkState, task: Task
 ) -> ListAgentConnectorsResponse:
     """Return connection metadata for the primary Space AgentApp."""
-    run = _get_task_run(state, task)
-    _, participant = core_runtime_handlers.authenticate_space_agent(task, run)
+    _, participant = core_runtime_handlers.authenticate_space_agent(state, task)
     connectors = []
     for connector in state.get_agent_connectors(participant.agent_id):
         flow = connector_registry.OAUTH_FLOWS.get(connector.connector_ref)
@@ -514,6 +392,69 @@ def push_task_output(
     return PushTaskOutputResponse()
 
 
+def _resolve_agent_automation_schedule(
+    request: StartAutomationRequest,
+) -> tuple[str, int | None, int | None]:
+    """Validate and normalize an agent automation's schedule."""
+    # shortcut: Legacy Control creation uses the same rules until it is retired.
+    try:
+        start_at = (
+            datetime.fromisoformat(request.start_at)
+            if request.HasField("start_at")
+            else now()
+        )
+        if start_at.tzinfo is None:
+            raise ValueError("Timezone is required.")
+    except ValueError as exc:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            f"Invalid automation start_at value: {request.start_at}",
+            public_details=(
+                "The automation start_at value must be a valid ISO 8601 "
+                "timestamp with a timezone."
+            ),
+        ) from exc
+
+    fixed_interval = (
+        request.fixed_interval if request.HasField("fixed_interval") else None
+    )
+    max_runs = (
+        request.max_runs
+        if request.HasField("max_runs")
+        else 1 if fixed_interval is None else None
+    )
+    if max_runs is not None and max_runs < 1:
+        error = "`max_runs` must be greater than zero."
+    elif fixed_interval is not None and fixed_interval < 1:
+        error = "`fixed_interval` must be greater than zero."
+    elif fixed_interval is not None and fixed_interval >= 2**63:
+        error = "`fixed_interval` must be less than 2**63."
+    elif fixed_interval is None and (max_runs is None or max_runs > 1):
+        error = "`fixed_interval` is required for automations with multiple runs."
+    else:
+        error = None
+    if error is not None:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            error,
+            public_details=error,
+        )
+
+    if max_runs == 1:
+        fixed_interval = None
+    try:
+        start_at = start_at.astimezone(UTC)
+        if fixed_interval is not None:
+            occurrences = max_runs - 1 if max_runs is not None else 1
+            _ = start_at + timedelta(seconds=fixed_interval * occurrences)
+    except OverflowError as exc:
+        error = "The next automation occurrence is outside the supported date range."
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST, error, public_details=error
+        ) from exc
+    return start_at.isoformat(), fixed_interval, max_runs
+
+
 def start_automation(
     request: StartAutomationRequest,
     state: LinkState,
@@ -527,6 +468,40 @@ def start_automation(
         )
 
     run = state.get_run(run_ids=[task.run_id])[0]
+    if run.space_id is not None:
+        if task.type != TaskType.AGENT_APP or run.agent_id is None:
+            raise FlowerError(
+                ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,
+                "Only Space AgentApps can create agent automations.",
+            )
+        prompt = request.start_run_request.user_prompt.strip()
+        if not prompt:
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+                "Agent automation prompt must be nonempty.",
+                public_details="The automation prompt must be nonempty.",
+            )
+        next_run_at, fixed_interval, max_runs = _resolve_agent_automation_schedule(
+            request
+        )
+        try:
+            automation = state.store_automation(
+                flwr_aid=run.flwr_aid,
+                agent_id=run.agent_id,
+                start_run_request=StartRunRequest(user_prompt=prompt),
+                next_run_at=next_run_at,
+                fixed_interval=fixed_interval,
+                max_runs=max_runs,
+            )
+        except ValueError as exc:
+            raise FlowerError(
+                ApiErrorCode.FAILED_TO_CREATE_RUN,
+                f"Failed to create automation for agent_id={run.agent_id}.",
+            ) from exc
+        return StartAutomationResponse(
+            automation_id=automation.automation_id,
+            next_run_at=automation.next_run_at,
+        )
     if not run.federation_id:
         raise FlowerError(
             ApiErrorCode.RUNTIME_AUTOMATION_CREATION_NOT_ALLOWED,

@@ -1224,6 +1224,19 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def claim_agent_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> SpaceItem | None:
+        """Atomically claim an agent automation and store its SpaceItem.
+
+        Return `None` if the occurrence was already claimed or the agent is gone.
+        """
+
+    @abstractmethod
     def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
