@@ -91,6 +91,9 @@ SUPERGRID_ADDRESS = os.getenv("FLWR_SUPERGRID_ADDRESS", "api.flower.ai")
 OAUTH_SESSION_TTL = timedelta(minutes=10)
 RUN_SERIES_DESCRIPTION_MAX_LENGTH = 80
 
+# Space API constants
+MAX_SPACE_PAGE_SIZE = 100
+
 # Specification for app publishing
 APP_PUBLISH_ALLOWED_LICENSE_FILES = ("LICENSE", "LICENSE.md")
 APP_PUBLISH_INCLUDE_PATTERNS = (
@@ -206,6 +209,15 @@ class NodeStatus:
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 
 
+class DeviceAuthorizationError(StrEnum):
+    """OAuth device authorization errors reported while polling for tokens."""
+
+    AUTHORIZATION_PENDING = "authorization_pending"
+    SLOW_DOWN = "slow_down"
+    ACCESS_DENIED = "access_denied"
+    EXPIRED_TOKEN = "expired_token"
+
+
 class InvitationStatus(StrEnum):
     """Status of a federation invitation."""
 
@@ -229,8 +241,21 @@ class EventType(StrEnum):
     """Application events delivered through user feeds."""
 
     AGENT_CREATED = "agent.created"
+    AGENT_UPDATED = "agent.updated"
+    AGENT_DELETED = "agent.deleted"
     SPACE_CREATED = "space.created"
     MESSAGE_CREATED = "message.created"
+    ITEM_CREATED = "item.created"
+    RUN_CREATED = "run.created"
+    TASK_CREATED = "task.created"
+    TASK_UPDATED = "task.updated"
+
+
+class SpaceItemType(StrEnum):
+    """Types of items in a Space's ordered stream."""
+
+    MESSAGE = "message"
+    AUTOMATION = "automation"
 
 
 class AutomationStatus(StrEnum):

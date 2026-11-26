@@ -15,7 +15,7 @@
 """SuperNode Runtime HTTP authentication integration tests."""
 
 from typing import cast
-from uuid import uuid4
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI
@@ -31,6 +31,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     AcquireTaskRequest,
     AcquireTaskResponse,
     CreateTaskRequest,
+    CreateTaskResponse,
     GetNodesRequest,
     GetRunSeriesEventsRequest,
     GetRunSeriesEventsResponse,
@@ -82,7 +83,8 @@ def fixture_client(state: NodeState) -> TestClient:
 @pytest.fixture(name="valid_token")
 def fixture_valid_token(state: NodeState) -> str:
     """Claim the ClientApp task and return its token."""
-    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    state.store_run(Run.create_empty(run_id=99))
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99, space_id=None)
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -125,6 +127,24 @@ def test_runtime_flower_error_is_translated(
     assert response.json()["code"] == ApiErrorCode.RUNTIME_INVALID_TASK_CREATION_REQUEST
 
 
+def test_create_task_uses_run_bound_connector(
+    client: TestClient, state: NodeState, valid_token: str
+) -> None:
+    """Create a child task with the stored connector granted to its Run."""
+    connector_id = state.create_connector("federation", "slack", "{}", "{}", "account")
+    assert connector_id is not None
+    assert state.bind_connectors_to_run(99, [connector_id])
+    response = _post(
+        client,
+        "create-task",
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_id=connector_id),
+        token=valid_token,
+    )
+    assert response.status_code == 200
+    task_id = CreateTaskResponse.FromString(response.content).task_id
+    assert state.get_tasks(task_ids=[task_id])[0].connector_id == connector_id
+
+
 def test_pull_object_denied_without_metadata_token(client: TestClient) -> None:
     """Protected routes should deny requests missing a task token."""
     response = _post(client, "pull-object", PullObjectRequest(object_id="obj-1"))
@@ -164,7 +184,7 @@ def test_acquire_task_allows_with_superexec_metadata(
     client: TestClient, state: NodeState
 ) -> None:
     """Signed acquisition returns a task and its claim token."""
-    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+    task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99, space_id=None)
     assert task_id is not None
     proto_request = AcquireTaskRequest(supported_task_types=[TaskType.CLIENT_APP])
     headers = create_superexec_auth_metadata(
@@ -198,7 +218,9 @@ def test_agent_events_round_trip(client: TestClient, state: NodeState) -> None:
     run = Run.create_empty(run_id=99)
     run.series_id = 7
     state.store_run(run)
-    task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run.run_id)
+    task_id = state.create_task(
+        task_type=TaskType.AGENT_APP, run_id=run.run_id, space_id=None
+    )
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -235,13 +257,14 @@ def test_space_events_return_only_local_events_in_authenticated_space(
 ) -> None:
     """A task token reads local events only from its run's Space."""
     run = Run.create_empty(run_id=99)
-    run.space_id = uuid4()
     other_run = Run.create_empty(run_id=100)
-    other_run.space_id = uuid4()
     for current_run in (run, other_run):
+        current_run.space_id = UUID(state.create_space(participants=[]).id)
         state.store_run(current_run)
         task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=current_run.run_id
+            task_type=TaskType.AGENT_APP,
+            run_id=current_run.run_id,
+            space_id=current_run.space_id,
         )
         assert task_id is not None
         assert state.store_task_events(

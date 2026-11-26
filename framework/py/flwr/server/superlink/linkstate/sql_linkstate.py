@@ -38,23 +38,27 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_to_proto
 from flwr.proto.control_pb2 import Agent  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore import log
-from flwr.supercore.constant import NodeStatus, TaskType
-from flwr.supercore.corestate.sql_corestate import SqlCoreState, _agent_from_model
+from flwr.supercore.constant import EventType, NodeStatus, TaskType
+from flwr.supercore.corestate.sql_corestate import (
+    SqlCoreState,
+    _agent_from_model,
+    task_from_model,
+)
 from flwr.supercore.corestate.utils import timestamp_to_iso, validate_task_event_data
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_models import Agent as AgentModel
+from flwr.supercore.state.schema.corestate_models import AgentConfig as AgentConfigModel
 from flwr.supercore.state.schema.corestate_models import Message as MessageModel
-from flwr.supercore.state.schema.corestate_models import (
-    SpaceMessage as SpaceMessageModel,
-)
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
@@ -140,7 +144,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         # Check if the run exists
-        runs = self.get_run_info(run_ids=[run_id])
+        runs = self.get_run(run_ids=[run_id])
         if not runs:
             return False
 
@@ -389,7 +393,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session() as session:
             return session.scalar(stmt)
 
-    def create_run(  # pylint: disable=R0913, R0914, R0917
+    def create_run(  # pylint: disable=R0912, R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
@@ -406,6 +410,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         user_prompt: str | None = None,
         space_id: UUID | None = None,
         agent_id: int | None = None,
+        trigger_item_id: int | None = None,
     ) -> int:
         """Create a new run."""
         validate_run_scope(
@@ -434,14 +439,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session() as session:
             if agent_id is not None:
-                # Serialize admission before checking for an open Run.
+                # Serialize admission with deletion before checking for an open Run.
                 session.execute(
-                    update(SpaceParticipantTable)
+                    update(AgentModel)
                     .where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c.agent_id == agent_id,
+                        AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                     )
-                    .values(agent_id=agent_id)
+                    .values(updated_at=AgentModel.updated_at)
                 )
                 open_run = (
                     select(RunModel.run_id)
@@ -462,6 +467,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     .where(
                         SpaceParticipantTable.c.space_id == space_id,
                         AgentModel.agent_id == agent_id,
+                        AgentModel.deleted_at.is_(None),
                         ~open_run,
                     )
                     .execution_options(populate_existing=True)
@@ -507,6 +513,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         series_id=resolved_series_id,
                         space_id=space_id,
                         agent_id=agent_id,
+                        trigger_item_id=trigger_item_id,
                         flwr_aid=flwr_aid or "",
                         bytes_sent=0,
                         bytes_recv=0,
@@ -518,6 +525,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         task_id=task_id,
                         type=primary_task_type,
                         run_id=run_id,
+                        space_id=space_id,
                         fab_hash=fab_hash,
                         model_ref=None,
                         connector_ref=None,
@@ -551,6 +559,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     run_id=run_id,
                     connector_ids=connector_ids,
                 )
+                if space_id is not None:
+                    self.store_event(
+                        EventType.RUN_CREATED,
+                        run_to_proto(self.get_run(run_ids=[run_id])[0]),
+                        space_id=space_id,
+                    )
+                    task = session.get(TaskModel, task_id)
+                    assert task is not None
+                    self.store_event(
+                        EventType.TASK_CREATED,
+                        task_from_model(task),
+                        space_id=space_id,
+                    )
                 return run_id
 
         log(ERROR, "Unexpected run creation failure.")
@@ -558,23 +579,25 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def get_agent_run_candidates(
         self, *, limit: int | None = None
-    ) -> Sequence[tuple[UUID, Agent]]:
-        """Find participating agents with unread messages and no open Run."""
+    ) -> Sequence[tuple[UUID, Agent, int]]:
+        """Find participating agents with unread items and no open Run."""
         if limit is not None and limit <= 0:
             return []
         self._cleanup_expired_task_tokens()
         with self.session() as session:
             return [
-                (space_id, _agent_from_model(agent))
-                for space_id, agent in session.execute(
+                (space_id, _agent_from_model(agent, config), trigger_item_id)
+                for space_id, agent, config, trigger_item_id in session.execute(
                     _agent_run_candidates_query().limit(limit)
                 )
             ]
 
-    def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
+    def get_run(  # pylint: disable=too-many-arguments, too-many-branches
         self,
         *,
         run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         flwr_aids: Sequence[str] | None = None,
         federation_ids: Sequence[str | None] | None = None,
@@ -596,6 +619,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not run_ids:
                 return []
             stmt = stmt.where(RunModel.run_id.in_(run_ids))
+
+        if space_ids is not None:
+            stmt = stmt.where(RunModel.space_id.in_(space_ids))
+
+        if agent_ids is not None:
+            stmt = stmt.where(RunModel.agent_id.in_(agent_ids))
 
         # Filter by statuses
         if statuses is not None:
@@ -632,9 +661,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             stmt = stmt.where(or_(*federation_conditions))
 
         if order_by is not None:
-            order_column = TaskModel.pending_at
             stmt = stmt.order_by(
-                order_column.asc() if ascending else order_column.desc(),
+                (
+                    TaskModel.pending_at.asc()
+                    if ascending
+                    else TaskModel.pending_at.desc()
+                ),
                 RunModel.run_id.asc() if ascending else RunModel.run_id.desc(),
             )
         if skip:
@@ -643,10 +675,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             stmt = stmt.limit(limit)
 
         with self.session() as session:
-            rows = session.execute(stmt).all()
             return [
                 _run_from_models(run_model, task_model)
-                for run_model, task_model in rows
+                for run_model, task_model in session.execute(stmt)
             ]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
@@ -720,7 +751,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
         )
         with self.session() as session:
-            session.execute(stmt)
+            tasks = session.scalars(stmt.returning(TaskModel)).all()
+            for task in tasks:
+                self._store_task_lifecycle_event(
+                    EventType.TASK_UPDATED, task_from_model(task)
+                )
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
@@ -940,18 +975,27 @@ def _run_from_models(run: RunModel, task: TaskModel) -> Run:
         series_id=run.series_id or 0,
         space_id=run.space_id,
         agent_id=run.agent_id,
+        trigger_item_id=run.trigger_item_id,
     )
 
 
-def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
-    """Select participating agents with unread messages and no open primary Task."""
-    unread = (
-        select(SpaceMessageModel.id)
+def _agent_run_candidates_query() -> (
+    Select[tuple[UUID, AgentModel, AgentConfigModel, int]]
+):
+    """Select participating agents with unread items and no open primary Task."""
+    trigger_item_id = (
+        select(SpaceItemModel.id)
         .where(
-            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id,
-            SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id,
+            SpaceItemModel.space_id == SpaceParticipantTable.c.space_id,
+            SpaceItemModel.id > SpaceParticipantTable.c.read_through_item_id,
+            or_(
+                SpaceItemModel.agent_id.is_(None),
+                SpaceItemModel.agent_id != SpaceParticipantTable.c.agent_id,
+            ),
         )
-        .exists()
+        .order_by(SpaceItemModel.id)
+        .limit(1)
+        .scalar_subquery()
     )
     open_run = (
         select(RunModel.run_id)
@@ -968,12 +1012,22 @@ def _agent_run_candidates_query() -> Select[tuple[UUID, AgentModel]]:
         .exists()
     )
     return (
-        select(SpaceParticipantTable.c.space_id, AgentModel)
+        select(
+            SpaceParticipantTable.c.space_id,
+            AgentModel,
+            AgentConfigModel,
+            trigger_item_id,
+        )
         .join(
             AgentModel,
             AgentModel.agent_id == SpaceParticipantTable.c.agent_id,
         )
-        .where(unread, ~open_run)
+        .join(
+            AgentConfigModel,
+            (AgentConfigModel.agent_id == AgentModel.agent_id)
+            & (AgentConfigModel.version == AgentModel.config_version),
+        )
+        .where(trigger_item_id.is_not(None), ~open_run, AgentModel.deleted_at.is_(None))
         .order_by(
             SpaceParticipantTable.c.space_id,
             AgentModel.agent_id,

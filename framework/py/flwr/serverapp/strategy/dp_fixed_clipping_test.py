@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.supercore.privacy_accounting import (
     GaussianPrivacyEvent,
     NeighboringRelation,
@@ -162,3 +162,62 @@ def test_budget_is_checked_before_training() -> None:
     with pytest.raises(PrivacyBudgetExhausted):
         list(wrapper.configure_train(1, ArrayRecord(), ConfigRecord(), _grid()))
     accountant.compose.assert_not_called()
+
+
+def test_integer_buffer_in_updates_raises_clear_error() -> None:
+    """Regression test: integer buffers in updates raise a clear error, not silence.
+
+    Integer tracking buffers like `num_batches_tracked` can depend on private data,
+    so the DP wrapper must reject them instead of leaving them unclipped and
+    un-noised inside the aggregate.
+    """
+    wrapper = DifferentialPrivacyServerSideFixedClipping(
+        strategy=FedAvg(min_train_nodes=2, min_available_nodes=2),
+        noise_multiplier=0.0,
+        clipping_norm=10.0,
+        num_sampled_clients=2,
+    )
+
+    # Initial model with float weights and a scalar integer tracking buffer
+    # (`num_batches_tracked` is a scalar in BatchNorm)
+    arrays = ArrayRecord(
+        {
+            "weights": Array(np.array([1.0, 2.0], dtype=np.float32)),
+            "num_batches_tracked": Array(np.array(10, dtype=np.int64)),
+        }
+    )
+
+    _ = list(wrapper.configure_train(1, arrays, ConfigRecord(), _grid()))
+
+    reply1 = Mock(spec=Message)
+    reply1.content = RecordDict(
+        {
+            "arrays": ArrayRecord(
+                {
+                    "weights": Array(np.array([1.5, 2.5], dtype=np.float32)),
+                    "num_batches_tracked": Array(np.array(15, dtype=np.int64)),
+                }
+            ),
+            "metrics": MetricRecord({"num-examples": 1.0}),
+        }
+    )
+    reply1.has_error.return_value = False
+
+    reply2 = Mock(spec=Message)
+    reply2.content = RecordDict(
+        {
+            "arrays": ArrayRecord(
+                {
+                    "weights": Array(np.array([2.5, 3.5], dtype=np.float32)),
+                    "num_batches_tracked": Array(np.array(15, dtype=np.int64)),
+                }
+            ),
+            "metrics": MetricRecord({"num-examples": 1.0}),
+        }
+    )
+    reply2.has_error.return_value = False
+
+    # Aggregation raises a clear error instead of silently passing the
+    # integer buffer through without clipping or noise
+    with pytest.raises(ValueError, match="num_batches_tracked"):
+        wrapper.aggregate_train(1, [reply1, reply2])

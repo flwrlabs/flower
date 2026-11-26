@@ -57,6 +57,7 @@ from flwr.supercore.constant import (
     OBJECT_PUSH_SESSION_TTL_SECONDS,
     AutomationStatus,
     EventType,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.date import now
@@ -797,22 +798,30 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(updated.run_config, updated_context.run_config)
 
     def test_store_compacted_context(self) -> None:
-        """Store summaries at distinct event boundaries in a series."""
+        """Store summaries at distinct event boundaries for an agent."""
         state = self.state_factory()
-        other_series_id = 2**63 + 43
-        state.store_compacted_context(42, 2**63, "First", token_count=123)
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
+        state.store_compacted_context(agent.id, 2**63, "First", token_count=123)
         with self.assertRaises(ValueError):
-            state.store_compacted_context(42, 2**63, "Duplicate", token_count=123)
-        state.store_compacted_context(42, 2**63 + 100, "Second", token_count=2**63)
-        state.store_compacted_context(other_series_id, 2**63, "Other", token_count=789)
+            state.store_compacted_context(agent.id, 2**63, "Duplicate", token_count=123)
+        state.store_compacted_context(
+            agent.id, 2**63 + 100, "Second", token_count=2**63
+        )
+        state.store_compacted_context(other.id, 2**63, "Other", token_count=789)
 
-        second, first = state.get_compacted_contexts(42, limit=2)
-        (other,) = state.get_compacted_contexts(other_series_id)
+        second, first = state.get_compacted_contexts(agent.id, limit=2)
+        (other_context,) = state.get_compacted_contexts(other.id)
 
         self.assertGreater(first.id, 0)
         self.assertLess(first.id, second.id)
         self.assertTrue(first.created_at)
-        self.assertEqual(first.series_id, 42)
+        self.assertEqual(first.agent_id, agent.id)
         self.assertEqual(first.through_event_id, 2**63)
         self.assertEqual(first.text, "First")
         self.assertEqual(first.token_count, 123)
@@ -821,10 +830,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(second.token_count, 2**63)
         self.assertNotEqual(second.id, first.id)
         self.assertEqual(
-            state.get_compacted_contexts(42, before_context_id=second.id), [first]
+            state.get_compacted_contexts(agent.id, before_context_id=second.id), [first]
         )
-        self.assertEqual(other.series_id, other_series_id)
-        self.assertEqual(other.text, "Other")
+        self.assertEqual(other_context.agent_id, other.id)
+        self.assertEqual(other_context.text, "Other")
 
     def test_connector_oauth_session_lifecycle(self) -> None:
         """An OAuth session can be created, retrieved, and completed once."""
@@ -927,9 +936,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         next_run_at: str | None = None,
         fixed_interval: int | None = None,
         max_runs: int | None = 1,
+        title: str,
     ) -> Automation:
         """Store a minimal automation."""
         return state.store_automation(
+            title=title,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=StartRunRequest(
@@ -1305,6 +1316,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         due = self.store_automation(
             state,
+            title="Daily summary",
             series_id=1,
             next_run_at=due_at,
             fixed_interval=60,
@@ -1313,15 +1325,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state,
             series_id=2,
             next_run_at=(current + timedelta(seconds=60)).isoformat(),
+            title="Daily summary",
         )
         other = self.store_automation(
             state,
             series_id=3,
             federation_id="@me/fed-b",
             next_run_at=(current - timedelta(seconds=30)).isoformat(),
+            title="Daily summary",
         )
 
         self.assertEqual(due.next_run_at, due_at)
+        self.assertEqual(due.title, "Daily summary")
+        self.assertEqual(future.title, "Daily summary")
 
         listed = state.list_automations(
             federations=["@me/fed-a"], order_by="updated_at"
@@ -1366,6 +1382,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
         self.assertEqual(due_list[0].remaining_runs, 1)
+        self.assertEqual(due_list[0].title, "Daily summary")
 
         self.assertTrue(state.stop_automation(due.automation_id))
         self.assertFalse(state.stop_automation(due.automation_id))
@@ -1379,6 +1396,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
+        self.assertEqual(stopped[0].title, "Daily summary")
 
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""
@@ -1394,6 +1412,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
         )
 
         # Advance the first occurrence and reject the stale due-time claim.
@@ -1449,6 +1468,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state,
             series_id=2,
             next_run_at=failed_previous_next_run_at,
+            title="Daily summary",
         )
         self.assertTrue(
             state.advance_automation(
@@ -1487,6 +1507,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=first_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
         )
         self.assertIsNone(
             state.claim_automation(
@@ -1534,11 +1555,174 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id = 123
 
         automation = self.store_automation(
-            state, federation_id="@me/fed-b", series_id=series_id
+            state,
+            federation_id="@me/fed-b",
+            series_id=series_id,
+            title="Daily summary",
         )
 
         self.assertEqual(automation.series_id, series_id)
         self.assertEqual(automation.federation, "@me/fed-b")
+        self.assertFalse(automation.HasField("agent_id"))
+
+    def test_store_automation_persists_agent_id(self) -> None:
+        """Store the agent ID in both state implementations."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "aid-a", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+
+        automation = state.store_automation(
+            title="Daily summary",
+            flwr_aid="aid-a",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=now().isoformat(),
+            max_runs=1,
+            agent_id=agent.id,
+        )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+
+        self.assertEqual(automation.agent_id, agent.id)
+        self.assertEqual(stored.agent_id, agent.id)
+        self.assertEqual(stored.title, "Daily summary")
+        self.assertEqual((stored.federation, stored.series_id), ("", 0))
+        self.assertEqual(
+            [
+                item.automation_id
+                for item in state.list_automations(
+                    agent_ids=[agent.id], order_by="updated_at"
+                )
+            ],
+            [automation.automation_id],
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[], order_by="updated_at"), []
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[agent.id + 1], order_by="updated_at"),
+            [],
+        )
+
+    def test_claim_agent_automation_stores_each_occurrence(self) -> None:
+        """Claim each due occurrence once, including with overlapping polls."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        first_due = now().isoformat()
+        second_due = (now() + timedelta(seconds=60)).isoformat()
+        automation = state.store_automation(
+            flwr_aid="alice",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=first_due,
+            fixed_interval=60,
+            max_runs=2,
+            agent_id=agent.id,
+            title="Daily summary",
+        )
+        cursor = state.get_bootstrap("alice").cursor
+        self.assertIsNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=first_due,
+                next_run_at=None,
+            )
+        )
+        other_poll = state.list_automations(
+            statuses=[AutomationStatus.ACTIVE],
+            due_before=now(),
+            order_by="next_run_at",
+            limit=1,
+        )[0]
+        first = state.claim_agent_automation(
+            automation.automation_id,
+            previous_next_run_at=first_due,
+            next_run_at=second_due,
+        )
+        assert first is not None
+        self.assertEqual(first.type, SpaceItemType.AUTOMATION.value)
+        self.assertEqual(first.space_id, agent.default_space_id)
+        self.assertEqual(first.content, "Do work")
+        self.assertFalse(first.HasField("author"))
+        self.assertIsNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=other_poll.next_run_at,
+                next_run_at=second_due,
+            )
+        )
+        self.assertEqual(other_poll.next_run_at, first_due)
+        second = state.claim_agent_automation(
+            automation.automation_id,
+            previous_next_run_at=second_due,
+            next_run_at=None,
+        )
+        assert second is not None
+        self.assertGreater(second.id, first.id)
+        self.assertEqual(
+            state.get_space_items(
+                UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+            ),
+            [first, second],
+        )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.COMPLETED)
+        self.assertEqual(stored.remaining_runs, 0)
+        events = state.get_user_events("alice", cursor)
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 2)
+        self.assertEqual(
+            [entry.event.payload["id"] for entry in events],
+            [str(first.id), str(second.id)],
+        )
+
+    def test_agent_automation_requires_prompt(self) -> None:
+        """Reject agent automations that cannot produce an item."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        with self.assertRaisesRegex(ValueError, "prompt must be nonempty"):
+            state.store_automation(
+                flwr_aid="alice",
+                start_run_request=StartRunRequest(),
+                next_run_at=now().isoformat(),
+                max_runs=1,
+                agent_id=agent.id,
+                title="Daily summary",
+            )
+
+    def test_store_automation_requires_one_owner(self) -> None:
+        """Reject missing, partial, or mixed automation ownership."""
+        state = self.state_factory()
+        invalid_owners = [
+            (None, None, None),
+            ("@me/fed-a", None, None),
+            (None, 123, None),
+            ("@me/fed-a", None, 456),
+            (None, 123, 456),
+            ("@me/fed-a", 123, 456),
+        ]
+        for federation_id, series_id, agent_id in invalid_owners:
+            with self.subTest(
+                federation_id=federation_id, series_id=series_id, agent_id=agent_id
+            ):
+                with self.assertRaisesRegex(ValueError, "Provide agent_id"):
+                    state.store_automation(
+                        federation_id=federation_id,
+                        flwr_aid="aid-a",
+                        start_run_request=StartRunRequest(user_prompt="Do work"),
+                        series_id=series_id,
+                        next_run_at=now().isoformat(),
+                        agent_id=agent_id,
+                        title="Daily summary",
+                    )
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
@@ -1548,6 +1732,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
             fab_hash=None,
             connector_ref="web_search",
         )
@@ -1578,6 +1763,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         requesting_task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
             run_id=run_id,
+            space_id=None,
         )
         assert requesting_task_id is not None
         self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
@@ -1585,6 +1771,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
             connector_ref="connector://test",
             requesting_task_id=requesting_task_id,
         )
@@ -1601,9 +1788,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id_1 = self.task_run_id(state)
         run_id_2 = self.other_task_run_id(state)
-        task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
-        task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_2)
-        task_id_3 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id_1)
+        task_id_1 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_1, space_id=None
+        )
+        task_id_2 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_2, space_id=None
+        )
+        task_id_3 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id_1, space_id=None
+        )
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
@@ -1617,7 +1810,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
@@ -1655,6 +1850,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
             run_id=run_id,
+            space_id=None,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -1678,6 +1874,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=run_id,
+            space_id=None,
         )
         assert task_id is not None
 
@@ -1723,6 +1920,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         log_entry_1 = "Log entry 1"
@@ -1750,6 +1948,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         log_entry_1 = "Log entry 1"
@@ -1778,6 +1977,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         fixed_now = now()
@@ -1798,6 +1998,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task_id = state.create_task(
             task_type=TaskType.CONNECTOR,
             run_id=self.task_run_id(state),
+            space_id=None,
         )
         assert task_id is not None
         fixed_now = now()
@@ -1820,7 +2021,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1846,9 +2047,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        claimed_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         finished_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert claimed_task_id is not None and finished_task_id is not None
 
@@ -1864,7 +2067,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1898,7 +2101,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state)
+            task_type=TaskType.CONNECTOR, run_id=self.task_run_id(state), space_id=None
         )
         assert task_id is not None
 
@@ -1939,7 +2142,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -1972,7 +2177,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
 
@@ -2019,7 +2226,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -2051,7 +2260,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -2073,7 +2284,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+            task_id = state.create_task(
+                task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+            )
             assert task_id is not None
             assert (token := state.claim_task(task_id))
 
@@ -2097,7 +2310,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         if not hasattr(state, "session"):
             self.skipTest("SQL session test")
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert task_id is not None
 
         with state.session():
@@ -2121,7 +2336,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ) as on_expired:
             with patch("datetime.datetime") as mock_dt:
                 mock_dt.now.return_value = fixed_now
-                task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+                task_id = state.create_task(
+                    task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+                )
                 assert task_id is not None
                 assert state.claim_task(task_id) is not None
 
@@ -2142,10 +2359,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Task Messages should round-trip, filter, and be delivered once."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         other_dst_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert (
             src_task_id is not None
@@ -2200,16 +2421,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         run_id = self.task_run_id(state)
         other_run_id = self.other_task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         other_run_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=other_run_id
+            task_type=TaskType.CONNECTOR, run_id=other_run_id, space_id=None
         )
         finished_src_task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=run_id
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
         )
         finished_dst_task_id = state.create_task(
-            task_type=TaskType.CONNECTOR, run_id=run_id
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
         )
         assert (
             src_task_id is not None
@@ -2266,8 +2491,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Getting task Messages should not return expired Messages."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         msg_ttl = 60.0
@@ -2290,8 +2519,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Getting task Messages should respect the provided limit."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2320,9 +2553,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """A source-specific claim should not consume another task's message."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id_1 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
-        src_task_id_2 = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        src_task_id_1 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
+        src_task_id_2 = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert (
             src_task_id_1 is not None
             and src_task_id_2 is not None
@@ -2354,7 +2593,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Prepare: Create one run with a task and two valid task events.
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         event_1 = TaskEvent(
             run_id=run_id,
@@ -2411,7 +2652,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Store task events with several types and return them in ID order."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         state.store_task_events(
             [
@@ -2497,7 +2740,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Prepare: Create one valid event followed by an invalid payload variant.
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
 
         # Execute: Attempt to store the mixed event batch.
@@ -2605,6 +2850,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         snapshot = state.get_bootstrap("alice")
         self.assertEqual(list(snapshot.agents), [agent])
         self.assertEqual(list(snapshot.spaces), list(state.get_spaces("alice")))
+        self.assertEqual(list(snapshot.active_runs), [])
         self.assertEqual(snapshot.cursor, 2)
         self.assertEqual(state.get_bootstrap("bob").cursor, 0)
         alice = SpaceParticipant(flwr_aid="alice")
@@ -2625,6 +2871,161 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
         self.assertEqual(entries[1].event.payload["id"], str(message.id))
+
+    def test_space_items_order_and_pagination(self) -> None:
+        """Typed items share one order and support participant-scoped reads."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        cursor = state.get_bootstrap("bob").cursor
+        first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", alice)
+        second = state.store_space_item(
+            space_id, SpaceItemType.MESSAGE, "second", alice
+        )
+        automation = state.store_space_item(
+            space_id, SpaceItemType.AUTOMATION, "scheduled"
+        )
+        assert first is not None and second is not None and automation is not None
+        events = state.get_user_events("bob", cursor)
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 3)
+        self.assertEqual(
+            [entry.event.payload["content"] for entry in events],
+            ["first", "second", "scheduled"],
+        )
+        self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
+        self.assertEqual([first.type, second.type], ["message", "message"])
+        self.assertEqual(automation.type, "automation")
+        self.assertFalse(automation.HasField("author"))
+        self.assertEqual(
+            [item.id for item in state.get_space_items(space_id, alice, limit=2) or []],
+            [2, 3],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, bob, after_id=0, limit=2)
+                or []
+            ],
+            [1, 2],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, bob, after_id=2) or []
+            ],
+            [3],
+        )
+        self.assertEqual(
+            [
+                item.id
+                for item in state.get_space_items(space_id, alice, before_id=3) or []
+            ],
+            [1, 2],
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, after_id=3), [])
+
+    def test_space_item_authorization_and_validation(self) -> None:
+        """Reject unauthorized and invalid items without persisting them."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice]).id)
+        self.assertIsNone(
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "secret", bob)
+        )
+        self.assertIsNone(state.get_space_items(space_id, bob))
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "  ", alice)
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, "message")
+        with self.assertRaises(ValueError):
+            state.store_space_item(
+                space_id, SpaceItemType.MESSAGE, "message", SpaceParticipant()
+            )
+        with self.assertRaises(ValueError):
+            state.store_space_item(
+                space_id, SpaceItemType.AUTOMATION, "scheduled", alice
+            )
+        with self.assertRaises(ValueError):
+            state.store_space_item(space_id, SpaceItemType.AUTOMATION, "scheduled", bob)
+        self.assertEqual(state.get_space_items(space_id, alice), [])
+        with self.assertRaises(ValueError):
+            state.store_space_item(UUID(int=0), SpaceItemType.MESSAGE, "missing")
+        self.assertIsNone(
+            state.store_space_item(UUID(int=0), SpaceItemType.AUTOMATION, "missing")
+        )
+
+    def test_space_items_accept_agent_author(self) -> None:
+        """An agent participant can author a message item."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
+        author = SpaceParticipant(agent_id=agent.id)
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "reply", author)
+        assert item is not None
+        self.assertEqual(item.author, author)
+        self.assertEqual(state.get_space_items(space_id, author), [item])
+        event = state.get_user_events("alice")[-1].event
+        self.assertEqual(event.type, EventType.ITEM_CREATED)
+        self.assertEqual(event.payload["id"], str(item.id))
+        self.assertEqual(event.space_id, str(space_id))
+
+    def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
+        """Reading items does not mark legacy messages as read."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        space_id = UUID(state.create_space(participants=[alice]).id)
+        message = state.create_space_message(space_id, alice, "legacy")
+        assert message is not None
+        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "new", alice)
+        assert item is not None
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
+        self.assertEqual(state.get_space_items(space_id, alice), [item])
+        self.assertEqual(
+            state.get_space_messages(space_id, alice, unread_only=True), [message]
+        )
+
+    def test_space_item_read_cursors_are_independent(self) -> None:
+        """Each participant tracks read items separately in each Space."""
+        state = self.state_factory()
+        alice = SpaceParticipant(flwr_aid="alice")
+        bob = SpaceParticipant(flwr_aid="bob")
+        space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        items = [
+            state.store_space_item(space_id, SpaceItemType.MESSAGE, str(i), alice)
+            for i in range(3)
+        ]
+        self.assertEqual(
+            state.get_space_items(space_id, alice, unread_only=True, limit=2),
+            items[:2],
+        )
+        self.assertEqual(
+            state.get_space_items(space_id, alice, unread_only=True), items[2:]
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, unread_only=True), [])
+        self.assertEqual(state.get_space_items(space_id, bob, limit=1), items[-1:])
+        self.assertEqual(state.get_space_items(space_id, bob, unread_only=True), [])
+        other_id = UUID(state.create_space(participants=[alice]).id)
+        other = state.store_space_item(other_id, SpaceItemType.MESSAGE, "other", alice)
+        self.assertEqual(
+            state.get_space_items(other_id, alice, unread_only=True), [other]
+        )
+        self.assertEqual(state.get_space_items(space_id, alice, before_id=3), items[:2])
+        self.assertEqual(state.get_space_items(space_id, alice, unread_only=True), [])
+
+    def test_user_event_explicit_empty_recipients(self) -> None:
+        """An empty recipient list delivers to nobody, even with a Space ID."""
+        state = self.state_factory()
+        space = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
+        state.store_event(EventType.SPACE_CREATED, space, [], space_id=UUID(space.id))
+        self.assertEqual(state.get_user_events("alice", after_seq=1), [])
+
+        with self.assertRaises(ValueError):
+            state.store_event(EventType.SPACE_CREATED, space)
 
     def test_user_event_replay(self) -> None:
         """Assign event metadata and replay immutable payloads in feed order."""
@@ -2656,9 +3057,16 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(state.get_user_events("alice", limit=1), page)
 
     def test_user_event_agent_creation_failure(self) -> None:
-        """Roll back the Agent and its event if initial Space creation fails."""
+        """Roll back the Agent, Space, and events if their creation fails."""
         state = self.state_factory()
-        with patch.object(state, "create_space", side_effect=ValueError("failed")):
+        original_store_event = state.store_event
+
+        def fail_space_event(event_type: str, *args: Any, **kwargs: Any) -> UUID:
+            if event_type == EventType.SPACE_CREATED:
+                raise ValueError("failed")
+            return original_store_event(event_type, *args, **kwargs)
+
+        with patch.object(state, "store_event", side_effect=fail_space_event):
             with self.assertRaises(ValueError):
                 state.create_agent(
                     "alice", AgentConfig(name="Agent", app_spec="@test/app")

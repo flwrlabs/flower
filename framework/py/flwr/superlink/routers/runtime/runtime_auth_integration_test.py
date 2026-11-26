@@ -25,16 +25,24 @@ from httpx import Response
 
 from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
 from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetConnectorRequest,
     GetConnectorResponse,
     GetNodesRequest,
     GetNodesResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
     SpaceParticipant,
@@ -81,8 +89,20 @@ def fixture_client(state: LinkState) -> TestClient:
     return TestClient(app)
 
 
+@pytest.fixture(name="agent")
+def fixture_agent(state: LinkState) -> tuple[int, str, str]:
+    """Create the shared Space agent and return its IDs and task token."""
+    agent = state.create_agent("alice", AgentConfig(name="Agent", app_spec="@flwr/app"))
+    assert agent is not None
+    space = state.create_space(participants=[SpaceParticipant(agent_id=agent.id)])
+    token = _create_running_task(
+        state, TaskType.AGENT_APP, space_id=UUID(space.id), agent_id=agent.id
+    )
+    return agent.id, space.id, token
+
+
 def _post(
-    client: TestClient, path: str, proto_request: Message, *, token: str | None = None
+    client: TestClient, path: str, proto_request: Message, token: str | None = None
 ) -> Response:
     """Send a protobuf request with an optional task token."""
     headers = {"content-type": PROTOBUF_MEDIA_TYPE}
@@ -119,7 +139,7 @@ def _create_running_task(
         agent_id=agent_id,
     )
     assert run_id
-    task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
+    task_id = state.get_run(run_ids=[run_id])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
@@ -162,6 +182,7 @@ def test_get_connector_requires_and_uses_connector_task_token(
     task_id = state.create_task(
         TaskType.CONNECTOR,
         run_id,
+        space_id=None,
         connector_ref="notion",
         connector_id=connector_id,
     )
@@ -221,32 +242,43 @@ def test_get_space_events_reads_only_authenticated_space(
         )
         for current_space_id in (space_id, other_space_id)
     ]
-    task_id = state.get_run_info(run_ids=[run_ids[0]])[0].primary_task_id
+    task_id = state.get_run(run_ids=[run_ids[0]])[0].primary_task_id
     assert task_id is not None
     token = state.claim_task(task_id)
     assert token is not None
     assert state.activate_task(task_id)
+    assert state.store_task_events(
+        [
+            TaskEvent(
+                run_id=run_ids[0],
+                task_id=task_id,
+                event="other",
+                data='{"type":"other"}',
+            )
+        ]
+    )
 
     assert _post(client, "get-space-events", GetSpaceEventsRequest()).status_code == 401
-    response = _post(client, "get-space-events", GetSpaceEventsRequest(), token=token)
+    response = _post(
+        client,
+        "get-space-events",
+        GetSpaceEventsRequest(event_types=["message"], last_n=1),
+        token=token,
+    )
 
     assert response.status_code == 200
     events = GetSpaceEventsResponse.FromString(response.content).events
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
+    assert events[0].event == "message"
 
 
 def test_space_messages_use_authenticated_run(
-    client: TestClient, state: LinkState
+    client: TestClient, agent: tuple[int, str, str]
 ) -> None:
     """Read and publish with the authenticated Run's Space and agent identity."""
-    agent = state.create_agent("alice", AgentConfig(name="agent", app_spec="@flwr/app"))
-    assert agent is not None
-    participant = SpaceParticipant(agent_id=agent.id)
-    space = state.create_space(participants=[participant])
-    token = _create_running_task(
-        state, TaskType.AGENT_APP, space_id=UUID(space.id), agent_id=agent.id
-    )
+    agent_id, space_id, token = agent
+    participant = SpaceParticipant(agent_id=agent_id)
     for path, request in (
         ("get-space-messages", GetSpaceMessagesRequest()),
         ("send-space-message", SendSpaceMessageRequest(content="Hello")),
@@ -262,7 +294,7 @@ def test_space_messages_use_authenticated_run(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == participant
-    assert message.space_id == space.id and message.content == "Hello"
+    assert message.space_id == space_id and message.content == "Hello"
 
     for expected in ([message], []):
         response = _post(
@@ -275,3 +307,117 @@ def test_space_messages_use_authenticated_run(
         assert (
             GetSpaceMessagesResponse.FromString(response.content).messages == expected
         )
+
+
+def test_space_item_endpoints_use_authenticated_run(
+    client: TestClient,
+    state: LinkState,
+    agent: tuple[int, str, str],
+) -> None:
+    """Read and publish items using the task's Space and agent identity."""
+    agent_id, space_id, token = agent
+    assert _post(client, "get-space-items", GetSpaceItemsRequest()).status_code == 401
+    assert (
+        _post(client, "send-space-item", SendSpaceItemRequest(content="Hi")).status_code
+        == 401
+    )
+    items = []
+    for content in ("First", "Second"):
+        response = _post(
+            client,
+            "send-space-item",
+            SendSpaceItemRequest(space_id="ignored", content=content),
+            token=token,
+        )
+        assert response.status_code == 200
+        items.append(SendSpaceItemResponse.FromString(response.content).item)
+    assert all(
+        item.space_id == space_id
+        and item.author == SpaceParticipant(agent_id=agent_id)
+        and item.type == "message"
+        for item in items
+    )
+    response = _post(
+        client,
+        "get-space-items",
+        GetSpaceItemsRequest(unread_only=True, limit=1),
+        token=token,
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    response = _post(
+        client, "get-space-items", GetSpaceItemsRequest(unread_only=True), token=token
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    response = _post(
+        client, "get-space-items", GetSpaceItemsRequest(unread_only=True), token=token
+    )
+    assert response.status_code == 200
+    assert not GetSpaceItemsResponse.FromString(response.content).items
+    assert (
+        state.get_space_messages(UUID(space_id), SpaceParticipant(agent_id=agent_id))
+        == []
+    )
+    for path, request in (
+        ("get-space-items", GetSpaceItemsRequest(limit=0)),
+        ("get-space-items", GetSpaceItemsRequest(limit=101)),
+        ("send-space-item", SendSpaceItemRequest(content="  ")),
+    ):
+        response = _post(client, path, request, token=token)
+        assert response.status_code == 400
+        assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
+
+
+def test_agent_connector_discovery_and_credentials(
+    client: TestClient, state: LinkState, agent: tuple[int, str, str]
+) -> None:
+    """List agent connections and use the selected connector task's credentials."""
+    agent_id, space_id, token = agent
+    connector_id = state.create_connector(
+        None, "slack", '{"access_token":"secret"}', "{}", "alice", agent_id
+    )
+    assert connector_id is not None
+    listed = _post(client, "list-agent-connectors", ListAgentConnectorsRequest(), token)
+    assert listed.status_code == 200
+    connections = ListAgentConnectorsResponse.FromString(listed.content).connectors
+    assert [item.connector_id for item in connections] == [connector_id]
+
+    created = _post(
+        client,
+        "create-task",
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_id=connector_id),
+        token,
+    )
+    assert created.status_code == 200
+    child_id = CreateTaskResponse.FromString(created.content).task_id
+    assert state.get_tasks(task_ids=[child_id])[0].space_id == space_id
+    child_token = state.claim_task(child_id)
+    assert child_token is not None and state.activate_task(child_id)
+    response = _post(client, "get-connector", GetConnectorRequest(), child_token)
+    assert response.status_code == 200
+    assert (
+        GetConnectorResponse.FromString(response.content).credentials_json
+        == '{"access_token":"secret"}'
+    )
+
+
+def test_agent_connector_rejects_foreign_connection(
+    client: TestClient, state: LinkState, agent: tuple[int, str, str]
+) -> None:
+    """Hide another agent's connection and deny its use."""
+    _, _, token = agent
+    other = state.create_agent("bob", AgentConfig(name="Other", app_spec="@test/app"))
+    assert other is not None
+    foreign = state.create_connector(None, "slack", "{}", "{}", "bob", other.id)
+    assert foreign is not None
+    listed = _post(client, "list-agent-connectors", ListAgentConnectorsRequest(), token)
+    assert listed.status_code == 200
+    assert not ListAgentConnectorsResponse.FromString(listed.content).connectors
+    response = _post(
+        client,
+        "create-task",
+        CreateTaskRequest(type=TaskType.CONNECTOR, connector_id=foreign),
+        token,
+    )
+    assert response.status_code == 403

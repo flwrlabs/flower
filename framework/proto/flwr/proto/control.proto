@@ -34,17 +34,32 @@ message AgentConfig {
   optional string description = 2;
   optional string title = 3;
   string app_spec = 4;
+  // Frontend preset avatar identifier.
+  string avatar = 5;
+  // Frontend color identifier.
+  string color = 6;
 }
 message Agent {
   uint64 id = 1;
   AgentConfig config = 2;
   string created_at = 3;
   string updated_at = 4;
+  string default_space_id = 5;
+  uint64 config_version = 6;
 }
 message CreateAgentRequest { AgentConfig config = 1; }
 message CreateAgentResponse { Agent agent = 1; }
 message ListAgentsRequest {}
 message ListAgentsResponse { repeated Agent agents = 1; }
+
+message UpdateAgentRequest {
+  uint64 agent_id = 1;
+  uint64 expected_config_version = 2;
+  AgentConfig config = 3;
+}
+message UpdateAgentResponse { Agent agent = 1; }
+message DeleteAgentRequest { uint64 agent_id = 1; }
+message DeleteAgentResponse {}
 
 message StartRunRequest {
   Fab fab = 1;
@@ -69,6 +84,7 @@ message StartAutomationRequest {
   optional string start_at = 2;
   optional uint64 fixed_interval = 3;
   optional uint32 max_runs = 4;
+  string title = 5;
 }
 message StartAutomationResponse {
   uint64 automation_id = 1;
@@ -87,8 +103,15 @@ message Automation {
   optional uint64 fixed_interval = 9;
   optional uint32 remaining_runs = 10;
   optional string stopped_at = 11;
+  optional uint64 agent_id = 12;
+  string title = 13;
 }
-message ListAutomationsRequest { string federation = 1; }
+message ListAutomationsRequest {
+  string federation = 1;
+  // When set, list this owned Agent's automations instead of federation
+  // automations.
+  optional uint64 agent_id = 2;
+}
 message ListAutomationsResponse { repeated Automation automations = 1; }
 message StopAutomationRequest { uint64 automation_id = 1; }
 message StopAutomationResponse {}
@@ -112,13 +135,15 @@ message ListRunsResponse {
   string now = 2;
 }
 
-// Agents and Spaces only. Message history is fetched through GetSpaceMessages.
+// Agents, Spaces and active runs. Message history is fetched through
+// GetSpaceMessages.
 message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;
   repeated Space spaces = 2;
   // Feed head from the same snapshot as agents and spaces.
   uint64 cursor = 3;
+  repeated Run active_runs = 4;
 }
 
 message Event {
@@ -168,12 +193,19 @@ message GetLoginDetailsResponse {
   string verification_uri_complete = 3;
   int64 expires_in = 4;
   int64 interval = 5;
+  // Used with user_code when the provider omits verification_uri_complete.
+  string verification_uri = 6;
+  string user_code = 7;
+  // The SuperLink supports completing account signup in the CLI.
+  bool supports_cli_signup = 8;
 }
 
 message GetAuthTokensRequest { string device_code = 1; }
 message GetAuthTokensResponse {
   string access_token = 1;
   string refresh_token = 2;
+  // OAuth device authorization error, if reported by the auth plugin.
+  string error = 3;
 }
 
 message RefreshAuthTokensRequest { string refresh_token = 1; }
@@ -182,7 +214,11 @@ message RefreshAuthTokensResponse {
   string refresh_token = 2;
 }
 
-message ListConnectorsRequest { string federation = 1; }
+message ListConnectorsRequest {
+  string federation = 1;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 2;
+}
 message Connector {
   string connector_ref = 1;
   string display_name = 2;
@@ -196,6 +232,8 @@ message DisconnectConnectorRequest {
   string connector_ref = 1;
   uint64 connector_id = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message DisconnectConnectorResponse {}
 
@@ -203,6 +241,8 @@ message BeginConnectorOAuthRequest {
   string connector_ref = 1;
   string redirect_uri = 2;
   string federation = 3;
+  // Select an agent instead of a federation; 0 leaves the agent unset.
+  uint64 agent_id = 4;
 }
 message BeginConnectorOAuthResponse {
   string oauth_session_id = 1;

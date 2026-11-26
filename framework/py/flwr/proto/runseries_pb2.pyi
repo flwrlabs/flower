@@ -68,13 +68,13 @@ class CompactedContext(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
-    SERIES_ID_FIELD_NUMBER: builtins.int
+    AGENT_ID_FIELD_NUMBER: builtins.int
     THROUGH_EVENT_ID_FIELD_NUMBER: builtins.int
     TEXT_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     TOKEN_COUNT_FIELD_NUMBER: builtins.int
     id: builtins.int
-    series_id: builtins.int
+    agent_id: builtins.int
     through_event_id: builtins.int
     text: builtins.str
     created_at: builtins.str
@@ -83,12 +83,12 @@ class CompactedContext(google.protobuf.message.Message):
         self,
         *,
         id: builtins.int = ...,
-        series_id: builtins.int = ...,
+        agent_id: builtins.int = ...,
         through_event_id: builtins.int = ...,
         text: builtins.str = ...,
         created_at: builtins.str = ...,
         token_count: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "series_id", b"series_id", "text", b"text", "through_event_id", b"through_event_id", "token_count", b"token_count"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["agent_id", b"agent_id", "created_at", b"created_at", "id", b"id", "text", b"text", "through_event_id", b"through_event_id", "token_count", b"token_count"]) -> None: ...
 
 global___CompactedContext = CompactedContext

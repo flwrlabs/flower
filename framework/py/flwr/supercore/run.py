@@ -56,6 +56,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     account_name: str = ""
     space_id: UUID | None = None
     agent_id: int | None = None
+    trigger_item_id: int | None = None
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":

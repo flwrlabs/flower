@@ -21,12 +21,13 @@ from collections.abc import Sequence
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
+from flwr.supercore.constant import DeviceAuthorizationError
 
 
 class ControlAuthnPlugin(ABC):
-    """Abstract Flower Authentication Plugin class for ControlServicer."""
+    """Authenticate Control requests through the synchronous plugin contract."""
 
     @abstractmethod
     def __init__(self) -> None:
@@ -39,15 +40,17 @@ class ControlAuthnPlugin(ABC):
     @abstractmethod
     def validate_tokens_in_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[bool, AccountInfo | None]:
+    ) -> tuple[bool, AuthenticatedUser | None]:
         """Validate authentication tokens in the provided metadata."""
 
     @abstractmethod
-    def get_auth_tokens(self, device_code: str) -> AccountAuthCredentials | None:
-        """Get authentication tokens."""
+    def get_auth_tokens(
+        self, device_code: str
+    ) -> AccountAuthCredentials | DeviceAuthorizationError | None:
+        """Return tokens, a device authorization error, or None while pending."""
 
     @abstractmethod
     def refresh_tokens(
         self, metadata: Sequence[tuple[str, str | bytes]]
-    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AccountInfo | None]:
+    ) -> tuple[Sequence[tuple[str, str | bytes]] | None, AuthenticatedUser | None]:
         """Refresh authentication tokens in the provided metadata."""

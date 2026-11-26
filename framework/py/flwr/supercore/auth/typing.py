@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class AccountAuthLoginDetails:
+class AccountAuthLoginDetails:  # pylint: disable=too-many-instance-attributes
     """Account authentication login details."""
 
     authn_type: str
@@ -27,6 +27,9 @@ class AccountAuthLoginDetails:
     verification_uri_complete: str
     expires_in: int
     interval: int
+    verification_uri: str = ""
+    user_code: str = ""
+    supports_cli_signup: bool = False
 
 
 @dataclass
@@ -37,9 +40,18 @@ class AccountAuthCredentials:
     refresh_token: str
 
 
-@dataclass
-class AccountInfo:
-    """User information for event log."""
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    """User identity within the deployment's single configured issuer."""
 
-    flwr_aid: str
-    account_name: str
+    # Keep the existing subject-based ID. The issuer is deployment configuration,
+    # not part of a new user-identity key or account-linking schema.
+    user_id: str
+    roles: tuple[str, ...] = ()
+    # Profile hints are optional and do not define the local account identity.
+    provider_username: str | None = None
+    given_name: str | None = None
+    family_name: str | None = None
+    email: str | None = None
+    # Account resolution supplies this only after local admission succeeds.
+    handle: str | None = None

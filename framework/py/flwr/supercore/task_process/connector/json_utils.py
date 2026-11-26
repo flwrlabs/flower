@@ -12,15 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Validation helpers shared by federation-scoped connectors."""
+"""JSON metadata and validation helpers shared by connectors."""
 
 
+import json
 from collections.abc import Callable
 from typing import cast
 
 from flwr.supercore.typing import JSONObject
 
 ErrorFactory = Callable[[str], Exception]
+
+
+def connector_display_name(config_json: str, fallback: str) -> str:
+    """Return the stored connection name, falling back to the provider name."""
+    try:
+        config = json.loads(config_json)
+    except (TypeError, ValueError):
+        return fallback
+    if isinstance(config, dict):
+        name = config.get("display_name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    return fallback
 
 
 def require_string(value: object, provider: str, name: str) -> str:

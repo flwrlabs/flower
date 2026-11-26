@@ -22,6 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from flwr.supercore.constant import SpaceItemType
 from flwr.supercore.state.schema.corestate_models import (
     Event,
     FlwrBase,
@@ -38,9 +39,11 @@ CORESTATE_TABLE_NAMES = {
     "file_revision",
     "message",
     "agent",
+    "agent_config",
     "space",
     "space_participant",
     "space_message",
+    "space_item",
     "events",
     "user_events",
     "user_event_feeds",
@@ -110,10 +113,86 @@ def test_connector_uses_incrementing_id_and_allows_multiple_provider_accounts() 
 
     assert [column.name for column in table.primary_key.columns] == ["connector_id"]
     assert table.c.connector_id.autoincrement is True
-    for column_name in ("federation_id", "created_at", "created_by"):
+    for column_name in ("created_at", "created_by"):
         assert table.c[column_name].nullable is False
-    for column_name in ("deleted_at", "deleted_by"):
+    for column_name in ("federation_id", "agent_id", "deleted_at", "deleted_by"):
         assert table.c[column_name].nullable is True
+
+
+@pytest.mark.parametrize("table_name", ["connector", "connector_oauth_session"])
+@pytest.mark.parametrize(
+    ("federation_id", "agent_id", "error"),
+    [
+        ("@user/fed", None, None),
+        (None, 1, None),
+        (None, None, "CHECK constraint failed"),
+        ("@user/fed", 1, "CHECK constraint failed"),
+        (None, 2, "FOREIGN KEY constraint failed"),
+    ],
+)
+def test_connector_requires_exactly_one_existing_owner(
+    table_name: str,
+    federation_id: str | None,
+    agent_id: int | None,
+    error: str | None,
+) -> None:
+    """Accept one owner and require agent owners to reference an existing agent."""
+    table = FlwrBase.metadata.tables[table_name]
+    agent_table = FlwrBase.metadata.tables["agent"]
+    config_table = FlwrBase.metadata.tables["agent_config"]
+    space_table = FlwrBase.metadata.tables["space"]
+    timestamp = datetime.now(UTC)
+    values: dict[str, object] = {
+        "federation_id": federation_id,
+        "agent_id": agent_id,
+        "connector_ref": "slack",
+        "created_at": timestamp,
+    }
+    if table_name == "connector":
+        values.update(credentials_json="{}", config_json="{}", created_by="user")
+    else:
+        values.update(
+            oauth_session_id="session",
+            flwr_aid="user",
+            state="state",
+            redirect_uri="http://localhost/callback",
+            expires_at=timestamp,
+        )
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        space_table.create(conn)
+        agent_table.create(conn)
+        config_table.create(conn)
+        table.create(conn)
+        conn.execute(
+            space_table.insert().values(id=UUID(int=1), created_at=timestamp, title="")
+        )
+        conn.execute(
+            agent_table.insert().values(
+                agent_id=1,
+                flwr_aid="user",
+                app_spec="@user/app",
+                config_version=1,
+                default_space_id=UUID(int=1),
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+        )
+        conn.execute(
+            config_table.insert().values(
+                agent_id=1,
+                version=1,
+                name="Agent",
+                created_at=timestamp,
+            )
+        )
+        if error is None:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match=error):
+                conn.execute(table.insert().values(**values))
 
 
 def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
@@ -144,6 +223,44 @@ def test_space_requires_exactly_one_identity(
     }
     if table_name == "space_message":
         values.update(content="Hello", created_at=datetime.now(UTC))
+
+    with engine.begin() as conn:
+        if valid:
+            conn.execute(table.insert().values(**values))
+        else:
+            with pytest.raises(IntegrityError, match="CHECK constraint failed"):
+                conn.execute(table.insert().values(**values))
+
+
+@pytest.mark.parametrize(
+    ("item_type", "flwr_aid", "agent_id", "valid"),
+    [
+        (SpaceItemType.MESSAGE, "user", None, True),
+        (SpaceItemType.MESSAGE, None, 1, True),
+        (SpaceItemType.MESSAGE, None, None, False),
+        (SpaceItemType.MESSAGE, "user", 1, False),
+        (SpaceItemType.AUTOMATION, None, None, True),
+        (SpaceItemType.AUTOMATION, "user", None, False),
+    ],
+)
+def test_space_item_requires_author_only_for_messages(
+    item_type: SpaceItemType,
+    flwr_aid: str | None,
+    agent_id: int | None,
+    valid: bool,
+) -> None:
+    """Keep message authors while allowing system-created automation items."""
+    table = FlwrBase.metadata.tables["space_item"]
+    engine = create_engine("sqlite:///:memory:")
+    table.create(engine)
+    values = {
+        "space_id": UUID(int=1),
+        "type": item_type,
+        "flwr_aid": flwr_aid,
+        "agent_id": agent_id,
+        "created_at": datetime.now(UTC),
+        "content": "Hello",
+    }
 
     with engine.begin() as conn:
         if valid:

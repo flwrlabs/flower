@@ -53,6 +53,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -79,8 +81,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -267,55 +273,70 @@ def get_run_series_events(
 def get_space_events(
     request: Annotated[GetSpaceEventsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceEventsResponse:
     """Get events from the authenticated task's Space."""
-    return handlers.get_space_events(request, state, task)
+    return core_runtime_handlers.get_space_events(request, state, task)
 
 
 @router.post("/get-space-messages")
 def runtime_get_space_messages(
     request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetSpaceMessagesResponse:
     """Read messages from the authenticated task's Space."""
-    return handlers.get_space_messages(request, state, task)
+    return core_runtime_handlers.get_space_messages(request, state, task)
+
+
+@router.post("/get-space-items")
+def runtime_get_space_items(
+    request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> GetSpaceItemsResponse:
+    """Read items from the authenticated task's Space."""
+    return core_runtime_handlers.get_space_items(request, state, task)
 
 
 @router.post("/send-space-message")
 def runtime_send_space_message(
     request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> SendSpaceMessageResponse:
     """Publish a message to the authenticated task's Space."""
-    return handlers.send_space_message(request, state, task)
+    return core_runtime_handlers.send_space_message(request, state, task)
+
+
+@router.post("/send-space-item")
+def runtime_send_space_item(
+    request: Annotated[SendSpaceItemRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    task: TaskDependency,
+) -> SendSpaceItemResponse:
+    """Publish a message item to the task's Space."""
+    return core_runtime_handlers.send_space_item(request, state, task)
 
 
 @router.post("/get-compacted-contexts")
 def get_compacted_contexts(
     request: Annotated[GetCompactedContextsRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> GetCompactedContextsResponse:
     """Get summaries from the authenticated task's run series."""
-    return handlers.get_compacted_contexts(request, state, task)
+    return core_runtime_handlers.get_compacted_contexts(request, state, task)
 
 
 @router.post("/put-compacted-context")
 def put_compacted_context(
     request: Annotated[PutCompactedContextRequest, PROTOBUF_REQUEST_DEPENDENCY],
     state: RuntimeStateDependency,
-    handlers: RuntimeHandlersDependency,
     task: TaskDependency,
 ) -> PutCompactedContextResponse:
     """Store a summary in the authenticated task's run series."""
-    return handlers.put_compacted_context(request, state, task)
+    return core_runtime_handlers.put_compacted_context(request, state, task)
 
 
 @router.post("/pull-task-message")
@@ -336,6 +357,17 @@ def record_task_usage(
 ) -> RecordTaskUsageResponse:
     """Record task usage."""
     return core_runtime_handlers.record_task_usage(request, state, task)
+
+
+@router.post("/list-agent-connectors")
+def list_agent_connectors(
+    request: Annotated[ListAgentConnectorsRequest, PROTOBUF_REQUEST_DEPENDENCY],
+    state: RuntimeStateDependency,
+    handlers: RuntimeHandlersDependency,
+    task: TaskDependency,
+) -> ListAgentConnectorsResponse:
+    """List connection metadata for the authenticated agent."""
+    return handlers.list_agent_connectors(request, state, task)
 
 
 @router.post("/get-connector")

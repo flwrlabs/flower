@@ -11,35 +11,48 @@
 ---
 erDiagram
   agent {
-    BIGINT agent_id PK
+    BIGINT agent_id PK,FK
+    BIGINT config_version FK
+    CHAR(32) default_space_id FK
     VARCHAR app_spec
     TIMESTAMP created_at
-    TEXT description "nullable"
+    TIMESTAMP deleted_at "nullable"
     VARCHAR flwr_aid
+    TIMESTAMP updated_at
+  }
+
+  agent_config {
+    BIGINT agent_id PK,FK
+    BIGINT version PK
+    VARCHAR avatar
+    VARCHAR color
+    TIMESTAMP created_at
+    TEXT description "nullable"
     VARCHAR name
     VARCHAR title "nullable"
-    TIMESTAMP updated_at
   }
 
   automation {
     INTEGER automation_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP created_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     BIGINT fixed_interval "nullable"
     VARCHAR flwr_aid
     TIMESTAMP next_run_at
     INTEGER remaining_runs "nullable"
-    BIGINT series_id
+    BIGINT series_id "nullable"
     BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
+    VARCHAR title
     TIMESTAMP updated_at
   }
 
   compacted_contexts {
     BIGINT id PK
+    BIGINT agent_id FK
     TIMESTAMP created_at
-    BIGINT series_id
     TEXT text
     BIGINT through_event_id
     BIGINT token_count
@@ -47,6 +60,7 @@ erDiagram
 
   connector {
     INTEGER connector_id PK
+    BIGINT agent_id FK "nullable"
     VARCHAR config_json
     VARCHAR connector_ref
     TIMESTAMP created_at
@@ -54,16 +68,17 @@ erDiagram
     VARCHAR credentials_json
     TIMESTAMP deleted_at "nullable"
     VARCHAR deleted_by "nullable"
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
   }
 
   connector_oauth_session {
     VARCHAR oauth_session_id PK
+    BIGINT agent_id FK "nullable"
     TIMESTAMP completed_at "nullable"
     VARCHAR connector_ref
     TIMESTAMP created_at
     TIMESTAMP expires_at
-    VARCHAR federation_id
+    VARCHAR federation_id "nullable"
     VARCHAR flwr_aid
     VARCHAR pkce_verifier "nullable"
     VARCHAR redirect_uri
@@ -191,6 +206,7 @@ erDiagram
   run {
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK "nullable"
+    BIGINT trigger_item_id FK "nullable"
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
@@ -243,6 +259,16 @@ erDiagram
     VARCHAR title
   }
 
+  space_item {
+    BIGINT id PK
+    BIGINT agent_id FK "nullable"
+    CHAR(32) space_id FK
+    TEXT content
+    TIMESTAMP created_at
+    VARCHAR flwr_aid "nullable"
+    VARCHAR type
+  }
+
   space_message {
     BIGINT id PK
     BIGINT agent_id FK "nullable"
@@ -250,12 +276,14 @@ erDiagram
     TEXT content
     TIMESTAMP created_at
     VARCHAR flwr_aid "nullable"
+    BOOLEAN hidden
   }
 
   space_participant {
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
+    BIGINT read_through_item_id
     BIGINT read_through_message_id
   }
 
@@ -270,6 +298,7 @@ erDiagram
     TIMESTAMP pending_at
     BIGINT run_id
     TIMESTAMP running_at "nullable"
+    CHAR(32) space_id "nullable"
     TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK
@@ -329,6 +358,14 @@ erDiagram
     CHAR(32) event_id FK
   }
 
+  agent_config ||--o| agent : agent_id
+  agent_config ||--o{ agent : config_version
+  space ||--o{ agent : default_space_id
+  agent ||--o| agent_config : agent_id
+  agent ||--o{ automation : agent_id
+  agent ||--o{ compacted_contexts : agent_id
+  agent ||--o{ connector : agent_id
+  agent ||--o{ connector_oauth_session : agent_id
   space ||--o{ events : space_id
   message ||--o{ message : reply_to_message_id
   objects ||--o| object_children : parent_id
@@ -337,7 +374,10 @@ erDiagram
   object_push_sessions ||--o{ object_push_session_roots : session_id
   space ||--o{ run : space_id
   agent ||--o{ run : agent_id
+  space_item ||--o{ run : trigger_item_id
   objects ||--o| run_objects : object_id
+  space ||--o{ space_item : space_id
+  agent ||--o{ space_item : agent_id
   space ||--o{ space_message : space_id
   agent ||--o{ space_message : agent_id
   space ||--o{ space_participant : space_id

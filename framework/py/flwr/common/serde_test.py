@@ -130,6 +130,7 @@ def test_agent_messages_proto_roundtrip() -> None:
         config=config,
         created_at="2026-10-29T08:00:00Z",
         updated_at="2026-10-29T09:00:00Z",
+        default_space_id="a513879f-6f39-4e53-9515-f7d5d36865ab",
     )
     create_response = CreateAgentResponse(agent=agent)
     list_response = ListAgentsResponse(agents=[agent])
@@ -552,6 +553,7 @@ def test_run_serialization_deserialization() -> None:
         account_name="test-account",
         space_id=UUID("12345678-1234-5678-1234-567812345678"),
         agent_id=42,
+        trigger_item_id=123,
     )
 
     # Execute
@@ -562,8 +564,11 @@ def test_run_serialization_deserialization() -> None:
     assert isinstance(proto, ProtoRun)
     assert proto.space_id == str(original.space_id)
     assert proto.agent_id == original.agent_id
+    assert proto.trigger_item_id == original.trigger_item_id
     assert original == deserialized
     assert not run_to_proto(Run.create_empty(2)).HasField("space_id")
     assert run_from_proto(ProtoRun()).space_id is None
     assert not run_to_proto(Run.create_empty(2)).HasField("agent_id")
     assert run_from_proto(ProtoRun()).agent_id is None
+    assert not run_to_proto(Run.create_empty(2)).HasField("trigger_item_id")
+    assert run_from_proto(ProtoRun()).trigger_item_id is None

@@ -239,6 +239,14 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         http_status_code=status.HTTP_400_BAD_REQUEST,
         public_message="Invalid user event cursor.",
     ),
+    ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT: ApiErrorSpec(
+        http_status_code=status.HTTP_409_CONFLICT,
+        public_message="Agent configuration version precondition failed.",
+    ),
+    ApiErrorCode.AGENT_NOT_FOUND: ApiErrorSpec(
+        http_status_code=status.HTTP_404_NOT_FOUND,
+        public_message="Agent not found.",
+    ),
     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
         public_message="Runtime version compatibility check failed.",
@@ -278,6 +286,10 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ApiErrorCode.FLEET_API_TYPE_NOT_INITIALIZED: ApiErrorSpec(
         http_status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         public_message="Fleet API type is not initialized.",
+    ),
+    ApiErrorCode.SPACE_ITEMS_NOT_AVAILABLE: ApiErrorSpec(
+        http_status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        public_message="Space item endpoints are not implemented yet.",
     ),
     ApiErrorCode.FLEET_SUPERNODE_REGISTRATION_DISABLED: ApiErrorSpec(
         http_status_code=status.HTTP_412_PRECONDITION_FAILED,
@@ -386,11 +398,15 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ),
     ApiErrorCode.RUNTIME_COMPACTED_CONTEXT_ALREADY_EXISTS: ApiErrorSpec(
         http_status_code=status.HTTP_409_CONFLICT,
-        public_message="Compacted context already exists for this event in the series.",
+        public_message="Compacted context already exists for this agent and event.",
     ),
     ApiErrorCode.RUNTIME_FILE_REVISION_CONFLICT: ApiErrorSpec(
         http_status_code=status.HTTP_409_CONFLICT,
         public_message="The file operation could not be completed because it "
         "already exists, is missing, or has a different revision than expected.",
+    ),
+    ApiErrorCode.RUNTIME_INVALID_FILE_KEY: ApiErrorSpec(
+        http_status_code=status.HTTP_400_BAD_REQUEST,
+        public_message="File key must not be empty or whitespace-only.",
     ),
 }

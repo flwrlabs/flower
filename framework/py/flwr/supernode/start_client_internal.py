@@ -324,7 +324,9 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
         run_id = message.metadata.run_id
 
         # Check if the message is from an unknown run
-        if (run_info := state.get_run(run_id)) is None:
+        runs = state.get_run(run_ids=[run_id])
+        run_info = runs[0] if runs else None
+        if run_info is None:
             # Pull run info from SuperLink
             run_info = get_run(run_id)
 
@@ -386,6 +388,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 else TaskType.CLIENT_APP
             ),
             run_id=run_id,
+            space_id=run_info.space_id,
             fab_hash=run_info.fab_hash,
         )
         if task_id is None:

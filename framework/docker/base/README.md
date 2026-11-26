@@ -25,8 +25,16 @@ refer to earlier releases.
 
 - `unstable`
   - points to the last successful build of the `main` branch
-- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.44.0.dev20261104`
+- `nightly`, `<version>.dev<YYYYMMDD>` e.g. `1.46.0.dev20261125`
   - uses Python 3.13 and Ubuntu 24.04
+- `1.45.0-py3.13-alpine3.23`
+- `1.45.0-py3.13-ubuntu24.04`
+- `1.45.0-py3.12-ubuntu24.04`
+- `1.45.0-py3.11-ubuntu24.04`
+- `1.44.0-py3.13-alpine3.23`
+- `1.44.0-py3.13-ubuntu24.04`
+- `1.44.0-py3.12-ubuntu24.04`
+- `1.44.0-py3.11-ubuntu24.04`
 - `1.43.0-py3.13-alpine3.23`
 - `1.43.0-py3.13-ubuntu24.04`
 - `1.43.0-py3.12-ubuntu24.04`

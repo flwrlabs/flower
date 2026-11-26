@@ -51,6 +51,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateAgentResponse,
     CreateFederationRequest,
     CreateFederationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     Event,
@@ -76,16 +78,23 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     StreamRunEventsRequest,
     StreamRunEventsResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceItem,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -93,10 +102,15 @@ from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION_ID
-from flwr.supercore.error import ApiErrorCode, http_error_translator
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION_ID,
+    DeviceAuthorizationError,
+    SpaceItemType,
+)
+from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
     PROTOBUF_MEDIA_TYPE,
@@ -110,6 +124,7 @@ from flwr.supercore.protobuf.translation import (
 )
 from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.artifact_provider import ArtifactProvider
+from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from flwr.superlink.dependencies.account import AccountAccessDependency
 from flwr.superlink.dependencies.linkstate import get_linkstate
 from flwr.superlink.federation import NoOpFederationManager
@@ -119,7 +134,7 @@ from flwr.superlink.routers.control.router import router
 from flwr.superlink.routers.control.router import start_run as start_run_route
 from flwr.superlink.servicer.control import control_handlers
 
-_ACCOUNT = AccountInfo(flwr_aid=NOOP_FLWR_AID, account_name="account")
+_ACCOUNT = AuthenticatedUser(user_id=NOOP_FLWR_AID, handle="account")
 CONNECTOR_FEDERATION_ID = "@bob/fed-a"
 
 
@@ -149,12 +164,12 @@ def test_space_routes(
     """Create, list, send, and read with authenticated caller membership."""
     client, state = space_client
     agent = state.create_agent(
-        flwr_aid=_ACCOUNT.flwr_aid,
+        flwr_aid=_ACCOUNT.user_id,
         config=AgentConfig(name="Research", app_spec="@flower/research"),
     )
     assert agent is not None
-    personal = state.get_spaces(_ACCOUNT.flwr_aid)[0]
-    caller = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    personal = state.get_spaces(_ACCOUNT.user_id)[0]
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
     agent_participant = SpaceParticipant(agent_id=agent.id)
     response = client.post(
         "/v1/control/create-space",
@@ -165,15 +180,6 @@ def test_space_routes(
     assert response.status_code == 200
     space = CreateSpaceResponse.FromString(response.content).space
     assert list(space.participants) == [caller, agent_participant]
-    listed = client.post(
-        "/v1/control/list-spaces",
-        content=ListSpacesRequest().SerializeToString(),
-    )
-    assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
-        space,
-        personal,
-    ]
     response = client.post(
         "/v1/control/send-space-message",
         content=SendSpaceMessageRequest(
@@ -183,6 +189,15 @@ def test_space_routes(
     assert response.status_code == 200
     message = SendSpaceMessageResponse.FromString(response.content).message
     assert message.author == caller and message.content == "Hello"
+    listed = client.post(
+        "/v1/control/list-spaces",
+        content=ListSpacesRequest().SerializeToString(),
+    )
+    assert listed.status_code == 200
+    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
+        space,
+        personal,
+    ]
     history = client.post(
         "/v1/control/get-space-messages",
         content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
@@ -193,6 +208,90 @@ def test_space_routes(
     ]
     assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
     assert not state.get_run_series() and not state.get_tasks()
+
+
+def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
+    """Store message items and read pages without changing legacy messages."""
+    client, state = space_client
+    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
+    space_id = state.create_space(participants=[caller]).id
+    items = []
+    for content in ("First", "Second"):
+        response = client.post(
+            "/v1/control/send-space-item",
+            content=SendSpaceItemRequest(
+                space_id=space_id, content=content
+            ).SerializeToString(),
+        )
+        assert response.status_code == 200
+        items.append(SendSpaceItemResponse.FromString(response.content).item)
+    assert [item.content for item in items] == ["First", "Second"]
+    assert all(item.author == caller and item.type == "message" for item in items)
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(space_id=space_id, limit=1).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[1:]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, before_id=items[1].id
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == items[:1]
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert not GetSpaceItemsResponse.FromString(response.content).items
+    response = client.post(
+        "/v1/control/send-space-item",
+        content=SendSpaceItemRequest(
+            space_id=space_id, content="Third"
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    new_item = SendSpaceItemResponse.FromString(response.content).item
+    response = client.post(
+        "/v1/control/get-space-items",
+        content=GetSpaceItemsRequest(
+            space_id=space_id, unread_only=True
+        ).SerializeToString(),
+    )
+    assert response.status_code == 200
+    assert list(GetSpaceItemsResponse.FromString(response.content).items) == [new_item]
+    assert state.get_space_messages(UUID(space_id), caller) == []
+
+
+def test_send_space_item_wire_format() -> None:
+    """Preserve one message content and created item on the wire."""
+    request = SendSpaceItemRequest(content="First")
+    response = SendSpaceItemResponse(item=SpaceItem(content="First"))
+
+    assert (
+        SendSpaceItemRequest.FromString(request.SerializeToString()).content == "First"
+    )
+    assert (
+        SendSpaceItemResponse.FromString(response.SerializeToString()).item.content
+        == "First"
+    )
+
+
+def test_get_space_items_response_keeps_multiple_items() -> None:
+    """Keep batch reads while changing the send contract to one item."""
+    response = GetSpaceItemsResponse(
+        items=[SpaceItem(content="First"), SpaceItem(content="Second")]
+    )
+
+    assert [
+        item.content
+        for item in GetSpaceItemsResponse.FromString(response.SerializeToString()).items
+    ] == ["First", "Second"]
 
 
 def test_create_space_rejects_invalid_participants(
@@ -208,7 +307,7 @@ def test_create_space_rejects_invalid_participants(
     )
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
-    assert not state.get_spaces(_ACCOUNT.flwr_aid)
+    assert not state.get_spaces(_ACCOUNT.user_id)
 
 
 def test_create_space_rejects_other_users_agent(
@@ -229,7 +328,7 @@ def test_create_space_rejects_other_users_agent(
     )
     assert response.status_code == 400
     assert response.json()["code"] == ApiErrorCode.INVALID_SPACE_REQUEST
-    assert not state.get_spaces(_ACCOUNT.flwr_aid)
+    assert not state.get_spaces(_ACCOUNT.user_id)
 
 
 @pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
@@ -239,10 +338,10 @@ def test_space_history_pagination(
     """Apply the HTTP request's cursor, page size, and unread filter."""
     client, state = space_client
     space = state.create_space(
-        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)]
+        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.user_id)]
     )
     space_id = UUID(space.id)
-    author = SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid)
+    author = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
     messages = [state.create_space_message(space_id, author, str(i)) for i in range(3)]
     last = messages[-1]
     assert last is not None
@@ -258,7 +357,10 @@ def test_space_history_pagination(
     ]
 
 
-@pytest.mark.parametrize("endpoint", ["get-space-messages", "send-space-message"])
+@pytest.mark.parametrize(
+    "endpoint",
+    ["get-space-messages", "send-space-message", "get-space-items", "send-space-item"],
+)
 def test_space_unavailable_to_nonparticipants(
     space_client: tuple[TestClient, LinkState], endpoint: str
 ) -> None:
@@ -266,11 +368,16 @@ def test_space_unavailable_to_nonparticipants(
     client, state = space_client
     private = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
     for space_id in [private.id, str(uuid4())]:
-        request = (
-            GetSpaceMessagesRequest(space_id=space_id)
-            if endpoint == "get-space-messages"
-            else SendSpaceMessageRequest(space_id=space_id, content="No access")
-        )
+        request = {
+            "get-space-messages": GetSpaceMessagesRequest(space_id=space_id),
+            "send-space-message": SendSpaceMessageRequest(
+                space_id=space_id, content="No access"
+            ),
+            "get-space-items": GetSpaceItemsRequest(space_id=space_id),
+            "send-space-item": SendSpaceItemRequest(
+                space_id=space_id, content="No access"
+            ),
+        }[endpoint]
         response = client.post(
             f"/v1/control/{endpoint}", content=request.SerializeToString()
         )
@@ -289,20 +396,26 @@ def test_space_unavailable_to_nonparticipants(
         ("get-space-messages", {"space_id": "bad-uuid"}),
         ("get-space-messages", {"limit": 0}),
         ("get-space-messages", {"limit": 101}),
+        ("send-space-item", {"content": " \n"}),
+        ("send-space-item", {"content": "Hello", "space_id": "bad-uuid"}),
+        ("get-space-items", {"space_id": "bad-uuid"}),
+        ("get-space-items", {"limit": 0}),
+        ("get-space-items", {"limit": 101}),
     ],
 )
 def test_invalid_space_request(
     space_client: tuple[TestClient, LinkState],
     endpoint: str,
-    fields: dict[str, str | int],
+    fields: dict[str, str | int | bool],
 ) -> None:
     """Reject malformed IDs, empty text, and unsupported page sizes."""
     client, _ = space_client
-    request_type = (
-        SendSpaceMessageRequest
-        if endpoint == "send-space-message"
-        else GetSpaceMessagesRequest
-    )
+    request_type = {
+        "send-space-message": SendSpaceMessageRequest,
+        "get-space-messages": GetSpaceMessagesRequest,
+        "send-space-item": SendSpaceItemRequest,
+        "get-space-items": GetSpaceItemsRequest,
+    }[endpoint]
     request = ParseDict({"space_id": str(uuid4()), **fields}, request_type())
     response = client.post(
         f"/v1/control/{endpoint}", content=request.SerializeToString()
@@ -313,7 +426,7 @@ def test_invalid_space_request(
 
 def _create_app(authn_plugin: Mock | None = None) -> FastAPI:
     """Create a minimal app containing the Control API stack."""
-    authn_plugin = authn_plugin or Mock()
+    authn_plugin = authn_plugin or Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (True, _ACCOUNT)
     app = FastAPI()
     app.state.account_access_dep = AccountAccessDependency(authn_plugin)
@@ -407,13 +520,19 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
-def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
-    """Persist an agent through HTTP and list only the authenticated owner's agents."""
+def test_agent_routes_create_update_list_and_delete_owned_agents(database: str) -> None:
+    """Create, update, list, and idempotently delete only owned agents."""
     state = LinkStateFactory(
         database, NoOpFederationManager(), ObjectStoreFactory()
     ).state()
-    config = AgentConfig(name="Research Agent", app_spec="@flower/research==1.2.3")
-    assert state.create_agent(flwr_aid="other-account", config=config) is not None
+    config = AgentConfig(
+        name="Research Agent",
+        app_spec="@flower/research==1.2.3",
+        avatar="robot",
+        color="sky",
+    )
+    other = state.create_agent(flwr_aid="other-account", config=config)
+    assert other is not None
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: state
     client = TestClient(app)
@@ -433,12 +552,27 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
     assert agent.id > 0
     assert agent.config == config
     assert agent.created_at and agent.updated_at == agent.created_at
-    assert state.list_agents(_ACCOUNT.flwr_aid) == [agent]
-    spaces = state.get_spaces(_ACCOUNT.flwr_aid)
+    assert state.list_agents(_ACCOUNT.user_id) == [agent]
+    spaces = state.get_spaces(_ACCOUNT.user_id)
     assert len(spaces) == 1
     assert len(spaces[0].participants) == 2
-    assert SpaceParticipant(flwr_aid=_ACCOUNT.flwr_aid) in spaces[0].participants
+    assert SpaceParticipant(flwr_aid=_ACCOUNT.user_id) in spaces[0].participants
     assert SpaceParticipant(agent_id=agent.id) in spaces[0].participants
+
+    updated_config = AgentConfig(name="Updated Agent", app_spec=config.app_spec)
+    response = client.post(
+        "/v1/control/update-agent",
+        content=UpdateAgentRequest(
+            agent_id=agent.id,
+            expected_config_version=agent.config_version,
+            config=updated_config,
+        ).SerializeToString(),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    updated = UpdateAgentResponse.FromString(response.content).agent
+    assert updated.config_version == agent.config_version + 1
+    assert updated.config == updated_config
 
     response = client.post(
         "/v1/control/list-agents",
@@ -446,7 +580,57 @@ def test_agent_routes_create_and_list_owned_agents(database: str) -> None:
         headers=headers,
     )
     assert response.status_code == 200
-    assert ListAgentsResponse.FromString(response.content).agents == [agent]
+    assert ListAgentsResponse.FromString(response.content).agents == [updated]
+
+    for agent_id, expected_status in (
+        (0, 404),
+        (other.id, 404),
+        (agent.id + 1, 404),
+        (agent.id, 200),
+        (agent.id, 200),
+    ):
+        response = client.post(
+            "/v1/control/delete-agent",
+            content=DeleteAgentRequest(agent_id=agent_id).SerializeToString(),
+            headers=headers,
+        )
+        assert response.status_code == expected_status
+        if expected_status == 200:
+            assert (
+                DeleteAgentResponse.FromString(response.content)
+                == DeleteAgentResponse()
+            )
+        else:
+            assert response.json()["code"] == ApiErrorCode.AGENT_NOT_FOUND
+    assert not state.list_agents(_ACCOUNT.user_id)
+    assert state.get_agent("other-account", other.id) == other
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (None, 404),
+        (ValueError("Invalid configuration"), 400),
+        (FlowerError(ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT, "Conflict"), 409),
+    ],
+)
+def test_agent_update_translates_state_errors(
+    space_client: tuple[TestClient, LinkState],
+    error: Exception | None,
+    status_code: int,
+) -> None:
+    """Translate missing agents, invalid updates, and conflicts to HTTP errors."""
+    client, state = space_client
+    request = UpdateAgentRequest(
+        agent_id=1,
+        expected_config_version=1,
+        config=AgentConfig(name="Agent", app_spec="@test/app"),
+    )
+    with patch.object(state, "update_agent", return_value=None, side_effect=error):
+        response = client.post(
+            "/v1/control/update-agent", content=request.SerializeToString()
+        )
+    assert response.status_code == status_code
 
 
 @pytest.mark.parametrize(
@@ -527,6 +711,29 @@ def test_agent_creation_rejects_invalid_requests(
                 ]
             ),
             "list_connectors",
+        ),
+        (
+            "/v1/control/list-connectors",
+            ListConnectorsRequest(agent_id=1),
+            ListConnectorsResponse.FromString,
+            ListConnectorsResponse(),
+            "list_connectors",
+        ),
+        (
+            "/v1/control/disconnect-connector",
+            DisconnectConnectorRequest(agent_id=1, connector_id=7),
+            DisconnectConnectorResponse.FromString,
+            DisconnectConnectorResponse(),
+            "disconnect_connector",
+        ),
+        (
+            "/v1/control/begin-connector-oauth",
+            BeginConnectorOAuthRequest(
+                agent_id=1, connector_ref="slack", redirect_uri="https://example.test"
+            ),
+            BeginConnectorOAuthResponse.FromString,
+            BeginConnectorOAuthResponse(oauth_session_id="agent-session"),
+            "begin_connector_oauth",
         ),
         (
             "/v1/control/disconnect-connector",
@@ -634,6 +841,8 @@ def test_connector_route_returns_existing_structured_error() -> None:
     ("path", "protobuf_request", "handler_name"),
     [
         ("/v1/control/create-agent", CreateAgentRequest(), "create_agent"),
+        ("/v1/control/update-agent", UpdateAgentRequest(), "update_agent"),
+        ("/v1/control/delete-agent", DeleteAgentRequest(agent_id=1), "delete_agent"),
         ("/v1/control/list-agents", ListAgentsRequest(), "list_agents"),
         (
             "/v1/control/list-connectors",
@@ -665,7 +874,7 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
     expected_metadata: list[tuple[str, str]],
 ) -> None:
     """Require an access token without attempting a refresh-token flow."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     app = _create_app(authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     app.dependency_overrides[get_linkstate] = lambda: Mock(spec=LinkState)
@@ -688,16 +897,28 @@ def test_control_routes_reject_invalid_access_tokens_without_refresh(
     handler.assert_not_called()
 
 
-def test_get_login_details_does_not_require_bearer_authentication() -> None:
+@pytest.mark.parametrize(
+    ("complete_uri", "verification_uri", "user_code", "supports_cli_signup"),
+    [
+        ("https://example.test/verify", "", "", False),
+        ("", "https://example.test/verify-code", "ABCD-EFGH", True),
+    ],
+)
+def test_get_login_details_does_not_require_bearer_authentication(
+    complete_uri: str, verification_uri: str, user_code: str, supports_cli_signup: bool
+) -> None:
     """Return login details without validating an access token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.get_login_details.return_value = AccountAuthLoginDetails(
         authn_type="oidc",
         device_code="device-code",
-        verification_uri_complete="https://example.test/verify",
+        verification_uri_complete=complete_uri,
         expires_in=600,
         interval=5,
+        verification_uri=verification_uri,
+        user_code=user_code,
+        supports_cli_signup=supports_cli_signup,
     )
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -712,58 +933,50 @@ def test_get_login_details_does_not_require_bearer_authentication() -> None:
         GetLoginDetailsResponse(
             authn_type="oidc",
             device_code="device-code",
-            verification_uri_complete="https://example.test/verify",
+            verification_uri_complete=complete_uri,
             expires_in=600,
             interval=5,
+            verification_uri=verification_uri,
+            user_code=user_code,
+            supports_cli_signup=supports_cli_signup,
         )
     )
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
 
 
-def test_get_auth_tokens_preserves_polling_semantics() -> None:
-    """Return an empty response while pending and tokens after authorization."""
-    authn_plugin = Mock()
-    authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
-    authn_plugin.get_auth_tokens.side_effect = [
-        None,
-        AccountAuthCredentials(
-            access_token="access-token",
-            refresh_token="refresh-token",
-        ),
-    ]
-    client = TestClient(_create_app(authn_plugin))
-    request = GetAuthTokensRequest(device_code="device-code")
-
-    pending_response = client.post(
+@pytest.mark.parametrize(
+    "result",
+    [None, *DeviceAuthorizationError, AccountAuthCredentials("access", "refresh")],
+)
+def test_get_auth_tokens_preserves_polling_semantics(
+    result: AccountAuthCredentials | DeviceAuthorizationError | None,
+) -> None:
+    """Relay plugin outcomes and preserve the legacy empty pending response."""
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
+    authn_plugin.get_auth_tokens.return_value = result
+    response = TestClient(_create_app(authn_plugin)).post(
         "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
-        headers={"content-type": PROTOBUF_MEDIA_TYPE},
-    )
-    completed_response = client.post(
-        "/v1/control/get-auth-tokens",
-        content=request.SerializeToString(),
+        content=GetAuthTokensRequest(device_code="device-code").SerializeToString(),
         headers={"content-type": PROTOBUF_MEDIA_TYPE},
     )
 
-    assert pending_response.status_code == 200
-    assert pending_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(pending_response.content) == (
-        GetAuthTokensResponse()
-    )
-    assert completed_response.status_code == 200
-    assert completed_response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
-    assert GetAuthTokensResponse.FromString(completed_response.content) == (
-        GetAuthTokensResponse(
-            access_token="access-token",
-            refresh_token="refresh-token",
+    expected = GetAuthTokensResponse()
+    if isinstance(result, AccountAuthCredentials):
+        expected.access_token, expected.refresh_token = (
+            result.access_token,
+            result.refresh_token,
         )
-    )
+    elif isinstance(result, DeviceAuthorizationError):
+        expected.error = result.value
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert GetAuthTokensResponse.FromString(response.content) == expected
     authn_plugin.validate_tokens_in_metadata.assert_not_called()
 
 
 def test_refresh_auth_tokens_does_not_require_bearer_authentication() -> None:
     """Exchange a refresh token without first validating an access token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     authn_plugin.refresh_tokens.return_value = (
         [
@@ -797,7 +1010,7 @@ def test_refresh_auth_tokens_does_not_require_bearer_authentication() -> None:
 
 def test_refresh_auth_tokens_returns_sanitized_authentication_error() -> None:
     """Return the established JSON error without exposing the refresh token."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     authn_plugin.refresh_tokens.return_value = (None, None)
 
     response = TestClient(_create_app(authn_plugin)).post(
@@ -1060,8 +1273,8 @@ def test_list_runs_returns_runs_from_linkstate(
     linkstate = Mock(spec=LinkState)
     linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
-    run.flwr_aid = _ACCOUNT.flwr_aid
-    linkstate.get_run_info.return_value = [run]
+    run.flwr_aid = _ACCOUNT.user_id
+    linkstate.get_run.return_value = [run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
     client = TestClient(app)
@@ -1079,11 +1292,11 @@ def test_list_runs_returns_runs_from_linkstate(
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     assert set(proto_response.run_dict) == {7}
-    assert proto_response.run_dict[7].account_name == _ACCOUNT.account_name
+    assert proto_response.run_dict[7].account_name == _ACCOUNT.handle
     assert datetime.fromisoformat(proto_response.now)
-    assert linkstate.get_run_info.call_args_list == [
+    assert linkstate.get_run.call_args_list == [
         call(
-            flwr_aids=[_ACCOUNT.flwr_aid],
+            flwr_aids=[_ACCOUNT.user_id],
             federation_ids=[NOOP_FEDERATION_ID, None],
             order_by="pending_at",
             ascending=False,
@@ -1098,9 +1311,9 @@ def test_list_runs_cleans_finished_runs_on_page() -> None:
     linkstate = Mock(spec=LinkState)
     linkstate.federation_manager = NoOpFederationManager()
     page_run = Run.create_empty(7)
-    page_run.flwr_aid = _ACCOUNT.flwr_aid
+    page_run.flwr_aid = _ACCOUNT.user_id
     page_run.status.status = Status.FINISHED
-    linkstate.get_run_info.return_value = [page_run]
+    linkstate.get_run.return_value = [page_run]
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -1121,8 +1334,8 @@ def test_list_runs_cleans_finished_runs_on_page() -> None:
 def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     """Control HTTP rejects invalid access tokens without refreshing them."""
     linkstate = Mock(spec=LinkState)
-    authn_plugin = Mock()
-    linkstate.get_run_info.return_value = []
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
+    linkstate.get_run.return_value = []
     app = _create_app(authn_plugin=authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     app.dependency_overrides[get_linkstate] = lambda: linkstate
@@ -1201,7 +1414,7 @@ def test_stream_logs_returns_framed_protobuf_responses() -> None:
 
     def stream(
         request: StreamLogsRequest,
-        account: AccountInfo,
+        account: AuthenticatedUser,
         state: LinkState,
         is_active: Callable[[], bool],
     ) -> object:
@@ -1269,7 +1482,7 @@ def test_stream_run_events_returns_framed_protobuf_responses() -> None:
 def test_stream_logs_returns_missing_run_error_before_streaming() -> None:
     """Return a JSON error instead of opening a stream for an unknown run."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = []
+    linkstate.get_run.return_value = []
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -1296,9 +1509,9 @@ def test_pull_artifacts_returns_provider_url() -> None:
     linkstate.federation_manager = NoOpFederationManager()
     run = Run.create_empty(7)
     run.federation_id = NOOP_FEDERATION_ID
-    run.flwr_aid = _ACCOUNT.flwr_aid
+    run.flwr_aid = _ACCOUNT.user_id
     run.status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-    linkstate.get_run_info.return_value = [run]
+    linkstate.get_run.return_value = [run]
     artifact_provider = Mock(spec=ArtifactProvider)
     artifact_provider.get_url.return_value = "https://artifacts.example/run-7.zip"
     app = _create_app()
@@ -1325,7 +1538,7 @@ def test_pull_artifacts_returns_provider_url() -> None:
 def test_stream_run_events_returns_missing_run_error_before_streaming() -> None:
     """Return a JSON error instead of opening an event stream for an unknown run."""
     linkstate = Mock(spec=LinkState)
-    linkstate.get_run_info.return_value = []
+    linkstate.get_run.return_value = []
     app = _create_app()
     app.dependency_overrides[get_linkstate] = lambda: linkstate
 
@@ -1371,11 +1584,18 @@ def test_pull_artifacts_returns_error_without_provider() -> None:
 def test_bootstrap_uses_authenticated_account(
     space_client: tuple[TestClient, LinkState],
 ) -> None:
-    """Return the caller's Agents, Spaces, and cursor without message history."""
+    """Return the caller's Agents, Space summaries, and cursor."""
     client, state = space_client
     config = AgentConfig(name="Agent", app_spec="@test/app")
-    state.create_agent(_ACCOUNT.flwr_aid, config)
+    state.create_agent(_ACCOUNT.user_id, config)
     state.create_agent("other-account", config)
+    space = state.get_spaces(_ACCOUNT.user_id)[0]
+    state.store_space_item(
+        UUID(space.id),
+        SpaceItemType.MESSAGE,
+        "Latest prompt",
+        SpaceParticipant(flwr_aid=_ACCOUNT.user_id),
+    )
     response = client.post(
         "/v1/control/bootstrap",
         content=BootstrapRequest().SerializeToString(),
@@ -1383,9 +1603,10 @@ def test_bootstrap_uses_authenticated_account(
     assert response.status_code == 200
     assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
     snapshot = BootstrapResponse.FromString(response.content)
-    assert snapshot == state.get_bootstrap(_ACCOUNT.flwr_aid)
+    assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.cursor == 2
+    assert snapshot.spaces[0].latest_user_message == "Latest prompt"
+    assert snapshot.cursor == 3
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])
@@ -1441,7 +1662,7 @@ def test_invalid_user_cursor_returns_error_before_streaming(
 @pytest.mark.parametrize("endpoint", ["bootstrap", "stream-events"])
 def test_user_event_routes_require_authentication(endpoint: str) -> None:
     """Authenticate both routes before serving account state or starting a stream."""
-    authn_plugin = Mock()
+    authn_plugin = Mock(spec=ControlAuthnPlugin)
     app = _create_app(authn_plugin)
     authn_plugin.validate_tokens_in_metadata.return_value = (False, None)
     response = TestClient(app).post(

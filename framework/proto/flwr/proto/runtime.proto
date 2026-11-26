@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/fab.proto";
+import "flwr/proto/control.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/file.proto";
 import "flwr/proto/message.proto";
@@ -85,6 +86,8 @@ message GetSpaceEventsRequest {
   // Select newest matching events; zero means no limit.
   // Response remains in ascending ID order.
   uint32 last_n = 3;
+  // Empty means all event types.
+  repeated string event_types = 4;
 }
 message GetSpaceEventsResponse { repeated TaskEvent events = 1; }
 
@@ -111,6 +114,10 @@ message PullTaskMessageResponse { repeated Message messages = 1; }
 message RecordTaskUsageRequest { TaskUsage task_usage = 1; }
 message RecordTaskUsageResponse {}
 
+// ListAgentConnectors messages
+message ListAgentConnectorsRequest {}
+message ListAgentConnectorsResponse { repeated Connector connectors = 1; }
+
 // GetConnector messages
 message GetConnectorRequest {}
 message GetConnectorResponse {
@@ -128,6 +135,7 @@ message PullTaskInputResponse {
   Fab fab = 3;
   SimulationConfig federation_config = 4;
   uint64 task_id = 5;
+  Agent agent = 6;
 }
 
 // PushTaskOutput messages

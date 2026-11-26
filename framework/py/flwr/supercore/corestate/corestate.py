@@ -34,12 +34,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.file_pb2 import File, FileMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.run_pb2 import Run as ProtoRun  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
     CompactedContext,
     RunSeries,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
+    SpaceItem,
     SpaceMessage,
     SpaceParticipant,
 )
@@ -50,10 +52,27 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.run import Run
 from flwr.supercore.typing import ConnectorOAuthSessionRecord, ConnectorRecord
 
-from ..constant import AutomationStatus
+from ..constant import AutomationStatus, SpaceItemType
 from ..object_store import ObjectStore
+
+
+def _validate_space_item(
+    item_type: SpaceItemType, content: str, author: SpaceParticipant | None
+) -> None:
+    """Validate an item's type, content, and author before storing."""
+    if not isinstance(item_type, SpaceItemType):
+        raise ValueError("Invalid SpaceItem type")
+    if not content.strip():
+        raise ValueError("SpaceItem content must be nonempty")
+    # Revisit author rules when SendSpaceItem accepts automation items.
+    if item_type == SpaceItemType.MESSAGE:
+        if author is None or not (author.flwr_aid or author.agent_id):
+            raise ValueError("Message items require an author")
+    elif author is not None:
+        raise ValueError("Only message items may have an author")
 
 
 class CoreState(ABC):  # pylint: disable=R0904
@@ -62,6 +81,63 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def get_node_id(self) -> int:
         """Return the ID of the node owning this CoreState."""
+
+    @abstractmethod
+    def get_run(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+        skip: int = 0,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - An empty filter sequence matches no runs.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        space_ids : Optional[Sequence[UUID]] (default: None)
+            Sequence of Space IDs to filter by.
+        agent_ids : Optional[Sequence[int]] (default: None)
+            Sequence of agent IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of run status values to filter by.
+        flwr_aids : Optional[Sequence[str]] (default: None)
+            Sequence of Flower Account IDs to filter by.
+        federation_ids : Optional[Sequence[Optional[str]]] (default: None)
+            Sequence of federation IDs to filter by. A ``None`` entry selects
+            Space runs without a federation; a ``None`` filter is unrestricted.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of runs to return. If `None`, no limit is applied.
+        skip : int (default: 0)
+            Number of matching runs to skip before applying the limit.
+
+        Returns
+        -------
+        Sequence[Run]
+            A sequence of Run objects representing runs matching the specified filters.
+        """
+
+    def _store_task_lifecycle_event(self, event_type: str, task: Task) -> None:
+        """Store a task snapshot for participants of its Space."""
+        if task.space_id:
+            self.store_event(event_type, task, space_id=UUID(task.space_id))
 
     @property
     @abstractmethod
@@ -245,7 +321,8 @@ class CoreState(ABC):  # pylint: disable=R0904
     ) -> Agent | None:
         """Create an agent and its initial Space atomically.
 
-        The untitled Space contains the agent and its owning account.
+        The untitled Space contains the agent and its owning account, and is
+        recorded as the agent's default Space.
 
         Parameters
         ----------
@@ -263,6 +340,77 @@ class CoreState(ABC):  # pylint: disable=R0904
             required configuration field, or a set optional field is empty.
             Ownership is stored separately and is not part of the returned message.
         """
+
+    @abstractmethod
+    def update_agent(
+        self,
+        flwr_aid: str,
+        agent_id: int,
+        expected_config_version: int,
+        config: AgentConfig,
+    ) -> Agent | None:
+        """Replace configuration and publish a new snapshot atomically.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            Agent to update.
+        expected_config_version : int
+            Current configuration version, which must match to accept the update.
+        config : AgentConfig
+            Complete replacement configuration with a nonempty name and the
+            agent's existing app_spec. Absent or empty title and description clear
+            their presence; empty avatar and color reset them.
+
+        Returns
+        -------
+        Agent | None
+            Updated agent, or None if the agent is absent or belongs to another
+            account. Each accepted update creates a new immutable snapshot,
+            increments config_version, updates updated_at, and emits agent.updated.
+
+        Raises
+        ------
+        ValueError
+            If the name is blank or app_spec differs from the agent's existing
+            value.
+        FlowerError
+            With code ``ApiErrorCode.AGENT_CONFIG_VERSION_CONFLICT`` if the owned
+            agent's current version differs from expected_config_version.
+        """
+
+    @abstractmethod
+    def delete_agent(self, flwr_aid: str, agent_id: int) -> bool:
+        """Soft-delete an owned agent.
+
+        Stop active automations and unfinished runs, prevent new runs, and remove
+        owned connectors and their credentials. Preserve historical agent data.
+        Deletion is idempotent and emits agent.deleted on the first successful
+        deletion.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Account ID owning the agent.
+        agent_id : int
+            ID of the agent to delete.
+
+        Returns
+        -------
+        bool
+            True if the agent was deleted or already deleted;
+            False if absent or not owned by the account.
+        """
+
+    @abstractmethod
+    def get_agent(self, flwr_aid: str, agent_id: int) -> Agent | None:
+        """Return an owned active agent, or None if unavailable."""
+
+    @abstractmethod
+    def get_default_space(self, flwr_aid: str, agent_id: int) -> UUID | None:
+        """Return an owned active agent's default Space ID, or None if unavailable."""
 
     @abstractmethod
     def list_agents(self, flwr_aid: str) -> Sequence[Agent]:
@@ -290,11 +438,14 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage,
-        recipients: Sequence[str],
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
+        recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
         """Store a shared event and its ordered deliveries, returning its UUID.
+
+        When recipients are omitted, space_id is required and all current user
+        participants receive the event. An empty sequence creates no deliveries.
 
         Each call creates a new event with a generated UUID and creation timestamp.
         SQL callers can use an enclosing session to commit application changes
@@ -412,18 +563,19 @@ class CoreState(ABC):  # pylint: disable=R0904
     @abstractmethod
     def create_connector(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         credentials_json: str,
         config_json: str,
         created_by: str,
+        agent_id: int | None = None,
     ) -> int | None:
-        """Create a connector for a federation.
+        """Create a connector owned by exactly one federation or agent.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID owning the connector.
+        federation_id : str | None
+            Federation ID owning the connector, or ``None`` for an agent owner.
         connector_ref : str
             Connector reference.
         credentials_json : str
@@ -432,11 +584,15 @@ class CoreState(ABC):  # pylint: disable=R0904
             Serialized connector configuration.
         created_by : str
             Account ID creating the connector.
+        agent_id : int | None (default: None)
+            Agent owning the connector. Must belong to ``created_by`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         int | None
-            The connector ID if the connector is created, otherwise ``None``.
+            The connector ID, or ``None`` if the owner is invalid, the agent is not
+            owned by ``created_by``, or a required identifier is empty.
         """
 
     @abstractmethod
@@ -463,6 +619,21 @@ class CoreState(ABC):  # pylint: disable=R0904
         """Return a connector by ID, if present."""
 
     @abstractmethod
+    def get_agent_connectors(self, agent_id: int) -> Sequence[ConnectorRecord]:
+        """List an agent's connectors in ascending connector ID order.
+
+        Parameters
+        ----------
+        agent_id : int
+            Agent ID owning the connectors.
+
+        Returns
+        -------
+        Sequence[ConnectorRecord]
+            The agent's connections. Invalid IDs return an empty sequence.
+        """
+
+    @abstractmethod
     def update_connector_credentials(
         self,
         connector_id: int,
@@ -477,15 +648,22 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
-    def delete_connector(self, federation_id: str, connector_id: int) -> bool:
-        """Delete a federation's connector if it exists.
+    def delete_connector(
+        self,
+        federation_id: str | None,
+        connector_id: int,
+        agent_id: int | None = None,
+    ) -> bool:
+        """Delete a connector belonging to the specified federation or agent.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID owning the connector.
+        federation_id : str | None
+            Federation ID owning the connector, or ``None`` for an agent owner.
         connector_id : int
             ID of the connector to delete.
+        agent_id : int | None (default: None)
+            Agent ID owning the connector. Requires ``federation_id=None``.
 
         Returns
         -------
@@ -506,12 +684,13 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         oauth_session_id: str,
         flwr_aid: str,
-        federation_id: str,
+        federation_id: str | None,
         connector_ref: str,
         state: str,
         redirect_uri: str,
         pkce_verifier: str | None,
         expires_at: datetime,
+        agent_id: int | None = None,
     ) -> ConnectorOAuthSessionRecord | None:
         """Create and return a connector OAuth session.
 
@@ -521,8 +700,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             Unique ID of the OAuth session.
         flwr_aid : str
             Account ID owning the OAuth session.
-        federation_id : str
-            Federation receiving the connector.
+        federation_id : str | None
+            Federation receiving the connector, or ``None`` for an agent owner.
         connector_ref : str
             Reference of the connector being authorized.
         state : str
@@ -533,12 +712,16 @@ class CoreState(ABC):  # pylint: disable=R0904
             PKCE verifier used for the authorization code exchange, if present.
         expires_at : datetime
             Timezone-aware expiration timestamp, normalized to UTC before storage.
+        agent_id : int | None (default: None)
+            Agent receiving the connector. Must belong to ``flwr_aid`` and requires
+            ``federation_id=None``.
 
         Returns
         -------
         ConnectorOAuthSessionRecord | None
             The created session, or `None` if the session ID already exists, a
-            required identifier is empty, or `expires_at` is timezone-naive.
+            required identifier is empty, the owner is invalid, the agent is not
+            owned by ``flwr_aid``, or `expires_at` is timezone-naive.
         """
 
     @abstractmethod
@@ -717,13 +900,75 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """List spaces the user participates in."""
+        """List participating spaces with their latest user message, newest first."""
 
     @abstractmethod
     def create_space_message(
         self, space_id: UUID, author: SpaceParticipant, content: str
     ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
+
+    @abstractmethod
+    def store_space_item(
+        self,
+        space_id: UUID,
+        item_type: SpaceItemType,
+        content: str,
+        author: SpaceParticipant | None = None,
+    ) -> SpaceItem | None:
+        """Store an item, or return None if the Space or membership is absent.
+
+        Message items require an author in the Space. Other items have no author.
+        Blank content and invalid type or author combinations raise ValueError.
+        """
+
+    @abstractmethod
+    def get_space_items(  # pylint: disable=too-many-arguments
+        self,
+        space_id: UUID,
+        participant: SpaceParticipant,
+        *,
+        limit: int = 50,
+        before_id: int | None = None,
+        after_id: int | None = None,
+        unread_only: bool = False,
+    ) -> Sequence[SpaceItem] | None:
+        """Read a page of items and advance the participant's read cursor.
+
+        Parameters
+        ----------
+        space_id : UUID
+            Space containing the items.
+        participant : SpaceParticipant
+            User or agent reading the items.
+        limit : int (default: 50)
+            Maximum number of items to return.
+        before_id : int | None (default: None)
+            Exclusive upper item ID bound.
+        after_id : int | None (default: None)
+            Exclusive lower item ID bound; selects the oldest matching page.
+        unread_only : bool (default: False)
+            Select the oldest page after the participant's read cursor.
+            Can be combined with ID bounds.
+
+        Returns
+        -------
+        Sequence[SpaceItem] | None
+            Items in ascending ID order, selecting the newest page by default.
+            An empty sequence if no items match.
+            None if the Space is missing or the identity is not a participant.
+
+        Raises
+        ------
+        ValueError
+            If limit is not positive or after_id >= before_id when both
+            bounds are provided.
+
+        Notes
+        -----
+        The read cursor advances through the newest returned ID and never moves
+        backward. Concurrent calls may return overlapping pages.
+        """
 
     @abstractmethod
     def get_space_messages(  # pylint: disable=too-many-arguments
@@ -838,19 +1083,19 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_compacted_contexts(
-        self, series_id: int, limit: int = 1, before_context_id: int | None = None
+        self, agent_id: int, limit: int = 1, before_context_id: int | None = None
     ) -> Sequence[CompactedContext]:
-        """Return a series's summaries newest first, before an optional ID."""
+        """Return an agent's summaries newest first, before an optional ID."""
 
     @abstractmethod
     def store_compacted_context(
         self,
-        series_id: int,
+        agent_id: int,
         through_event_id: int,
         text: str,
         token_count: int,
     ) -> None:
-        """Store a summary; raise ValueError for an existing series/event pair."""
+        """Store a summary; raise ValueError for an existing agent/event pair."""
 
     @abstractmethod
     def set_run_series_context(self, series_id: int, context: Context) -> None:
@@ -905,26 +1150,28 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_automation(  # pylint: disable=too-many-arguments
         self,
         *,
-        federation_id: str,
+        federation_id: str | None = None,
         flwr_aid: str,
         start_run_request: StartRunRequest,
-        series_id: int,
+        series_id: int | None = None,
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
+        agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata.
 
         Parameters
         ----------
-        federation_id : str
-            Federation ID the automation belongs to.
+        federation_id : str | None (default: None)
+            Federation ID for a run-series automation; None for an agent automation.
         flwr_aid : str
             FLWR account ID used to dispatch the automation.
         start_run_request : StartRunRequest
             Unresolved run request to execute for each scheduled occurrence.
-        series_id : int
-            Run series ID to use when dispatching automation runs.
+        series_id : int | None (default: None)
+            Run series ID for a run-series automation; None for an agent automation.
         next_run_at : str
             Initial due time as a timestamp string. This is required when
             storing an automation. For one-shot automations, this is the
@@ -935,11 +1182,20 @@ class CoreState(ABC):  # pylint: disable=R0904
         max_runs : int | None (default: None)
             Maximum number of runs, if finite. The value initializes the
             persisted `remaining_runs` counter.
+        agent_id : int | None (default: None)
+            Agent associated with the automation, if any.
+        title : str
+            Human-readable title describing the automation.
 
         Returns
         -------
         Automation
             Stored automation metadata.
+
+        Raises
+        ------
+        ValueError
+            If neither or both automation ownership forms are provided.
         """
 
     @abstractmethod
@@ -971,10 +1227,24 @@ class CoreState(ABC):  # pylint: disable=R0904
         """
 
     @abstractmethod
+    def claim_agent_automation(
+        self,
+        automation_id: int,
+        *,
+        previous_next_run_at: str,
+        next_run_at: str | None,
+    ) -> SpaceItem | None:
+        """Atomically claim an agent automation and store its SpaceItem.
+
+        Return `None` if the occurrence was already claimed or the agent is gone.
+        """
+
+    @abstractmethod
     def list_automations(  # pylint: disable=too-many-arguments
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        agent_ids: Sequence[int] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -987,6 +1257,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         automation_ids : Sequence[int] | None (default: None)
             Automation IDs to filter by.
+        agent_ids : Sequence[int] | None (default: None)
+            Agent IDs to filter by.
         federations : Sequence[str] | None (default: None)
             Federation IDs to filter by.
         statuses : Sequence[str] | None (default: None)
@@ -1113,6 +1385,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         task_type: str,
         run_id: int,
+        space_id: UUID | None,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
@@ -1127,6 +1400,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             The executor type of the task to create.
         run_id : int
             The run ID this task belongs to.
+        space_id : Optional[UUID]
+            The run's Space ID, or None for a federation run.
         fab_hash : Optional[str] (default: None)
             FAB hash associated with the task, if applicable.
         model_ref : Optional[str] (default: None)

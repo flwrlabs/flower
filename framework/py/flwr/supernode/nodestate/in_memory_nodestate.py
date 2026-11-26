@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from logging import ERROR
 from threading import Lock
+from typing import Literal
 from uuid import UUID
 
 from flwr.app import Message
@@ -29,6 +30,7 @@ from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.run import Run
+from flwr.supercore.utils import uint64_to_int64
 
 from .nodestate import NodeState
 
@@ -87,10 +89,51 @@ class InMemoryNodeState(
         with self.lock_run_store:
             self.run_store[run.run_id] = run
 
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve a run by its ID."""
+    def get_run(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        space_ids: Sequence[UUID] | None = None,
+        agent_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federation_ids: Sequence[str | None] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+        skip: int = 0,
+    ) -> Sequence[Run]:
+        """Retrieve locally stored runs matching the specified filters."""
         with self.lock_run_store:
-            return self.run_store.get(run_id)
+            if run_ids is None:
+                runs = list(self.run_store.values())
+            else:
+                runs = [
+                    self.run_store[run_id]
+                    for run_id in set(run_ids)
+                    if run_id in self.run_store
+                ]
+            if space_ids is not None:
+                runs = [run for run in runs if run.space_id in space_ids]
+            if agent_ids is not None:
+                runs = [run for run in runs if run.agent_id in agent_ids]
+            if statuses is not None:
+                runs = [run for run in runs if run.status.status in statuses]
+            if flwr_aids is not None:
+                runs = [run for run in runs if run.flwr_aid in flwr_aids]
+            if federation_ids is not None:
+                runs = [
+                    run
+                    for run in runs
+                    if run.federation_id in federation_ids
+                    or (None in federation_ids and run.space_id is not None)
+                ]
+            if order_by is not None:
+                runs.sort(
+                    key=lambda run: (run.pending_at, uint64_to_int64(run.run_id)),
+                    reverse=not ascending,
+                )
+            return runs[skip : skip + limit if limit is not None else None]
 
     def _get_run_ids_for_space(self, space_id: UUID) -> Sequence[int]:
         """Return IDs of locally stored runs in the given Space."""

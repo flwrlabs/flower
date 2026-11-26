@@ -49,6 +49,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     GetRunSeriesEventsResponse,
     GetSpaceEventsRequest,
     GetSpaceEventsResponse,
+    ListAgentConnectorsRequest,
+    ListAgentConnectorsResponse,
     ListFilesRequest,
     ListFilesResponse,
     PullAppMessagesRequest,
@@ -75,8 +77,12 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
@@ -262,6 +268,15 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=GetSpaceMessagesResponse,
         )
 
+    def GetSpaceItems(self, request: GetSpaceItemsRequest) -> GetSpaceItemsResponse:
+        """Read items from the authenticated task's Space."""
+        return self._unary_unary(
+            path="/v1/runtime/get-space-items",
+            rpc_method="/flwr.proto.Runtime/GetSpaceItems",
+            request=request,
+            response_type=GetSpaceItemsResponse,
+        )
+
     def SendSpaceMessage(
         self, request: SendSpaceMessageRequest
     ) -> SendSpaceMessageResponse:
@@ -271,6 +286,15 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/SendSpaceMessage",
             request=request,
             response_type=SendSpaceMessageResponse,
+        )
+
+    def SendSpaceItem(self, request: SendSpaceItemRequest) -> SendSpaceItemResponse:
+        """Publish a message item as the task's agent participant."""
+        return self._unary_unary(
+            path="/v1/runtime/send-space-item",
+            rpc_method="/flwr.proto.Runtime/SendSpaceItem",
+            request=request,
+            response_type=SendSpaceItemResponse,
         )
 
     def GetCompactedContexts(
@@ -315,6 +339,17 @@ class RuntimeHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Runtime/RecordTaskUsage",
             request=request,
             response_type=RecordTaskUsageResponse,
+        )
+
+    def ListAgentConnectors(
+        self, request: ListAgentConnectorsRequest
+    ) -> ListAgentConnectorsResponse:
+        """List connections owned by the authenticated task's agent."""
+        return self._unary_unary(
+            path="/v1/runtime/list-agent-connectors",
+            rpc_method="/flwr.proto.Runtime/ListAgentConnectors",
+            request=request,
+            response_type=ListAgentConnectorsResponse,
         )
 
     def GetConnector(self, request: GetConnectorRequest) -> GetConnectorResponse:

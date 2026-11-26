@@ -34,6 +34,7 @@ from typing import Any, cast
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
+from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError
 from parameterized import parameterized
 from sqlalchemy import event, select, update
@@ -49,8 +50,16 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.control_pb2 import AgentConfig, StartRunRequest  # pylint: disable=E0611
+from flwr.common.serde import (
+    message_from_proto,
+    message_to_proto,
+    user_config_from_proto,
+)
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
+    BootstrapResponse,
+    StartRunRequest,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -58,8 +67,8 @@ from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.runseries_pb2 import CompactedContext  # pylint: disable=E0611
-from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.proto.space_pb2 import SpaceItem, SpaceParticipant  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
@@ -70,6 +79,7 @@ from flwr.supercore.constant import (
     SYSTEM_MESSAGE_TYPE,
     AutomationStatus,
     NodeStatus,
+    SpaceItemType,
     TaskType,
 )
 from flwr.supercore.corestate import CoreState
@@ -87,6 +97,7 @@ from flwr.supercore.state.schema.corestate_models import (
 )
 from flwr.supercore.state.schema.corestate_models import Connector as ConnectorModel
 from flwr.supercore.state.schema.corestate_models import Fab as FabModel
+from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
 from flwr.supercore.state.schema.linkstate_models import Run as RunModel
 from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
@@ -117,6 +128,31 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_agent_run_candidates_use_unread_items(self) -> None:
+        """Select the first unread item not authored by the agent."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
+        alice = SpaceParticipant(flwr_aid="alice")
+        agent_author = SpaceParticipant(agent_id=agent.id)
+        state.create_space_message(space_id, alice, "Legacy message")
+        state.store_space_item(space_id, SpaceItemType.MESSAGE, "Own", agent_author)
+        assert not state.get_agent_run_candidates()
+        first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "First", alice)
+        state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
+        assert first is not None
+        assert state.get_agent_run_candidates() == [(space_id, agent, first.id)]
+        state.get_space_items(space_id, agent_author, unread_only=True)
+        assert not state.get_agent_run_candidates()
+        next_item = state.store_space_item(
+            space_id, SpaceItemType.AUTOMATION, "Next scheduled"
+        )
+        assert next_item is not None
+        assert state.get_agent_run_candidates() == [(space_id, agent, next_item.id)]
 
     def test_store_messages_policy_results_keep_input_order(self) -> None:
         """Reject individual endpoints without rejecting the rest of a batch."""
@@ -175,7 +211,7 @@ class StateTest(CoreStateTest):
         message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
         assert state.store_messages([message]) == [True]
         with (
-            patch.object(state, "get_run_info", side_effect=RuntimeError("lookup")),
+            patch.object(state, "get_run", side_effect=RuntimeError("lookup")),
             patch.object(
                 state, "cancel_messages", wraps=state.cancel_messages
             ) as cancel,
@@ -213,7 +249,7 @@ class StateTest(CoreStateTest):
         # Prepare: Track run and federation lookups on a fresh state.
         state = self.state_factory()
         with (
-            patch.object(state, "get_run_info") as get_runs,
+            patch.object(state, "get_run") as get_runs,
             patch.object(state.federation_manager, "filter_nodes") as filter_nodes,
         ):
             # Execute & Assert: An empty batch produces no policy results.
@@ -273,7 +309,7 @@ class StateTest(CoreStateTest):
             "other": {40},
         }
         with (
-            patch.object(state, "get_run_info", wraps=state.get_run_info) as get_runs,
+            patch.object(state, "get_run", wraps=state.get_run) as get_runs,
             patch.object(
                 state.federation_manager,
                 "filter_nodes",
@@ -320,7 +356,7 @@ class StateTest(CoreStateTest):
 
     @parameterized.expand(  # type: ignore
         [
-            ("get_run_info", OperationalError("select", {}, RuntimeError("offline"))),
+            ("get_run", OperationalError("select", {}, RuntimeError("offline"))),
             ("filter_nodes", OperationalError("select", {}, RuntimeError("offline"))),
             (
                 "filter_nodes",
@@ -340,7 +376,7 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         message = create_ins_message_obj(SUPERLINK_NODE_ID, SUPERLINK_NODE_ID, run_id)
-        target = state if method == "get_run_info" else state.federation_manager
+        target = state if method == "get_run" else state.federation_manager
         with patch.object(target, method, side_effect=error):
             # Execute & Assert: Policy evaluation propagates the lookup error.
             with self.assertRaises(type(error)) as caught:
@@ -397,8 +433,8 @@ class StateTest(CoreStateTest):
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
-    def test_create_and_get_run_info(self) -> None:
-        """Test if create_run and get_run_info work correctly."""
+    def test_create_and_get_run(self) -> None:
+        """Test if create_run and get_run work correctly."""
         # Prepare
         state: LinkState = self.state_factory()
         initial_event = TaskEvent(event="message", data='{"type":"message"}')
@@ -415,7 +451,7 @@ class StateTest(CoreStateTest):
         )
 
         # Execute
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
 
         # Assert
         assert run.run_id == run_id
@@ -452,9 +488,11 @@ class StateTest(CoreStateTest):
                         .where(RunModel.run_id == assigned_run_id)
                         .values(space_id=assigned_space_id)
                     )
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=space_id
+        )
         other_task_id = state.create_task(
-            task_type=TaskType.AGENT_APP, run_id=other_run_id
+            task_type=TaskType.AGENT_APP, run_id=other_run_id, space_id=other_space_id
         )
         assert task_id is not None and other_task_id is not None
         assert state.store_task_events(
@@ -478,6 +516,91 @@ class StateTest(CoreStateTest):
         )
         self.assertEqual(state.get_task_events(space_id=uuid4()), [])
 
+    def test_task_lifecycle_events(self) -> None:
+        """Correlate run creation with primary and child task events."""
+        state = self.state_factory()
+        space = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
+        cursor = state.get_bootstrap("alice").cursor
+        run_id = state.create_run(
+            None,
+            None,
+            None,
+            {},
+            None,
+            None,
+            None,
+            TaskType.AGENT_APP,
+            space_id=UUID(space.id),
+        )
+        task_id = get_primary_task_id(state, run_id)
+        child_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=UUID(space.id)
+        )
+        assert child_id is not None
+        transition_run_status(state, run_id, 3)
+        created, *events = [
+            MessageToDict(entry.event)
+            for entry in state.get_user_events("alice", cursor)
+        ]
+        assert created["type"] == "run.created"
+        assert created["payload"]["run_id"] == str(run_id)
+        assert created["payload"]["primary_task_id"] == str(task_id)
+        assert all(event["payload"]["space_id"] == space.id for event in events)
+        assert all(
+            Task.FromString(task.SerializeToString()).space_id == space.id
+            for task in state.get_tasks(run_ids=[run_id])
+        )
+        assert [
+            (
+                event["type"],
+                event["payload"]["task_id"],
+                event["payload"]["status"]["status"],
+            )
+            for event in events
+        ] == [
+            ("task.created", str(task_id), Status.PENDING),
+            ("task.created", str(child_id), Status.PENDING),
+            ("task.updated", str(task_id), Status.STARTING),
+            ("task.updated", str(task_id), Status.RUNNING),
+            ("task.updated", str(task_id), Status.FINISHED),
+            ("task.updated", str(child_id), Status.FINISHED),
+        ]
+        assert events[-2]["payload"]["status"]["sub_status"] == SubStatus.COMPLETED
+        assert events[-1]["payload"]["status"]["sub_status"] == SubStatus.FAILED
+
+    def test_bootstrap_active_runs(self) -> None:
+        """Bootstrap includes visible active agent runs and omits finished runs."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        space_id = UUID(state.get_spaces("alice")[0].id)
+        run_id = state.create_run(
+            "publisher/app",
+            "1.0",
+            state.store_fab(Fab("", b"fab", {})),
+            {"test_key": "test_value"},
+            None,
+            None,
+            None,
+            TaskType.AGENT_APP,
+            space_id=space_id,
+            agent_id=agent.id,
+        )
+        snapshot = state.get_bootstrap("alice")
+        assert BootstrapResponse.FromString(snapshot.SerializeToString()) == snapshot
+        (run,) = snapshot.active_runs
+        assert run.run_id == run_id
+        assert run.agent_id == agent.id
+        assert run.space_id == str(space_id)
+        assert run.status.status == Status.PENDING
+        assert user_config_from_proto(run.override_config) == {"test_key": "test_value"}
+        state.create_space(participants=[SpaceParticipant(flwr_aid="bob")])
+        assert state.get_bootstrap("bob").active_runs == []
+        assert state.stop_run(run_id)
+        assert state.get_bootstrap("alice").active_runs == []
+
     def test_create_space_run(self) -> None:
         """Create a Space AgentApp run without federation or series resources."""
         state = self.state_factory()
@@ -495,7 +618,7 @@ class StateTest(CoreStateTest):
                 space_id=space_id,
                 user_prompt="Hello",
             )
-            run = state.get_run_info(run_ids=[run_id])[0]
+            run = state.get_run(run_ids=[run_id])[0]
             assert run.space_id == space_id
             assert run.agent_id is None
             assert run.federation_id == "" and run.series_id == 0
@@ -541,7 +664,7 @@ class StateTest(CoreStateTest):
                     series_id=series_id,
                     space_id=scope,
                 )
-        assert state.get_run_info() == []
+        assert state.get_run() == []
         assert state.get_tasks() == [] and state.get_run_series() == []
 
     def test_create_run_rejects_unknown_space(self) -> None:
@@ -566,7 +689,7 @@ class StateTest(CoreStateTest):
                 )
                 == 0
             )
-        assert state.get_run_info() == [] and state.get_tasks() == []
+        assert state.get_run() == [] and state.get_tasks() == []
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
         [
@@ -630,7 +753,7 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         initial_run_id = create_dummy_run(state, federation_id="@me/health")
-        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        series_id = state.get_run(run_ids=[initial_run_id])[0].series_id
 
         # Execute
         run_id = create_dummy_run(
@@ -640,7 +763,7 @@ class StateTest(CoreStateTest):
         )
 
         # Assert
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         self.assertEqual(run.series_id, series_id)
 
     def test_create_run_reuses_series_id_in_same_federation(self) -> None:
@@ -653,7 +776,7 @@ class StateTest(CoreStateTest):
             state,
             federation_id="@me/health",
         )
-        first_run = state.get_run_info(run_ids=[run_id_1])[0]
+        first_run = state.get_run(run_ids=[run_id_1])[0]
         run_id_2 = create_dummy_run(
             state,
             federation_id="@me/health",
@@ -661,7 +784,7 @@ class StateTest(CoreStateTest):
         )
 
         # Assert
-        runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
+        runs = state.get_run(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
     @parameterized.expand(  # type: ignore[untyped-decorator]
@@ -677,7 +800,7 @@ class StateTest(CoreStateTest):
         """Test run series stores whether its first run is an AgentApp."""
         state = self.state_factory()
         run_id = create_dummy_run(state, primary_task_type=primary_task_type)
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
 
         matching_series = state.get_run_series(is_agent=expected_is_agent)
         other_series = state.get_run_series(is_agent=not expected_is_agent)
@@ -691,7 +814,7 @@ class StateTest(CoreStateTest):
         """Claiming an automation should return its unresolved run request."""
         state = self.state_factory()
         initial_run_id = create_dummy_run(state, federation_id="@me/health")
-        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        series_id = state.get_run(run_ids=[initial_run_id])[0].series_id
         previous_next_run_at = (now() - timedelta(seconds=30)).isoformat()
         next_run_at = (now() + timedelta(seconds=30)).isoformat()
         start_run_request = StartRunRequest(
@@ -707,6 +830,7 @@ class StateTest(CoreStateTest):
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
         )
 
         claimed = state.claim_automation(
@@ -750,10 +874,11 @@ class StateTest(CoreStateTest):
 
         # Assert
         tasks = state.get_tasks(run_ids=[run_id])
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+        self.assertEqual(tasks[0].space_id, "")
 
     def test_create_run_binds_connectors(self) -> None:
         """Creating a run should atomically persist its connector allowlist."""
@@ -805,21 +930,21 @@ class StateTest(CoreStateTest):
             state.store_object(run_id, session_id, msg.metadata.message_id, b"content")
         )
 
-    def test_get_run_info_without_filters_returns_all_runs(self) -> None:
-        """Test get_run_info returns all runs when no filter is provided."""
+    def test_get_run_without_filters_returns_all_runs(self) -> None:
+        """Test get_run returns all runs when no filter is provided."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/other")
         run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed")
 
         # Execute
-        runs = state.get_run_info()
+        runs = state.get_run()
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id2})
 
-    def test_get_run_info_filter_by_run_ids(self) -> None:
-        """Test get_run_info filters correctly by run_ids."""
+    def test_get_run_filter_by_run_ids(self) -> None:
+        """Test get_run filters correctly by run_ids."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state)
@@ -827,47 +952,106 @@ class StateTest(CoreStateTest):
         run_id3 = create_dummy_run(state)
 
         # Execute
-        runs = state.get_run_info(run_ids=[run_id1, run_id3])
+        runs = state.get_run(run_ids=[run_id1, run_id3])
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_run_info_filter_space_and_federation_runs(self) -> None:
-        """Distinguish unrestricted, empty, Space-only, and mixed filters."""
+    def test_get_run_trigger_item_id(self) -> None:
+        """Return the trigger item ID supplied when creating a run."""
+        state = self.state_factory()
+        space_id = UUID(state.create_space(participants=[]).id)
+        trigger_item_id = 123
+        if isinstance(state, SqlLinkState):
+            with state.session() as session:
+                item = SpaceItemModel(
+                    space_id=space_id,
+                    type="automation",
+                    created_at=now(),
+                    content="test",
+                )
+                session.add(item)
+                session.flush()
+                trigger_item_id = item.id
+        run_id = state.create_run(
+            fab_id="flwr/test",
+            fab_version="1.0",
+            fab_hash="hash",
+            override_config={},
+            federation_id=None,
+            federation_config=None,
+            flwr_aid="account",
+            primary_task_type=TaskType.AGENT_APP,
+            space_id=space_id,
+            trigger_item_id=trigger_item_id,
+        )
+
+        assert state.get_run(run_ids=[run_id])[0].trigger_item_id == trigger_item_id
+        assert (
+            state.get_run(run_ids=[create_dummy_run(state)])[0].trigger_item_id is None
+        )
+        if isinstance(state, SqlLinkState):
+            with self.assertRaises(IntegrityError), state.session() as session:
+                session.execute(
+                    update(RunModel)
+                    .where(RunModel.run_id == run_id)
+                    .values(trigger_item_id=trigger_item_id + 1)
+                )
+
+    def test_get_run_filter_by_scope(self) -> None:
+        """Filter by Space, agent, and federation, combining filters with AND."""
         state = self.state_factory()
         federation_run_id = create_dummy_run(state)
+        agent = state.create_agent(
+            "account", AgentConfig(name="Agent", app_spec="@flwr/test")
+        )
+        assert agent is not None
+        space_id = UUID(agent.default_space_id)
         space_run_id = state.create_run(
             "flwr/test",
             "1.0",
-            "hash",
+            state.store_fab(Fab("", b"app", {})),
             {},
             None,
             None,
             "account",
             TaskType.AGENT_APP,
-            space_id=UUID(state.create_space(participants=[]).id),
+            space_id=space_id,
+            agent_id=agent.id,
             user_prompt="Hello",
         )
 
-        cases: list[tuple[list[str | None] | None, set[int]]] = [
-            (None, {federation_run_id, space_run_id}),
-            ([], set()),
-            ([None], {space_run_id}),
-            ([NOOP_FEDERATION_ID], {federation_run_id}),
-            ([NOOP_FEDERATION_ID, None], {federation_run_id, space_run_id}),
+        cases: list[tuple[dict[str, Any], set[int]]] = [
+            ({}, {federation_run_id, space_run_id}),
+            ({"federation_ids": []}, set()),
+            ({"federation_ids": [None]}, {space_run_id}),
+            ({"federation_ids": [NOOP_FEDERATION_ID]}, {federation_run_id}),
+            (
+                {"federation_ids": [NOOP_FEDERATION_ID, None]},
+                {federation_run_id, space_run_id},
+            ),
+            ({"space_ids": [space_id]}, {space_run_id}),
+            ({"space_ids": []}, set()),
+            ({"agent_ids": []}, set()),
+            ({"agent_ids": [agent.id]}, {space_run_id}),
+            ({"agent_ids": [agent.id + 1]}, set()),
+            ({"agent_ids": [agent.id + 1, agent.id]}, {space_run_id}),
+            ({"agent_ids": [agent.id], "statuses": [Status.FINISHED]}, set()),
+            ({"agent_ids": [agent.id], "run_ids": [federation_run_id]}, set()),
+            (
+                {"space_ids": [space_id], "federation_ids": [NOOP_FEDERATION_ID]},
+                set(),
+            ),
         ]
-        for federation_ids, expected in cases:
-            with self.subTest(federation_ids=federation_ids):
+        for filters, expected in cases:
+            with self.subTest(filters=str(filters)):
                 self.assertSetEqual(
-                    {
-                        run.run_id
-                        for run in state.get_run_info(federation_ids=federation_ids)
-                    },
+                    {run.run_id for run in state.get_run(**filters)},
                     expected,
                 )
 
-    def test_get_run_info_filter_logic(self) -> None:
-        """Test get_run_info ORs within each filter and ANDs across filters."""
+    def test_get_run_filter_logic(self) -> None:
+        """Test get_run ORs within each filter and ANDs across filters."""
         # Prepare
         state = self.state_factory()
 
@@ -881,7 +1065,7 @@ class StateTest(CoreStateTest):
         transition_run_status(state, run_id4, 2)  # RUNNING
 
         # Execute
-        runs = state.get_run_info(
+        runs = state.get_run(
             statuses=[Status.STARTING, Status.RUNNING],
             flwr_aids=["aid-2"],
             federation_ids=["@me/fed-a", "@me/fed-b"],
@@ -890,8 +1074,8 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id3, run_id4})
 
-    def test_get_run_info_filter_by_statuses(self) -> None:
-        """Test get_run_info filters correctly by statuses only."""
+    def test_get_run_filter_by_statuses(self) -> None:
+        """Test get_run filters correctly by statuses only."""
         # Prepare
         state = self.state_factory()
         pending_run_id = create_dummy_run(state)
@@ -913,14 +1097,14 @@ class StateTest(CoreStateTest):
         # Execute & Assert
         for status, expected_run_ids in expected_runs.items():
             with self.subTest(status=status):
-                runs = state.get_run_info(statuses=[status])
+                runs = state.get_run(statuses=[status])
                 self.assertSetEqual(
                     {run.run_id for run in runs},
                     expected_run_ids,
                 )
 
-    def test_get_run_info_filter_by_federation_ids(self) -> None:
-        """Test get_run_info filters correctly by federation IDs only."""
+    def test_get_run_filter_by_federation_ids(self) -> None:
+        """Test get_run filters correctly by federation IDs only."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state, federation_id="@me/fed-a")
@@ -928,13 +1112,13 @@ class StateTest(CoreStateTest):
         run_id3 = create_dummy_run(state, federation_id="@me/fed-a")
 
         # Execute
-        runs = state.get_run_info(federation_ids=["@me/fed-a"])
+        runs = state.get_run(federation_ids=["@me/fed-a"])
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_run_info_filter_by_flwr_aids(self) -> None:
-        """Test get_run_info filters correctly by flwr_aids only."""
+    def test_get_run_filter_by_flwr_aids(self) -> None:
+        """Test get_run filters correctly by flwr_aids only."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state, flwr_aid="aid-1")
@@ -942,25 +1126,25 @@ class StateTest(CoreStateTest):
         run_id3 = create_dummy_run(state, flwr_aid="aid-1")
 
         # Execute
-        runs = state.get_run_info(flwr_aids=["aid-1"])
+        runs = state.get_run(flwr_aids=["aid-1"])
 
         # Assert
         self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_run_info_filter_by_nonexistent_run_ids(self) -> None:
-        """Test get_run_info returns empty for non-existent run_ids."""
+    def test_get_run_filter_by_nonexistent_run_ids(self) -> None:
+        """Test get_run returns empty for non-existent run_ids."""
         # Prepare
         state = self.state_factory()
         _ = create_dummy_run(state)
 
         # Execute
-        runs = state.get_run_info(run_ids=[999999])
+        runs = state.get_run(run_ids=[999999])
 
         # Assert
         self.assertEqual(list(runs), [])
 
-    def test_get_run_info_order_by_pending_at_and_limit(self) -> None:
-        """Test get_run_info ordering by pending_at and applying limit."""
+    def test_get_run_order_by_pending_at_and_limit(self) -> None:
+        """Test get_run ordering by pending_at and applying limit."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state)
@@ -971,12 +1155,10 @@ class StateTest(CoreStateTest):
         run_ids = [run_id1, run_id2, run_id3]
 
         # Execute
-        ascending_runs = state.get_run_info(order_by="pending_at", ascending=True)
-        descending_runs = state.get_run_info(order_by="pending_at", ascending=False)
-        limited_runs = state.get_run_info(
-            order_by="pending_at", ascending=True, limit=2
-        )
-        second_page = state.get_run_info(
+        ascending_runs = state.get_run(order_by="pending_at", ascending=True)
+        descending_runs = state.get_run(order_by="pending_at", ascending=False)
+        limited_runs = state.get_run(order_by="pending_at", ascending=True, limit=2)
+        second_page = state.get_run(
             order_by="pending_at", ascending=False, limit=2, skip=1
         )
 
@@ -986,7 +1168,7 @@ class StateTest(CoreStateTest):
         self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
         self.assertEqual([run.run_id for run in second_page], run_ids[1::-1])
 
-    def test_get_run_info_paging_with_equal_timestamps(self) -> None:
+    def test_get_run_paging_with_equal_timestamps(self) -> None:
         """Break equal timestamp ties consistently across storage backends."""
         state = self.state_factory()
         module = (
@@ -1006,8 +1188,8 @@ class StateTest(CoreStateTest):
             for _ in run_ids:
                 create_dummy_run(state)
 
-        first_page = state.get_run_info(order_by="pending_at", ascending=False, limit=2)
-        second_page = state.get_run_info(
+        first_page = state.get_run(order_by="pending_at", ascending=False, limit=2)
+        second_page = state.get_run(
             order_by="pending_at", ascending=False, limit=2, skip=2
         )
 
@@ -1015,15 +1197,15 @@ class StateTest(CoreStateTest):
         self.assertEqual([run.run_id for run in second_page], [run_ids[1]])
 
     @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
-    def test_get_run_info_limit_without_order_by(self, limit: int) -> None:
-        """Test get_run_info applies limit when no order_by is specified."""
+    def test_get_run_limit_without_order_by(self, limit: int) -> None:
+        """Test get_run applies limit when no order_by is specified."""
         # Prepare
         state = self.state_factory()
         run_ids = {create_dummy_run(state) for _ in range(3)}
         expected_count = min(limit, len(run_ids))
 
         # Execute
-        runs = state.get_run_info(limit=limit)
+        runs = state.get_run(limit=limit)
         returned_run_ids = {run.run_id for run in runs}
 
         # Assert
@@ -1031,24 +1213,24 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(returned_run_ids), expected_count)
         self.assertTrue(returned_run_ids.issubset(run_ids))
 
-    def test_get_run_info_empty_filters(self) -> None:
-        """Test get_run_info returns empty when any filter list is empty."""
+    def test_get_run_empty_filters(self) -> None:
+        """Test get_run returns empty when any filter list is empty."""
         # Prepare
         state = self.state_factory()
         _ = create_dummy_run(state, flwr_aid="aid-1", federation_id="@me/fed-a")
         _ = create_dummy_run(state, flwr_aid="aid-2", federation_id="@me/fed-b")
 
         # Execute & Assert
-        runs_statuses_empty = state.get_run_info(statuses=[])
+        runs_statuses_empty = state.get_run(statuses=[])
         self.assertEqual(list(runs_statuses_empty), [])
 
-        runs_flwr_aids_empty = state.get_run_info(flwr_aids=[])
+        runs_flwr_aids_empty = state.get_run(flwr_aids=[])
         self.assertEqual(list(runs_flwr_aids_empty), [])
 
-        runs_federation_ids_empty = state.get_run_info(federation_ids=[])
+        runs_federation_ids_empty = state.get_run(federation_ids=[])
         self.assertEqual(list(runs_federation_ids_empty), [])
 
-        runs_run_ids_empty = state.get_run_info(run_ids=[])
+        runs_run_ids_empty = state.get_run(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])
 
     def test_get_run_status_uses_primary_task_status(self) -> None:
@@ -1068,7 +1250,7 @@ class StateTest(CoreStateTest):
         assert status1.status == Status.PENDING
         assert status2.status == Status.RUNNING
 
-    @parameterized.expand([("get_run_info",), ("get_run_status",)])  # type: ignore
+    @parameterized.expand([("get_run",), ("get_run_status",)])  # type: ignore
     def test_run_failed_due_to_heartbeat(self, test_method: str) -> None:
         """Test methods work correctly when the run has no heartbeat."""
         # Prepare
@@ -1088,8 +1270,8 @@ class StateTest(CoreStateTest):
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
 
-            if test_method == "get_run_info":
-                run = state.get_run_info(run_ids=[run_id])[0]
+            if test_method == "get_run":
+                run = state.get_run(run_ids=[run_id])[0]
                 status = run.status
             elif test_method == "get_run_status":
                 status = state.get_run_status({run_id})[run_id]
@@ -1107,7 +1289,9 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
         assert state.activate_task(primary_task_id)
@@ -1159,7 +1343,9 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
         if sub_status == SubStatus.COMPLETED:
@@ -1224,7 +1410,9 @@ class StateTest(CoreStateTest):
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        task_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=None
+        )
         assert task_id is not None
         assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
@@ -1673,8 +1861,8 @@ class StateTest(CoreStateTest):
         second_run_id = create_dummy_run(state)
 
         # Execute
-        run_info = state.get_run_info(run_ids=[run_id])[0]
-        second_run_info = state.get_run_info(run_ids=[second_run_id])[0]
+        run_info = state.get_run(run_ids=[run_id])[0]
+        second_run_info = state.get_run(run_ids=[second_run_id])[0]
 
         # Assert
         assert run_info.primary_task_type == TaskType.SIMULATION
@@ -1696,7 +1884,7 @@ class StateTest(CoreStateTest):
 
         # Execute
         state.store_traffic(run_id, bytes_sent=1000, bytes_recv=2000)
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
 
         # Assert
         assert run.bytes_sent == 1000
@@ -1713,7 +1901,7 @@ class StateTest(CoreStateTest):
         state.store_traffic(run_id, bytes_sent=1000, bytes_recv=500)
         state.store_traffic(run_id, bytes_sent=2000, bytes_recv=1500)
         state.store_traffic(run_id, bytes_sent=500, bytes_recv=1000)
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
 
         # Assert
         assert run.bytes_sent == 3500
@@ -1742,7 +1930,7 @@ class StateTest(CoreStateTest):
             state.store_traffic(run_id, bytes_sent=bytes_sent, bytes_recv=bytes_recv)
 
         # Verify traffic was not updated
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         assert run.bytes_sent == 1000
         assert run.bytes_recv == 2000
 
@@ -1767,7 +1955,7 @@ class StateTest(CoreStateTest):
             state.store_traffic(run_id, bytes_sent=0, bytes_recv=0)
 
         assert "cannot be zero" in str(context.exception)
-        run = state.get_run_info(run_ids=[run_id])[0]
+        run = state.get_run(run_ids=[run_id])[0]
         assert run.bytes_sent == 0
         assert run.bytes_recv == 0
 
@@ -1835,7 +2023,7 @@ def create_ins_message_obj(src_node_id: int, dst_node_id: int, run_id: int) -> M
 
 def get_primary_task_id(state: LinkState, run_id: int) -> int:
     """Return the primary task ID for a run."""
-    run = state.get_run_info(run_ids=[run_id])[0]
+    run = state.get_run(run_ids=[run_id])[0]
     assert run.primary_task_id is not None
     return run.primary_task_id
 
@@ -1953,16 +2141,14 @@ class InMemoryStateTest(StateTest):
         return InMemoryLinkState(NoOpFederationManager(), ObjectStoreFactory().store())
 
     def test_get_compacted_contexts(self) -> None:
-        """Read one series newest first with an exclusive cursor."""
+        """Read one agent newest first with an exclusive cursor."""
         state = self.state_factory()
         state.compacted_context_store = {
             context.id: context
             for context in (
-                CompactedContext(id=1, series_id=42, through_event_id=10, text="First"),
-                CompactedContext(
-                    id=2, series_id=42, through_event_id=20, text="Second"
-                ),
-                CompactedContext(id=3, series_id=43, through_event_id=30, text="Other"),
+                CompactedContext(id=1, agent_id=42, through_event_id=10, text="First"),
+                CompactedContext(id=2, agent_id=42, through_event_id=20, text="Second"),
+                CompactedContext(id=3, agent_id=43, through_event_id=30, text="Other"),
             )
         }
 
@@ -2014,21 +2200,28 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         return state
 
     def test_get_compacted_contexts(self) -> None:
-        """Read only one series in newest-first order with an exclusive cursor."""
+        """Read only one agent in newest-first order with an exclusive cursor."""
         state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@test/app")
+        )
+        other = state.create_agent(
+            "alice", AgentConfig(name="Other", app_spec="@test/app")
+        )
+        assert agent is not None and other is not None
         with state.session() as session:
             rows = [
                 CompactedContextModel(
-                    series_id=series_id,
+                    agent_id=agent_id,
                     through_event_id=event_id,
                     text=text,
                     token_count=1,
                     created_at=now(),
                 )
-                for series_id, event_id, text in (
-                    (42, 10, "First"),
-                    (42, 20, "Second"),
-                    (43, 30, "Other"),
+                for agent_id, event_id, text in (
+                    (agent.id, 10, "First"),
+                    (agent.id, 20, "Second"),
+                    (other.id, 30, "Other"),
                 )
             ]
             session.add_all(rows)
@@ -2036,24 +2229,27 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             first_id, second_id = rows[0].id, rows[1].id
 
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(42, limit=2)],
+            [
+                context.text
+                for context in state.get_compacted_contexts(agent.id, limit=2)
+            ],
             ["Second", "First"],
         )
         self.assertEqual(
-            [context.id for context in state.get_compacted_contexts(42)],
+            [context.id for context in state.get_compacted_contexts(agent.id)],
             [second_id],
         )
         self.assertEqual(
             [
                 context.id
                 for context in state.get_compacted_contexts(
-                    42, before_context_id=second_id
+                    agent.id, before_context_id=second_id
                 )
             ],
             [first_id],
         )
         self.assertEqual(
-            [context.text for context in state.get_compacted_contexts(43)],
+            [context.text for context in state.get_compacted_contexts(other.id)],
             ["Other"],
         )
 
@@ -2128,15 +2324,15 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
 
         self.assertEqual(refreshed.status, NodeStatus.OFFLINE)
 
-    def test_get_run_info_refreshes_rows_after_raw_sql_update(self) -> None:
-        """Test get_run_info observes raw SQL updates in a shared session."""
+    def test_get_run_refreshes_rows_after_raw_sql_update(self) -> None:
+        """Test get_run observes raw SQL updates in a shared session."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
 
         with state.session():
-            state.get_run_info(run_ids=[run_id])
+            state.get_run(run_ids=[run_id])
             state.store_traffic(run_id, bytes_sent=100, bytes_recv=200)
-            refreshed = state.get_run_info(run_ids=[run_id])[0]
+            refreshed = state.get_run(run_ids=[run_id])[0]
 
         self.assertEqual(refreshed.bytes_sent, 100)
         self.assertEqual(refreshed.bytes_recv, 200)
@@ -2226,8 +2422,12 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         """Malformed claimed task Messages should not remain queued forever."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id, space_id=None
+        )
+        dst_task_id = state.create_task(
+            task_type=TaskType.CONNECTOR, run_id=run_id, space_id=None
+        )
         assert src_task_id is not None and dst_task_id is not None
 
         current = now().timestamp()
@@ -2310,7 +2510,9 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        extra_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, space_id=None
+        )
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
 
@@ -2419,7 +2621,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         return self.states
 
     def test_agent_run_admission_is_atomic(self) -> None:
-        """Two replicas admit one Run even after the triggering message is read."""
+        """Two replicas admit one Run even after the triggering item is read."""
         with tempfile.TemporaryDirectory() as tmpdir:
             states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
             state = states[0]
@@ -2430,11 +2632,15 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             space_id = UUID(state.get_spaces("alice")[0].id)
             fab_hash = state.store_fab(Fab("", b"fab", {}))
             assert not state.get_agent_run_candidates()
-            state.create_space_message(
-                space_id, SpaceParticipant(agent_id=agent.id), "Agent message"
+            item = state.store_space_item(
+                space_id,
+                SpaceItemType.MESSAGE,
+                "User message",
+                SpaceParticipant(flwr_aid="alice"),
             )
-            assert state.get_agent_run_candidates() == [(space_id, agent)]
-            state.get_space_messages(space_id, SpaceParticipant(agent_id=agent.id))
+            assert item is not None
+            assert state.get_agent_run_candidates() == [(space_id, agent, item.id)]
+            state.get_space_items(space_id, SpaceParticipant(agent_id=agent.id))
             assert not state.get_agent_run_candidates()
             barrier = Barrier(2)
 
@@ -2451,13 +2657,96 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                     primary_task_type=TaskType.AGENT_APP,
                     space_id=space_id,
                     agent_id=agent.id,
+                    trigger_item_id=item.id,
                 )
 
             with ThreadPoolExecutor(max_workers=2) as pool:
                 run_ids = list(pool.map(start, states))
             assert sum(bool(run_id) for run_id in run_ids) == 1
-            assert len(state.get_run_info()) == 1
+            assert len(state.get_run()) == 1
             assert not state.get_agent_run_candidates()
+
+    def test_agent_automation_claim_is_atomic(self) -> None:
+        """Two SQL replicas create one item for the same due occurrence."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            states = self._create_shared_sql_states(self._shared_sql_database(tmpdir))
+            state = states[0]
+            agent = state.create_agent(
+                "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+            )
+            assert agent is not None
+            due_at = now().isoformat()
+            automation = state.store_automation(
+                flwr_aid="alice",
+                start_run_request=StartRunRequest(user_prompt="Do work"),
+                next_run_at=due_at,
+                max_runs=1,
+                agent_id=agent.id,
+                title="Daily summary",
+            )
+            barrier = Barrier(2)
+
+            def claim(backend: LinkState) -> SpaceItem | None:
+                barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
+                return backend.claim_agent_automation(
+                    automation.automation_id,
+                    previous_next_run_at=due_at,
+                    next_run_at=None,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(claim, states))
+            self.assertEqual(sum(item is not None for item in results), 1)
+            self.assertEqual(
+                state.get_space_items(
+                    UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+                ),
+                [item for item in results if item is not None],
+            )
+
+    def test_agent_automation_item_failure_rolls_back_claim(self) -> None:
+        """A failed SQL item insert leaves the occurrence available to retry."""
+        state = self.state_factory()
+        agent = state.create_agent(
+            "alice", AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        assert agent is not None
+        due_at = now().isoformat()
+        automation = state.store_automation(
+            flwr_aid="alice",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at=due_at,
+            max_runs=1,
+            agent_id=agent.id,
+            title="Daily summary",
+        )
+        with patch.object(
+            state, "store_space_item", side_effect=RuntimeError("failed")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "failed"):
+                state.claim_agent_automation(
+                    automation.automation_id,
+                    previous_next_run_at=due_at,
+                    next_run_at=None,
+                )
+        stored = state.list_automations(
+            automation_ids=[automation.automation_id], order_by="updated_at"
+        )[0]
+        self.assertEqual(stored.status, AutomationStatus.ACTIVE)
+        self.assertEqual(stored.remaining_runs, 1)
+        self.assertEqual(
+            state.get_space_items(
+                UUID(agent.default_space_id), SpaceParticipant(agent_id=agent.id)
+            ),
+            [],
+        )
+        self.assertIsNotNone(
+            state.claim_agent_automation(
+                automation.automation_id,
+                previous_next_run_at=due_at,
+                next_run_at=None,
+            )
+        )
 
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""

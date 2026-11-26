@@ -53,7 +53,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
-    AccountInfo,
+    AuthenticatedUser,
 )
 from flwr.supercore.error import ApiErrorCode
 from flwr.supercore.event_log.typing import LogEntry
@@ -129,7 +129,7 @@ def _create_authn_plugin() -> Mock:
             (ACCESS_TOKEN_KEY, "new-access-token"),
             (REFRESH_TOKEN_KEY, "new-refresh-token"),
         ],
-        AccountInfo(flwr_aid="aid", account_name="account"),
+        AuthenticatedUser(user_id="aid", handle="account"),
     )
     return plugin
 
@@ -707,8 +707,8 @@ def test_event_log_middleware_writes_before_and_after_events(
     before_kwargs = event_log_plugin.compose_log_before_event.call_args.kwargs
     assert before_kwargs["request"] == ListRunsRequest()
     assert isinstance(before_kwargs["context"], Request)
-    assert before_kwargs["account_info"].flwr_aid == NOOP_FLWR_AID
-    assert before_kwargs["account_info"].account_name == NOOP_ACCOUNT_NAME
+    assert before_kwargs["account_info"].user_id == NOOP_FLWR_AID
+    assert before_kwargs["account_info"].handle == NOOP_ACCOUNT_NAME
     assert before_kwargs["method_name"] == "/v1/control/list-runs"
     after_kwargs = event_log_plugin.compose_log_after_event.call_args.kwargs
     assert after_kwargs["request"] == ListRunsRequest()

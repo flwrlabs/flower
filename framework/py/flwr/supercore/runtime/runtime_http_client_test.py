@@ -45,11 +45,14 @@ _UNARY_UNARY_PATHS = (
     "get-run-series-events",
     "get-space-events",
     "get-space-messages",
+    "get-space-items",
     "send-space-message",
+    "send-space-item",
     "get-compacted-contexts",
     "put-compacted-context",
     "pull-task-message",
     "record-task-usage",
+    "list-agent-connectors",
     "get-connector",
 )
 _RESPONSE_NAME_OVERRIDES = {

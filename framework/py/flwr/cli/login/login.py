@@ -32,6 +32,7 @@ from flwr.supercore.auth.typing import AccountAuthLoginDetails
 from ..config_migration import migrate, warn_if_federation_config_overrides
 from ..flower_config import read_superlink_connection
 from ..utils import flwr_cli_exc_handler, load_cli_auth_plugin_from_connection
+from .signup import complete_signup
 
 
 def login(
@@ -58,7 +59,6 @@ def login(
 
     # Read superlink connection configuration
     superlink_connection = read_superlink_connection(superlink)
-    superlink = superlink_connection.name
 
     # Check if insecure flag is set to `True`
     if superlink_connection.insecure:
@@ -89,19 +89,27 @@ def login(
             verification_uri_complete=login_response.verification_uri_complete,
             expires_in=login_response.expires_in,
             interval=login_response.interval,
+            verification_uri=login_response.verification_uri,
+            user_code=login_response.user_code,
+            supports_cli_signup=login_response.supports_cli_signup,
         )
         try:
             with flwr_cli_exc_handler():
                 credentials = authn_plugin.login(details, control_client)
-            typer.secho(
-                "✅ Login successful.",
-                fg=typer.colors.GREEN,
-                bold=False,
-            )
         except LoginError as e:
             raise click.ClickException(f"Login failed: {e.message}") from None
 
+        if details.supports_cli_signup:
+            credentials = complete_signup(
+                superlink_connection, credentials, control_client
+            )
+
         # Store the tokens
         authn_plugin.store_tokens(credentials)
+        typer.secho(
+            "✅ Login successful.",
+            fg=typer.colors.GREEN,
+            bold=False,
+        )
     finally:
         control_client.close()

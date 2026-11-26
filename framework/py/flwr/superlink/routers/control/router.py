@@ -42,6 +42,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteAgentRequest,
+    DeleteAgentResponse,
     DisconnectConnectorRequest,
     DisconnectConnectorResponse,
     GetAuthTokensRequest,
@@ -108,6 +110,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamRunEventsResponse,
     UnregisterNodeRequest,
     UnregisterNodeResponse,
+    UpdateAgentRequest,
+    UpdateAgentResponse,
     UpdateRunSeriesDescriptionRequest,
     UpdateRunSeriesDescriptionResponse,
 )
@@ -115,15 +119,19 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     CreateSpaceResponse,
+    GetSpaceItemsRequest,
+    GetSpaceItemsResponse,
     GetSpaceMessagesRequest,
     GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
+    SendSpaceItemRequest,
+    SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
-from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
 from flwr.supercore.protobuf.openapi import protobuf_message_description
 from flwr.supercore.protobuf.routing import ProtobufRoute
@@ -158,7 +166,7 @@ router = APIRouter(
 )
 
 LinkStateDependency = Annotated[LinkState, Depends(get_linkstate)]
-AccountDependency = Annotated[AccountInfo, Depends(get_account)]
+AccountDependency = Annotated[AuthenticatedUser, Depends(get_account)]
 AuthnPluginDependency = Annotated[ControlAuthnPlugin, Depends(get_authn_plugin)]
 ProtobufStreamContextDependency = Annotated[
     ProtobufStreamContext, Depends(get_protobuf_stream_context)
@@ -199,6 +207,26 @@ def create_agent(
 ) -> CreateAgentResponse:
     """Create an agent and a Space containing the agent and its creator."""
     return control_handlers.create_agent(request, account, linkstate)
+
+
+@router.post("/update-agent")
+def update_agent(
+    request: Annotated[UpdateAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> UpdateAgentResponse:
+    """Replace an owned agent's configuration using its current version."""
+    return control_handlers.update_agent(request, account, linkstate)
+
+
+@router.post("/delete-agent")
+def delete_agent(
+    request: Annotated[DeleteAgentRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> DeleteAgentResponse:
+    """Delete an agent owned by the authenticated account."""
+    return control_handlers.delete_agent(request, account, linkstate)
 
 
 @router.post("/list-agents")
@@ -267,6 +295,16 @@ def get_space_messages(
     return control_handlers.get_space_messages(request, account, linkstate)
 
 
+@router.post("/get-space-items")
+def get_space_items(
+    request: Annotated[GetSpaceItemsRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> GetSpaceItemsResponse:
+    """Get space items."""
+    return control_handlers.get_space_items(request, account, linkstate)
+
+
 @router.post("/send-space-message")
 def send_space_message(
     request: Annotated[SendSpaceMessageRequest, Depends(get_protobuf_request)],
@@ -275,6 +313,16 @@ def send_space_message(
 ) -> SendSpaceMessageResponse:
     """Send space message."""
     return control_handlers.send_space_message(request, account, linkstate)
+
+
+@router.post("/send-space-item")
+def send_space_item(
+    request: Annotated[SendSpaceItemRequest, Depends(get_protobuf_request)],
+    linkstate: LinkStateDependency,
+    account: AccountDependency,
+) -> SendSpaceItemResponse:
+    """Send a message item."""
+    return control_handlers.send_space_item(request, account, linkstate)
 
 
 @router.post("/list-run-series")

@@ -24,6 +24,8 @@ from flwr.supercore.protobuf.client import ProtobufClient
 _UNARY_UNARY_ENDPOINTS = (
     "bootstrap",
     "create-agent",
+    "update-agent",
+    "delete-agent",
     "list-agents",
     "start-run",
     "stop-run",
@@ -35,7 +37,9 @@ _UNARY_UNARY_ENDPOINTS = (
     "create-space",
     "list-spaces",
     "get-space-messages",
+    "get-space-items",
     "send-space-message",
+    "send-space-item",
     "get-run-series",
     "update-run-series-description",
     "list-run-series-events",
