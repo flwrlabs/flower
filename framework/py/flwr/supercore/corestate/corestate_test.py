@@ -941,7 +941,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Store a minimal automation."""
         return state.store_automation(
             title=title,
-            agent_id=None,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=StartRunRequest(

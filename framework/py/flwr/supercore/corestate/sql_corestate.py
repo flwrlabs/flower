@@ -2107,7 +2107,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
-        agent_id: int | None,
+        agent_id: int | None = None,
         title: str,
     ) -> Automation:
         """Store an automation and return its metadata."""

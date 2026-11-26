@@ -831,7 +831,6 @@ class StateTest(CoreStateTest):
             fixed_interval=60,
             max_runs=2,
             title="Daily summary",
-            agent_id=None,
         )
 
         claimed = state.claim_automation(

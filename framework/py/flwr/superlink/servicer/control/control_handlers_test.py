@@ -1063,7 +1063,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
             title="Daily summary",
-            agent_id=None,
         )
 
         # Execute
@@ -1104,7 +1103,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
             title="Daily summary",
-            agent_id=None,
         )
 
         request = ListAutomationsRequest(agent_id=agent.id)
@@ -1150,7 +1148,6 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
             title="Daily summary",
-            agent_id=None,
         )
 
         # Execute

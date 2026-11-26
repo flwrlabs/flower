@@ -889,7 +889,6 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             next_run_at=datetime.now(tz=UTC).isoformat(),
             max_runs=1,
             title="Daily summary",
-            agent_id=None,
         )
 
         with (
