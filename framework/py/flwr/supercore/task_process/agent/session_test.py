@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# pylint: disable=too-many-lines
 """Runtime AgentApp session tests."""
 
 from logging import ERROR
@@ -728,6 +729,39 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         "function_call_output",
     ]
     assert items[0]["name"] == START_AUTOMATION_TOOL_NAME
+
+
+def test_space_session_creates_automation() -> None:
+    """Expose automation creation without a federation run request."""
+    stub, events = Mock(), Mock()
+    stub.StartAutomation.return_value = StartAutomationResponse(
+        automation_id=42, next_run_at="2026-07-28T12:00:00+00:00"
+    )
+    agent = create_space_session(
+        Mock(_runtime_client=stub), events, PullTaskInputResponse()
+    )
+
+    assert [
+        tool["name"] for tool in agent.connectors.tools([START_AUTOMATION_TOOL_NAME])
+    ] == [START_AUTOMATION_TOOL_NAME]
+    output = agent.connectors.call(
+        {
+            "name": START_AUTOMATION_TOOL_NAME,
+            "call_id": "call-1",
+            "arguments": {"input": "Do work", "start_at": "2026-07-28T12:00:00Z"},
+        }
+    )
+
+    stub.StartAutomation.assert_called_once_with(
+        StartAutomationRequest(
+            start_at="2026-07-28T12:00:00Z",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+        )
+    )
+    output_value = strict_json_loads(str(output["output"]))
+    assert isinstance(output_value, dict)
+    assert output_value["automation_id"] == 42
+    assert events.emit.call_count == 2
 
 
 def test_connector_call_emits_standard_items() -> None:
