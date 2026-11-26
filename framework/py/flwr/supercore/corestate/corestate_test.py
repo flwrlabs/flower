@@ -1581,6 +1581,22 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored.agent_id, agent.id)
         self.assertEqual(stored.title, "Daily summary")
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
+        self.assertEqual(
+            [
+                item.automation_id
+                for item in state.list_automations(
+                    agent_ids=[agent.id], order_by="updated_at"
+                )
+            ],
+            [automation.automation_id],
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[], order_by="updated_at"), []
+        )
+        self.assertEqual(
+            state.list_automations(agent_ids=[agent.id + 1], order_by="updated_at"),
+            [],
+        )
 
     def test_claim_agent_automation_stores_each_occurrence(self) -> None:
         """Claim each due occurrence once, including with overlapping polls."""
@@ -1599,6 +1615,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             max_runs=2,
             agent_id=agent.id,
         )
+        cursor = state.get_bootstrap("alice").cursor
         self.assertIsNone(
             state.claim_agent_automation(
                 automation.automation_id,
@@ -1648,6 +1665,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )[0]
         self.assertEqual(stored.status, AutomationStatus.COMPLETED)
         self.assertEqual(stored.remaining_runs, 0)
+        events = state.get_user_events("alice", cursor)
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 2)
+        self.assertEqual(
+            [entry.event.payload["id"] for entry in events],
+            [str(first.id), str(second.id)],
+        )
 
     def test_agent_automation_requires_prompt(self) -> None:
         """Reject agent automations that cannot produce an item."""
@@ -2844,6 +2867,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         alice = SpaceParticipant(flwr_aid="alice")
         bob = SpaceParticipant(flwr_aid="bob")
         space_id = UUID(state.create_space(participants=[alice, bob]).id)
+        cursor = state.get_bootstrap("bob").cursor
         first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "first", alice)
         second = state.store_space_item(
             space_id, SpaceItemType.MESSAGE, "second", alice
@@ -2852,6 +2876,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             space_id, SpaceItemType.AUTOMATION, "scheduled"
         )
         assert first is not None and second is not None and automation is not None
+        events = state.get_user_events("bob", cursor)
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 3)
+        self.assertEqual(
+            [entry.event.payload["content"] for entry in events],
+            ["first", "second", "scheduled"],
+        )
         self.assertEqual([item.id for item in [first, second, automation]], [1, 2, 3])
         self.assertEqual([first.type, second.type], ["message", "message"])
         self.assertEqual(automation.type, "automation")
@@ -2928,6 +2958,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert item is not None
         self.assertEqual(item.author, author)
         self.assertEqual(state.get_space_items(space_id, author), [item])
+        event = state.get_user_events("alice")[-1].event
+        self.assertEqual(event.type, EventType.ITEM_CREATED)
+        self.assertEqual(event.payload["id"], str(item.id))
+        self.assertEqual(event.space_id, str(space_id))
 
     def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
         """Reading items does not mark legacy messages as read."""

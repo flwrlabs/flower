@@ -1076,6 +1076,63 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id],
         )
 
+    def test_list_agent_automations(self) -> None:
+        """List owned agent automations without changing legacy list results."""
+        agent = self.state.create_agent(
+            self.account.user_id, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        other_agent = self.state.create_agent(
+            "other", AgentConfig(name="Other", app_spec="@publisher/app")
+        )
+        assert agent is not None and other_agent is not None
+        agent_automation = self.state.store_automation(
+            flwr_aid=self.account.user_id,
+            agent_id=agent.id,
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+        )
+        legacy_automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=self.account.user_id,
+            start_run_request=StartRunRequest(series_id=1),
+            series_id=1,
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+        )
+
+        request = ListAutomationsRequest(agent_id=agent.id)
+        parsed = ListAutomationsRequest.FromString(request.SerializeToString())
+        self.assertTrue(parsed.HasField("agent_id"))
+        response = list_automations(request, self.account, self.state)
+        self.assertEqual(
+            [item.automation_id for item in response.automations],
+            [agent_automation.automation_id],
+        )
+        legacy_response = list_automations(
+            ListAutomationsRequest(), self.account, self.state
+        )
+        self.assertEqual(
+            [item.automation_id for item in legacy_response.automations],
+            [legacy_automation.automation_id],
+        )
+        with self.assertRaises(FlowerError) as error:
+            list_automations(
+                ListAutomationsRequest(agent_id=other_agent.id),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.AGENT_NOT_FOUND)
+        with self.assertRaises(FlowerError) as error:
+            list_automations(
+                ListAutomationsRequest(
+                    federation=NOOP_FEDERATION_ID, agent_id=agent.id
+                ),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+
     def test_stop_automation(self) -> None:
         """Stop an active automation."""
         # Prepare
@@ -1104,6 +1161,54 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [item.automation_id for item in stopped],
             [automation.automation_id],
+        )
+
+    def test_stop_agent_automation_checks_owner(self) -> None:
+        """Allow the owner to stop an agent automation and reject other accounts."""
+        agent = self.state.create_agent(
+            self.account.user_id, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        other_agent = self.state.create_agent(
+            "other", AgentConfig(name="Other", app_spec="@publisher/app")
+        )
+        assert agent is not None and other_agent is not None
+        owned = self.state.store_automation(
+            flwr_aid=self.account.user_id,
+            agent_id=agent.id,
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+        )
+        foreign = self.state.store_automation(
+            flwr_aid="other",
+            agent_id=other_agent.id,
+            start_run_request=StartRunRequest(user_prompt="Private"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+        )
+
+        stop_automation(
+            StopAutomationRequest(automation_id=owned.automation_id),
+            self.account,
+            self.state,
+        )
+        with self.assertRaises(FlowerError) as error:
+            stop_automation(
+                StopAutomationRequest(automation_id=foreign.automation_id),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.AGENT_NOT_FOUND)
+        stored = self.state.list_automations(
+            automation_ids=[owned.automation_id, foreign.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            {item.automation_id: item.status for item in stored},
+            {
+                owned.automation_id: AutomationStatus.STOPPED,
+                foreign.automation_id: AutomationStatus.ACTIVE,
+            },
         )
 
 

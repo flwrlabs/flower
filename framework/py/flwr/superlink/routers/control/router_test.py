@@ -1574,7 +1574,7 @@ def test_bootstrap_uses_authenticated_account(
     assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
     assert snapshot.spaces[0].latest_user_message == "Latest prompt"
-    assert snapshot.cursor == 2
+    assert snapshot.cursor == 3
 
 
 @pytest.mark.parametrize("accept", [PROTOBUF_STREAM_MEDIA_TYPE, "text/event-stream"])

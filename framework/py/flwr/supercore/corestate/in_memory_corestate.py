@@ -793,7 +793,7 @@ class InMemoryCoreState(
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1365,6 +1365,7 @@ class InMemoryCoreState(
             )
             if author is not None:
                 item.author.CopyFrom(author)
+            self.store_event(EventType.ITEM_CREATED, item, space_id=space_id)
             self.space_item_store[space_id].append(item)
             self.space_item_id_counter = item.id
             return item
@@ -1713,6 +1714,7 @@ class InMemoryCoreState(
                 next_run_at=next_run_at,
             ):
                 return None
+            self.store_event(EventType.ITEM_CREATED, item, space_id=space_id)
             self.space_item_store[space_id].append(item)
             self.space_item_id_counter = item.id
             if (
@@ -1726,6 +1728,7 @@ class InMemoryCoreState(
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        agent_ids: Sequence[int] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -1738,6 +1741,7 @@ class InMemoryCoreState(
         if (
             limit == 0
             or (automation_ids is not None and not automation_ids)
+            or (agent_ids is not None and not agent_ids)
             or (federations is not None and not federations)
             or (statuses is not None and not statuses)
         ):
@@ -1760,8 +1764,8 @@ class InMemoryCoreState(
             for record in records:
                 automation = record.automation
 
-                # Apply federation filter.
-                if (
+                # Apply agent and federation filters.
+                if (agent_ids is not None and automation.agent_id not in agent_ids) or (
                     federation_set is not None
                     and automation.federation not in federation_set
                 ):

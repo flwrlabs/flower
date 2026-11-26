@@ -106,7 +106,12 @@ message Automation {
   optional uint64 agent_id = 12;
   string title = 13;
 }
-message ListAutomationsRequest { string federation = 1; }
+message ListAutomationsRequest {
+  string federation = 1;
+  // When set, list this owned Agent's automations instead of federation
+  // automations.
+  optional uint64 agent_id = 2;
+}
 message ListAutomationsResponse { repeated Automation automations = 1; }
 message StopAutomationRequest { uint64 automation_id = 1; }
 message StopAutomationResponse {}
