@@ -31,6 +31,10 @@ def make_start_automation_tool() -> JSONObject:
         "parameters": {
             "type": "object",
             "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "A short, descriptive title for the automation.",
+                },
                 "input": {
                     "type": "string",
                     "description": "The input for each automated run.",
@@ -54,7 +58,7 @@ def make_start_automation_tool() -> JSONObject:
                     ),
                 },
             },
-            "required": ["input", "start_at"],
+            "required": ["title", "input", "start_at"],
             "additionalProperties": False,
         },
     }

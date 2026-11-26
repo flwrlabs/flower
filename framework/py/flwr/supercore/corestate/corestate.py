@@ -438,7 +438,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1158,6 +1158,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         fixed_interval: int | None = None,
         max_runs: int | None = None,
         agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -1183,6 +1184,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             persisted `remaining_runs` counter.
         agent_id : int | None (default: None)
             Agent associated with the automation, if any.
+        title : str
+            Human-readable title describing the automation.
 
         Returns
         -------
@@ -1241,6 +1244,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        agent_ids: Sequence[int] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -1253,6 +1257,8 @@ class CoreState(ABC):  # pylint: disable=R0904
         ----------
         automation_ids : Sequence[int] | None (default: None)
             Automation IDs to filter by.
+        agent_ids : Sequence[int] | None (default: None)
+            Agent IDs to filter by.
         federations : Sequence[str] | None (default: None)
             Federation IDs to filter by.
         statuses : Sequence[str] | None (default: None)

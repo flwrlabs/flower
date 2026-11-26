@@ -930,6 +930,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
+            title="  Daily summary  ",
             start_at="2026-07-10T04:00:00-05:00",
             fixed_interval=60,
             max_runs=3,
@@ -947,6 +948,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             automation_ids=[response.automation_id],
             order_by="updated_at",
         )[0]
+        self.assertEqual(automation.title, "Daily summary")
         self.assertEqual(
             (
                 automation.series_id,
@@ -957,10 +959,35 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
         )
 
+    def test_start_automation_rejects_empty_title(self) -> None:
+        """Reject empty and whitespace-only titles without storing an automation."""
+        for title in ("", " \t\n "):
+            with self.subTest(title=title):
+                request = StartAutomationRequest(
+                    title=title,
+                    start_run_request=StartRunRequest(
+                        federation=NOOP_FEDERATION_ID,
+                        series_id=1,
+                    ),
+                )
+                with self.assertRaises(FlowerError) as error:
+                    start_automation(request, self.account, self.state)
+
+                self.assertEqual(
+                    error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST
+                )
+                self.assertEqual(
+                    error.exception.public_details,
+                    "The automation title must be nonempty.",
+                )
+
+        self.assertEqual(self.state.list_automations(order_by="updated_at"), [])
+
     def test_start_automation_omits_interval_for_one_run(self) -> None:
         """Store and list one-run automations without a recurrence interval."""
         # Prepare
         request = StartAutomationRequest(
+            title="Daily summary",
             fixed_interval=60,
             max_runs=1,
             start_run_request=StartRunRequest(
@@ -984,6 +1011,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
+        self.assertEqual(listed_automation.title, "Daily summary")
 
     def test_start_automation_stores_hub_app_without_fab(self) -> None:
         """Store Hub automations by app ID so dispatch fetches the latest FAB."""
@@ -997,10 +1025,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             is_hub_app=True,
         )
         request = StartAutomationRequest(
+            title="Daily summary",
             start_run_request=StartRunRequest(
                 federation=NOOP_FEDERATION_ID,
                 series_id=1,
-            )
+            ),
         )
         request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.start_run_request.fab.content = fab_content
@@ -1032,6 +1061,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Reject a start time without timezone information."""
         # Prepare
         request = StartAutomationRequest(
+            title="Daily summary",
             start_at="2026-07-10T09:00:00",
             start_run_request=StartRunRequest(series_id=1),
         )
@@ -1058,6 +1088,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
         )
 
         # Execute
@@ -1073,6 +1104,65 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id],
         )
 
+    def test_list_agent_automations(self) -> None:
+        """List owned agent automations without changing legacy list results."""
+        agent = self.state.create_agent(
+            self.account.user_id, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        other_agent = self.state.create_agent(
+            "other", AgentConfig(name="Other", app_spec="@publisher/app")
+        )
+        assert agent is not None and other_agent is not None
+        agent_automation = self.state.store_automation(
+            flwr_aid=self.account.user_id,
+            agent_id=agent.id,
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+            title="Daily summary",
+        )
+        legacy_automation = self.state.store_automation(
+            federation_id=NOOP_FEDERATION_ID,
+            flwr_aid=self.account.user_id,
+            start_run_request=StartRunRequest(series_id=1),
+            series_id=1,
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+            title="Daily summary",
+        )
+
+        request = ListAutomationsRequest(agent_id=agent.id)
+        parsed = ListAutomationsRequest.FromString(request.SerializeToString())
+        self.assertTrue(parsed.HasField("agent_id"))
+        response = list_automations(request, self.account, self.state)
+        self.assertEqual(
+            [item.automation_id for item in response.automations],
+            [agent_automation.automation_id],
+        )
+        legacy_response = list_automations(
+            ListAutomationsRequest(), self.account, self.state
+        )
+        self.assertEqual(
+            [item.automation_id for item in legacy_response.automations],
+            [legacy_automation.automation_id],
+        )
+        with self.assertRaises(FlowerError) as error:
+            list_automations(
+                ListAutomationsRequest(agent_id=other_agent.id),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.AGENT_NOT_FOUND)
+        with self.assertRaises(FlowerError) as error:
+            list_automations(
+                ListAutomationsRequest(
+                    federation=NOOP_FEDERATION_ID, agent_id=agent.id
+                ),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST)
+
     def test_stop_automation(self) -> None:
         """Stop an active automation."""
         # Prepare
@@ -1083,6 +1173,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
         )
 
         # Execute
@@ -1101,6 +1192,56 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [item.automation_id for item in stopped],
             [automation.automation_id],
+        )
+
+    def test_stop_agent_automation_checks_owner(self) -> None:
+        """Allow the owner to stop an agent automation and reject other accounts."""
+        agent = self.state.create_agent(
+            self.account.user_id, AgentConfig(name="Agent", app_spec="@publisher/app")
+        )
+        other_agent = self.state.create_agent(
+            "other", AgentConfig(name="Other", app_spec="@publisher/app")
+        )
+        assert agent is not None and other_agent is not None
+        owned = self.state.store_automation(
+            flwr_aid=self.account.user_id,
+            agent_id=agent.id,
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+            title="Daily summary",
+        )
+        foreign = self.state.store_automation(
+            flwr_aid="other",
+            agent_id=other_agent.id,
+            start_run_request=StartRunRequest(user_prompt="Private"),
+            next_run_at="2026-07-10T09:00:00+00:00",
+            max_runs=1,
+            title="Daily summary",
+        )
+
+        stop_automation(
+            StopAutomationRequest(automation_id=owned.automation_id),
+            self.account,
+            self.state,
+        )
+        with self.assertRaises(FlowerError) as error:
+            stop_automation(
+                StopAutomationRequest(automation_id=foreign.automation_id),
+                self.account,
+                self.state,
+            )
+        self.assertEqual(error.exception.code, ApiErrorCode.AGENT_NOT_FOUND)
+        stored = self.state.list_automations(
+            automation_ids=[owned.automation_id, foreign.automation_id],
+            order_by="updated_at",
+        )
+        self.assertEqual(
+            {item.automation_id: item.status for item in stored},
+            {
+                owned.automation_id: AutomationStatus.STOPPED,
+                foreign.automation_id: AutomationStatus.ACTIVE,
+            },
         )
 
 

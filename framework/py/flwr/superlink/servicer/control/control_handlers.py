@@ -1150,6 +1150,14 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     state: LinkState,
 ) -> StartAutomationResponse:
     """Create automation."""
+    request.title = request.title.strip()
+    if not request.title:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation title must be nonempty.",
+            public_details="The automation title must be nonempty.",
+        )
+
     # Validate the run series shared by all runs in this automation.
     start_run_request = request.start_run_request
     if not start_run_request.HasField("series_id"):
@@ -1245,6 +1253,7 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     # Persist the unresolved run request so dispatch uses the StartRun workflow.
     try:
         automation = state.store_automation(
+            title=request.title,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=stored_start_run_request,
@@ -1408,6 +1417,20 @@ def list_automations(
 ) -> ListAutomationsResponse:
     """List automations."""
     flwr_aid = account.user_id
+    if request.HasField("agent_id"):
+        if request.federation:
+            reason = "Specify either an agent or a federation."
+            raise FlowerError(
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST, reason, public_details=reason
+            )
+        if state.get_agent(flwr_aid, request.agent_id) is None:
+            raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
+        return ListAutomationsResponse(
+            automations=state.list_automations(
+                agent_ids=[request.agent_id], order_by="updated_at"
+            )
+        )
+
     if request.federation:
         _validate_federation_membership_in_request(state, flwr_aid, request.federation)
         federations = [request.federation]
@@ -1434,9 +1457,14 @@ def stop_automation(
         order_by="updated_at",
     )
     if automations:
-        _validate_federation_membership_in_request(
-            state, account.user_id, automations[0].federation
-        )
+        automation = automations[0]
+        if automation.HasField("agent_id"):
+            if automation.flwr_aid != account.user_id:
+                raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
+        else:
+            _validate_federation_membership_in_request(
+                state, account.user_id, automation.federation
+            )
 
     state.stop_automation(request.automation_id)
     return StopAutomationResponse()

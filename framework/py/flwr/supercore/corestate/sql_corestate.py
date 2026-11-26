@@ -967,7 +967,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1756,7 +1756,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     )
                     .returning(SpaceItemModel)
                 ).one_or_none()
-                return _space_item_from_model(model) if model is not None else None
+                if model is None:
+                    return None
+                item = _space_item_from_model(model)
+                self.store_event(EventType.ITEM_CREATED, item, space_id=space_id)
+                return item
         except IntegrityError as exc:
             raise ValueError("Invalid SpaceItem") from exc
 
@@ -2122,6 +2126,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         fixed_interval: int | None = None,
         max_runs: int | None = None,
         agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata."""
         if not (
@@ -2137,6 +2142,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             insert(AutomationModel)
             .values(
+                title=title,
                 federation_id=federation_id,
                 status=AutomationStatus.ACTIVE,
                 series_id=series_id,
@@ -2265,6 +2271,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         self,
         *,
         automation_ids: Sequence[int] | None = None,
+        agent_ids: Sequence[int] | None = None,
         federations: Sequence[str] | None = None,
         statuses: Sequence[str] | None = None,
         due_before: datetime | None = None,
@@ -2277,6 +2284,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         if (
             limit == 0
             or (automation_ids is not None and not automation_ids)
+            or (agent_ids is not None and not agent_ids)
             or (federations is not None and not federations)
             or (statuses is not None and not statuses)
         ):
@@ -2285,6 +2293,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         query = select(AutomationModel)
         if automation_ids is not None:
             query = query.where(AutomationModel.automation_id.in_(automation_ids))
+        if agent_ids is not None:
+            query = query.where(AutomationModel.agent_id.in_(agent_ids))
         if federations is not None:
             query = query.where(AutomationModel.federation_id.in_(federations))
         if statuses is not None:
@@ -3311,6 +3321,7 @@ def _automation_from_model(model: AutomationModel) -> Automation:
     """Convert an automation model to its proto representation."""
     return Automation(
         automation_id=model.automation_id,
+        title=model.title,
         status=model.status,
         federation=model.federation_id or "",
         series_id=model.series_id or 0,
