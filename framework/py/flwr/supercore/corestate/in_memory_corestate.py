@@ -1613,8 +1613,8 @@ class InMemoryCoreState(
         next_run_at: str,
         fixed_interval: int | None = None,
         max_runs: int | None = None,
-        agent_id: int | None = None,
-        title: str = "",
+        agent_id: int | None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata."""
         if not (

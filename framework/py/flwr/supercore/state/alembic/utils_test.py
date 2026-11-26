@@ -42,6 +42,7 @@ from sqlalchemy.exc import IntegrityError
 
 from flwr.common.constant import SubStatus
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
@@ -650,15 +651,14 @@ class TestAlembicRun(unittest.TestCase):
                     },
                 )
 
-            self.upgrade_to_revision(engine, "heads")
+            self.upgrade_to_revision(engine, "7208a0cbdcd7")
 
             with engine.connect() as connection:
                 automation = (
                     connection.execute(
                         text(
                             """
-                            SELECT created_at, updated_at, next_run_at,
-                                   stopped_at, title
+                            SELECT created_at, updated_at, next_run_at, stopped_at
                             FROM automation
                             WHERE federation_id = :federation_id
                             """
@@ -673,7 +673,6 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(automation["updated_at"], "2026-08-10 10:01:00+00:00")
             self.assertEqual(automation["next_run_at"], "2026-08-10 10:02:00+00:00")
             self.assertEqual(automation["stopped_at"], "2026-08-10 10:03:00+00:00")
-            self.assertEqual(automation["title"], "")
         finally:
             engine.dispose()
 

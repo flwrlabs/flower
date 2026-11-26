@@ -963,6 +963,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Store and list one-run automations without a recurrence interval."""
         # Prepare
         request = StartAutomationRequest(
+            title="Daily summary",
             fixed_interval=60,
             max_runs=1,
             start_run_request=StartRunRequest(
@@ -986,7 +987,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertFalse(stored_automation.HasField("fixed_interval"))
         self.assertFalse(listed_automation.HasField("fixed_interval"))
-        self.assertEqual(listed_automation.title, "")
+        self.assertEqual(listed_automation.title, "Daily summary")
 
     def test_start_automation_stores_hub_app_without_fab(self) -> None:
         """Store Hub automations by app ID so dispatch fetches the latest FAB."""
@@ -1061,6 +1062,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
+            agent_id=None,
         )
 
         # Execute
@@ -1091,6 +1094,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             start_run_request=StartRunRequest(user_prompt="Do work"),
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
         )
         legacy_automation = self.state.store_automation(
             federation_id=NOOP_FEDERATION_ID,
@@ -1099,6 +1103,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
+            agent_id=None,
         )
 
         request = ListAutomationsRequest(agent_id=agent.id)
@@ -1143,6 +1149,8 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             series_id=1,
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
+            agent_id=None,
         )
 
         # Execute
@@ -1178,6 +1186,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             start_run_request=StartRunRequest(user_prompt="Do work"),
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
         )
         foreign = self.state.store_automation(
             flwr_aid="other",
@@ -1185,6 +1194,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             start_run_request=StartRunRequest(user_prompt="Private"),
             next_run_at="2026-07-10T09:00:00+00:00",
             max_runs=1,
+            title="Daily summary",
         )
 
         stop_automation(

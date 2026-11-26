@@ -830,6 +830,8 @@ class StateTest(CoreStateTest):
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
+            agent_id=None,
         )
 
         claimed = state.claim_automation(
@@ -2681,6 +2683,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 next_run_at=due_at,
                 max_runs=1,
                 agent_id=agent.id,
+                title="Daily summary",
             )
             barrier = Barrier(2)
 
@@ -2716,6 +2719,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             next_run_at=due_at,
             max_runs=1,
             agent_id=agent.id,
+            title="Daily summary",
         )
         with patch.object(
             state, "store_space_item", side_effect=RuntimeError("failed")

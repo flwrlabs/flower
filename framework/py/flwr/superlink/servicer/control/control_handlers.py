@@ -1246,6 +1246,7 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     try:
         automation = state.store_automation(
             title=request.title,
+            agent_id=None,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=stored_start_run_request,

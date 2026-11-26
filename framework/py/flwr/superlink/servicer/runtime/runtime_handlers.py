@@ -468,6 +468,13 @@ def start_automation(
         )
 
     run = state.get_run(run_ids=[task.run_id])[0]
+    request.title = request.title.strip()
+    if not request.title:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation title must be nonempty.",
+            public_details="The automation title must be nonempty.",
+        )
     if run.space_id is not None:
         if task.type != TaskType.AGENT_APP or run.agent_id is None:
             raise FlowerError(

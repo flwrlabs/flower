@@ -76,7 +76,7 @@ from flwr.supercore.runtime import RuntimeHttpClient
 from flwr.supercore.task_identity import TaskIdentity
 from flwr.supercore.task_process.connector import registry as connector_registry
 from flwr.supercore.task_process.connector.automation import START_AUTOMATION_TOOL_NAME
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_loads
 
 from .files import RuntimeAgentFiles
@@ -680,8 +680,9 @@ def test_space_discovery_failure_does_not_hide_healthy_connections(
     assert "credential-secret" not in caplog.text
 
 
-def test_call_automation_embeds_input_in_control_request() -> None:
-    """Embed model input in the Control request sent to the Runtime API."""
+@pytest.mark.parametrize("title", ["  Daily summary  ", "", "   "])
+def test_call_automation_embeds_input_in_control_request(title: str) -> None:
+    """Embed input and leave title normalization to the Runtime API."""
     # Prepare
     stub = Mock()
     stub.StartAutomation.return_value = StartAutomationResponse()
@@ -699,7 +700,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         events=Mock(),
     )
     arguments: JSONObject = {
-        "title": "  Daily summary  ",
+        "title": title,
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",
         "fixed_interval": 60,
@@ -713,7 +714,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     # Assert
     request = stub.StartAutomation.call_args.args[0]
     assert request == StartAutomationRequest(
-        title="Daily summary",
+        title=title,
         start_at="2026-07-28T12:00:00Z",
         fixed_interval=60,
         max_runs=3,
@@ -731,31 +732,6 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         "function_call_output",
     ]
     assert items[0]["name"] == START_AUTOMATION_TOOL_NAME
-
-
-@pytest.mark.parametrize("title", [None, "", "   ", 123])
-def test_call_automation_rejects_invalid_title(title: JSONValue) -> None:
-    """Reject missing, blank, and non-string titles before creating a schedule."""
-    stub, events = Mock(), Mock()
-    runtime = AgentRuntime(
-        stub=stub,
-        run_id=123,
-        task_id=789,
-        start_run_request=StartRunRequest(),
-        events=events,
-    )
-    arguments: JSONObject = {
-        "input": "Do work",
-        "start_at": "2026-07-28T12:00:00Z",
-    }
-    if title is not None:
-        arguments["title"] = title
-
-    with pytest.raises(ValueError, match="Automation title must be a non-empty string"):
-        runtime.call_automation_with_events(call_id="call-1", arguments=arguments)
-
-    stub.StartAutomation.assert_not_called()
-    assert events.emit.call_args.args[0]["type"] == "function_call_output"
 
 
 def test_space_session_creates_automation() -> None:

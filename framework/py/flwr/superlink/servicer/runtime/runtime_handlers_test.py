@@ -758,7 +758,7 @@ def test_start_agent_automation_from_space_run(backend: str, tmp_path: Path) -> 
     task = Task(run_id=run_id, type=TaskType.AGENT_APP)
 
     request = StartAutomationRequest(
-        title="Daily summary",
+        title="  Daily summary  ",
         start_run_request=StartRunRequest(user_prompt="  Do work  "),
         start_at="2030-07-10T04:00:00-05:00",
         fixed_interval=60,
@@ -781,24 +781,42 @@ def test_start_agent_automation_from_space_run(backend: str, tmp_path: Path) -> 
 
     with pytest.raises(FlowerError) as error:
         runtime_handlers.start_automation(
-            StartAutomationRequest(start_run_request=StartRunRequest()), state, task
+            StartAutomationRequest(title="Daily summary"), state, task
         )
     assert error.value.code == ApiErrorCode.INVALID_AUTOMATION_REQUEST
+    assert "prompt must be nonempty" in str(error.value)
+    for title in ("", "   "):
+        with pytest.raises(FlowerError) as error:
+            runtime_handlers.start_automation(
+                StartAutomationRequest(
+                    title=title,
+                    start_run_request=StartRunRequest(user_prompt="Do work"),
+                ),
+                state,
+                task,
+            )
+        assert error.value.code == ApiErrorCode.INVALID_AUTOMATION_REQUEST
+        assert "title must be nonempty" in str(error.value)
     for invalid in (
         StartAutomationRequest(
-            start_run_request=StartRunRequest(user_prompt="Do work"), max_runs=2
+            title="Daily summary",
+            start_run_request=StartRunRequest(user_prompt="Do work"),
+            max_runs=2,
         ),
         StartAutomationRequest(
+            title="Daily summary",
             start_run_request=StartRunRequest(user_prompt="Do work"),
             start_at="2030-07-10T04:00:00",
         ),
         StartAutomationRequest(
+            title="Daily summary",
             start_run_request=StartRunRequest(user_prompt="Do work"),
             start_at="2030-07-10T09:00:00Z",
             fixed_interval=10**12,
             max_runs=2,
         ),
         StartAutomationRequest(
+            title="Daily summary",
             start_run_request=StartRunRequest(user_prompt="Do work"),
             start_at="2030-07-10T09:00:00Z",
             fixed_interval=150_000_000_000,
@@ -870,6 +888,8 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             series_id=series_id,
             next_run_at=datetime.now(tz=UTC).isoformat(),
             max_runs=1,
+            title="Daily summary",
+            agent_id=None,
         )
 
         with (
@@ -920,6 +940,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             next_run_at=datetime.now(tz=UTC).isoformat(),
             max_runs=1,
             agent_id=agent.id,
+            title="Daily summary",
         )
         with patch.object(runtime_handlers, "process_pending_agent_runs"):
             runtime_handlers.acquire_task(AcquireTaskRequest(), self.state)
@@ -949,6 +970,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             fixed_interval=10**12,
             max_runs=2,
             agent_id=agent.id,
+            title="Daily summary",
         )
         final = self.state.store_automation(
             flwr_aid=NOOP_FLWR_AID,
@@ -957,6 +979,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             fixed_interval=10**12,
             max_runs=1,
             agent_id=agent.id,
+            title="Daily summary",
         )
 
         with patch.object(runtime_handlers, "process_pending_agent_runs"):
@@ -989,6 +1012,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
             next_run_at=datetime.now(tz=UTC).isoformat(),
             max_runs=1,
             agent_id=agent.id,
+            title="Daily summary",
         )
 
         with (
@@ -1042,13 +1066,30 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
         assert task.type == TaskType.SIMULATION
         assert task.fab_hash == "fab-hash"
 
+    def test_start_automation_rejects_empty_title(self) -> None:
+        """Validate titles for both AgentApp and ServerApp callers."""
+        for task_type in (TaskType.AGENT_APP, TaskType.SERVER_APP):
+            for title in ("", "   "):
+                with self.subTest(task_type=task_type, title=title):
+                    with self.assertRaises(FlowerError) as error:
+                        runtime_handlers.start_automation(
+                            StartAutomationRequest(title=title),
+                            self.state,
+                            Task(run_id=self._auth_run_id, type=task_type),
+                        )
+                    self.assertEqual(
+                        error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST
+                    )
+                    self.assertIn("title must be nonempty", str(error.exception))
+
     def test_start_automation_enriches_connector_ids(self) -> None:
         """Enrich connector IDs and delegate automation creation."""
         # Prepare
         request = StartAutomationRequest(
+            title="  Daily summary  ",
             start_run_request=StartRunRequest(
                 connector_ids=[999], connector_refs=["legacy"]
-            )
+            ),
         )
         expected = StartAutomationResponse(automation_id=1)
 
@@ -1069,6 +1110,7 @@ class TestSuperLinkRuntimeHandlers(unittest.TestCase):  # pylint: disable=R0902,
 
         # Assert
         assert response is expected
+        assert request.title == "Daily summary"
         assert list(request.start_run_request.connector_ids) == [42]
         assert not request.start_run_request.connector_refs
         assert start_automation_mock.call_args.args[0] is request
