@@ -619,10 +619,10 @@ def test_pull_task_messages_filters_by_child_task() -> None:
     )
 
 
-def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
+def test_start_automation_tool_exposes_title_input_and_schedule() -> None:
     """Keep the embedded run request out of the model-facing schema."""
     # Prepare
-    expected_properties = {"input", "start_at", "fixed_interval", "max_runs"}
+    expected_properties = {"title", "input", "start_at", "fixed_interval", "max_runs"}
 
     # Execute
     parameters = connector_registry.get_connector_tools(START_AUTOMATION_TOOL_NAME)[0][
@@ -634,7 +634,7 @@ def test_start_automation_tool_exposes_only_input_and_schedule() -> None:
     properties = parameters["properties"]
     assert isinstance(properties, dict)
     assert set(properties) == expected_properties
-    assert parameters["required"] == ["input", "start_at"]
+    assert parameters["required"] == ["title", "input", "start_at"]
 
 
 def test_runtime_connectors_expand_one_connector_into_multiple_tools() -> None:
@@ -680,8 +680,9 @@ def test_space_discovery_failure_does_not_hide_healthy_connections(
     assert "credential-secret" not in caplog.text
 
 
-def test_call_automation_embeds_input_in_control_request() -> None:
-    """Embed model input in the Control request sent to the Runtime API."""
+@pytest.mark.parametrize("title", ["  Daily summary  ", "", "   "])
+def test_call_automation_embeds_input_in_control_request(title: str) -> None:
+    """Embed input and leave title normalization to the Runtime API."""
     # Prepare
     stub = Mock()
     stub.StartAutomation.return_value = StartAutomationResponse()
@@ -699,6 +700,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
         events=Mock(),
     )
     arguments: JSONObject = {
+        "title": title,
         "input": "Do work",
         "start_at": "2026-07-28T12:00:00Z",
         "fixed_interval": 60,
@@ -712,6 +714,7 @@ def test_call_automation_embeds_input_in_control_request() -> None:
     # Assert
     request = stub.StartAutomation.call_args.args[0]
     assert request == StartAutomationRequest(
+        title=title,
         start_at="2026-07-28T12:00:00Z",
         fixed_interval=60,
         max_runs=3,
@@ -748,12 +751,17 @@ def test_space_session_creates_automation() -> None:
         {
             "name": START_AUTOMATION_TOOL_NAME,
             "call_id": "call-1",
-            "arguments": {"input": "Do work", "start_at": "2026-07-28T12:00:00Z"},
+            "arguments": {
+                "title": "Daily summary",
+                "input": "Do work",
+                "start_at": "2026-07-28T12:00:00Z",
+            },
         }
     )
 
     stub.StartAutomation.assert_called_once_with(
         StartAutomationRequest(
+            title="Daily summary",
             start_at="2026-07-28T12:00:00Z",
             start_run_request=StartRunRequest(user_prompt="Do work"),
         )

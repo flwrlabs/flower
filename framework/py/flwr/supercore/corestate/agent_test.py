@@ -215,6 +215,7 @@ def test_delete_agent_stops_activity(
         agent_id=agent.id,
         start_run_request=StartRunRequest(user_prompt="Do work"),
         next_run_at=now().isoformat(),
+        title="Daily summary",
     )
     create_run = partial(
         state.create_run,

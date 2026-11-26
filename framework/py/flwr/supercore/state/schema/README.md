@@ -45,6 +45,7 @@ erDiagram
     BLOB start_run_request "nullable"
     VARCHAR status
     TIMESTAMP stopped_at "nullable"
+    VARCHAR title
     TIMESTAMP updated_at
   }
 

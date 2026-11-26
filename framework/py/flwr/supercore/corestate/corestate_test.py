@@ -936,9 +936,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         next_run_at: str | None = None,
         fixed_interval: int | None = None,
         max_runs: int | None = 1,
+        title: str,
     ) -> Automation:
         """Store a minimal automation."""
         return state.store_automation(
+            title=title,
             federation_id=federation_id,
             flwr_aid=flwr_aid,
             start_run_request=StartRunRequest(
@@ -1314,6 +1316,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         due = self.store_automation(
             state,
+            title="Daily summary",
             series_id=1,
             next_run_at=due_at,
             fixed_interval=60,
@@ -1322,15 +1325,19 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state,
             series_id=2,
             next_run_at=(current + timedelta(seconds=60)).isoformat(),
+            title="Daily summary",
         )
         other = self.store_automation(
             state,
             series_id=3,
             federation_id="@me/fed-b",
             next_run_at=(current - timedelta(seconds=30)).isoformat(),
+            title="Daily summary",
         )
 
         self.assertEqual(due.next_run_at, due_at)
+        self.assertEqual(due.title, "Daily summary")
+        self.assertEqual(future.title, "Daily summary")
 
         listed = state.list_automations(
             federations=["@me/fed-a"], order_by="updated_at"
@@ -1375,6 +1382,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in due_list], [due.automation_id]
         )
         self.assertEqual(due_list[0].remaining_runs, 1)
+        self.assertEqual(due_list[0].title, "Daily summary")
 
         self.assertTrue(state.stop_automation(due.automation_id))
         self.assertFalse(state.stop_automation(due.automation_id))
@@ -1388,6 +1396,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [automation.automation_id for automation in stopped], [due.automation_id]
         )
         self.assertEqual(stopped[0].next_run_at, due_at)
+        self.assertEqual(stopped[0].title, "Daily summary")
 
     def test_advance_and_finish_automation(self) -> None:
         """Automation advance should update records and finish terminally."""
@@ -1403,6 +1412,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=previous_next_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
         )
 
         # Advance the first occurrence and reject the stale due-time claim.
@@ -1458,6 +1468,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state,
             series_id=2,
             next_run_at=failed_previous_next_run_at,
+            title="Daily summary",
         )
         self.assertTrue(
             state.advance_automation(
@@ -1496,6 +1507,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             next_run_at=first_run_at,
             fixed_interval=60,
             max_runs=2,
+            title="Daily summary",
         )
         self.assertIsNone(
             state.claim_automation(
@@ -1543,7 +1555,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         series_id = 123
 
         automation = self.store_automation(
-            state, federation_id="@me/fed-b", series_id=series_id
+            state,
+            federation_id="@me/fed-b",
+            series_id=series_id,
+            title="Daily summary",
         )
 
         self.assertEqual(automation.series_id, series_id)
@@ -1559,6 +1574,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert agent is not None
 
         automation = state.store_automation(
+            title="Daily summary",
             flwr_aid="aid-a",
             start_run_request=StartRunRequest(user_prompt="Do work"),
             next_run_at=now().isoformat(),
@@ -1571,6 +1587,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertEqual(automation.agent_id, agent.id)
         self.assertEqual(stored.agent_id, agent.id)
+        self.assertEqual(stored.title, "Daily summary")
         self.assertEqual((stored.federation, stored.series_id), ("", 0))
         self.assertEqual(
             [
@@ -1605,6 +1622,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             fixed_interval=60,
             max_runs=2,
             agent_id=agent.id,
+            title="Daily summary",
         )
         cursor = state.get_bootstrap("alice").cursor
         self.assertIsNone(
@@ -1677,6 +1695,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 next_run_at=now().isoformat(),
                 max_runs=1,
                 agent_id=agent.id,
+                title="Daily summary",
             )
 
     def test_store_automation_requires_one_owner(self) -> None:
@@ -1702,6 +1721,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                         series_id=series_id,
                         next_run_at=now().isoformat(),
                         agent_id=agent_id,
+                        title="Daily summary",
                     )
 
     def test_create_and_get_task(self) -> None:
