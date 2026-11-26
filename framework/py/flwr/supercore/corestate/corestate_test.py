@@ -1641,9 +1641,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(stored.status, AutomationStatus.COMPLETED)
         self.assertEqual(stored.remaining_runs, 0)
         events = state.get_user_events("alice", cursor)
-        self.assertEqual(
-            [entry.event.type for entry in events], ["message.created"] * 2
-        )
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 2)
         self.assertEqual(
             [entry.event.payload["id"] for entry in events],
             [str(first.id), str(second.id)],
@@ -2854,9 +2852,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         assert first is not None and second is not None and automation is not None
         events = state.get_user_events("bob", cursor)
-        self.assertEqual(
-            [entry.event.type for entry in events], ["message.created"] * 3
-        )
+        self.assertEqual([entry.event.type for entry in events], ["item.created"] * 3)
         self.assertEqual(
             [entry.event.payload["content"] for entry in events],
             ["first", "second", "scheduled"],
@@ -2938,7 +2934,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(item.author, author)
         self.assertEqual(state.get_space_items(space_id, author), [item])
         event = state.get_user_events("alice")[-1].event
-        self.assertEqual(event.type, EventType.MESSAGE_CREATED)
+        self.assertEqual(event.type, EventType.ITEM_CREATED)
         self.assertEqual(event.payload["id"], str(item.id))
         self.assertEqual(event.space_id, str(space_id))
 

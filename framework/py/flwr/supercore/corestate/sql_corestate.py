@@ -1741,7 +1741,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 if model is None:
                     return None
                 item = _space_item_from_model(model)
-                self.store_event(EventType.MESSAGE_CREATED, item, space_id=space_id)
+                self.store_event(EventType.ITEM_CREATED, item, space_id=space_id)
                 return item
         except IntegrityError as exc:
             raise ValueError("Invalid SpaceItem") from exc
