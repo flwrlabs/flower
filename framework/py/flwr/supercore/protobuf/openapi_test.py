@@ -14,22 +14,13 @@
 # ==============================================================================
 """Tests for descriptor-derived protobuf documentation."""
 
-import pytest
-
-from flwr.proto.control_pb2 import CreateFederationRequest  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.supercore.protobuf.openapi import protobuf_message_description
 
 
-def test_reject_unknown_field_notes() -> None:
-    """Fail at registration when field notes refer to a removed or mistyped field."""
-    with pytest.raises(ValueError, match="Unknown fields.*typo"):
-        protobuf_message_description(CreateFederationRequest(), {"typo": "Note"})
-
-
 def test_descriptor_fields_and_nested_type_links() -> None:
     """Include fields missing from the example and link nested protobuf messages."""
-    description = protobuf_message_description(Federation(), {})
+    description = protobuf_message_description(Federation())
     assert "**`nodes`** ([flwr.proto.NodeInfo]" in description
     assert "field 2, repeated presence" in description
     assert "framework/proto/flwr/proto/node.proto" in description

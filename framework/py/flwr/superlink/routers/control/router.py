@@ -632,19 +632,6 @@ def set_federation_icon(
                     description="Federation for simulation experiments",
                     simulation=True,
                 ),
-                {
-                    "federation_name": "Required by the API. Bare federation name, "
-                    "without the namespace prefix. Must start with a letter and "
-                    "contain only letters, digits, and hyphens.",
-                    "description": "Human-readable description. Defaults to an empty "
-                    "string when omitted.",
-                    "simulation": "True for simulation, false for deployment. "
-                    "Defaults to false when omitted.",
-                    "handle": "Optional bare namespace handle (no @). Omission "
-                    "selects the authenticated caller's handle. Explicit values must "
-                    "contain only ASCII letters, digits, hyphens, or underscores. "
-                    "The caller must be authorized to create in that namespace.",
-                },
             )
         }
     },
@@ -659,11 +646,6 @@ def set_federation_icon(
                         member_count=1,
                     )
                 ),
-                {
-                    "federation": "Created federation, including its qualified name "
-                    "(@handle/name), description, members, member count, runtime mode, "
-                    "and caller permissions. Follow the type link for nested fields."
-                },
             )
         }
     },

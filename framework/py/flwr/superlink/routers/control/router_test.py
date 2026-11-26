@@ -106,6 +106,7 @@ from flwr.supercore.auth.typing import (
 )
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
+    MAX_NAME_LENGTH,
     NOOP_FEDERATION_ID,
     DeviceAuthorizationError,
     SpaceItemType,
@@ -463,7 +464,8 @@ def test_create_federation_documents_protobuf_messages() -> None:
 
     assert "flwr.proto.CreateFederationRequest" in request_description
     assert "**`handle`** (string, field 4, explicit presence)" in request_description
-    assert "Omission selects the authenticated caller's handle" in request_description
+    assert f"{MAX_NAME_LENGTH} characters" in request_description
+    assert "authenticated caller's handle" in request_description
     assert "flwr.proto.CreateFederationResponse" in response_description
     assert "flwr.proto.Federation" in response_description
     assert "federation.proto" in response_description

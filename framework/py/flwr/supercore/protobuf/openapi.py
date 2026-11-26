@@ -14,29 +14,25 @@
 # ==============================================================================
 """Readable OpenAPI descriptions for binary protobuf messages."""
 
-from collections.abc import Mapping
-
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.descriptor_pb2 import FieldDescriptorProto  # pylint: disable=E0611
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import Message
 
+from flwr.proto.control_pb2_docs import PROTOBUF_DESCRIPTIONS
 
-def protobuf_message_description(
-    example: Message, field_descriptions: Mapping[str, str]
-) -> str:
-    """Describe a message using its descriptor, field notes, and decoded example."""
+
+def protobuf_message_description(example: Message) -> str:
+    """Describe a protobuf message using its descriptor and source comments."""
     descriptor = example.DESCRIPTOR
-    unknown_fields = field_descriptions.keys() - descriptor.fields_by_name.keys()
-    if unknown_fields:
-        raise ValueError(f"Unknown fields in {descriptor.full_name}: {unknown_fields}")
-
     source_root = "https://github.com/flwrlabs/flower/blob/main/framework/proto/"
     lines = [
         f"Binary protobuf message: `{descriptor.full_name}`.",
         f"[Protobuf definition]({source_root}{descriptor.file.name}).",
         "",
     ]
+    if summary := PROTOBUF_DESCRIPTIONS.get(descriptor.full_name):
+        lines.extend([summary, ""])
     for field in descriptor.fields:
         field_type = FieldDescriptorProto.Type.Name(field.type).removeprefix("TYPE_")
         type_name = field_type.lower()
@@ -55,7 +51,7 @@ def protobuf_message_description(
             presence = "repeated"
         elif field.has_presence:
             presence = "explicit"
-        note = field_descriptions.get(field.name, "")
+        note = PROTOBUF_DESCRIPTIONS.get(field.full_name, "")
         lines.append(
             f"- **`{field.name}`** ({type_name}, field {field.number}, "
             f"{presence} presence): {note}"
