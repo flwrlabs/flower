@@ -51,7 +51,7 @@ msgstr "更新日志"
 #: ../../source/changelog/v1.45.0.md:2
 #, fuzzy
 msgid "v1.45.0 (2026-11-25)"
-msgstr "v1.4.0 (2023-04-21)"
+msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
 #: ../../source/changelog/v1.10.0.md:4 ../../source/changelog/v1.11.0.md:4
@@ -119,11 +119,6 @@ msgid ""
 "Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Laasya priya "
 "Bhadri`, `Mohammad Naseri`"
 msgstr ""
-"`Adam Narozniak`, `Anass Anhari`, `Charles Beauville`, `Dana-Farber`, "
-"`Daniel J. Beutel`, `Daniel Nata Nugraha`, `Edoardo Gabrielli`, `Gustavo "
-"Bertoli`, `Heng Pan`, `Javier`, `Mahdi`, `Steven Hé (Sīchàng)`, `Taner "
-"Topal`, `achiverram28`, `danielnugraha`, `eunchung`, `ruthgal` <!---"
-"TOKEN_v1.5.0-->"
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
 #: ../../source/changelog/v0.15.0.md:4 ../../source/changelog/v0.16.0.md:4
@@ -191,12 +186,6 @@ msgid ""
 "[#8612](https://github.com/flwrlabs/flower/pull/8612), "
 "[#8614](https://github.com/flwrlabs/flower/pull/8614))"
 msgstr ""
-"**普通改进**（[#1872](https://github.com/adap/flower/pull/1872), "
-"[#1866](https://github.com/adap/flower/pull/1866), "
-"[#1884](https://github.com/adap/flower/pull/1884), "
-"[#1837](https://github.com/adap/flower/pull/1837), "
-"[#1477](https://github.com/adap/flower/pull/1477), "
-"[#2171](https://github.com/adap/flower/pull/2171))"
 
 #: ../../source/changelog/v1.45.0.md:14
 msgid ""
@@ -211,8 +200,6 @@ msgid ""
 "**Apply differential privacy operations only to floating-point arrays** "
 "([#8381](https://github.com/flwrlabs/flower/pull/8381))"
 msgstr ""
-"**使用 Opacus 和 PyTorch 的新差分隐私示例** "
-"([#805](https://github.com/adap/flower/pull/805))"
 
 #: ../../source/changelog/v1.45.0.md:18
 msgid ""
@@ -241,19 +228,6 @@ msgid ""
 "[#8613](https://github.com/flwrlabs/flower/pull/8613), "
 "[#8621](https://github.com/flwrlabs/flower/pull/8621))"
 msgstr ""
-"**普通改进** ([#1491](https://github.com/adap/flower/pull/1491), "
-"[#1504](https://github.com/adap/flower/pull/1504), "
-"[#1506](https://github.com/adap/flower/pull/1506), "
-"[#1514](https://github.com/adap/flower/pull/1514), "
-"[#1522](https://github.com/adap/flower/pull/1522), "
-"[#1523](https://github.com/adap/flower/pull/1523), "
-"[#1526](https://github. com/adap/flower/pull/1526), "
-"[#1528](https://github.com/adap/flower/pull/1528), "
-"[#1547](https://github.com/adap/flower/pull/1547), "
-"[#1549](https://github.com/adap/flower/pull/1549), "
-"[#1560](https://github.com/adap/flower/pull/1560), "
-"[#1564](https://github.com/adap/flower/pull/1564), "
-"[#1566](https://github.com/adap/flower/pull/1566))"
 
 #: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
 #: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
@@ -37183,8 +37157,6 @@ msgid ""
 ":py:obj:`get_items <flwr.agentapp.AgentSpace.get_items>`\\ \\(\\*\\[\\, "
 "limit\\, before\\_id\\, after\\_id\\, ...\\]\\)"
 msgstr ""
-":py:obj:`Metadata <flwr.common.Metadata>`\\ \\(run\\_id\\, "
-"message\\_id\\, src\\_node\\_id\\, ...\\)"
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace.get_items:1 of
@@ -37206,7 +37178,7 @@ msgstr ""
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`send_item <flwr.agentapp.AgentSpace.send_item>`\\ \\(content\\)"
-msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
+msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace.send_item:1 of
@@ -90604,13 +90576,6 @@ msgstr ""
 #~ msgid ""
 #~ ":py:obj:`tools <flwr.agentapp.AgentConnectors.tools>`\\ "
 #~ "\\(names\\, \\*\\[\\, refresh\\]\\)"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Messages in ascending ID order, with "
-#~ "id, space_id, author, created_at, and "
-#~ "content. Author contains either flwr_aid "
-#~ "or agent_id."
 #~ msgstr ""
 
 #~ msgid "Read and publish messages in the authenticated agent's Space."

@@ -94268,13 +94268,6 @@ msgstr ""
 #~ "\\(names\\, \\*\\[\\, refresh\\]\\)"
 #~ msgstr ""
 
-#~ msgid ""
-#~ "Messages in ascending ID order, with "
-#~ "id, space_id, author, created_at, and "
-#~ "content. Author contains either flwr_aid "
-#~ "or agent_id."
-#~ msgstr ""
-
 #~ msgid "Read and publish messages in the authenticated agent's Space."
 #~ msgstr ""
 
