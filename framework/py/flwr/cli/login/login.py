@@ -100,7 +100,9 @@ def login(
             raise click.ClickException(f"Login failed: {e.message}") from None
 
         if details.supports_cli_signup:
-            complete_signup(superlink_connection, credentials.access_token)
+            credentials = complete_signup(
+                superlink_connection, credentials, control_client
+            )
 
         # Store the tokens
         authn_plugin.store_tokens(credentials)
