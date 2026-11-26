@@ -2108,6 +2108,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         fixed_interval: int | None = None,
         max_runs: int | None = None,
         agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata."""
         if not (
@@ -2123,6 +2124,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         stmt = (
             insert(AutomationModel)
             .values(
+                title=title,
                 federation_id=federation_id,
                 status=AutomationStatus.ACTIVE,
                 series_id=series_id,
@@ -3301,6 +3303,7 @@ def _automation_from_model(model: AutomationModel) -> Automation:
     """Convert an automation model to its proto representation."""
     return Automation(
         automation_id=model.automation_id,
+        title=model.title,
         status=model.status,
         federation=model.federation_id or "",
         series_id=model.series_id or 0,

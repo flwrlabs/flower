@@ -1158,6 +1158,7 @@ class CoreState(ABC):  # pylint: disable=R0904
         fixed_interval: int | None = None,
         max_runs: int | None = None,
         agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata.
 
@@ -1183,6 +1184,8 @@ class CoreState(ABC):  # pylint: disable=R0904
             persisted `remaining_runs` counter.
         agent_id : int | None (default: None)
             Agent associated with the automation, if any.
+        title : str
+            Human-readable title describing the automation.
 
         Returns
         -------

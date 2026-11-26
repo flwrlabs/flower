@@ -650,7 +650,7 @@ class TestAlembicRun(unittest.TestCase):
                     },
                 )
 
-            self.upgrade_to_revision(engine, "heads")
+            self.upgrade_to_revision(engine, "7208a0cbdcd7")
 
             with engine.connect() as connection:
                 automation = (

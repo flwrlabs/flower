@@ -1614,6 +1614,7 @@ class InMemoryCoreState(
         fixed_interval: int | None = None,
         max_runs: int | None = None,
         agent_id: int | None = None,
+        title: str,
     ) -> Automation:
         """Store an automation and return its metadata."""
         if not (
@@ -1633,6 +1634,7 @@ class InMemoryCoreState(
             self._next_automation_id += 1
             automation = Automation(
                 automation_id=automation_id,
+                title=title,
                 status=AutomationStatus.ACTIVE,
                 federation=federation_id or "",
                 series_id=series_id or 0,
