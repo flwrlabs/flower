@@ -1765,10 +1765,7 @@ class InMemoryCoreState(
                 # Apply agent and federation filters.
                 if (
                     agent_ids is not None
-                    and (
-                        not automation.HasField("agent_id")
-                        or automation.agent_id not in agent_ids
-                    )
+                    and automation.agent_id not in agent_ids
                 ) or (
                     federation_set is not None
                     and automation.federation not in federation_set
