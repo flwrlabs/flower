@@ -930,7 +930,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Normalize the start time and preserve a recurring interval."""
         # Prepare
         request = StartAutomationRequest(
-            title="Daily summary",
+            title="  Daily summary  ",
             start_at="2026-07-10T04:00:00-05:00",
             fixed_interval=60,
             max_runs=3,
@@ -958,6 +958,30 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             ),
             (response.series_id, "2026-07-10T09:00:00+00:00", 60, 3),
         )
+
+    def test_start_automation_rejects_empty_title(self) -> None:
+        """Reject empty and whitespace-only titles without storing an automation."""
+        for title in ("", " \t\n "):
+            with self.subTest(title=title):
+                request = StartAutomationRequest(
+                    title=title,
+                    start_run_request=StartRunRequest(
+                        federation=NOOP_FEDERATION_ID,
+                        series_id=1,
+                    ),
+                )
+                with self.assertRaises(FlowerError) as error:
+                    start_automation(request, self.account, self.state)
+
+                self.assertEqual(
+                    error.exception.code, ApiErrorCode.INVALID_AUTOMATION_REQUEST
+                )
+                self.assertEqual(
+                    error.exception.public_details,
+                    "The automation title must be nonempty.",
+                )
+
+        self.assertEqual(self.state.list_automations(order_by="updated_at"), [])
 
     def test_start_automation_omits_interval_for_one_run(self) -> None:
         """Store and list one-run automations without a recurrence interval."""
@@ -1001,10 +1025,11 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
             is_hub_app=True,
         )
         request = StartAutomationRequest(
+            title="Daily summary",
             start_run_request=StartRunRequest(
                 federation=NOOP_FEDERATION_ID,
                 series_id=1,
-            )
+            ),
         )
         request.start_run_request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.start_run_request.fab.content = fab_content
@@ -1036,6 +1061,7 @@ class TestControlHandlers(unittest.TestCase):  # pylint: disable=R0904
         """Reject a start time without timezone information."""
         # Prepare
         request = StartAutomationRequest(
+            title="Daily summary",
             start_at="2026-07-10T09:00:00",
             start_run_request=StartRunRequest(series_id=1),
         )

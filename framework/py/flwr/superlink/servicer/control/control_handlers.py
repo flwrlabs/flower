@@ -1150,6 +1150,14 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     state: LinkState,
 ) -> StartAutomationResponse:
     """Create automation."""
+    request.title = request.title.strip()
+    if not request.title:
+        raise FlowerError(
+            ApiErrorCode.INVALID_AUTOMATION_REQUEST,
+            "Automation title must be nonempty.",
+            public_details="The automation title must be nonempty.",
+        )
+
     # Validate the run series shared by all runs in this automation.
     start_run_request = request.start_run_request
     if not start_run_request.HasField("series_id"):
