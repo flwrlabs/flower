@@ -61,25 +61,14 @@ If you're familiar with how contributing on GitHub works, you can directly check
 
        This will create a ``flower/`` (or the name of your fork if you renamed it)
        folder in the current working directory.
-4. **Add origin**
-       You can then go into the repository folder:
+4. **Enter the cloned repository**
+       Change into the repository folder, using your fork's name if you renamed it:
 
        .. code-block:: shell
 
            $ cd flower
 
-       And here we will need to add an origin to our repository. The origin is the
-       \<URL\> of the remote fork repository. To obtain it, we can do as previously
-       mentioned by going to our fork repository on our GitHub account and copying the
-       link.
-
-       .. image:: _static/cloning_fork.png
-
-       Once the \<URL\> is copied, we can type the following command in our terminal:
-
-       .. code-block:: shell
-
-           $ git remote add origin <URL>
+       ``git clone`` has already configured ``origin`` to point to your fork.
 5. **Add upstream**
        Now we will add an upstream address to our repository. Still in the same
        directory, we must run the following command:
