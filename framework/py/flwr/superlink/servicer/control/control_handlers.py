@@ -1412,7 +1412,7 @@ def list_automations(
         if request.federation:
             raise FlowerError(
                 ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-                "Specify either an agent or a federation.",
+                public_details="Specify either an agent or a federation.",
             )
         if state.get_agent(flwr_aid, request.agent_id) is None:
             raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
