@@ -438,7 +438,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | ProtoRun | Task,
+        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
