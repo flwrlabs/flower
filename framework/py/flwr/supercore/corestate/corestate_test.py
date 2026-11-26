@@ -1590,6 +1590,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             max_runs=2,
             agent_id=agent.id,
         )
+        cursor = state.get_bootstrap("alice").cursor
         self.assertIsNone(
             state.claim_agent_automation(
                 automation.automation_id,
@@ -1639,6 +1640,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )[0]
         self.assertEqual(stored.status, AutomationStatus.COMPLETED)
         self.assertEqual(stored.remaining_runs, 0)
+        events = state.get_user_events("alice", cursor)
+        self.assertEqual(
+            [entry.event.type for entry in events], ["message.created"] * 2
+        )
+        self.assertEqual(
+            [entry.event.payload["id"] for entry in events],
+            [str(first.id), str(second.id)],
+        )
 
     def test_agent_automation_requires_prompt(self) -> None:
         """Reject agent automations that cannot produce an item."""

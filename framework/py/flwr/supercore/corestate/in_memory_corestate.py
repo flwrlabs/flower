@@ -1712,6 +1712,7 @@ class InMemoryCoreState(
                 next_run_at=next_run_at,
             ):
                 return None
+            self.store_event(EventType.MESSAGE_CREATED, item, space_id=space_id)
             self.space_item_store[space_id].append(item)
             self.space_item_id_counter = item.id
             if (
