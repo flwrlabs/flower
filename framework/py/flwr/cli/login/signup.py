@@ -23,15 +23,25 @@ import typer
 
 from flwr.cli.config_utils import load_certificate_in_connection
 from flwr.cli.typing import SuperLinkConnection
-from flwr.cli.utils import prompt_text
+from flwr.cli.utils import (
+    flwr_cli_exc_handler,
+    prompt_text,
+    refresh_account_auth_tokens,
+)
+from flwr.supercore.auth.typing import AccountAuthCredentials
+from flwr.supercore.control import ControlHttpClient
 
 _INVALID_RESPONSE = (
     "SuperLink returned an invalid signup response. Run flwr login again."
 )
 
 
-def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
-    """Check signup status and prompt for a handle when the account needs one."""
+def complete_signup(
+    connection: SuperLinkConnection,
+    credentials: AccountAuthCredentials,
+    control_client: ControlHttpClient,
+) -> AccountAuthCredentials:
+    """Return the current credentials after checking or completing handle signup."""
     try:
         origin = httpx.URL(f"https://{connection.address or ''}")
     except httpx.InvalidURL:
@@ -52,10 +62,28 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
         with httpx.Client(
             verify=verify,
             follow_redirects=False,
-            headers={"Authorization": f"Bearer {access_token}"},
         ) as client:
-            if _read_handle(client.get(handle_url)) is not None:
-                return
+
+            def send_with_refresh(request: httpx.Request) -> httpx.Response:
+                nonlocal credentials
+                request.headers["Authorization"] = f"Bearer {credentials.access_token}"
+                response = client.send(request)
+                if (
+                    response.status_code != httpx.codes.UNAUTHORIZED
+                    or response.headers.get("WWW-Authenticate") != "Bearer"
+                ):
+                    return response
+
+                with flwr_cli_exc_handler():
+                    credentials = refresh_account_auth_tokens(
+                        control_client, credentials.refresh_token
+                    )
+                request.headers["Authorization"] = f"Bearer {credentials.access_token}"
+                return client.send(request)
+
+            response = send_with_refresh(client.build_request("GET", handle_url))
+            if _read_handle(response) is not None:
+                return credentials
 
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
                 raise click.ClickException(
@@ -65,7 +93,9 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
 
             while True:
                 handle = prompt_text("Choose a handle for your Flower account")
-                response = client.post(signup_url, json={"handle": handle})
+                response = send_with_refresh(
+                    client.build_request("POST", signup_url, json={"handle": handle})
+                )
                 if response.status_code == httpx.codes.CONFLICT:
                     typer.echo(
                         "That handle is already in use. Choose another.", err=True
@@ -76,7 +106,7 @@ def complete_signup(connection: SuperLinkConnection, access_token: str) -> None:
                     continue
                 if _read_handle(response) is None:
                     raise click.ClickException(_INVALID_RESPONSE)
-                return
+                return credentials
     except httpx.RequestError:
         raise click.ClickException(
             "Could not reach SuperLink to complete signup. Run flwr login again."

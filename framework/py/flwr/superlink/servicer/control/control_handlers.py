@@ -1154,7 +1154,7 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
     if not request.title:
         raise FlowerError(
             ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-            message="Automation title must be nonempty.",
+            "Automation title must be nonempty.",
             public_details="The automation title must be nonempty.",
         )
 
