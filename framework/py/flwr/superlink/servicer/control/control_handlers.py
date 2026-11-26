@@ -1410,9 +1410,9 @@ def list_automations(
     flwr_aid = account.user_id
     if request.HasField("agent_id"):
         if request.federation:
+            reason = "Specify either an agent or a federation."
             raise FlowerError(
-                ApiErrorCode.INVALID_AUTOMATION_REQUEST,
-                public_details="Specify either an agent or a federation.",
+                ApiErrorCode.INVALID_AUTOMATION_REQUEST, reason, public_details=reason
             )
         if state.get_agent(flwr_aid, request.agent_id) is None:
             raise FlowerError(ApiErrorCode.AGENT_NOT_FOUND, "Agent not found.")
