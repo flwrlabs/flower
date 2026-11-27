@@ -1596,14 +1596,14 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             raise ValueError("Invalid space participants") from exc
 
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """Return participating spaces with their latest user message, newest first."""
+        """List participating spaces newest first, including their latest message."""
         viewer = SpaceParticipantTable.alias("viewer")
-        latest_user_message = (
+        # Summarize the same message items shown in the chat, regardless of author.
+        latest_message = (
             select(SpaceItemModel.content)
             .where(
                 SpaceItemModel.space_id == SpaceModel.id,
                 SpaceItemModel.type == SpaceItemType.MESSAGE.value,
-                SpaceItemModel.flwr_aid.is_not(None),
             )
             .order_by(SpaceItemModel.id.desc())
             .limit(1)
@@ -1613,7 +1613,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         query = (
             select(
                 SpaceModel,
-                latest_user_message,
+                latest_message,
                 SpaceParticipantTable.c.flwr_aid,
                 SpaceParticipantTable.c.agent_id,
             )
@@ -1634,12 +1634,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         )
         with self.session() as session:
             spaces: dict[UUID, Space] = {}
-            for model, prompt, member_flwr_aid, member_agent_id in session.execute(
+            for model, message, member_flwr_aid, member_agent_id in session.execute(
                 query
             ):
                 if model.id not in spaces:
                     spaces[model.id] = _space_from_model(model)
-                    spaces[model.id].latest_user_message = prompt or ""
+                    spaces[model.id].latest_message = message or ""
                 space = spaces[model.id]
                 if member_flwr_aid is not None:
                     space.participants.add(flwr_aid=member_flwr_aid)
