@@ -98,8 +98,14 @@ def test_login_uses_control_http_client() -> None:
     [
         ([(200, "alice")], None, None),
         (
-            [(200, None), (409, None), (422, None), (200, "alice")],
-            "taken\ninvalid!\nalice\n",
+            [
+                (200, None),
+                (409, None),
+                (422, "Use at least five characters."),
+                (422, None),
+                (200, "alice"),
+            ],
+            "taken\ncsng\ninvalid!\nalice\n",
             None,
         ),
         ([(200, None)], None, "interactive terminal"),
@@ -155,13 +161,13 @@ def test_login_completes_advertised_signup(
         auth_plugin.store_tokens.assert_not_called()
         payload = json.loads(request.content) if request.content else None
         requests.append((request.method, payload))
-        status, handle = next(expected_responses)
+        status, value = next(expected_responses)
         headers = {"Location": "https://other.example/v1/user/signup"}
         if status == 401:
             headers["WWW-Authenticate"] = "Bearer"
         return httpx.Response(
             status,
-            json={"handle": handle},
+            json={"detail": value} if status == 422 else {"handle": value},
             headers=headers,
         )
 
@@ -201,6 +207,11 @@ def test_login_completes_advertised_signup(
         )
     else:
         control_client.RefreshAuthTokens.assert_not_called()
+    assert all(
+        (detail or "That handle is invalid. Choose another.") in result.output
+        for status, detail in replies
+        if status == 422
+    )
     assert requests == expected_requests
     if expected_error:
         assert result.exit_code == 1
