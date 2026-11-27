@@ -610,7 +610,9 @@ global___ListRunsResponse = ListRunsResponse
 
 @typing.final
 class BootstrapRequest(google.protobuf.message.Message):
-    """Agents, Spaces and active runs. Item history is fetched through GetSpaceItems."""
+    """Agents, Spaces and active runs. Item history is fetched through
+    GetSpaceItems.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

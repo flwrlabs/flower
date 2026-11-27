@@ -81,11 +81,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
-    CreateSpaceResponse,
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    ListSpacesRequest,
-    ListSpacesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
     SpaceItem,

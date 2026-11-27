@@ -21,7 +21,7 @@ from unittest.mock import Mock, call, patch
 import httpx
 import pytest
 
-from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentFiles, AgentSpace
+from flwr.agentapp import RUN_SUMMARY_EVENT_TYPES, AgentFiles
 from flwr.common.serde import user_config_to_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Agent,
