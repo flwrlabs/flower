@@ -32,7 +32,7 @@ from flwr.supercore.auth.typing import AccountAuthLoginDetails
 from ..config_migration import migrate, warn_if_federation_config_overrides
 from ..flower_config import read_superlink_connection
 from ..utils import flwr_cli_exc_handler, load_cli_auth_plugin_from_connection
-from .signup import complete_signup
+from .signup import complete_signup, wait_for_web_signup
 
 
 def login(
@@ -92,6 +92,7 @@ def login(
             verification_uri=login_response.verification_uri,
             user_code=login_response.user_code,
             supports_cli_signup=login_response.supports_cli_signup,
+            web_signup_url=login_response.web_signup_url,
         )
         try:
             with flwr_cli_exc_handler():
@@ -99,13 +100,22 @@ def login(
         except LoginError as e:
             raise click.ClickException(f"Login failed: {e.message}") from None
 
-        if details.supports_cli_signup:
-            credentials = complete_signup(
-                superlink_connection, credentials, control_client
+        if details.web_signup_url:
+            authn_plugin.store_tokens(credentials)
+            wait_for_web_signup(
+                superlink_connection,
+                credentials,
+                control_client,
+                details.web_signup_url,
+                authn_plugin.store_tokens,
             )
+        else:
+            if details.supports_cli_signup:
+                credentials = complete_signup(
+                    superlink_connection, credentials, control_client
+                )
+            authn_plugin.store_tokens(credentials)
 
-        # Store the tokens
-        authn_plugin.store_tokens(credentials)
         typer.secho(
             "✅ Login successful.",
             fg=typer.colors.GREEN,

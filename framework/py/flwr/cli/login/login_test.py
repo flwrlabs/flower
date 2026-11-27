@@ -16,13 +16,14 @@
 
 import json
 from functools import partial
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import httpx
 import pytest
 from typer.testing import CliRunner
 
 from flwr.cli.app import app
+from flwr.cli.login.signup import _valid_web_signup_url
 from flwr.cli.typing import SuperLinkConnection
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsResponse,
@@ -70,6 +71,7 @@ def test_login_uses_control_http_client() -> None:
         ),
         patch("flwr.cli.login.login.typer.secho"),
         patch("flwr.cli.login.login.complete_signup") as signup,
+        patch("flwr.cli.login.login.wait_for_web_signup") as web_signup,
     ):
         result = CliRunner().invoke(app, ["login", "remote"])
 
@@ -91,6 +93,7 @@ def test_login_uses_control_http_client() -> None:
     auth_plugin.store_tokens.assert_called_once_with(credentials)
     client.close.assert_called_once_with()
     signup.assert_not_called()
+    web_signup.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -212,3 +215,122 @@ def test_login_completes_advertised_signup(
         auth_plugin.store_tokens.assert_called_once_with(
             refreshed if retry_at is not None else credentials
         )
+
+
+@pytest.mark.parametrize(
+    ("replies", "timeout", "expected_output"),
+    [
+        ([True], 300, "Login successful"),
+        ([False, 401, True], 300, "Login successful"),
+        ([False, 401, None], 300, "Stopped waiting for signup"),
+        ([False], 0, "Timed out waiting for signup"),
+        ([307], 300, "HTTP 307"),
+        (["false"], 300, "invalid signup response"),
+    ],
+)
+def test_login_waits_for_advertised_browser_signup(
+    replies: list[bool | int | str | None], timeout: int, expected_output: str
+) -> None:
+    """Use the SuperLink for status checks and save tokens before waiting."""
+    web_signup_url = "https://signup.example/start"
+    connection = SuperLinkConnection(name="remote", address="control.example:8443")
+    credentials = AccountAuthCredentials("access-token", "refresh-token")
+    refreshed = AccountAuthCredentials("new-access-token", "new-refresh-token")
+    control_client = Mock()
+    control_client.GetLoginDetails.return_value = GetLoginDetailsResponse(
+        authn_type="oidc", web_signup_url=web_signup_url
+    )
+    control_client.RefreshAuthTokens.return_value = RefreshAuthTokensResponse(
+        access_token=refreshed.access_token, refresh_token=refreshed.refresh_token
+    )
+    auth_plugin = Mock()
+    auth_plugin.login.return_value = credentials
+    remaining_replies = iter(replies)
+    scanned: list[bool | int | str | None] = []
+
+    def send(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url == "https://control.example:8443/v1/user/signup/status"
+        expected = refreshed if 401 in scanned else credentials
+        assert auth_plugin.store_tokens.call_args == call(expected)
+        assert request.headers["Authorization"] == f"Bearer {expected.access_token}"
+        reply = next(remaining_replies)
+        scanned.append(reply)
+        if reply is None:
+            raise KeyboardInterrupt
+        if reply == 401:
+            return httpx.Response(401, headers={"WWW-Authenticate": "Bearer"})
+        if reply == 307:
+            return httpx.Response(307, headers={"Location": web_signup_url})
+        return httpx.Response(200, json={"complete": reply})
+
+    with (
+        patch("flwr.cli.app.warn_if_flwr_update_available"),
+        patch("flwr.cli.login.login.migrate"),
+        patch(
+            "flwr.cli.login.login.read_superlink_connection", return_value=connection
+        ),
+        patch(
+            "flwr.cli.login.login.init_http_client_from_connection",
+            return_value=control_client,
+        ),
+        patch(
+            "flwr.cli.login.login.load_cli_auth_plugin_from_connection",
+            return_value=auth_plugin,
+        ),
+        patch(
+            "flwr.cli.login.signup.httpx.Client",
+            side_effect=partial(httpx.Client, transport=httpx.MockTransport(send)),
+        ),
+        patch("flwr.cli.login.signup.webbrowser.open", return_value=False) as open_url,
+        patch("flwr.cli.login.signup.time.sleep"),
+        patch("flwr.cli.login.signup._SIGNUP_TIMEOUT", timeout),
+    ):
+        result = CliRunner().invoke(app, ["login", "remote"])
+
+    assert scanned == replies
+    assert expected_output in result.output
+    success = expected_output == "Login successful"
+    assert result.exit_code == (0 if success else 1)
+    assert ("Login successful" in result.output) == success
+    if replies[0] is False:
+        assert "Device approved" in result.output
+        assert "using the same sign-in" in result.output
+        assert web_signup_url in result.output
+        open_url.assert_called_once_with(web_signup_url)
+        if not success:
+            assert "Finish signup in your browser" in result.output
+    else:
+        open_url.assert_not_called()
+
+    if 401 in replies:
+        control_client.RefreshAuthTokens.assert_called_once_with(
+            RefreshAuthTokensRequest(refresh_token=credentials.refresh_token)
+        )
+        assert auth_plugin.store_tokens.call_args_list == [
+            call(credentials),
+            call(refreshed),
+        ]
+    else:
+        control_client.RefreshAuthTokens.assert_not_called()
+        auth_plugin.store_tokens.assert_called_once_with(credentials)
+
+
+@pytest.mark.parametrize(
+    ("url", "valid"),
+    [
+        ("https://signup.example/start", True),
+        ("http://localhost:3000/start", True),
+        ("http://127.0.0.1:3000/start", True),
+        ("http://[::1]:3000/start", True),
+        ("http://signup.example/start", False),
+        ("http://localhost.signup.example/start", False),
+        ("https://user:password@signup.example/start", False),
+        ("http://signup.example\\@localhost/start", False),
+        ("https://signup.example/\nstart", False),
+        ("file:///start", False),
+    ],
+)
+def test_web_signup_url_requires_https_or_loopback(url: str, valid: bool) -> None:
+    """Accept web signup links with a supported scheme and no user info."""
+    assert _valid_web_signup_url(url) is valid
