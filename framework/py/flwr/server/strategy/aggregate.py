@@ -226,10 +226,20 @@ def aggregate_qffl(
     parameters: NDArrays, deltas: list[NDArrays], hs_fll: list[NDArrays]
 ) -> NDArrays:
     """Compute weighted average based on Q-FFL paper."""
-    demominator: float = np.sum(np.asarray(hs_fll))
+    denominator: float = np.sum(np.asarray(hs_fll))
+
+    # Guard against a zero denominator: when every client's h value is zero their
+    # sum is zero, and dividing by it would return NaN updates as the new global
+    # model instead of failing the round.
+    if denominator == 0:
+        raise ValueError(
+            "aggregate_qffl() requires the sum of h values (hs_fll) to be greater "
+            "than zero"
+        )
+
     scaled_deltas = []
     for client_delta in deltas:
-        scaled_deltas.append([layer * 1.0 / demominator for layer in client_delta])
+        scaled_deltas.append([layer * 1.0 / denominator for layer in client_delta])
     updates = []
     for i in range(len(deltas[0])):
         tmp = scaled_deltas[0][i]
