@@ -71,6 +71,27 @@ def generate_ca() -> tuple[rsa.RSAPrivateKey, x509.Certificate]:
             + datetime.timedelta(days=VALIDITY_DAYS)
         )
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        # Strict X.509 verification (e.g. Python 3.13's default SSL context) requires a
+        # CA to carry key usage and a subject key identifier, and the certificates it
+        # signs to carry an authority key identifier.
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
+            critical=False,
+        )
         .sign(private_key, hashes.SHA256())
     )
 
@@ -113,6 +134,14 @@ def generate_server_cert(
         )
         .add_extension(
             x509.SubjectAlternativeName(alt_names),
+            critical=False,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
             critical=False,
         )
         .sign(ca_key, hashes.SHA256())
