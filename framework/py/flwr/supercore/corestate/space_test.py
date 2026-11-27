@@ -74,14 +74,14 @@ def test_create_and_list_spaces(state: CoreState) -> None:
     )
 
 
-def test_latest_user_message(state: CoreState) -> None:
-    """Summarize each space's newest user message item without consuming history."""
+def test_latest_message(state: CoreState) -> None:
+    """Summarize each space's newest message item without consuming history."""
     agent = state.create_agent(
         "alice", AgentConfig(name="Agent", app_spec="@flower/research")
     )
     assert agent is not None
     personal = state.get_spaces("alice")[0]
-    assert personal.latest_user_message == ""
+    assert personal.latest_message == ""
     alice = SpaceParticipant(flwr_aid="alice")
     bob = SpaceParticipant(flwr_aid="bob")
     author = SpaceParticipant(agent_id=agent.id)
@@ -91,53 +91,38 @@ def test_latest_user_message(state: CoreState) -> None:
     shared = state.create_space(participants=[alice, bob, author])
     space_id = UUID(shared.id)
     state.create_space_message(space_id, alice, "Legacy prompt")
-    assert state.get_spaces("bob")[0].latest_user_message == ""
+    assert state.get_spaces("bob")[0].latest_message == ""
     first = state.store_space_item(
         space_id, SpaceItemType.MESSAGE, "First prompt", alice
     )
     previous = state.get_spaces("bob")[0]
     prompt = "  Follow up: €100.\nNext line.  "
     latest = state.store_space_item(space_id, SpaceItemType.MESSAGE, prompt, bob)
-    automation = state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
     reply = state.store_space_item(
         space_id, SpaceItemType.MESSAGE, "Agent reply", author
     )
+    assert state.get_spaces("bob")[0].latest_message == "Agent reply"
+    automation = state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
+    assert state.get_spaces("bob")[0].latest_message == "Agent reply"
+    follow_up = state.store_space_item(space_id, SpaceItemType.MESSAGE, prompt, bob)
+    snapshot = state.get_bootstrap("bob")
+    restored = type(snapshot).FromString(snapshot.SerializeToString())
+    assert restored.spaces[0].latest_message == prompt
     other = state.create_space(participants=[alice])
     state.store_space_item(UUID(other.id), SpaceItemType.MESSAGE, "Other space", alice)
-    assert {
-        space.id: space.latest_user_message for space in state.get_spaces("alice")
-    } == {personal.id: "", shared.id: prompt, other.id: "Other space"}
-    assert previous.latest_user_message == "First prompt"
+    assert {space.id: space.latest_message for space in state.get_spaces("alice")} == {
+        personal.id: "Agent-only space",
+        shared.id: prompt,
+        other.id: "Other space",
+    }
+    assert previous.latest_message == "First prompt"
     assert state.get_space_items(space_id, alice, unread_only=True) == [
         first,
         latest,
-        automation,
         reply,
+        automation,
+        follow_up,
     ]
-
-
-def test_latest_agent_message(state: CoreState) -> None:
-    """Bootstrap retains the latest reply when a newer user prompt arrives."""
-    agent = state.create_agent(
-        "alice", AgentConfig(name="Agent", app_spec="@flower/research")
-    )
-    assert agent is not None
-    space = state.get_spaces("alice")[0]
-    assert space.latest_agent_message == ""
-    space_id = UUID(space.id)
-    author = SpaceParticipant(agent_id=agent.id)
-    state.create_space_message(space_id, author, "First reply")
-    state.create_space_message(space_id, author, "Latest reply")
-    state.store_space_item(
-        space_id,
-        SpaceItemType.MESSAGE,
-        "Next prompt",
-        SpaceParticipant(flwr_aid="alice"),
-    )
-    snapshot = state.get_bootstrap("alice")
-    restored = type(snapshot).FromString(snapshot.SerializeToString())
-    assert restored.spaces[0].latest_agent_message == "Latest reply"
-    assert restored.spaces[0].latest_user_message == "Next prompt"
 
 
 def test_participation_controls_message_access(state: CoreState) -> None:

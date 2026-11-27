@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/space.proto\x12\nflwr.proto\"I\n\x10SpaceParticipant\x12\x12\n\x08\x66lwr_aid\x18\x01 \x01(\tH\x00\x12\x12\n\x08\x61gent_id\x18\x02 \x01(\x04H\x00\x42\r\n\x0bparticipant\"\xa5\x01\n\x05Space\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x12\n\ncreated_at\x18\x03 \x01(\t\x12\x32\n\x0cparticipants\x18\x04 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x1b\n\x13latest_user_message\x18\x05 \x01(\t\x12\x1c\n\x14latest_agent_message\x18\x06 \x01(\t\"H\n\x12\x43reateSpaceRequest\x12\x32\n\x0cparticipants\x18\x01 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"7\n\x13\x43reateSpaceResponse\x12 \n\x05space\x18\x01 \x01(\x0b\x32\x11.flwr.proto.Space\"\x13\n\x11ListSpacesRequest\"7\n\x12ListSpacesResponse\x12!\n\x06spaces\x18\x01 \x03(\x0b\x32\x11.flwr.proto.Space\"\x7f\n\x0cSpaceMessage\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\"\x8a\x01\n\tSpaceItem\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0c\n\x04type\x18\x06 \x01(\t\"\xa8\x01\n\x17GetSpaceMessagesRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x16\n\tbefore_id\x18\x02 \x01(\x04H\x00\x88\x01\x01\x12\x12\n\x05limit\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x15\n\x08\x61\x66ter_id\x18\x04 \x01(\x04H\x02\x88\x01\x01\x12\x13\n\x0bunread_only\x18\x05 \x01(\x08\x42\x0c\n\n_before_idB\x08\n\x06_limitB\x0b\n\t_after_id\"F\n\x18GetSpaceMessagesResponse\x12*\n\x08messages\x18\x01 \x03(\x0b\x32\x18.flwr.proto.SpaceMessage\"\xa5\x01\n\x14GetSpaceItemsRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x16\n\tbefore_id\x18\x02 \x01(\x04H\x00\x88\x01\x01\x12\x12\n\x05limit\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x15\n\x08\x61\x66ter_id\x18\x04 \x01(\x04H\x02\x88\x01\x01\x12\x13\n\x0bunread_only\x18\x05 \x01(\x08\x42\x0c\n\n_before_idB\x08\n\x06_limitB\x0b\n\t_after_id\"=\n\x15GetSpaceItemsResponse\x12$\n\x05items\x18\x01 \x03(\x0b\x32\x15.flwr.proto.SpaceItem\"<\n\x17SendSpaceMessageRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"E\n\x18SendSpaceMessageResponse\x12)\n\x07message\x18\x01 \x01(\x0b\x32\x18.flwr.proto.SpaceMessage\"9\n\x14SendSpaceItemRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"<\n\x15SendSpaceItemResponse\x12#\n\x04item\x18\x01 \x01(\x0b\x32\x15.flwr.proto.SpaceItemb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/space.proto\x12\nflwr.proto\"I\n\x10SpaceParticipant\x12\x12\n\x08\x66lwr_aid\x18\x01 \x01(\tH\x00\x12\x12\n\x08\x61gent_id\x18\x02 \x01(\x04H\x00\x42\r\n\x0bparticipant\"\x82\x01\n\x05Space\x12\n\n\x02id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x12\n\ncreated_at\x18\x03 \x01(\t\x12\x32\n\x0cparticipants\x18\x04 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x16\n\x0elatest_message\x18\x05 \x01(\t\"H\n\x12\x43reateSpaceRequest\x12\x32\n\x0cparticipants\x18\x01 \x03(\x0b\x32\x1c.flwr.proto.SpaceParticipant\"7\n\x13\x43reateSpaceResponse\x12 \n\x05space\x18\x01 \x01(\x0b\x32\x11.flwr.proto.Space\"\x13\n\x11ListSpacesRequest\"7\n\x12ListSpacesResponse\x12!\n\x06spaces\x18\x01 \x03(\x0b\x32\x11.flwr.proto.Space\"\x7f\n\x0cSpaceMessage\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\"\x8a\x01\n\tSpaceItem\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x10\n\x08space_id\x18\x02 \x01(\t\x12,\n\x06\x61uthor\x18\x03 \x01(\x0b\x32\x1c.flwr.proto.SpaceParticipant\x12\x12\n\ncreated_at\x18\x04 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x05 \x01(\t\x12\x0c\n\x04type\x18\x06 \x01(\t\"\xa5\x01\n\x14GetSpaceItemsRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x16\n\tbefore_id\x18\x02 \x01(\x04H\x00\x88\x01\x01\x12\x12\n\x05limit\x18\x03 \x01(\rH\x01\x88\x01\x01\x12\x15\n\x08\x61\x66ter_id\x18\x04 \x01(\x04H\x02\x88\x01\x01\x12\x13\n\x0bunread_only\x18\x05 \x01(\x08\x42\x0c\n\n_before_idB\x08\n\x06_limitB\x0b\n\t_after_id\"=\n\x15GetSpaceItemsResponse\x12$\n\x05items\x18\x01 \x03(\x0b\x32\x15.flwr.proto.SpaceItem\"9\n\x14SendSpaceItemRequest\x12\x10\n\x08space_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"<\n\x15SendSpaceItemResponse\x12#\n\x04item\x18\x01 \x01(\x0b\x32\x15.flwr.proto.SpaceItemb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,33 +34,25 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SPACEPARTICIPANT']._serialized_start=38
   _globals['_SPACEPARTICIPANT']._serialized_end=111
   _globals['_SPACE']._serialized_start=114
-  _globals['_SPACE']._serialized_end=279
-  _globals['_CREATESPACEREQUEST']._serialized_start=281
-  _globals['_CREATESPACEREQUEST']._serialized_end=353
-  _globals['_CREATESPACERESPONSE']._serialized_start=355
-  _globals['_CREATESPACERESPONSE']._serialized_end=410
-  _globals['_LISTSPACESREQUEST']._serialized_start=412
-  _globals['_LISTSPACESREQUEST']._serialized_end=431
-  _globals['_LISTSPACESRESPONSE']._serialized_start=433
-  _globals['_LISTSPACESRESPONSE']._serialized_end=488
-  _globals['_SPACEMESSAGE']._serialized_start=490
-  _globals['_SPACEMESSAGE']._serialized_end=617
-  _globals['_SPACEITEM']._serialized_start=620
-  _globals['_SPACEITEM']._serialized_end=758
-  _globals['_GETSPACEMESSAGESREQUEST']._serialized_start=761
-  _globals['_GETSPACEMESSAGESREQUEST']._serialized_end=929
-  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_start=931
-  _globals['_GETSPACEMESSAGESRESPONSE']._serialized_end=1001
-  _globals['_GETSPACEITEMSREQUEST']._serialized_start=1004
-  _globals['_GETSPACEITEMSREQUEST']._serialized_end=1169
-  _globals['_GETSPACEITEMSRESPONSE']._serialized_start=1171
-  _globals['_GETSPACEITEMSRESPONSE']._serialized_end=1232
-  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_start=1234
-  _globals['_SENDSPACEMESSAGEREQUEST']._serialized_end=1294
-  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_start=1296
-  _globals['_SENDSPACEMESSAGERESPONSE']._serialized_end=1365
-  _globals['_SENDSPACEITEMREQUEST']._serialized_start=1367
-  _globals['_SENDSPACEITEMREQUEST']._serialized_end=1424
-  _globals['_SENDSPACEITEMRESPONSE']._serialized_start=1426
-  _globals['_SENDSPACEITEMRESPONSE']._serialized_end=1486
+  _globals['_SPACE']._serialized_end=244
+  _globals['_CREATESPACEREQUEST']._serialized_start=246
+  _globals['_CREATESPACEREQUEST']._serialized_end=318
+  _globals['_CREATESPACERESPONSE']._serialized_start=320
+  _globals['_CREATESPACERESPONSE']._serialized_end=375
+  _globals['_LISTSPACESREQUEST']._serialized_start=377
+  _globals['_LISTSPACESREQUEST']._serialized_end=396
+  _globals['_LISTSPACESRESPONSE']._serialized_start=398
+  _globals['_LISTSPACESRESPONSE']._serialized_end=453
+  _globals['_SPACEMESSAGE']._serialized_start=455
+  _globals['_SPACEMESSAGE']._serialized_end=582
+  _globals['_SPACEITEM']._serialized_start=585
+  _globals['_SPACEITEM']._serialized_end=723
+  _globals['_GETSPACEITEMSREQUEST']._serialized_start=726
+  _globals['_GETSPACEITEMSREQUEST']._serialized_end=891
+  _globals['_GETSPACEITEMSRESPONSE']._serialized_start=893
+  _globals['_GETSPACEITEMSRESPONSE']._serialized_end=954
+  _globals['_SENDSPACEITEMREQUEST']._serialized_start=956
+  _globals['_SENDSPACEITEMREQUEST']._serialized_end=1013
+  _globals['_SENDSPACEITEMRESPONSE']._serialized_start=1015
+  _globals['_SENDSPACEITEMRESPONSE']._serialized_end=1075
 # @@protoc_insertion_point(module_scope)

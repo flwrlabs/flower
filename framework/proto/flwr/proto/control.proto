@@ -135,8 +135,8 @@ message ListRunsResponse {
   string now = 2;
 }
 
-// Agents, Spaces and active runs. Message history is fetched through
-// GetSpaceMessages.
+// Agents, Spaces and active runs. Item history is fetched through
+// GetSpaceItems.
 message BootstrapRequest {}
 message BootstrapResponse {
   repeated Agent agents = 1;

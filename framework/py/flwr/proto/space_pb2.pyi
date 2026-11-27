@@ -54,13 +54,11 @@ class Space(google.protobuf.message.Message):
     TITLE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
     PARTICIPANTS_FIELD_NUMBER: builtins.int
-    LATEST_USER_MESSAGE_FIELD_NUMBER: builtins.int
-    LATEST_AGENT_MESSAGE_FIELD_NUMBER: builtins.int
+    LATEST_MESSAGE_FIELD_NUMBER: builtins.int
     id: builtins.str
     title: builtins.str
     created_at: builtins.str
-    latest_user_message: builtins.str
-    latest_agent_message: builtins.str
+    latest_message: builtins.str
     @property
     def participants(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceParticipant]: ...
     def __init__(
@@ -70,10 +68,9 @@ class Space(google.protobuf.message.Message):
         title: builtins.str = ...,
         created_at: builtins.str = ...,
         participants: collections.abc.Iterable[global___SpaceParticipant] | None = ...,
-        latest_user_message: builtins.str = ...,
-        latest_agent_message: builtins.str = ...,
+        latest_message: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "latest_agent_message", b"latest_agent_message", "latest_user_message", b"latest_user_message", "participants", b"participants", "title", b"title"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "id", b"id", "latest_message", b"latest_message", "participants", b"participants", "title", b"title"]) -> None: ...
 
 global___Space = Space
 
@@ -200,68 +197,11 @@ class SpaceItem(google.protobuf.message.Message):
 global___SpaceItem = SpaceItem
 
 @typing.final
-class GetSpaceMessagesRequest(google.protobuf.message.Message):
+class GetSpaceItemsRequest(google.protobuf.message.Message):
     """Selects the newest page by default. All reads advance the caller's read
     cursor.
     """
 
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SPACE_ID_FIELD_NUMBER: builtins.int
-    BEFORE_ID_FIELD_NUMBER: builtins.int
-    LIMIT_FIELD_NUMBER: builtins.int
-    AFTER_ID_FIELD_NUMBER: builtins.int
-    UNREAD_ONLY_FIELD_NUMBER: builtins.int
-    space_id: builtins.str
-    """Required by Control. Runtime uses the authenticated task's Space."""
-    before_id: builtins.int
-    """Exclusive upper ID bound."""
-    limit: builtins.int
-    """Absent uses the server's default page size."""
-    after_id: builtins.int
-    """Runtime only: exclusive lower bound, selecting the earliest matching page."""
-    unread_only: builtins.bool
-    """Return only messages after the caller's read cursor, oldest first."""
-    def __init__(
-        self,
-        *,
-        space_id: builtins.str = ...,
-        before_id: builtins.int | None = ...,
-        limit: builtins.int | None = ...,
-        after_id: builtins.int | None = ...,
-        unread_only: builtins.bool = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "_before_id", b"_before_id", "_limit", b"_limit", "after_id", b"after_id", "before_id", b"before_id", "limit", b"limit", "space_id", b"space_id", "unread_only", b"unread_only"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_after_id", b"_after_id"]) -> typing.Literal["after_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_before_id", b"_before_id"]) -> typing.Literal["before_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
-
-global___GetSpaceMessagesRequest = GetSpaceMessagesRequest
-
-@typing.final
-class GetSpaceMessagesResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    MESSAGES_FIELD_NUMBER: builtins.int
-    @property
-    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___SpaceMessage]:
-        """Messages in the selected page, ordered by ascending ID."""
-
-    def __init__(
-        self,
-        *,
-        messages: collections.abc.Iterable[global___SpaceMessage] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
-
-global___GetSpaceMessagesResponse = GetSpaceMessagesResponse
-
-@typing.final
-class GetSpaceItemsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SPACE_ID_FIELD_NUMBER: builtins.int
@@ -316,43 +256,6 @@ class GetSpaceItemsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
 
 global___GetSpaceItemsResponse = GetSpaceItemsResponse
-
-@typing.final
-class SendSpaceMessageRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SPACE_ID_FIELD_NUMBER: builtins.int
-    CONTENT_FIELD_NUMBER: builtins.int
-    space_id: builtins.str
-    """Required by Control. Runtime uses the authenticated task's Space."""
-    content: builtins.str
-    """The author is resolved from the authenticated account or task."""
-    def __init__(
-        self,
-        *,
-        space_id: builtins.str = ...,
-        content: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["content", b"content", "space_id", b"space_id"]) -> None: ...
-
-global___SendSpaceMessageRequest = SendSpaceMessageRequest
-
-@typing.final
-class SendSpaceMessageResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    MESSAGE_FIELD_NUMBER: builtins.int
-    @property
-    def message(self) -> global___SpaceMessage: ...
-    def __init__(
-        self,
-        *,
-        message: global___SpaceMessage | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["message", b"message"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
-
-global___SendSpaceMessageResponse = SendSpaceMessageResponse
 
 @typing.final
 class SendSpaceItemRequest(google.protobuf.message.Message):
