@@ -57,14 +57,9 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SpaceItem,
-    SpaceMessage,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -236,38 +231,6 @@ def test_runtime_files_propagate_conflicts(operation: str) -> None:
     assert rpc.call_count == 1
 
 
-def test_space_session_reads_messages() -> None:
-    """Forward message filters and preserve user and agent authors."""
-    stub = Mock()
-    stub.GetSpaceMessages.return_value = GetSpaceMessagesResponse(
-        messages=[
-            SpaceMessage(id=1, author=SpaceParticipant(flwr_aid="alice"), content="Hi"),
-            SpaceMessage(
-                id=2,
-                author=SpaceParticipant(agent_id=42),
-                content="Hello",
-            ),
-        ]
-    )
-    agent = create_space_session(
-        Mock(_runtime_client=stub), Mock(), PullTaskInputResponse()
-    )
-    assert isinstance(agent.space, AgentSpace)
-
-    messages = agent.space.get_messages(
-        limit=2, before_id=3, after_id=0, unread_only=True
-    )
-
-    stub.GetSpaceMessages.assert_called_once_with(
-        GetSpaceMessagesRequest(limit=2, before_id=3, after_id=0, unread_only=True)
-    )
-    assert [message["author"] for message in messages] == [
-        {"flwr_aid": "alice"},
-        {"agent_id": 42},
-    ]
-    assert [message["id"] for message in messages] == [1, 2]
-
-
 def test_space_session_reads_items() -> None:
     """Forward item filters and preserve typed and authorless inputs."""
     stub = Mock()
@@ -301,7 +264,7 @@ def test_space_session_reads_items() -> None:
 
 
 def test_space_session_sends_item() -> None:
-    """Publish a message item without changing the legacy model tool."""
+    """Publish a message item directly."""
     stub, events = Mock(), Mock()
     stub.SendSpaceItem.return_value = SendSpaceItemResponse(
         item=SpaceItem(
@@ -324,12 +287,15 @@ def test_space_session_sends_item() -> None:
 
 
 @pytest.mark.parametrize("arguments", [{"content": "Hello"}, '{"content":"Hello"}'])
-def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
+def test_space_session_model_tool_sends_item(arguments: JSONObject | str) -> None:
     """Publish through a model tool using the server-assigned author."""
     stub, events = Mock(), Mock()
-    stub.SendSpaceMessage.return_value = SendSpaceMessageResponse(
-        message=SpaceMessage(
-            id=7, author=SpaceParticipant(agent_id=42), content="Hello"
+    stub.SendSpaceItem.return_value = SendSpaceItemResponse(
+        item=SpaceItem(
+            id=7,
+            type="message",
+            author=SpaceParticipant(agent_id=42),
+            content="Hello",
         )
     )
     agent = create_space_session(
@@ -338,19 +304,22 @@ def test_space_session_sends_messages(arguments: JSONObject | str) -> None:
     assert agent.space is not None
     assert [tool["name"] for tool in agent.space.tools()] == ["send_space_message"]
     output = agent.space.call(
-        {"name": "send_space_message", "call_id": "call-1", "arguments": arguments}
+        {
+            "name": "send_space_message",
+            "call_id": "call-1",
+            "arguments": arguments,
+        }
     )
     events.emit.assert_called_with(output)
     assert strict_json_loads(str(output["output"])) == {
         "id": 7,
         "space_id": "",
+        "type": "message",
         "author": {"agent_id": 42},
         "created_at": "",
         "content": "Hello",
     }
-    stub.SendSpaceMessage.assert_called_once_with(
-        SendSpaceMessageRequest(content="Hello")
-    )
+    stub.SendSpaceItem.assert_called_once_with(SendSpaceItemRequest(content="Hello"))
 
 
 def test_close_drains_events_before_worker_stops() -> None:

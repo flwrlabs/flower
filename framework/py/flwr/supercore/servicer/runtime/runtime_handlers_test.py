@@ -51,9 +51,7 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
-    GetSpaceMessagesRequest,
     SendSpaceItemRequest,
-    SendSpaceMessageRequest,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
@@ -192,7 +190,6 @@ def test_file_revision_conflict(state: Mock, operation: str) -> None:
 
 
 @pytest.mark.parametrize("read", [False, True])
-@pytest.mark.parametrize("items", [False, True])
 @pytest.mark.parametrize(
     "task,agent_id",
     [
@@ -202,7 +199,7 @@ def test_file_revision_conflict(state: Mock, operation: str) -> None:
     ],
 )
 def test_space_access_requires_bound_primary_agent(
-    task: Task, agent_id: int | None, read: bool, items: bool
+    task: Task, agent_id: int | None, read: bool
 ) -> None:
     """Space reads and writes require the Run's bound primary AgentApp task."""
     state = Mock(spec=CoreState)
@@ -212,21 +209,13 @@ def test_space_access_requires_bound_primary_agent(
     run.primary_task_id = 1
     state.get_run.return_value = [run]
     with pytest.raises(FlowerError) as error:
-        if read and items:
+        if read:
             runtime_handlers.get_space_items(GetSpaceItemsRequest(), state, task)
-        elif read:
-            runtime_handlers.get_space_messages(GetSpaceMessagesRequest(), state, task)
-        elif items:
+        else:
             runtime_handlers.send_space_item(
                 SendSpaceItemRequest(content="No"), state, task
             )
-        else:
-            runtime_handlers.send_space_message(
-                SendSpaceMessageRequest(content="No"), state, task
-            )
     assert error.value.code == ApiErrorCode.RUNTIME_ENDPOINT_UNAVAILABLE
-    state.get_space_messages.assert_not_called()
-    state.create_space_message.assert_not_called()
     state.get_space_items.assert_not_called()
     state.store_space_item.assert_not_called()
 

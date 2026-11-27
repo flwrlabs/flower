@@ -84,14 +84,10 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SpaceItem,
     SpaceParticipant,
 )
@@ -154,58 +150,6 @@ def space_client_fixture() -> tuple[TestClient, LinkState]:
         ),
         state,
     )
-
-
-def test_space_routes(
-    space_client: tuple[TestClient, LinkState],
-) -> None:
-    """Create, list, send, and read with authenticated caller membership."""
-    client, state = space_client
-    agent = state.create_agent(
-        flwr_aid=_ACCOUNT.user_id,
-        config=AgentConfig(name="Research", app_spec="@flower/research"),
-    )
-    assert agent is not None
-    personal = state.get_spaces(_ACCOUNT.user_id)[0]
-    caller = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
-    agent_participant = SpaceParticipant(agent_id=agent.id)
-    response = client.post(
-        "/v1/control/create-space",
-        content=CreateSpaceRequest(
-            participants=[agent_participant]
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    space = CreateSpaceResponse.FromString(response.content).space
-    assert list(space.participants) == [caller, agent_participant]
-    response = client.post(
-        "/v1/control/send-space-message",
-        content=SendSpaceMessageRequest(
-            space_id=space.id, content="Hello"
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    message = SendSpaceMessageResponse.FromString(response.content).message
-    assert message.author == caller and message.content == "Hello"
-    listed = client.post(
-        "/v1/control/list-spaces",
-        content=ListSpacesRequest().SerializeToString(),
-    )
-    assert listed.status_code == 200
-    assert list(ListSpacesResponse.FromString(listed.content).spaces) == [
-        space,
-        personal,
-    ]
-    history = client.post(
-        "/v1/control/get-space-messages",
-        content=GetSpaceMessagesRequest(space_id=space.id).SerializeToString(),
-    )
-    assert history.status_code == 200
-    assert list(GetSpaceMessagesResponse.FromString(history.content).messages) == [
-        message
-    ]
-    assert state.get_space_messages(UUID(space.id), caller, unread_only=True) == []
-    assert not state.get_run_series() and not state.get_tasks()
 
 
 def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
@@ -329,35 +273,9 @@ def test_create_space_rejects_other_users_agent(
     assert not state.get_spaces(_ACCOUNT.user_id)
 
 
-@pytest.mark.parametrize("unread_only,expected_index", [(False, 1), (True, 0)])
-def test_space_history_pagination(
-    space_client: tuple[TestClient, LinkState], unread_only: bool, expected_index: int
-) -> None:
-    """Apply the HTTP request's cursor, page size, and unread filter."""
-    client, state = space_client
-    space = state.create_space(
-        participants=[SpaceParticipant(flwr_aid=_ACCOUNT.user_id)]
-    )
-    space_id = UUID(space.id)
-    author = SpaceParticipant(flwr_aid=_ACCOUNT.user_id)
-    messages = [state.create_space_message(space_id, author, str(i)) for i in range(3)]
-    last = messages[-1]
-    assert last is not None
-    response = client.post(
-        "/v1/control/get-space-messages",
-        content=GetSpaceMessagesRequest(
-            space_id=space.id, before_id=last.id, limit=1, unread_only=unread_only
-        ).SerializeToString(),
-    )
-    assert response.status_code == 200
-    assert list(GetSpaceMessagesResponse.FromString(response.content).messages) == [
-        messages[expected_index]
-    ]
-
-
 @pytest.mark.parametrize(
     "endpoint",
-    ["get-space-messages", "send-space-message", "get-space-items", "send-space-item"],
+    ["get-space-items", "send-space-item"],
 )
 def test_space_unavailable_to_nonparticipants(
     space_client: tuple[TestClient, LinkState], endpoint: str
@@ -367,10 +285,6 @@ def test_space_unavailable_to_nonparticipants(
     private = state.create_space(participants=[SpaceParticipant(flwr_aid="alice")])
     for space_id in [private.id, str(uuid4())]:
         request = {
-            "get-space-messages": GetSpaceMessagesRequest(space_id=space_id),
-            "send-space-message": SendSpaceMessageRequest(
-                space_id=space_id, content="No access"
-            ),
             "get-space-items": GetSpaceItemsRequest(space_id=space_id),
             "send-space-item": SendSpaceItemRequest(
                 space_id=space_id, content="No access"
@@ -386,14 +300,6 @@ def test_space_unavailable_to_nonparticipants(
 @pytest.mark.parametrize(
     "endpoint,fields",
     [
-        ("send-space-message", {"content": " \n"}),
-        (
-            "send-space-message",
-            {"content": "Hello", "space_id": "bad-uuid"},
-        ),
-        ("get-space-messages", {"space_id": "bad-uuid"}),
-        ("get-space-messages", {"limit": 0}),
-        ("get-space-messages", {"limit": 101}),
         ("send-space-item", {"content": " \n"}),
         ("send-space-item", {"content": "Hello", "space_id": "bad-uuid"}),
         ("get-space-items", {"space_id": "bad-uuid"}),
@@ -409,8 +315,6 @@ def test_invalid_space_request(
     """Reject malformed IDs, empty text, and unsupported page sizes."""
     client, _ = space_client
     request_type = {
-        "send-space-message": SendSpaceMessageRequest,
-        "get-space-messages": GetSpaceMessagesRequest,
         "send-space-item": SendSpaceItemRequest,
         "get-space-items": GetSpaceItemsRequest,
     }[endpoint]
