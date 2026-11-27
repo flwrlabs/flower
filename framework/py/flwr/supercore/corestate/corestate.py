@@ -904,7 +904,12 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def create_space_message(
-        self, space_id: UUID, author: SpaceParticipant, content: str
+        self,
+        space_id: UUID,
+        author: SpaceParticipant,
+        content: str,
+        *,
+        hidden: bool = False,
     ) -> SpaceMessage | None:
         """Store a participant's message, or return None if membership is absent."""
 

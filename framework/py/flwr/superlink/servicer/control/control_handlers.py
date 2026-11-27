@@ -171,6 +171,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     SendSpaceItemResponse,
     SendSpaceMessageRequest,
     SendSpaceMessageResponse,
+    SpaceMessage,
     SpaceParticipant,
 )
 from flwr.server.superlink.linkstate import LinkState
@@ -1275,6 +1276,30 @@ def start_automation(  # pylint: disable=too-many-branches,too-many-locals
         series_id=automation.series_id,
         next_run_at=automation.next_run_at,
     )
+
+
+def _store_hidden_agent_automation_message(
+    state: LinkState, *, flwr_aid: str, agent_id: int, content: str
+) -> SpaceMessage:
+    """Store a hidden message in the agent's sole Space."""
+    if state.get_agent(flwr_aid, agent_id) is None:
+        raise ValueError("Agent not found.")
+    spaces = [
+        space
+        for space in state.get_spaces(flwr_aid)
+        if SpaceParticipant(agent_id=agent_id) in space.participants
+    ]
+    if len(spaces) != 1:
+        raise ValueError("Agent must belong to exactly one Space.")
+    message = state.create_space_message(
+        UUID(spaces[0].id),
+        SpaceParticipant(flwr_aid=flwr_aid),
+        content,
+        hidden=True,
+    )
+    if message is None:
+        raise ValueError("Agent Space is unavailable.")
+    return message
 
 
 def dispatch_automation(

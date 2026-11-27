@@ -1652,7 +1652,12 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             return list(spaces.values())
 
     def create_space_message(
-        self, space_id: UUID, author: SpaceParticipant, content: str
+        self,
+        space_id: UUID,
+        author: SpaceParticipant,
+        content: str,
+        *,
+        hidden: bool = False,
     ) -> SpaceMessage | None:
         """Authorize membership in the message insert itself."""
         if not content.strip():
@@ -1667,6 +1672,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             SpaceParticipantTable.c.agent_id,
             literal(now(), type_=UTCDateTime()),
             literal(content),
+            literal(hidden),
         ).where(
             SpaceParticipantTable.c.space_id == space_id,
             SpaceParticipantTable.c[field] == identity,
@@ -1681,6 +1687,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                         "agent_id",
                         "created_at",
                         "content",
+                        "hidden",
                     ],
                     source,
                 )
