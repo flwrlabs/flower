@@ -61,7 +61,9 @@ class WorkflowState:  # pylint: disable=R0902
 
     nid_to_proxies: dict[int, ClientProxy] = field(default_factory=dict)
     nid_to_fitins: dict[int, RecordDict] = field(default_factory=dict)
-    sampled_node_ids: set[int] = field(default_factory=set)
+    sampled_node_ids: frozenset[int] = field(default_factory=frozenset)
+    # Owners whose share_keys replies were accepted; retained after vector dropout.
+    share_owner_node_ids: frozenset[int] = field(default_factory=frozenset)
     active_node_ids: set[int] = field(default_factory=set)
     num_shares: int = 0
     threshold: int = 0
@@ -264,8 +266,12 @@ class SecAggPlusWorkflow:
         if bin(self.modulus_range).count("1") != 1:
             raise ValueError("`modulus_range` must be a power of 2.")
 
-    def _check_threshold(self, state: WorkflowState) -> bool:
-        for node_id in state.sampled_node_ids:
+    def _check_threshold(
+        self, state: WorkflowState, owner_ids: set[int] | frozenset[int]
+    ) -> bool:
+        if not owner_ids:
+            return False
+        for node_id in owner_ids:
             active_neighbors = state.nid_to_neighbours[node_id] & state.active_node_ids
             if len(active_neighbors) < state.threshold:
                 log(ERROR, "Insufficient available nodes.")
@@ -357,7 +363,7 @@ class SecAggPlusWorkflow:
             for idx, nid in enumerate(sampled_node_ids)
         }
 
-        state.sampled_node_ids = state.active_node_ids
+        state.sampled_node_ids = frozenset(state.active_node_ids)
 
         # Send setup configuration to clients
         cfg_record = ConfigRecord(sa_params_dict)  # type: ignore
@@ -397,7 +403,7 @@ class SecAggPlusWorkflow:
             pk1, pk2 = key_dict[Key.PUBLIC_KEY_1], key_dict[Key.PUBLIC_KEY_2]
             state.nid_to_publickeys[node_id] = [cast(bytes, pk1), cast(bytes, pk2)]
 
-        return self._check_threshold(state)
+        return self._check_threshold(state, state.active_node_ids)
 
     def share_keys_stage(  # pylint: disable=R0914
         self, grid: Grid, context: LegacyContext, state: WorkflowState
@@ -464,10 +470,11 @@ class SecAggPlusWorkflow:
                 fwd_ciphertexts[dst].append(ciphertext)
                 fwd_srcs[dst].append(src)
 
+        state.share_owner_node_ids = frozenset(state.active_node_ids)
         state.forward_srcs = fwd_srcs
         state.forward_ciphertexts = fwd_ciphertexts
 
-        return self._check_threshold(state)
+        return self._check_threshold(state, state.share_owner_node_ids)
 
     def collect_masked_vectors_stage(
         self, grid: Grid, context: LegacyContext, state: WorkflowState
@@ -538,7 +545,7 @@ class SecAggPlusWorkflow:
             proxy = state.nid_to_proxies[msg.metadata.src_node_id]
             state.legacy_results.append((proxy, fitres))
 
-        return self._check_threshold(state)
+        return self._check_threshold(state, state.share_owner_node_ids)
 
     def unmask_stage(  # pylint: disable=R0912, R0914, R0915
         self, grid: Grid, context: LegacyContext, state: WorkflowState
@@ -549,7 +556,7 @@ class SecAggPlusWorkflow:
 
         # Construct active node IDs and dead node IDs
         active_nids = state.active_node_ids
-        dead_nids = state.sampled_node_ids - active_nids
+        dead_nids = state.share_owner_node_ids - active_nids
 
         # Send secure IDs of active and dead clients and collect key shares from clients
         def make(nid: int) -> Message:
@@ -587,7 +594,7 @@ class SecAggPlusWorkflow:
 
         # Build collected shares dict
         collected_shares_dict: dict[int, list[bytes]] = {}
-        for nid in state.sampled_node_ids:
+        for nid in state.share_owner_node_ids:
             collected_shares_dict[nid] = []
         for msg in msgs:
             if msg.has_error():
@@ -617,8 +624,8 @@ class SecAggPlusWorkflow:
                 masked_vector = parameters_subtraction(masked_vector, private_mask)
             else:
                 # The seed for PRG is the secret key 1 of a dropped client.
-                neighbours = state.nid_to_neighbours[nid]
-                neighbours.remove(nid)
+                # Only contributors have pairwise masks present in the sum.
+                neighbours = state.nid_to_neighbours[nid] & active_nids
 
                 for neighbor_nid in neighbours:
                     shared_key = generate_shared_key(
