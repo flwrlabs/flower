@@ -101,10 +101,15 @@ it and authenticate directly against the OIDC provider.
     # [... follows URL and logs in ... in the meantime the CLI will wait ...]
     ✅ Login successful.
 
-Once the login is successful, the credentials returned by the OIDC provider via the
-SuperLink will be stored locally. The tokens will be sent transparently with each
-subsequent ``flwr`` CLI request to the SuperLink, and it will relay them to the OIDC
-provider to perform the authentication checks.
+If SuperLink requires you to finish signing up in a browser, ``flwr login`` saves your
+credentials after you approve the device and displays a second URL. Use the same account
+to finish signup. If the browser does not open, copy the URL into a browser. The CLI
+waits for SuperLink to confirm signup. If you press Ctrl+C or the wait times out, you
+can finish signup in the browser and retry your Flower command with the saved
+credentials. Run ``flwr login`` again to reopen signup.
+
+The CLI stores your credentials locally and includes the tokens with subsequent
+authenticated requests to SuperLink.
 
 *****************************************
  Run authenticated ``flwr`` CLI commands
