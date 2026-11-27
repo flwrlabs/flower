@@ -87,3 +87,19 @@ def test_fedopt_strategies_aggregate_scalar_arrays(strategy_cls: type[FedOpt]) -
     scalar_weight = actual.to_numpy_ndarrays()[0]
     assert scalar_weight.shape == ()
     assert np.isfinite(scalar_weight)
+
+
+def test_fedadam_first_round_uses_bias_corrected_step() -> None:
+    """Test that FedAdam's bias correction uses the current round as its step.
+
+    With one reply whose update is constant, bias-corrected Adam moves the model by
+    roughly `eta` in the first round.
+    """
+    strategy = FedAdam(eta=0.1, tau=1e-9)
+    strategy.current_arrays = {"0": np.array([0.0])}
+    replies = [create_mock_reply(ArrayRecord([np.array([1.0])]), num_examples=1)]
+
+    actual, _ = strategy.aggregate_train(1, replies)
+
+    assert actual is not None
+    np.testing.assert_allclose(actual.to_numpy_ndarrays()[0], [0.1])
