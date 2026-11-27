@@ -87,6 +87,17 @@ def _middleware_classes(app: FastAPI) -> list[type[object]]:
     return [cast(type[object], middleware.cls) for middleware in app.user_middleware]
 
 
+def test_create_app_serves_protobuf_swagger_ui(monkeypatch: MonkeyPatch) -> None:
+    """Serve the protobuf request-body plugin at the standard docs route."""
+    app = _create_app(monkeypatch)
+
+    response = TestClient(app).get("/docs")
+
+    assert response.status_code == 200
+    assert response.text.count("wrapComponents:") == 1
+    assert '"url": "/openapi.json"' in response.text
+
+
 def test_create_app_mounts_core_health_router(monkeypatch: MonkeyPatch) -> None:
     """Mount the health route from SuperCore without a readiness route."""
     app = _create_app(monkeypatch)

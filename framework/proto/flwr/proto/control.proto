@@ -330,14 +330,27 @@ message SetFederationIconRequest {
 }
 message SetFederationIconResponse {}
 
+// Create a private federation in the selected namespace.
 message CreateFederationRequest {
+  // Required bare federation name, up to 32 characters. It must start with a
+  // letter and contain only letters, digits, and hyphens.
   string federation_name = 1;
+  // Human-readable description. Defaults to an empty string when omitted.
   string description = 2;
+  // True for simulation, false for deployment. Defaults to false when omitted.
   bool simulation = 3;
-  // Bare namespace handle. Omission selects the authenticated caller's handle.
+  // Optional bare namespace handle (without @). Omission selects the
+  // authenticated caller's handle. An explicit handle must contain one or more
+  // ASCII letters, digits, hyphens, or underscores. The caller must be
+  // authorized to create a federation in the selected namespace.
   optional string handle = 4;
 }
-message CreateFederationResponse { Federation federation = 1; }
+
+// Result of creating a federation.
+message CreateFederationResponse {
+  // Created federation, including its qualified name (@handle/name).
+  Federation federation = 1;
+}
 
 message ArchiveFederationRequest { string federation_name = 1; }
 message ArchiveFederationResponse {}

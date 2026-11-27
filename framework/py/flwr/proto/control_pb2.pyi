@@ -1562,6 +1562,8 @@ global___SetFederationIconResponse = SetFederationIconResponse
 
 @typing.final
 class CreateFederationRequest(google.protobuf.message.Message):
+    """Create a private federation in the selected namespace."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_NAME_FIELD_NUMBER: builtins.int
@@ -1569,10 +1571,19 @@ class CreateFederationRequest(google.protobuf.message.Message):
     SIMULATION_FIELD_NUMBER: builtins.int
     HANDLE_FIELD_NUMBER: builtins.int
     federation_name: builtins.str
+    """Required bare federation name, up to 32 characters. It must start with a
+    letter and contain only letters, digits, and hyphens.
+    """
     description: builtins.str
+    """Human-readable description. Defaults to an empty string when omitted."""
     simulation: builtins.bool
+    """True for simulation, false for deployment. Defaults to false when omitted."""
     handle: builtins.str
-    """Bare namespace handle. Omission selects the authenticated caller's handle."""
+    """Optional bare namespace handle (without @). Omission selects the
+    authenticated caller's handle. An explicit handle must contain one or more
+    ASCII letters, digits, hyphens, or underscores. The caller must be
+    authorized to create a federation in the selected namespace.
+    """
     def __init__(
         self,
         *,
@@ -1589,11 +1600,15 @@ global___CreateFederationRequest = CreateFederationRequest
 
 @typing.final
 class CreateFederationResponse(google.protobuf.message.Message):
+    """Result of creating a federation."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_FIELD_NUMBER: builtins.int
     @property
-    def federation(self) -> flwr.proto.federation_pb2.Federation: ...
+    def federation(self) -> flwr.proto.federation_pb2.Federation:
+        """Created federation, including its qualified name (@handle/name)."""
+
     def __init__(
         self,
         *,

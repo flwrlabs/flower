@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from runpy import run_path
 
 import grpc_tools
 import pytest
@@ -26,13 +27,14 @@ from grpc_tools import protoc as grpc_protoc
 from devtool import protoc
 
 
-def _write_pyproject(project_dir: Path) -> None:
+def _write_pyproject(project_dir: Path, protoc_options: str = "") -> None:
     (project_dir / "pyproject.toml").write_text(
-        """
+        f"""
 [tool.devtool.protoc]
 proto_root = "proto"
 include_globs = ["flwr/**/*.proto", "google/**/*.proto"]
 include_paths = ["proto", "third_party/proto"]
+{protoc_options}
 
 [tool.devtool.protoc.outputs]
 python = "py"
@@ -169,3 +171,36 @@ def test_compile_project_uses_loaded_protoc(
     assert calls[0][0] == "grpc_tools.protoc"
     assert f"--proto_path={tmp_path / 'grpc' / '_proto'}" in calls[0]
     assert str(proto_file.resolve()) in calls[0]
+
+
+def test_compile_project_generates_selected_source_comments(tmp_path: Path) -> None:
+    """Generate leading and trailing comments for the configured messages."""
+    (tmp_path / "proto" / "flwr").mkdir(parents=True)
+    (tmp_path / "third_party" / "proto").mkdir(parents=True)
+    (tmp_path / "py").mkdir()
+    _write_pyproject(tmp_path, 'documented_messages = ["flwr.Documented"]')
+    (tmp_path / "proto" / "flwr" / "example.proto").write_text(
+        """syntax = "proto3";
+package flwr;
+
+// Message description.
+message Documented {
+  // Leading description.
+  string leading = 1;
+  string trailing = 2;  // Trailing description.
+}
+
+// Unrelated description.
+message Other {}
+""",
+        encoding="utf-8",
+    )
+
+    protoc.compile_project(tmp_path)
+
+    generated = run_path(str(tmp_path / "py" / "flwr" / "example_pb2_docs.py"))
+    assert generated["PROTOBUF_DESCRIPTIONS"] == {
+        "flwr.Documented": "Message description.",
+        "flwr.Documented.leading": "Leading description.",
+        "flwr.Documented.trailing": "Trailing description.",
+    }

@@ -172,6 +172,10 @@ source-exclude = ["py/**/*_test.py", "py/**/*_test_utils.py"]
 proto_root = "proto"
 include_globs = ["flwr/**/*.proto"]
 include_paths = ["proto"]
+documented_messages = [
+    "flwr.proto.CreateFederationRequest",
+    "flwr.proto.CreateFederationResponse",
+]
 
 [tool.devtool.protoc.outputs]
 python = "py"
