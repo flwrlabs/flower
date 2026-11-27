@@ -117,14 +117,10 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.supercore.protobuf.client import ProtobufClient
 
@@ -277,17 +273,6 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             response_type=ListSpacesResponse,
         )
 
-    def GetSpaceMessages(
-        self, request: GetSpaceMessagesRequest
-    ) -> GetSpaceMessagesResponse:
-        """Get space messages."""
-        return self._unary_unary(
-            path="/v1/control/get-space-messages",
-            rpc_method="/flwr.proto.Control/GetSpaceMessages",
-            request=request,
-            response_type=GetSpaceMessagesResponse,
-        )
-
     def GetSpaceItems(self, request: GetSpaceItemsRequest) -> GetSpaceItemsResponse:
         """Get space items."""
         return self._unary_unary(
@@ -295,17 +280,6 @@ class ControlHttpClient(ProtobufClient):  # pylint: disable=too-many-public-meth
             rpc_method="/flwr.proto.Control/GetSpaceItems",
             request=request,
             response_type=GetSpaceItemsResponse,
-        )
-
-    def SendSpaceMessage(
-        self, request: SendSpaceMessageRequest
-    ) -> SendSpaceMessageResponse:
-        """Send space message."""
-        return self._unary_unary(
-            path="/v1/control/send-space-message",
-            rpc_method="/flwr.proto.Control/SendSpaceMessage",
-            request=request,
-            response_type=SendSpaceMessageResponse,
         )
 
     def SendSpaceItem(self, request: SendSpaceItemRequest) -> SendSpaceItemResponse:

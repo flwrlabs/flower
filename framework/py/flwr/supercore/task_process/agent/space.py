@@ -19,11 +19,8 @@ from typing import cast
 from flwr.agentapp import AgentEvents, AgentSpace
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
-    GetSpaceMessagesRequest,
     SendSpaceItemRequest,
-    SendSpaceMessageRequest,
     SpaceItem,
-    SpaceMessage,
 )
 from flwr.supercore.constant import MAX_SPACE_PAGE_SIZE
 from flwr.supercore.runtime import RuntimeHttpClient
@@ -33,22 +30,6 @@ from flwr.supercore.task_process.connector.tool_schema import (
 )
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
-
-
-def _message_to_json(message: SpaceMessage) -> JSONObject:
-    """Serialize a Space message without exposing protobufs to AgentApps."""
-    author: JSONObject = (
-        {"agent_id": message.author.agent_id}
-        if message.author.HasField("agent_id")
-        else {"flwr_aid": message.author.flwr_aid}
-    )
-    return {
-        "id": message.id,
-        "space_id": message.space_id,
-        "author": author,
-        "created_at": message.created_at,
-        "content": message.content,
-    }
 
 
 def _item_to_json(item: SpaceItem) -> JSONObject:
@@ -75,25 +56,6 @@ class RuntimeAgentSpace(AgentSpace):
     def __init__(self, stub: RuntimeHttpClient, events: AgentEvents) -> None:
         self._stub = stub
         self._events = events
-
-    def get_messages(
-        self,
-        *,
-        limit: int = 100,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        unread_only: bool = False,
-    ) -> list[JSONObject]:
-        """Read messages and advance the agent's read cursor."""
-        response = self._stub.GetSpaceMessages(
-            GetSpaceMessagesRequest(
-                limit=limit,
-                before_id=before_id,
-                after_id=after_id,
-                unread_only=unread_only,
-            )
-        )
-        return [_message_to_json(message) for message in response.messages]
 
     def get_items(
         self,
@@ -151,13 +113,11 @@ class RuntimeAgentSpace(AgentSpace):
                 "arguments": strict_json_dumps(arguments, compact=True),
             }
         )
-        response = self._stub.SendSpaceMessage(SendSpaceMessageRequest(content=content))
+        response = self._stub.SendSpaceItem(SendSpaceItemRequest(content=content))
         output: JSONObject = {
             "type": "function_call_output",
             "call_id": call_id,
-            "output": strict_json_dumps(
-                _message_to_json(response.message), compact=True
-            ),
+            "output": strict_json_dumps(_item_to_json(response.item), compact=True),
         }
         self._events.emit(output)
         return output

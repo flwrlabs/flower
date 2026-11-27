@@ -120,14 +120,10 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AuthenticatedUser
@@ -283,16 +279,6 @@ def list_spaces(
     return control_handlers.list_spaces(request, account, linkstate)
 
 
-@router.post("/get-space-messages")
-def get_space_messages(
-    request: Annotated[GetSpaceMessagesRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> GetSpaceMessagesResponse:
-    """Get space messages."""
-    return control_handlers.get_space_messages(request, account, linkstate)
-
-
 @router.post("/get-space-items")
 def get_space_items(
     request: Annotated[GetSpaceItemsRequest, Depends(get_protobuf_request)],
@@ -301,16 +287,6 @@ def get_space_items(
 ) -> GetSpaceItemsResponse:
     """Get space items."""
     return control_handlers.get_space_items(request, account, linkstate)
-
-
-@router.post("/send-space-message")
-def send_space_message(
-    request: Annotated[SendSpaceMessageRequest, Depends(get_protobuf_request)],
-    linkstate: LinkStateDependency,
-    account: AccountDependency,
-) -> SendSpaceMessageResponse:
-    """Send space message."""
-    return control_handlers.send_space_message(request, account, linkstate)
 
 
 @router.post("/send-space-item")
