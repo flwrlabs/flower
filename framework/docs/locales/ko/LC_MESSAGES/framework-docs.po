@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-19 00:06+0000\n"
+"POT-Creation-Date: 2026-11-26 00:05+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -48,8 +48,8 @@ msgstr "문제 중심의 방법 가이드는 특정 목표를 달성하는 방�
 msgid "Changelog"
 msgstr ""
 
-#: ../../source/changelog/v1.44.0.md:2
-msgid "v1.44.0 (2026-11-18)"
+#: ../../source/changelog/v1.45.0.md:2
+msgid "v1.45.0 (2026-11-25)"
 msgstr ""
 
 #: ../../source/changelog/v1.0.0.md:11 ../../source/changelog/v1.1.0.md:4
@@ -75,9 +75,9 @@ msgstr ""
 #: ../../source/changelog/v1.4.0.md:4 ../../source/changelog/v1.40.0.md:4
 #: ../../source/changelog/v1.41.0.md:4 ../../source/changelog/v1.42.0.md:4
 #: ../../source/changelog/v1.43.0.md:4 ../../source/changelog/v1.44.0.md:4
-#: ../../source/changelog/v1.5.0.md:4 ../../source/changelog/v1.6.0.md:4
-#: ../../source/changelog/v1.7.0.md:4 ../../source/changelog/v1.8.0.md:4
-#: ../../source/changelog/v1.9.0.md:4
+#: ../../source/changelog/v1.45.0.md:4 ../../source/changelog/v1.5.0.md:4
+#: ../../source/changelog/v1.6.0.md:4 ../../source/changelog/v1.7.0.md:4
+#: ../../source/changelog/v1.8.0.md:4 ../../source/changelog/v1.9.0.md:4
 msgid "Thanks to our contributors"
 msgstr ""
 
@@ -103,18 +103,19 @@ msgstr ""
 #: ../../source/changelog/v1.4.0.md:6 ../../source/changelog/v1.40.0.md:6
 #: ../../source/changelog/v1.41.0.md:6 ../../source/changelog/v1.42.0.md:6
 #: ../../source/changelog/v1.43.0.md:6 ../../source/changelog/v1.44.0.md:6
-#: ../../source/changelog/v1.5.0.md:6 ../../source/changelog/v1.6.0.md:6
-#: ../../source/changelog/v1.7.0.md:6 ../../source/changelog/v1.8.0.md:6
-#: ../../source/changelog/v1.9.0.md:6
+#: ../../source/changelog/v1.45.0.md:6 ../../source/changelog/v1.5.0.md:6
+#: ../../source/changelog/v1.6.0.md:6 ../../source/changelog/v1.7.0.md:6
+#: ../../source/changelog/v1.8.0.md:6 ../../source/changelog/v1.9.0.md:6
 msgid ""
 "We would like to give our special thanks to all the contributors who made"
 " the new version of Flower possible (in `git shortlog` order):"
 msgstr ""
 
-#: ../../source/changelog/v1.44.0.md:8
+#: ../../source/changelog/v1.45.0.md:8
 msgid ""
-"`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng "
-"Pan`, `Javier`, `Taner Topal`"
+"`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata "
+"Nugraha`, `Dimitris Stripelis`, `Heng Pan`, `Javier`, `Laasya priya "
+"Bhadri`, `Mohammad Naseri`"
 msgstr ""
 
 #: ../../source/changelog/v0.13.0.md:4 ../../source/changelog/v0.14.0.md:4
@@ -143,10 +144,118 @@ msgstr ""
 #: ../../source/changelog/v1.4.0.md:10 ../../source/changelog/v1.40.0.md:10
 #: ../../source/changelog/v1.41.0.md:10 ../../source/changelog/v1.42.0.md:10
 #: ../../source/changelog/v1.43.0.md:10 ../../source/changelog/v1.44.0.md:10
-#: ../../source/changelog/v1.5.0.md:10 ../../source/changelog/v1.6.0.md:10
-#: ../../source/changelog/v1.7.0.md:10 ../../source/changelog/v1.8.0.md:10
-#: ../../source/changelog/v1.9.0.md:10
+#: ../../source/changelog/v1.45.0.md:10 ../../source/changelog/v1.5.0.md:10
+#: ../../source/changelog/v1.6.0.md:10 ../../source/changelog/v1.7.0.md:10
+#: ../../source/changelog/v1.8.0.md:10 ../../source/changelog/v1.9.0.md:10
 msgid "What's new?"
+msgstr ""
+
+#: ../../source/changelog/v1.45.0.md:12
+msgid ""
+"**Improve the Agent runtime** "
+"([#8549](https://github.com/flwrlabs/flower/pull/8549), "
+"[#8560](https://github.com/flwrlabs/flower/pull/8560), "
+"[#8561](https://github.com/flwrlabs/flower/pull/8561), "
+"[#8562](https://github.com/flwrlabs/flower/pull/8562), "
+"[#8564](https://github.com/flwrlabs/flower/pull/8564), "
+"[#8566](https://github.com/flwrlabs/flower/pull/8566), "
+"[#8568](https://github.com/flwrlabs/flower/pull/8568), "
+"[#8570](https://github.com/flwrlabs/flower/pull/8570), "
+"[#8572](https://github.com/flwrlabs/flower/pull/8572), "
+"[#8579](https://github.com/flwrlabs/flower/pull/8579), "
+"[#8580](https://github.com/flwrlabs/flower/pull/8580), "
+"[#8581](https://github.com/flwrlabs/flower/pull/8581), "
+"[#8583](https://github.com/flwrlabs/flower/pull/8583), "
+"[#8585](https://github.com/flwrlabs/flower/pull/8585), "
+"[#8586](https://github.com/flwrlabs/flower/pull/8586), "
+"[#8587](https://github.com/flwrlabs/flower/pull/8587), "
+"[#8589](https://github.com/flwrlabs/flower/pull/8589), "
+"[#8590](https://github.com/flwrlabs/flower/pull/8590), "
+"[#8591](https://github.com/flwrlabs/flower/pull/8591), "
+"[#8595](https://github.com/flwrlabs/flower/pull/8595), "
+"[#8597](https://github.com/flwrlabs/flower/pull/8597), "
+"[#8598](https://github.com/flwrlabs/flower/pull/8598), "
+"[#8600](https://github.com/flwrlabs/flower/pull/8600), "
+"[#8605](https://github.com/flwrlabs/flower/pull/8605), "
+"[#8606](https://github.com/flwrlabs/flower/pull/8606), "
+"[#8609](https://github.com/flwrlabs/flower/pull/8609), "
+"[#8610](https://github.com/flwrlabs/flower/pull/8610), "
+"[#8612](https://github.com/flwrlabs/flower/pull/8612), "
+"[#8614](https://github.com/flwrlabs/flower/pull/8614))"
+msgstr ""
+
+#: ../../source/changelog/v1.45.0.md:14
+msgid ""
+"Agent runs are easier to follow, and AgentApps have more flexibility in "
+"how they use Spaces. These changes lay the groundwork for more "
+"interactive Agent workflows."
+msgstr ""
+
+#: ../../source/changelog/v1.45.0.md:16
+msgid ""
+"**Apply differential privacy operations only to floating-point arrays** "
+"([#8381](https://github.com/flwrlabs/flower/pull/8381))"
+msgstr ""
+
+#: ../../source/changelog/v1.45.0.md:18
+msgid ""
+"Differential privacy norm calculation, clipping, and noise addition now "
+"ignore non-floating model state such as BatchNorm tracking buffers, "
+"preventing casting errors and unintended changes to integer arrays."
+msgstr ""
+
+#: ../../source/changelog/v1.45.0.md:20
+msgid ""
+"**General improvements** "
+"([#8565](https://github.com/flwrlabs/flower/pull/8565), "
+"[#8567](https://github.com/flwrlabs/flower/pull/8567), "
+"[#8569](https://github.com/flwrlabs/flower/pull/8569), "
+"[#8571](https://github.com/flwrlabs/flower/pull/8571), "
+"[#8574](https://github.com/flwrlabs/flower/pull/8574), "
+"[#8575](https://github.com/flwrlabs/flower/pull/8575), "
+"[#8578](https://github.com/flwrlabs/flower/pull/8578), "
+"[#8584](https://github.com/flwrlabs/flower/pull/8584), "
+"[#8592](https://github.com/flwrlabs/flower/pull/8592), "
+"[#8593](https://github.com/flwrlabs/flower/pull/8593), "
+"[#8599](https://github.com/flwrlabs/flower/pull/8599), "
+"[#8607](https://github.com/flwrlabs/flower/pull/8607), "
+"[#8608](https://github.com/flwrlabs/flower/pull/8608), "
+"[#8613](https://github.com/flwrlabs/flower/pull/8613), "
+"[#8621](https://github.com/flwrlabs/flower/pull/8621))"
+msgstr ""
+
+#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
+#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
+#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
+#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
+#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
+#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
+#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
+#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
+#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
+#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
+#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
+#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
+#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
+#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
+#: ../../source/changelog/v1.37.0.md:40 ../../source/changelog/v1.38.0.md:36
+#: ../../source/changelog/v1.39.0.md:28 ../../source/changelog/v1.40.0.md:38
+#: ../../source/changelog/v1.41.0.md:24 ../../source/changelog/v1.42.0.md:26
+#: ../../source/changelog/v1.43.0.md:30 ../../source/changelog/v1.44.0.md:22
+#: ../../source/changelog/v1.45.0.md:22
+msgid ""
+"As always, many parts of the Flower framework and quality infrastructure "
+"were improved and updated."
+msgstr ""
+
+#: ../../source/changelog/v1.44.0.md:2
+msgid "v1.44.0 (2026-11-18)"
+msgstr ""
+
+#: ../../source/changelog/v1.44.0.md:8
+msgid ""
+"`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng "
+"Pan`, `Javier`, `Taner Topal`"
 msgstr ""
 
 #: ../../source/changelog/v1.44.0.md:12
@@ -231,29 +340,6 @@ msgid ""
 "[#8555](https://github.com/flwrlabs/flower/pull/8555), "
 "[#8556](https://github.com/flwrlabs/flower/pull/8556), "
 "[#8558](https://github.com/flwrlabs/flower/pull/8558))"
-msgstr ""
-
-#: ../../source/changelog/v1.10.0.md:68 ../../source/changelog/v1.11.0.md:65
-#: ../../source/changelog/v1.12.0.md:64 ../../source/changelog/v1.13.0.md:69
-#: ../../source/changelog/v1.13.1.md:32 ../../source/changelog/v1.14.0.md:63
-#: ../../source/changelog/v1.15.0.md:80 ../../source/changelog/v1.16.0.md:54
-#: ../../source/changelog/v1.17.0.md:85 ../../source/changelog/v1.18.0.md:50
-#: ../../source/changelog/v1.19.0.md:68 ../../source/changelog/v1.20.0.md:66
-#: ../../source/changelog/v1.21.0.md:56 ../../source/changelog/v1.22.0.md:40
-#: ../../source/changelog/v1.23.0.md:48 ../../source/changelog/v1.24.0.md:42
-#: ../../source/changelog/v1.25.0.md:36 ../../source/changelog/v1.26.0.md:44
-#: ../../source/changelog/v1.27.0.md:50 ../../source/changelog/v1.28.0.md:50
-#: ../../source/changelog/v1.29.0.md:46 ../../source/changelog/v1.30.0.md:34
-#: ../../source/changelog/v1.31.0.md:50 ../../source/changelog/v1.32.0.md:44
-#: ../../source/changelog/v1.33.0.md:50 ../../source/changelog/v1.34.0.md:54
-#: ../../source/changelog/v1.35.0.md:50 ../../source/changelog/v1.36.0.md:30
-#: ../../source/changelog/v1.37.0.md:40 ../../source/changelog/v1.38.0.md:36
-#: ../../source/changelog/v1.39.0.md:28 ../../source/changelog/v1.40.0.md:38
-#: ../../source/changelog/v1.41.0.md:24 ../../source/changelog/v1.42.0.md:26
-#: ../../source/changelog/v1.43.0.md:30 ../../source/changelog/v1.44.0.md:22
-msgid ""
-"As always, many parts of the Flower framework and quality infrastructure "
-"were improved and updated."
 msgstr ""
 
 #: ../../source/changelog/v1.43.0.md:2
@@ -19810,7 +19896,9 @@ msgstr ""
 #: ../../source/ref-api/flwr.simulation.SimulationIoConnection.rst
 #: ../../source/ref-api/flwr.simulation.run_simulation.rst
 #: flwr.agentapp.base.AgentConnectors.tools
+#: flwr.agentapp.base.AgentSpace.get_items
 #: flwr.agentapp.base.AgentSpace.get_messages
+#: flwr.agentapp.base.AgentSpace.send_item
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
@@ -32624,7 +32712,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:33:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace:1 of
-msgid "Read and publish messages in the authenticated agent's Space."
+msgid "Read and publish messages and items in the authenticated agent's Space."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.rst:35
@@ -32947,7 +33035,9 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
 #: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
 #: flwr.agentapp.base.AgentConnectors.tools
+#: flwr.agentapp.base.AgentSpace.get_items
 #: flwr.agentapp.base.AgentSpace.get_messages
+#: flwr.agentapp.base.AgentSpace.send_item
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
@@ -33012,7 +33102,9 @@ msgstr ""
 #: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
 #: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
 #: flwr.agentapp.base.AgentConnectors.tools
+#: flwr.agentapp.base.AgentSpace.get_items
 #: flwr.agentapp.base.AgentSpace.get_messages
+#: flwr.agentapp.base.AgentSpace.send_item
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
@@ -33045,7 +33137,9 @@ msgid "Independent copies of the model-facing tool schemas."
 msgstr ""
 
 #: flwr.agentapp.base.AgentConnectors.tools:13
+#: flwr.agentapp.base.AgentSpace.get_items:18
 #: flwr.agentapp.base.AgentSpace.get_messages:17
+#: flwr.agentapp.base.AgentSpace.send_item:10
 #: flwr.client.mod.centraldp_mods.adaptiveclipping_mod:15
 #: flwr.client.mod.centraldp_mods.fixedclipping_mod:13
 #: flwr.clientapp.mod.centraldp_mods.adaptiveclipping_mod:15
@@ -33419,6 +33513,18 @@ msgstr ""
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 #, fuzzy
 msgid ""
+":py:obj:`get_items <flwr.agentapp.AgentSpace.get_items>`\\ \\(\\*\\[\\, "
+"limit\\, before\\_id\\, after\\_id\\, ...\\]\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentSpace.get_items:1 of
+msgid "Read SpaceItems and advance this agent's item read cursor."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
+#, fuzzy
+msgid ""
 ":py:obj:`get_messages <flwr.agentapp.AgentSpace.get_messages>`\\ "
 "\\(\\*\\[\\, limit\\, before\\_id\\, ...\\]\\)"
 msgstr ""
@@ -33430,12 +33536,51 @@ msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
 #, fuzzy
+msgid ":py:obj:`send_item <flwr.agentapp.AgentSpace.send_item>`\\ \\(content\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
+#: flwr.agentapp.base.AgentSpace.send_item:1 of
+msgid "Publish a message item and return its server-assigned fields."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1 of
+#, fuzzy
 msgid ":py:obj:`tools <flwr.agentapp.AgentSpace.tools>`\\ \\(\\)"
 msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.call:1:<autosummary>:1
 #: flwr.agentapp.base.AgentSpace.tools:1 of
 msgid "Return the model-facing send_space_message tool schema."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:3 of
+msgid "Maximum number of items to return, between 1 and 100."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:5 of
+msgid "Exclusive upper item ID bound."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:7 of
+msgid "Exclusive lower item ID bound; selects the oldest matching page."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:9 of
+msgid "Select the oldest page after this agent's item read cursor."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:12 of
+msgid ""
+"Items in ascending ID order, with id, space_id, type, created_at, and "
+"content. Message items also have an author containing either flwr_aid or "
+"agent_id."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.get_items:19 of
+msgid ""
+"Reads select the newest page by default and advance the item cursor "
+"through the newest returned ID."
 msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.get_messages:3 of
@@ -33457,13 +33602,25 @@ msgstr ""
 #: flwr.agentapp.base.AgentSpace.get_messages:12 of
 msgid ""
 "Messages in ascending ID order, with id, space_id, author, created_at, "
-"content, and hidden. Author contains either flwr_aid or agent_id."
+"and content. Author contains either flwr_aid or agent_id."
 msgstr ""
 
 #: flwr.agentapp.base.AgentSpace.get_messages:18 of
 msgid ""
 "Reads select the newest page by default. Every read advances the cursor "
 "through the newest returned message, including history reads."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.send_item:3 of
+msgid "Nonempty message text to publish."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.send_item:6 of
+msgid "The created item, including its type and server-assigned fields."
+msgstr ""
+
+#: flwr.agentapp.base.AgentSpace.send_item:11 of
+msgid "Only message items can be sent through the current Runtime endpoint."
 msgstr ""
 
 #: ../../source/ref-api/flwr.agentapp.LoadAgentAppError.rst:2
@@ -90472,10 +90629,13 @@ msgstr ""
 #~ "\\(names\\, \\*\\[\\, refresh\\]\\)"
 #~ msgstr ""
 
+#~ msgid "Read and publish messages in the authenticated agent's Space."
+#~ msgstr ""
+
 #~ msgid ""
 #~ "Messages in ascending ID order, with "
-#~ "id, space_id, author, created_at, and "
-#~ "content. Author contains either flwr_aid "
-#~ "or agent_id."
+#~ "id, space_id, author, created_at, content, "
+#~ "and hidden. Author contains either "
+#~ "flwr_aid or agent_id."
 #~ msgstr ""
 
