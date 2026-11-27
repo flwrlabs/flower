@@ -207,9 +207,11 @@ def test_login_completes_advertised_signup(
         )
     else:
         control_client.RefreshAuthTokens.assert_not_called()
-    for status, value in replies:
-        if status == 422:
-            assert (value or "That handle is invalid. Choose another.") in result.output
+    assert all(
+        (detail or "That handle is invalid. Choose another.") in result.output
+        for status, detail in replies
+        if status == 422
+    )
     assert requests == expected_requests
     if expected_error:
         assert result.exit_code == 1
