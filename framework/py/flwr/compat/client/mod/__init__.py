@@ -17,9 +17,13 @@
 from .centraldp_mods import adaptiveclipping_mod as adaptiveclipping_mod
 from .centraldp_mods import fixedclipping_mod as fixedclipping_mod
 from .localdp_mod import LocalDpMod as LocalDpMod
+from .secure_aggregation import secagg_mod as secagg_mod
+from .secure_aggregation import secaggplus_mod as secaggplus_mod
 
 __all__ = [
     "LocalDpMod",
     "adaptiveclipping_mod",
     "fixedclipping_mod",
+    "secagg_mod",
+    "secaggplus_mod",
 ]
