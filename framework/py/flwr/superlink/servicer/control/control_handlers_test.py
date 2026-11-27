@@ -1258,7 +1258,7 @@ def test_stream_replays_pages_polls_and_stops_on_disconnect(
     state = Mock(spec=LinkState)
     entries = [StreamEventsResponse(seq=seq) for seq in range(1, 5)]
     entries[0].event.type = "agent.created"
-    entries[-1].event.type = "message.created"
+    entries[-1].event.type = "item.created"
     state.get_user_events.side_effect = [entries[:2], entries[2:3], [], [], entries[3:]]
     active = Mock(return_value=True)
     stream = stream_events(StreamEventsRequest(), _ACCOUNT, state, active)

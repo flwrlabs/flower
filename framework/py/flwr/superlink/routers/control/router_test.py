@@ -204,7 +204,6 @@ def test_space_item_routes(space_client: tuple[TestClient, LinkState]) -> None:
     )
     assert response.status_code == 200
     assert list(GetSpaceItemsResponse.FromString(response.content).items) == [new_item]
-    assert state.get_space_messages(UUID(space_id), caller) == []
 
 
 def test_send_space_item_wire_format() -> None:

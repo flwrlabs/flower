@@ -134,35 +134,6 @@ class ListSpacesResponse(google.protobuf.message.Message):
 global___ListSpacesResponse = ListSpacesResponse
 
 @typing.final
-class SpaceMessage(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ID_FIELD_NUMBER: builtins.int
-    SPACE_ID_FIELD_NUMBER: builtins.int
-    AUTHOR_FIELD_NUMBER: builtins.int
-    CREATED_AT_FIELD_NUMBER: builtins.int
-    CONTENT_FIELD_NUMBER: builtins.int
-    id: builtins.int
-    space_id: builtins.str
-    created_at: builtins.str
-    content: builtins.str
-    @property
-    def author(self) -> global___SpaceParticipant: ...
-    def __init__(
-        self,
-        *,
-        id: builtins.int = ...,
-        space_id: builtins.str = ...,
-        author: global___SpaceParticipant | None = ...,
-        created_at: builtins.str = ...,
-        content: builtins.str = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["author", b"author"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["author", b"author", "content", b"content", "created_at", b"created_at", "id", b"id", "space_id", b"space_id"]) -> None: ...
-
-global___SpaceMessage = SpaceMessage
-
-@typing.final
 class SpaceItem(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
