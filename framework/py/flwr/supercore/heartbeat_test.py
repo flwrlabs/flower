@@ -15,6 +15,7 @@
 """Tests for heartbeat sender."""
 
 
+import random
 import signal
 import time
 import unittest
@@ -105,6 +106,20 @@ class TestHeartbeatSender(unittest.TestCase):
     def test_thread_is_daemon(self) -> None:
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
+
+    def test_interval_jitter_leaves_the_global_rng_unchanged(self) -> None:
+        """Heartbeat spacing must not consume a seeded experiment stream."""
+        random.seed(5)
+        expected = random.random()
+        random.seed(5)
+
+        def _stop_after_one_heartbeat() -> bool:
+            self.heartbeat_sender._stop_event.set()
+            return True
+
+        self.heartbeat_sender.heartbeat_fn = _stop_after_one_heartbeat
+        self.heartbeat_sender._run()
+        self.assertEqual(random.random(), expected)
 
 
 def test_http_heartbeat_returns_true_on_success() -> None:

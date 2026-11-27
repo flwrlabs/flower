@@ -16,7 +16,6 @@
 
 
 import json
-import random
 from collections.abc import Iterable
 from logging import INFO
 from time import monotonic, sleep
@@ -36,6 +35,7 @@ from flwr.app import (
 from flwr.app.message import remove_content_from_message
 from flwr.common import NDArray
 from flwr.common.constant import ErrorCode
+from flwr.common.seeding import sample_population
 from flwr.supercore import log
 
 from ..exception import InconsistentMessageReplies
@@ -190,8 +190,9 @@ def sample_nodes(
         )
         sleep(1)
 
-    # Sample nodes
-    sampled_nodes = random.sample(all_nodes, sample_size)
+    # Sample nodes. A configured random-seed sorts candidates first and draws
+    # from a generator that heartbeat jitter cannot advance.
+    sampled_nodes = sample_population(all_nodes, sample_size)
 
     return sampled_nodes, all_nodes
 

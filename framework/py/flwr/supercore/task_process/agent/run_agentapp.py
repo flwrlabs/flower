@@ -43,6 +43,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
+from flwr.common.seeding import seed_server
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -120,6 +121,17 @@ class PreloadedAgentApp:
     fab_id: str
     fab_version: str
     fab_hash: str
+
+
+def _load_agentapp_for_run(
+    run_config: object, agent_app_attr: str, app_path: Path
+) -> AgentApp:
+    """Seed Python and NumPy, then import the AgentApp.
+
+    A framework this module imports is seeded when the AgentApp runs.
+    """
+    seed_server(run_config, process="agent")
+    return _load_agentapp_component(agent_app_attr, app_path)
 
 
 def _load_agentapp_component(agent_app_attr: str, app_path: Path) -> AgentApp:
@@ -321,8 +333,11 @@ class _AgentAppTaskLifecycle:  # pylint: disable=too-many-instance-attributes,pr
                 )
                 if agent_app is None:
                     assert agent_app_attr is not None
+                    assert self._context is not None
                     with trace_span("agentapp.load"):
-                        agent_app = _load_agentapp_component(agent_app_attr, app_path)
+                        agent_app = _load_agentapp_for_run(
+                            self._context.run_config, agent_app_attr, app_path
+                        )
             with trace_span(
                 "agentapp.execute",
                 attributes=self._trace_attributes,

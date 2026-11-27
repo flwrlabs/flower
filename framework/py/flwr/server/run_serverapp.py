@@ -18,6 +18,7 @@
 from logging import DEBUG
 
 from flwr.app import Context
+from flwr.common.seeding import seed_server
 from flwr.serverapp.grid import Grid
 from flwr.serverapp.server_app import LoadServerAppError, ServerApp
 from flwr.supercore import log
@@ -54,6 +55,9 @@ def run(
             server_app = loaded_server_app
         return server_app
 
+    # Seed Python and NumPy before the import. A framework the module imports
+    # is seeded when ServerApp runs, after that import finishes.
+    seed_server(context.run_config)
     server_app = _load()
 
     # Call ServerApp

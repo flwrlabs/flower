@@ -72,6 +72,11 @@ def constant(
     yield from interval
 
 
+# Retry delays must not draw from the global random module. A run seed uses
+# that module, and these draws would otherwise advance the experiment stream.
+_RETRY_RNG = random.Random()
+
+
 def full_jitter(max_value: float) -> float:
     """Randomize a float between 0 and the given maximum value.
 
@@ -89,7 +94,7 @@ def full_jitter(max_value: float) -> float:
     float
         A random float that is less than max_value.
     """
-    return random.uniform(0, max_value)
+    return _RETRY_RNG.uniform(0, max_value)
 
 
 @dataclass

@@ -20,6 +20,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 from flwr.app import Context
+from flwr.common.seeding import seed_server
 from flwr.compat.server.typing import ServerFn
 from flwr.server.client_manager import ClientManager
 from flwr.server.compat import start_grid
@@ -153,6 +154,10 @@ class ServerApp:  # pylint: disable=too-many-instance-attributes
 
     def __call__(self, grid: Grid, context: Context) -> None:
         """Execute `ServerApp`."""
+        # Reseed before user code, including a framework this module imported.
+        # Weights created while the module was importing that framework are
+        # not redone.
+        seed_server(context.run_config)
         with self._lifespan(context):
             # Compatibility mode
             if not self._main:

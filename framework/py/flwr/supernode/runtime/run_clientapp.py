@@ -27,6 +27,7 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
+from flwr.common.seeding import seed_client
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -183,6 +184,9 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             multi_app=True,
         )
 
+        # Seed Python and NumPy before the import. A framework the module
+        # imports is seeded when ClientApp runs, after that import finishes.
+        seed_client(context, message)
         # Load ClientApp
         log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
         client_app: ClientApp = load_client_app_fn(

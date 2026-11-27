@@ -15,11 +15,11 @@
 """Flower ClientManager."""
 
 
-import random
 import threading
 from abc import ABC, abstractmethod
 from logging import INFO
 
+from flwr.common.seeding import sample_population
 from flwr.supercore import log
 
 from .client_proxy import ClientProxy
@@ -203,5 +203,5 @@ class SimpleClientManager(ClientManager):
             )
             return []
 
-        sampled_cids = random.sample(available_cids, num_clients)
+        sampled_cids = sample_population(available_cids, num_clients)
         return [self.clients[cid] for cid in sampled_cids]

@@ -22,6 +22,7 @@ import pytest
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.seeding import RANDOM_SEED_KEY, clear_run_seed, seed_server
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import (
     AGENT_MESSAGE_CONTENT_RECORD_KEY,
@@ -149,6 +150,31 @@ def test_runtime_agent_grid_tools() -> None:
         '"payload":"done","error":null}],"pending_message_ids":[]}'
     )
     assert events.emit.call_count == 8
+
+
+def test_seeded_get_nodes_ignores_registration_order() -> None:
+    """A run seed samples the same node ids regardless of list order."""
+
+    def sampled_ids(node_ids: list[int]) -> str:
+        grid = Mock()
+        grid.get_nodes.return_value = [
+            NodeInfo(node_id=node_id) for node_id in node_ids
+        ]
+        agent_grid = RuntimeAgentGrid(grid, Mock(), SUPERLINK_NODE_ID)
+        seed_server({RANDOM_SEED_KEY: 8})
+        result = agent_grid.call(
+            {
+                "name": "get_nodes",
+                "call_id": "call-seed",
+                "arguments": {"sample_size": 2},
+            }
+        )
+        return cast(str, result["output"])
+
+    try:
+        assert sampled_ids([30, 10, 20]) == sampled_ids([20, 30, 10])
+    finally:
+        clear_run_seed()
 
 
 def test_supernode_agent_grid_only_pushes_one_reply() -> None:
