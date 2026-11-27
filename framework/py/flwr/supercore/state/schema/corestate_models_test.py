@@ -42,7 +42,6 @@ CORESTATE_TABLE_NAMES = {
     "agent_config",
     "space",
     "space_participant",
-    "space_message",
     "space_item",
     "events",
     "user_events",
@@ -201,19 +200,17 @@ def test_task_logs_table_remains_unmapped_without_unique_identity_key() -> None:
     assert TaskLogsTable.primary_key.columns.values() == []
 
 
-@pytest.mark.parametrize("table_name", ["space_participant", "space_message"])
 @pytest.mark.parametrize(
     ("flwr_aid", "agent_id", "valid"),
     [("user", None, True), (None, 1, True), (None, None, False), ("user", 1, False)],
 )
 def test_space_requires_exactly_one_identity(
-    table_name: str,
     flwr_aid: str | None,
     agent_id: int | None,
     valid: bool,
 ) -> None:
-    """Accept either identity and reject both or neither in both tables."""
-    table = FlwrBase.metadata.tables[table_name]
+    """Accept either identity and reject both or neither for participants."""
+    table = FlwrBase.metadata.tables["space_participant"]
     engine = create_engine("sqlite:///:memory:")
     table.create(engine)
     values: dict[str, object] = {
@@ -221,9 +218,6 @@ def test_space_requires_exactly_one_identity(
         "flwr_aid": flwr_aid,
         "agent_id": agent_id,
     }
-    if table_name == "space_message":
-        values.update(content="Hello", created_at=datetime.now(UTC))
-
     with engine.begin() as conn:
         if valid:
             conn.execute(table.insert().values(**values))

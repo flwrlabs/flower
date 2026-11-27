@@ -38,14 +38,6 @@ message CreateSpaceResponse { Space space = 1; }
 message ListSpacesRequest {}
 message ListSpacesResponse { repeated Space spaces = 1; }
 
-message SpaceMessage {
-  uint64 id = 1;
-  string space_id = 2;
-  SpaceParticipant author = 3;
-  string created_at = 4;
-  string content = 5;
-}
-
 message SpaceItem {
   uint64 id = 1;
   string space_id = 2;
