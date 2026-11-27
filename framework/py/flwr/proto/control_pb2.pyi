@@ -868,6 +868,7 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
     VERIFICATION_URI_FIELD_NUMBER: builtins.int
     USER_CODE_FIELD_NUMBER: builtins.int
     SUPPORTS_CLI_SIGNUP_FIELD_NUMBER: builtins.int
+    WEB_SIGNUP_URL_FIELD_NUMBER: builtins.int
     authn_type: builtins.str
     device_code: builtins.str
     verification_uri_complete: builtins.str
@@ -878,6 +879,8 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
     user_code: builtins.str
     supports_cli_signup: builtins.bool
     """The SuperLink supports completing account signup in the CLI."""
+    web_signup_url: builtins.str
+    """Browser URL for completing account signup, if supported."""
     def __init__(
         self,
         *,
@@ -889,8 +892,9 @@ class GetLoginDetailsResponse(google.protobuf.message.Message):
         verification_uri: builtins.str = ...,
         user_code: builtins.str = ...,
         supports_cli_signup: builtins.bool = ...,
+        web_signup_url: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["authn_type", b"authn_type", "device_code", b"device_code", "expires_in", b"expires_in", "interval", b"interval", "supports_cli_signup", b"supports_cli_signup", "user_code", b"user_code", "verification_uri", b"verification_uri", "verification_uri_complete", b"verification_uri_complete"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["authn_type", b"authn_type", "device_code", b"device_code", "expires_in", b"expires_in", "interval", b"interval", "supports_cli_signup", b"supports_cli_signup", "user_code", b"user_code", "verification_uri", b"verification_uri", "verification_uri_complete", b"verification_uri_complete", "web_signup_url", b"web_signup_url"]) -> None: ...
 
 global___GetLoginDetailsResponse = GetLoginDetailsResponse
 

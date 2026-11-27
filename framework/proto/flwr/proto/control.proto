@@ -198,6 +198,8 @@ message GetLoginDetailsResponse {
   string user_code = 7;
   // The SuperLink supports completing account signup in the CLI.
   bool supports_cli_signup = 8;
+  // Browser URL for completing account signup, if supported.
+  string web_signup_url = 9;
 }
 
 message GetAuthTokensRequest { string device_code = 1; }
