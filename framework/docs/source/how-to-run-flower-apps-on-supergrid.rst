@@ -86,8 +86,10 @@ Pull the app locally with ``flwr new``:
     $ cd demo
 
 Then, log in to SuperGrid with ``flwr login``. This opens a browser window where you can
-authenticate with your SuperGrid account. Finally, run the app with ``flwr run`` and use
-``--federation`` to choose the target federation:
+authenticate with your SuperGrid account. Finally, run the app with ``flwr run .
+supergrid`` to select the SuperGrid connection, and use ``--federation`` to choose the
+target federation. If you omit ``supergrid``, the CLI uses your default SuperLink
+connection instead; ``--federation`` does not select the connection:
 
 .. note::
 
@@ -99,7 +101,7 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
     # This opens a browser window where you can log in to SuperGrid.
     $ flwr login supergrid
 
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . supergrid --federation @<username>/<federation-name>
     🎊 Successfully started run 1859953118041441032 in federation @<username>/<federation-name>
 
 The run appears on the `All runs <https://flower.ai/runs>`__ page.
