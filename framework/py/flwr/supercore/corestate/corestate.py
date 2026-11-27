@@ -899,7 +899,7 @@ class CoreState(ABC):  # pylint: disable=R0904
 
     @abstractmethod
     def get_spaces(self, flwr_aid: str) -> Sequence[Space]:
-        """List participating spaces with their latest user message, newest first."""
+        """List participating spaces newest first, including their latest message."""
 
     @abstractmethod
     def store_space_item(

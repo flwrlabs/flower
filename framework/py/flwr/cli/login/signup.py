@@ -102,7 +102,7 @@ def complete_signup(
                     )
                     continue
                 if response.status_code == httpx.codes.UNPROCESSABLE_ENTITY:
-                    typer.echo("That handle is invalid. Choose another.", err=True)
+                    typer.echo(_invalid_handle_message(response), err=True)
                     continue
                 if _read_handle(response) is None:
                     raise click.ClickException(_INVALID_RESPONSE)
@@ -111,6 +111,18 @@ def complete_signup(
         raise click.ClickException(
             "Could not reach SuperLink to complete signup. Run flwr login again."
         ) from None
+
+
+def _invalid_handle_message(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if isinstance(detail, str) and detail.strip() and detail.isprintable():
+            return detail.strip()
+    return "That handle is invalid. Choose another."
 
 
 def _read_handle(response: httpx.Response) -> str | None:

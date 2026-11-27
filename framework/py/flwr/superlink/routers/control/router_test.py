@@ -1473,7 +1473,7 @@ def test_bootstrap_uses_authenticated_account(
     snapshot = BootstrapResponse.FromString(response.content)
     assert snapshot == state.get_bootstrap(_ACCOUNT.user_id)
     assert len(snapshot.agents) == len(snapshot.spaces) == 1
-    assert snapshot.spaces[0].latest_user_message == "Latest prompt"
+    assert snapshot.spaces[0].latest_message == "Latest prompt"
     assert snapshot.cursor == 3
 
 
