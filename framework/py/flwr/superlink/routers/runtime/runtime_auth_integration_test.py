@@ -271,7 +271,6 @@ def test_get_space_events_reads_only_authenticated_space(
 
 def test_space_item_endpoints_use_authenticated_run(
     client: TestClient,
-    state: LinkState,
     agent: tuple[int, str, str],
 ) -> None:
     """Read and publish items using the task's Space and agent identity."""
@@ -315,10 +314,6 @@ def test_space_item_endpoints_use_authenticated_run(
     )
     assert response.status_code == 200
     assert not GetSpaceItemsResponse.FromString(response.content).items
-    assert (
-        state.get_space_messages(UUID(space_id), SpaceParticipant(agent_id=agent_id))
-        == []
-    )
     for path, request in (
         ("get-space-items", GetSpaceItemsRequest(limit=0)),
         ("get-space-items", GetSpaceItemsRequest(limit=101)),

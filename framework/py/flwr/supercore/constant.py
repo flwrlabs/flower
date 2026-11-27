@@ -244,7 +244,6 @@ class EventType(StrEnum):
     AGENT_UPDATED = "agent.updated"
     AGENT_DELETED = "agent.deleted"
     SPACE_CREATED = "space.created"
-    MESSAGE_CREATED = "message.created"
     ITEM_CREATED = "item.created"
     RUN_CREATED = "run.created"
     TASK_CREATED = "task.created"

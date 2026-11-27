@@ -305,7 +305,6 @@ SpaceParticipantTable = Table(
     Column("space_id", Uuid, ForeignKey("space.id"), nullable=False),
     Column("flwr_aid", String, nullable=True),
     Column("agent_id", BigInteger, ForeignKey("agent.agent_id"), nullable=True),
-    Column("read_through_message_id", BigInteger, nullable=False, server_default="0"),
     Column("read_through_item_id", BigInteger, nullable=False, server_default="0"),
     CheckConstraint(
         "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
@@ -316,38 +315,6 @@ SpaceParticipantTable = Table(
     UniqueConstraint("space_id", "agent_id"),
     Index("idx_space_participant_flwr_aid", "flwr_aid"),
 )
-
-
-class SpaceMessage(FlwrBase):
-    """Represent a message authored by a user or agent in a space."""
-
-    __tablename__ = "space_message"
-    __table_args__ = (
-        CheckConstraint(
-            "(flwr_aid IS NOT NULL AND agent_id IS NULL) OR "
-            "(flwr_aid IS NULL AND agent_id IS NOT NULL)",
-            name="ck_space_message_identity",
-        ),
-        Index("idx_space_message_space_id_id", "space_id", "id"),
-        {"sqlite_autoincrement": True},
-    )
-
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-        autoincrement=True,
-    )
-    space_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("space.id"), nullable=False)
-    flwr_aid: Mapped[str | None] = mapped_column(String, nullable=True)
-    agent_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("agent.agent_id"), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    # This field is not in use.
-    hidden: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
 
 
 class SpaceItem(FlwrBase):
