@@ -271,7 +271,6 @@ def test_get_space_events_reads_only_authenticated_space(
 
 def test_space_item_endpoints_use_authenticated_run(
     client: TestClient,
-    state: LinkState,
     agent: tuple[int, str, str],
 ) -> None:
     """Read and publish items using the task's Space and agent identity."""
