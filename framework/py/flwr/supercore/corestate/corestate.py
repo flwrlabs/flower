@@ -42,7 +42,6 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
     SpaceItem,
-    SpaceMessage,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskUsage  # pylint: disable=E0611
@@ -438,7 +437,7 @@ class CoreState(ABC):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
+        payload: Agent | Space | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -903,12 +902,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         """List participating spaces with their latest user message, newest first."""
 
     @abstractmethod
-    def create_space_message(
-        self, space_id: UUID, author: SpaceParticipant, content: str
-    ) -> SpaceMessage | None:
-        """Store a participant's message, or return None if membership is absent."""
-
-    @abstractmethod
     def store_space_item(
         self,
         space_id: UUID,
@@ -963,52 +956,6 @@ class CoreState(ABC):  # pylint: disable=R0904
         ValueError
             If limit is not positive or after_id >= before_id when both
             bounds are provided.
-
-        Notes
-        -----
-        The read cursor advances through the newest returned ID and never moves
-        backward. Concurrent calls may return overlapping pages.
-        """
-
-    @abstractmethod
-    def get_space_messages(  # pylint: disable=too-many-arguments
-        self,
-        space_id: UUID,
-        participant: SpaceParticipant,
-        *,
-        limit: int = 50,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        unread_only: bool = False,
-    ) -> Sequence[SpaceMessage] | None:
-        """Read a page and advance the participant's read cursor.
-
-        Parameters
-        ----------
-        space_id : UUID
-            Space containing the messages.
-        participant : SpaceParticipant
-            User or agent reading the messages.
-        limit : int (default: 50)
-            Maximum number of messages to return.
-        before_id : int | None (default: None)
-            Exclusive upper message ID bound.
-        after_id : int | None (default: None)
-            Exclusive lower message ID bound; selects the oldest matching page.
-        unread_only : bool (default: False)
-            Select the oldest page after the participant's read cursor.
-            Can be combined with ID bounds.
-
-        Returns
-        -------
-        Sequence[SpaceMessage] | None
-            Messages in ascending ID order, selecting the newest page by default.
-            None if the Space is missing or the identity is not a participant.
-
-        Raises
-        ------
-        ValueError
-            If limit is not positive or the supplied ID range is invalid.
 
         Notes
         -----

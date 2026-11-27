@@ -107,7 +107,7 @@ def test_create_agent_creates_space(state: CoreState) -> None:
         assert SpaceParticipant(flwr_aid="alice") in space.participants
         assert space.title == ""
         assert (
-            state.get_space_messages(UUID(space.id), SpaceParticipant(flwr_aid="alice"))
+            state.get_space_items(UUID(space.id), SpaceParticipant(flwr_aid="alice"))
             == []
         )
     assert state.get_spaces("bob") == []

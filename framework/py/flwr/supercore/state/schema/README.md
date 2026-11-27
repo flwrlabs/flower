@@ -269,22 +269,11 @@ erDiagram
     VARCHAR type
   }
 
-  space_message {
-    BIGINT id PK
-    BIGINT agent_id FK "nullable"
-    CHAR(32) space_id FK
-    TEXT content
-    TIMESTAMP created_at
-    VARCHAR flwr_aid "nullable"
-    BOOLEAN hidden
-  }
-
   space_participant {
     BIGINT agent_id FK "nullable"
     CHAR(32) space_id FK
     VARCHAR flwr_aid "nullable"
     BIGINT read_through_item_id
-    BIGINT read_through_message_id
   }
 
   task {
@@ -378,8 +367,6 @@ erDiagram
   objects ||--o| run_objects : object_id
   space ||--o{ space_item : space_id
   agent ||--o{ space_item : agent_id
-  space ||--o{ space_message : space_id
-  agent ||--o{ space_message : agent_id
   space ||--o{ space_participant : space_id
   agent ||--o{ space_participant : agent_id
   task ||--o{ task_event : task_id
