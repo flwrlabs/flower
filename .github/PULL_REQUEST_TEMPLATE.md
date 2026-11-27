@@ -1,56 +1,71 @@
 <!--
 Thank you for opening a pull request (PR)!
 
-Please rename your PRs following this [format](https://flower.ai/docs/framework/contributor-tutorial-contribute-on-github.html#pr-title-format).
+Please follow the [PR title format](https://flower.ai/docs/framework/contributor-tutorial-contribute-on-github.html#pr-title-format).
 Contribution guidelines: https://github.com/flwrlabs/flower/blob/main/CONTRIBUTING.md
 -->
 
-## Issue
+## Why
+<!-- Why is this change needed? Describe its impact.
+     Link to related issues, PRs, or specifications. -->
 
-### Description
+## How
+<!-- Describe the implementation approach, important design decisions,
+     trade-offs, or deviations from the spec. Highlight anything that
+     needs human review. Keep brief for straightforward changes. -->
+
+## What
+<!-- Summarise the key changes in 1–3 bullets. -->
+
+-
+
+### How to test
+<!-- Give reproducible commands or steps and expected results.
+     Do not assume access to private environments or credentials.
+     Write "N/A" if not applicable. -->
+
+### Configuration & CLI changes
+<!-- List changes to environment variables, CLI flags, commands,
+     defaults, and compatibility implications. Never include secrets. -->
+
+None
+
+### Data model & database changes
+<!-- List data model or schema changes, migrations, backfills,
+     and backward compatibility considerations. -->
+
+None
+
+### Compatibility & breaking changes
+<!-- Describe changes to public APIs, CLI behaviour, configuration, or
+     existing Flower applications. Include migration instructions for
+     breaking changes. Write "None" if not applicable. -->
+
+None
+
+### Deployment & rollout
+<!-- Note deployment configuration, rollout steps, rollback considerations,
+     and post-deployment verification. Write "None" if not applicable. -->
+
+None
+
+### Validation
+- [ ] Relevant tests added/updated and passing (if applicable)
+- [ ] Tested locally (if applicable)
+- [ ] Documentation updated (if applicable)
+- [ ] Blocking AI reviewer findings addressed (if applicable)
+- [ ] CI checks pass
+- [ ] I understand the implementation and can explain it to maintainers
+
+### Risks & follow-up
+<!-- Note known limitations, outstanding risks, or follow-up work.
+     Write "None" if not applicable. -->
+
+None
 
 <!--
-Describe the problem addressed by this PR.
-
-Example: The variable name `rnd` could be misinterpreted as an abbreviation of *random*, but it refers to the current server round.
--->
-
-### Related issues/PRs
-
-<!--
-Link issues and/or PRs that are related to this PR.
-
-Example: Fixes #123. See also #456 and #789.
--->
-
-## Proposal
-
-### Explanation
-
-<!--
-Explain the changes and how they improve the issue described above.
-
-Example: The variable `rnd` was renamed to `server_round` to improve readability.
--->
-
-### Checklist
-
-- [ ] Implement proposed change
-- [ ] Write tests
-- [ ] Update [documentation](https://flower.ai/docs/writing-documentation.html)
-- [ ] Address LLM-reviewer comments, if applicable (e.g., GitHub Copilot)
-- [ ] Make CI checks pass
-- [ ] Ping maintainers on [Slack](https://flower.ai/join-slack/) (channel `#contributions`)
-
-### Any other comments?
-
-<!--
-Please be aware that it may take some time until the maintainers can review the PR.
-Smaller PRs with good descriptions can be considered much more easily.
-
-If you have an urgent request or question, please use the Flower Slack:
-
-    https://flower.ai/join-slack/ (channel: #contributions)
-
+For questions or to notify maintainers, visit the Flower Slack
+#contributions channel: https://flower.ai/join-slack/
+Smaller, focused PRs with clear descriptions are easier to review.
 Thank you for contributing to Flower!
 -->
