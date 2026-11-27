@@ -25,8 +25,12 @@ def make_start_automation_tool() -> JSONObject:
         "type": "function",
         "name": START_AUTOMATION_TOOL_NAME,
         "description": (
-            "Schedule work only when the user explicitly asks for future or "
-            "recurring execution."
+            "Create one automation per explicitly requested future or recurring "
+            "schedule. For recurring work, use start_at for the first run and "
+            "fixed_interval for later runs; do not create separate one-time "
+            "automations. Ask if the start time, recurrence interval, or timezone "
+            "for a local clock time is unknown. Do not retry if the creation "
+            "outcome is unknown."
         ),
         "parameters": {
             "type": "object",
@@ -37,24 +41,34 @@ def make_start_automation_tool() -> JSONObject:
                 },
                 "input": {
                     "type": "string",
-                    "description": "The input for each automated run.",
+                    "description": (
+                        "Work to perform on each run, without scheduling "
+                        "instructions or requests to create another automation."
+                    ),
                 },
                 "start_at": {
                     "type": "string",
                     "description": (
-                        "When to start, for example 2026-07-28T12:00:00+00:00."
+                        "First future run as an ISO 8601 timestamp with a UTC "
+                        "offset. Resolve local times using the user's timezone."
                     ),
                 },
                 "fixed_interval": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "Seconds between runs. Omit for one execution.",
+                    "description": (
+                        "Elapsed seconds between runs (600 = 10 minutes). Omit "
+                        "for one run. Fixed intervals may shift local clock time "
+                        "across daylight saving changes."
+                    ),
                 },
                 "max_runs": {
                     "type": "integer",
                     "minimum": 1,
                     "description": (
-                        "Maximum executions. Valid only with fixed_interval."
+                        "Total run limit. Set only when requested; omit for "
+                        "unlimited recurrence. A value of 1 means only one run, "
+                        "even with fixed_interval."
                     ),
                 },
             },
