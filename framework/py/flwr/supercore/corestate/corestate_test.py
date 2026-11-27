@@ -2858,19 +2858,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         space = state.create_space(
             participants=[alice, SpaceParticipant(flwr_aid="bob"), author]
         )
-        message = state.create_space_message(UUID(space.id), author, "Hello")
-        assert message is not None
+        item = state.store_space_item(
+            UUID(space.id), SpaceItemType.MESSAGE, "Hello", author
+        )
+        assert item is not None
         entries = state.get_user_events("alice", snapshot.cursor)
         self.assertEqual(
             [(entry.seq, entry.event.type) for entry in entries],
-            [(3, "space.created"), (4, "message.created")],
+            [(3, "space.created"), (4, "item.created")],
         )
         self.assertEqual(
             [entry.event for entry in entries],
             [entry.event for entry in state.get_user_events("bob")],
         )
         self.assertEqual(entries[1].event.payload["space_id"], space.id)
-        self.assertEqual(entries[1].event.payload["id"], str(message.id))
+        self.assertEqual(entries[1].event.payload["id"], str(item.id))
 
     def test_space_items_order_and_pagination(self) -> None:
         """Typed items share one order and support participant-scoped reads."""
@@ -2974,21 +2976,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(event.payload["id"], str(item.id))
         self.assertEqual(event.space_id, str(space_id))
 
-    def test_space_item_reads_do_not_advance_message_cursor(self) -> None:
-        """Reading items does not mark legacy messages as read."""
-        state = self.state_factory()
-        alice = SpaceParticipant(flwr_aid="alice")
-        space_id = UUID(state.create_space(participants=[alice]).id)
-        message = state.create_space_message(space_id, alice, "legacy")
-        assert message is not None
-        item = state.store_space_item(space_id, SpaceItemType.MESSAGE, "new", alice)
-        assert item is not None
-        self.assertEqual(state.get_space_items(space_id, alice), [item])
-        self.assertEqual(state.get_space_items(space_id, alice), [item])
-        self.assertEqual(
-            state.get_space_messages(space_id, alice, unread_only=True), [message]
-        )
-
     def test_space_item_read_cursors_are_independent(self) -> None:
         """Each participant tracks read items separately in each Space."""
         state = self.state_factory()
@@ -3081,10 +3068,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         space = state.create_space(
             participants=[alice, SpaceParticipant(flwr_aid="bob")]
         )
-        state.create_space_message(UUID(space.id), alice, "Private")
+        state.store_space_item(UUID(space.id), SpaceItemType.MESSAGE, "Private", alice)
         visible = state.create_space(participants=[alice])
-        state.create_space_message(UUID(visible.id), alice, "Visible")
-        state.create_space_message(UUID(space.id), alice, "Hidden tail")
+        state.store_space_item(
+            UUID(visible.id), SpaceItemType.MESSAGE, "Visible", alice
+        )
+        state.store_space_item(
+            UUID(space.id), SpaceItemType.MESSAGE, "Hidden tail", alice
+        )
         if isinstance(state, SqlCoreState):
             with state.session() as session:
                 session.execute(
@@ -3103,7 +3094,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         page = state.get_user_events("alice", 3, limit=1)
         self.assertEqual(
-            [(entry.seq, entry.event.type) for entry in page], [(4, "message.created")]
+            [(entry.seq, entry.event.type) for entry in page], [(4, "item.created")]
         )
         self.assertEqual(
             state.get_user_events("alice", 4), [StreamEventsResponse(seq=5)]

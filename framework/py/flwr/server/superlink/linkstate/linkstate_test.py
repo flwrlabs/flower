@@ -139,7 +139,6 @@ class StateTest(CoreStateTest):
         space_id = UUID(agent.default_space_id)
         alice = SpaceParticipant(flwr_aid="alice")
         agent_author = SpaceParticipant(agent_id=agent.id)
-        state.create_space_message(space_id, alice, "Legacy message")
         state.store_space_item(space_id, SpaceItemType.MESSAGE, "Own", agent_author)
         assert not state.get_agent_run_candidates()
         first = state.store_space_item(space_id, SpaceItemType.MESSAGE, "First", alice)

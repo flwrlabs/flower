@@ -81,7 +81,6 @@ from flwr.proto.runseries_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     Space,
     SpaceItem,
-    SpaceMessage,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import (  # pylint: disable=E0611
@@ -142,9 +141,6 @@ from flwr.supercore.state.schema.corestate_models import (
 from flwr.supercore.state.schema.corestate_models import SeriesRuns as SeriesRunsModel
 from flwr.supercore.state.schema.corestate_models import Space as SpaceModel
 from flwr.supercore.state.schema.corestate_models import SpaceItem as SpaceItemModel
-from flwr.supercore.state.schema.corestate_models import (
-    SpaceMessage as SpaceMessageModel,
-)
 from flwr.supercore.state.schema.corestate_models import SpaceParticipantTable
 from flwr.supercore.state.schema.corestate_models import Task as TaskModel
 from flwr.supercore.state.schema.corestate_models import TaskEvent as TaskEventModel
@@ -967,7 +963,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     def store_event(
         self,
         event_type: str,
-        payload: Agent | Space | SpaceMessage | SpaceItem | ProtoRun | Task,
+        payload: Agent | Space | SpaceItem | ProtoRun | Task,
         recipients: Sequence[str] | None = None,
         space_id: UUID | None = None,
     ) -> UUID:
@@ -1651,47 +1647,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     space.participants.add(agent_id=member_agent_id)
             return list(spaces.values())
 
-    def create_space_message(
-        self, space_id: UUID, author: SpaceParticipant, content: str
-    ) -> SpaceMessage | None:
-        """Authorize membership in the message insert itself."""
-        if not content.strip():
-            raise ValueError("Message content must be nonempty")
-        if not (author.flwr_aid or author.agent_id):
-            return None
-        field = "flwr_aid" if author.HasField("flwr_aid") else "agent_id"
-        identity = author.flwr_aid or author.agent_id
-        source = select(
-            SpaceParticipantTable.c.space_id,
-            SpaceParticipantTable.c.flwr_aid,
-            SpaceParticipantTable.c.agent_id,
-            literal(now(), type_=UTCDateTime()),
-            literal(content),
-        ).where(
-            SpaceParticipantTable.c.space_id == space_id,
-            SpaceParticipantTable.c[field] == identity,
-        )
-        with self.session() as session:
-            model = session.scalars(
-                insert(SpaceMessageModel)
-                .from_select(
-                    [
-                        "space_id",
-                        "flwr_aid",
-                        "agent_id",
-                        "created_at",
-                        "content",
-                    ],
-                    source,
-                )
-                .returning(SpaceMessageModel)
-            ).one_or_none()
-            if model is None:
-                return None
-            message = _space_message_from_model(model)
-            self.store_event(EventType.MESSAGE_CREATED, message, space_id=space_id)
-            return message
-
     def store_space_item(
         self,
         space_id: UUID,
@@ -1806,78 +1761,6 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     .values(read_through_item_id=read_through)
                 )
             return items if unread_only or after_id is not None else items[::-1]
-
-    def get_space_messages(  # pylint: disable=too-many-arguments
-        self,
-        space_id: UUID,
-        participant: SpaceParticipant,
-        *,
-        limit: int = 50,
-        before_id: int | None = None,
-        after_id: int | None = None,
-        unread_only: bool = False,
-    ) -> Sequence[SpaceMessage] | None:
-        """Read messages and advance the participant's read cursor."""
-        if limit <= 0:
-            raise ValueError("limit must be positive")
-        if before_id is not None and after_id is not None and after_id >= before_id:
-            raise ValueError("after_id must be less than before_id")
-        if not (participant.flwr_aid or participant.agent_id):
-            return None
-        field = "flwr_aid" if participant.HasField("flwr_aid") else "agent_id"
-        identity = participant.flwr_aid or participant.agent_id
-        message_conditions = [
-            SpaceMessageModel.space_id == SpaceParticipantTable.c.space_id
-        ]
-        if unread_only:
-            message_conditions.append(
-                SpaceMessageModel.id > SpaceParticipantTable.c.read_through_message_id
-            )
-        # Larger protobuf uint64 bounds include every supported BIGINT message ID.
-        if before_id is not None and before_id <= 2**63 - 1:
-            message_conditions.append(SpaceMessageModel.id < before_id)
-        if after_id is not None:
-            message_conditions.append(SpaceMessageModel.id > min(after_id, 2**63 - 1))
-        query = (
-            select(SpaceMessageModel)
-            .select_from(SpaceParticipantTable)
-            .outerjoin(SpaceMessageModel, and_(*message_conditions))
-            .where(
-                SpaceParticipantTable.c.space_id == space_id,
-                SpaceParticipantTable.c[field] == identity,
-            )
-            .order_by(
-                SpaceMessageModel.id.asc()
-                if unread_only or after_id is not None
-                else SpaceMessageModel.id.desc()
-            )
-            .limit(limit)
-        )
-        with self.session() as session:
-            models = list(session.scalars(query))
-            if not models:
-                return None
-            messages = [
-                _space_message_from_model(model)
-                for model in models
-                if model is not None
-            ]
-            if messages:
-                read_through = max(message.id for message in messages)
-                session.execute(
-                    update(SpaceParticipantTable)
-                    .where(
-                        SpaceParticipantTable.c.space_id == space_id,
-                        SpaceParticipantTable.c[field] == identity,
-                        SpaceParticipantTable.c.read_through_message_id < read_through,
-                    )
-                    .values(read_through_message_id=read_through)
-                )
-            return (
-                messages
-                if unread_only or after_id is not None
-                else list(reversed(messages))
-            )
 
     def get_run_series(  # pylint: disable=R0913,R0914
         self,
@@ -3216,24 +3099,6 @@ def _space_from_model(model: SpaceModel) -> Space:
         id=str(model.id),
         title=model.title,
         created_at=model.created_at.isoformat(),
-    )
-
-
-def _space_message_from_model(
-    model: SpaceMessageModel,
-) -> SpaceMessage:
-    """Convert a persisted user or agent message to its API representation."""
-    author = SpaceParticipant()
-    if model.flwr_aid is not None:
-        author.flwr_aid = model.flwr_aid
-    else:
-        author.agent_id = cast(int, model.agent_id)
-    return SpaceMessage(
-        id=model.id,
-        space_id=str(model.space_id),
-        author=author,
-        created_at=model.created_at.isoformat(),
-        content=model.content,
     )
 
 
