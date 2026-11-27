@@ -30,6 +30,7 @@ class AccountAuthLoginDetails:  # pylint: disable=too-many-instance-attributes
     verification_uri: str = ""
     user_code: str = ""
     supports_cli_signup: bool = False
+    web_signup_url: str = ""
 
 
 @dataclass
