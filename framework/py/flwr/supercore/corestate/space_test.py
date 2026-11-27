@@ -18,7 +18,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from flwr.proto.control_pb2 import AgentConfig  # pylint: disable=E0611
+from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    AgentConfig,
+    BootstrapResponse,
+)
 from flwr.proto.space_pb2 import SpaceParticipant  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.in_memory_linkstate import InMemoryLinkState
 from flwr.server.superlink.linkstate.sql_linkstate import SqlLinkState
@@ -88,8 +91,7 @@ def test_latest_message(state: CoreState) -> None:
     state.store_space_item(
         UUID(personal.id), SpaceItemType.MESSAGE, "Agent-only space", author
     )
-    shared = state.create_space(participants=[alice, bob, author])
-    space_id = UUID(shared.id)
+    space_id = UUID(state.create_space(participants=[alice, bob, author]).id)
     state.create_space_message(space_id, alice, "Legacy prompt")
     assert state.get_spaces("bob")[0].latest_message == ""
     first = state.store_space_item(
@@ -105,14 +107,17 @@ def test_latest_message(state: CoreState) -> None:
     automation = state.store_space_item(space_id, SpaceItemType.AUTOMATION, "Scheduled")
     assert state.get_spaces("bob")[0].latest_message == "Agent reply"
     follow_up = state.store_space_item(space_id, SpaceItemType.MESSAGE, prompt, bob)
-    snapshot = state.get_bootstrap("bob")
-    restored = type(snapshot).FromString(snapshot.SerializeToString())
-    assert restored.spaces[0].latest_message == prompt
+    assert (
+        BootstrapResponse.FromString(state.get_bootstrap("bob").SerializeToString())
+        .spaces[0]
+        .latest_message
+        == prompt
+    )
     other = state.create_space(participants=[alice])
     state.store_space_item(UUID(other.id), SpaceItemType.MESSAGE, "Other space", alice)
     assert {space.id: space.latest_message for space in state.get_spaces("alice")} == {
         personal.id: "Agent-only space",
-        shared.id: prompt,
+        str(space_id): prompt,
         other.id: "Other space",
     }
     assert previous.latest_message == "First prompt"
