@@ -83,12 +83,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
 )
 from flwr.supercore.dependencies.runtime import (
     RuntimeHandlersDependency,
@@ -279,16 +275,6 @@ def get_space_events(
     return core_runtime_handlers.get_space_events(request, state, task)
 
 
-@router.post("/get-space-messages")
-def runtime_get_space_messages(
-    request: Annotated[GetSpaceMessagesRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: RuntimeStateDependency,
-    task: TaskDependency,
-) -> GetSpaceMessagesResponse:
-    """Read messages from the authenticated task's Space."""
-    return core_runtime_handlers.get_space_messages(request, state, task)
-
-
 @router.post("/get-space-items")
 def runtime_get_space_items(
     request: Annotated[GetSpaceItemsRequest, PROTOBUF_REQUEST_DEPENDENCY],
@@ -297,16 +283,6 @@ def runtime_get_space_items(
 ) -> GetSpaceItemsResponse:
     """Read items from the authenticated task's Space."""
     return core_runtime_handlers.get_space_items(request, state, task)
-
-
-@router.post("/send-space-message")
-def runtime_send_space_message(
-    request: Annotated[SendSpaceMessageRequest, PROTOBUF_REQUEST_DEPENDENCY],
-    state: RuntimeStateDependency,
-    task: TaskDependency,
-) -> SendSpaceMessageResponse:
-    """Publish a message to the authenticated task's Space."""
-    return core_runtime_handlers.send_space_message(request, state, task)
 
 
 @router.post("/send-space-item")

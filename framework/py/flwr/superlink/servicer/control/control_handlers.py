@@ -163,14 +163,10 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceResponse,
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     ListSpacesRequest,
     ListSpacesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SpaceParticipant,
 )
 from flwr.server.superlink.linkstate import LinkState
@@ -1576,31 +1572,6 @@ def list_spaces(
     return ListSpacesResponse(spaces=state.get_spaces(account.user_id))
 
 
-def get_space_messages(
-    request: GetSpaceMessagesRequest, account: AuthenticatedUser, state: LinkState
-) -> GetSpaceMessagesResponse:
-    """Read a participating user's message history with an exclusive ID cursor."""
-    limit = request.limit if request.HasField("limit") else 50
-    if limit > MAX_SPACE_PAGE_SIZE:
-        raise InvalidSpaceRequestError(f"limit must be at most {MAX_SPACE_PAGE_SIZE}.")
-    try:
-        messages = state.get_space_messages(
-            UUID(request.space_id),
-            SpaceParticipant(flwr_aid=account.user_id),
-            limit=limit,
-            before_id=request.before_id if request.HasField("before_id") else None,
-            unread_only=request.unread_only,
-        )
-    except ValueError as exc:
-        raise InvalidSpaceRequestError(str(exc)) from exc
-    if messages is None:
-        raise FlowerError(
-            ApiErrorCode.SPACE_NOT_FOUND,
-            "Space not found or account is not a participant.",
-        )
-    return GetSpaceMessagesResponse(messages=messages)
-
-
 def get_space_items(
     request: GetSpaceItemsRequest, account: AuthenticatedUser, state: LinkState
 ) -> GetSpaceItemsResponse:
@@ -1624,26 +1595,6 @@ def get_space_items(
             "Space not found or account is not a participant.",
         )
     return GetSpaceItemsResponse(items=items)
-
-
-def send_space_message(
-    request: SendSpaceMessageRequest, account: AuthenticatedUser, state: LinkState
-) -> SendSpaceMessageResponse:
-    """Persist a message authored by the authenticated account."""
-    try:
-        message = state.create_space_message(
-            UUID(request.space_id),
-            SpaceParticipant(flwr_aid=account.user_id),
-            request.content,
-        )
-    except ValueError as exc:
-        raise InvalidSpaceRequestError(str(exc)) from exc
-    if message is None:
-        raise FlowerError(
-            ApiErrorCode.SPACE_NOT_FOUND,
-            "Space not found or account is not a participant.",
-        )
-    return SendSpaceMessageResponse(message=message)
 
 
 def send_space_item(

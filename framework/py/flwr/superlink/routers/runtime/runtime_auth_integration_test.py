@@ -39,12 +39,8 @@ from flwr.proto.runtime_pb2 import (  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     GetSpaceItemsRequest,
     GetSpaceItemsResponse,
-    GetSpaceMessagesRequest,
-    GetSpaceMessagesResponse,
     SendSpaceItemRequest,
     SendSpaceItemResponse,
-    SendSpaceMessageRequest,
-    SendSpaceMessageResponse,
     SpaceParticipant,
 )
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
@@ -271,42 +267,6 @@ def test_get_space_events_reads_only_authenticated_space(
     assert len(events) == 1
     assert events[0].run_id == run_ids[0]
     assert events[0].event == "message"
-
-
-def test_space_messages_use_authenticated_run(
-    client: TestClient, agent: tuple[int, str, str]
-) -> None:
-    """Read and publish with the authenticated Run's Space and agent identity."""
-    agent_id, space_id, token = agent
-    participant = SpaceParticipant(agent_id=agent_id)
-    for path, request in (
-        ("get-space-messages", GetSpaceMessagesRequest()),
-        ("send-space-message", SendSpaceMessageRequest(content="Hello")),
-    ):
-        assert _post(client, path, request).status_code == 401
-
-    response = _post(
-        client,
-        "send-space-message",
-        SendSpaceMessageRequest(space_id="ignored", content="Hello"),
-        token=token,
-    )
-    assert response.status_code == 200
-    message = SendSpaceMessageResponse.FromString(response.content).message
-    assert message.author == participant
-    assert message.space_id == space_id and message.content == "Hello"
-
-    for expected in ([message], []):
-        response = _post(
-            client,
-            "get-space-messages",
-            GetSpaceMessagesRequest(space_id="ignored", unread_only=True),
-            token=token,
-        )
-        assert response.status_code == 200
-        assert (
-            GetSpaceMessagesResponse.FromString(response.content).messages == expected
-        )
 
 
 def test_space_item_endpoints_use_authenticated_run(
