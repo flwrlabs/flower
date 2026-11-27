@@ -1,0 +1,1047 @@
+:og:description: Run Flower simulations on AMD Instinct GPUs with ROCm. Configure Ray's AMD GPU discovery via ROCM_PATH and HIP_VISIBLE_DEVICES so the Simulation Runtime can place ClientApps.
+.. meta::
+    :description: Run Flower simulations on AMD Instinct GPUs with ROCm. Configure Ray's AMD GPU discovery via ROCM_PATH and HIP_VISIBLE_DEVICES so the Simulation Runtime can place ClientApps.
+
+.. |clientapp_link| replace:: ``ClientApp``
+
+.. _clientapp_link: ref-api/flwr.client.ClientApp.html
+
+#############################
+ Run simulations on AMD GPUs
+#############################
+
+Flower is framework-agnostic and performs no GPU compute of its own: all device work is
+delegated to the ML framework your |clientapp_link|_ uses. On AMD Instinct GPUs,
+acceleration therefore comes from a ROCm build of that framework (for example, PyTorch
+for ROCm). Flower itself is pure Python, compiles no device code, and runs unmodified --
+there is no separate AMD build of ``flwr``.
+
+The Simulation Runtime is a second, independent consumer of the GPU. It uses Ray to
+schedule ``ClientApp`` instances, and **Ray discovers AMD GPUs through a different
+mechanism than your ML framework does**. The two can disagree: it is common for
+``torch.cuda.is_available()`` to return ``True`` while Ray reports zero GPUs. When that
+happens, every run that requests a GPU fraction fails before training starts. This guide
+covers the AMD-specific setup that keeps the two in agreement.
+
+.. note::
+
+    PyTorch for ROCm exposes AMD GPUs through the ``cuda`` device namespace.
+    ``torch.device("cuda")`` and ``torch.cuda.is_available()`` refer to the AMD GPU via
+    HIP. No change to your ``ClientApp`` code is required.
+
+The steps below were validated on a single-node AMD Instinct MI300X (gfx942) running
+ROCm; other Instinct-class cards behave the same way. Consumer Radeon cards may
+additionally need ``HSA_OVERRIDE_GFX_VERSION`` to be set for the ML framework -- a ROCm
+concern rather than a Flower one; see AMD's ROCm documentation. Multi-GPU and multi-node
+placement follow the same discovery rules described here, but are not covered
+separately.
+
+***********************************
+ Check that ROCm can reach the GPU
+***********************************
+
+This guide assumes a working ROCm installation underneath. ROCm reaches the GPU through
+``/dev/kfd`` and ``/dev/dri/renderD*``, which are normally owned by the ``render``
+group:
+
+.. code-block:: shell
+
+    ls -l /dev/kfd   # e.g. crw-rw---- 1 root render ...
+    id -nG           # must list the owning group
+
+If your account is not in that group, your ML framework cannot use the GPU: it opens
+``/dev/kfd`` directly for compute, and no ``ROCM_PATH``/``HIP_VISIBLE_DEVICES``
+configuration covered later in this guide changes that -- only group membership or
+device pass-through will. Ray's own GPU count works differently: it comes from the
+``amdsmi`` package rather than opening ``/dev/kfd`` directly, so Ray may still report
+the GPU as present even while your ``ClientApp`` cannot use it -- a non-zero Ray GPU
+count does not mean this group-membership issue does not apply to you. Add yourself to
+the ``render`` and ``video`` groups with ``sudo usermod -aG render,video "$USER"``, then
+start a new login session. If you run Flower in a container, pass the devices through
+instead:
+
+.. code-block:: shell
+
+    docker run --device=/dev/kfd --device=/dev/dri \
+        --group-add video --group-add render ...
+
+``render`` matters as much as ``video``: ``/dev/kfd`` is owned by it, so a non-root
+container that adds only ``video`` still sees zero GPUs. If your distribution owns the
+devices with a differently named group, add that one instead -- the ``ls -l`` above
+reports it.
+
+The rest of this guide addresses the opposite, more confusing case: ROCm works and your
+ML framework sees the GPU, but Ray does not.
+
+******************************************
+ Install the ROCm framework before Flower
+******************************************
+
+Install your ROCm-enabled ML framework first, following AMD's instructions for that
+framework, and only then install Flower:
+
+.. code-block:: shell
+
+    # 1a. ROCm already installed system-wide (e.g. /opt/rocm): install a matching
+    #     ROCm build of your framework. Replace "rocm6.4" with the index for your
+    #     version; https://pytorch.org/get-started/locally/ reports the right one.
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.4
+
+    # 1b. No system ROCm: install ROCm and the framework together from AMD's
+    #     index. This produces the wheel-based layout discussed below. Replace
+    #     gfx942 with your architecture, which `rocminfo | grep gfx` reports.
+    pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ \
+        "rocm[libraries,devel,device-gfx942]" "torch[device-gfx942]" \
+        "torchvision[device-gfx942]"
+
+    # 2. Flower with the simulation extra, which pulls in Ray
+    pip install "flwr[simulation]"
+
+.. important::
+
+    Install the two in separate commands, in this order. Resolving them together can let
+    ``pip`` select the default PyPI ``torch`` wheel, which is built for CUDA and will
+    never see an AMD GPU. The installation succeeds and only fails later, at the point
+    where your ``ClientApp`` tries to use the device.
+
+.. important::
+
+    Installing ROCm wheels into your own environment is not sufficient for the default
+    ``flwr run`` workflow. By default, the SuperLink that ``flwr run`` starts installs
+    each run's app dependencies into a fresh, isolated environment and activates it in
+    place of your base environment. An app that declares a plain ``torch`` dependency
+    can therefore resolve the default CUDA wheel from PyPI into that fresh environment
+    even though both GPU checks below pass in your base environment. Choose one:
+
+    - Pin the ROCm index in the app's own ``pyproject.toml``, so the install Flower
+      performs for you resolves the same wheels:
+
+      .. code-block:: toml
+
+          [[tool.uv.index]]
+          name = "rocm"
+          url = "https://download.pytorch.org/whl/rocm6.4"
+          explicit = true
+
+          [tool.uv.sources]
+          torch = { index = "rocm" }
+          torchvision = { index = "rocm" }
+
+    - Or preinstall every app dependency into your base environment and skip the per-run
+      install entirely, by disabling it before the SuperLink starts:
+
+      .. code-block:: shell
+
+          export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1
+
+      Set this *before* the first ``flwr run`` of the session -- a local SuperLink is
+      started lazily on first use and, like ``ROCM_PATH`` and ``HIP_VISIBLE_DEVICES``
+      below, keeps the environment it started with until it is stopped and restarted.
+      The equivalent flag on a SuperLink you start yourself is
+      ``--disable-runtime-dependency-installation``.
+
+***********************************
+ Point Ray at the ROCm SMI library
+***********************************
+
+Ray (this repo pins Ray 2.56.0) no longer opens ``librocm_smi64.so`` directly: it
+discovers AMD GPUs through the ``amdsmi`` Python package, via
+``ray._private.thirdparty.pyamdsmi``, which does ``import amdsmi`` and calls into it.
+
+.. important::
+
+    A missing or unimportable ``amdsmi`` fails silently. Ray's AMD accelerator manager
+    catches the resulting ``ImportError`` and simply reports zero GPUs -- there is no
+    visible error anywhere in Ray's own logs. If Ray reports ``GPU=0`` while
+    ``/dev/kfd`` and an AMD-backed render node are both accessible (see Troubleshooting_
+    below), this is almost always the cause.
+
+Confirm ``amdsmi`` is importable in the **exact same Python environment Ray runs in** --
+a venv created with ``uv`` or ``python -m venv`` does not see packages installed into
+the system/apt Python by default, which is a common trap:
+
+.. code-block:: shell
+
+    python -c "import amdsmi; print(amdsmi.__file__)"
+
+If that fails, install ``amdsmi`` one of two ways:
+
+- **System package** (``apt install amd-smi-lib`` or your distribution's equivalent):
+  installs ``amdsmi`` into the **system** Python's site-packages via the package's
+  post-install script, together with its own bundled ``libamd_smi.so``. This is
+  invisible to an isolated virtual environment unless that environment has
+  system-site-packages access.
+- **Pip wheel** (``pip install amdsmi``): installs a pure-Python wrapper with no bundled
+  ``.so``. It locates the native library itself, checking ``ROCM_HOME`` before
+  ``ROCM_PATH`` (the opposite order from the rest of this guide), then
+  ``lib/libamd_smi.so`` under whichever of those is set -- the same
+  unversioned-shared-library requirement as ``librocm_smi64.so`` above, just a different
+  filename. Use the same unset-vs-empty check, substituting ``libamd_smi.so``:
+
+  .. code-block:: shell
+
+      if [ -n "${ROCM_HOME+x}" ]; then
+          _rocm_root="$ROCM_HOME"
+      elif [ -n "${ROCM_PATH+x}" ]; then
+          _rocm_root="$ROCM_PATH"
+      else
+          _rocm_root="/opt/rocm"
+      fi
+      test -f "$_rocm_root/lib/libamd_smi.so" && echo "amd_smi library found"
+      unset _rocm_root
+
+  When ROCm is installed from wheels, the same root split as above applies: only
+  ``_rocm_sdk_devel`` (the ``devel`` extra) ships the unversioned ``libamd_smi.so``
+  symlink -- ``_rocm_sdk_core`` ships only the versioned ``libamd_smi.so.<N>``. Point
+  ``ROCM_HOME``/``ROCM_PATH`` at the root ``rocm-sdk path --root`` reports, same as
+  above. Installing ``rocm[devel]`` does **not** itself provide the importable
+  ``amdsmi`` package -- it bundles the package's source and native library for its own
+  CLI tooling, but neither is placed on Python's import path. The pip wheel above is
+  still required even with ``rocm[devel]`` installed.
+
+.. note::
+
+    Pinned to an older Ray release (before 2.56)? AMD GPU discovery there opens
+    ``$ROCM_PATH/lib/librocm_smi64.so`` directly instead of going through ``amdsmi`` --
+    the ``amdsmi`` requirement above does not apply. ``ROCM_PATH`` defaults to
+    ``/opt/rocm``, but a wheel-based ROCm install usually has no ``/opt/rocm`` at all, so
+    it must be set explicitly, and Ray opens the library by its **unversioned** name -- a
+    ROCm tree that ships only a versioned ``librocm_smi64.so.<N>`` with no unversioned
+    symlink is not sufficient.
+
+    Confirm the library is where Ray will look for it, using the same unset-vs-empty test
+    as ``ROCR_VISIBLE_DEVICES`` below rather than a plain ``${ROCM_PATH:-/opt/rocm}``
+    substitution -- older Ray only applies its own ``/opt/rocm`` default when
+    ``ROCM_PATH`` is completely absent from the environment, not when it is set to an
+    empty string:
+
+    .. code-block:: shell
+
+        if [ -n "${ROCM_PATH+x}" ]; then
+            _rocm_path="$ROCM_PATH"
+        else
+            _rocm_path="/opt/rocm"
+        fi
+        test -f "$_rocm_path/lib/librocm_smi64.so" && echo "ROCm SMI found"
+        unset _rocm_path
+
+    If that prints nothing, set ``ROCM_PATH`` to a ROCm root that contains the
+    unversioned symlink. When ROCm is installed from wheels, only ``_rocm_sdk_devel``
+    (the ``devel`` extra) ships that symlink -- ``_rocm_sdk_core`` ships only the
+    versioned ``librocm_smi64.so.<N>`` -- and ``rocm-sdk path --root``, also from the
+    ``devel`` extra, reports the correct root:
+
+    .. code-block:: shell
+
+        export ROCM_PATH="$(rocm-sdk path --root)"
+
+    Published ROCm container recipes commonly set ``ROCM_PATH`` to the *core* root,
+    which is correct for your ML framework but leaves Ray unable to enumerate GPUs. If
+    you adapt such an image for the Simulation Runtime, override ``ROCM_PATH`` for Ray.
+
+*************************************
+ Set ``HIP_VISIBLE_DEVICES`` for Ray
+*************************************
+
+Many GPU hosts preset ``ROCR_VISIBLE_DEVICES`` in the login environment. Ray rejects
+that variable: when ``ROCR_VISIBLE_DEVICES`` is set and ``HIP_VISIBLE_DEVICES`` is not,
+``import ray`` raises ``RuntimeError: Please use HIP_VISIBLE_DEVICES instead of
+ROCR_VISIBLE_DEVICES``.
+
+The failure occurs at **import** time, not at ``ray.init()``. Because every Ray worker
+re-imports Ray on startup, this also surfaces indirectly as workers that never register.
+
+Satisfy Ray without disturbing ``ROCR_VISIBLE_DEVICES``, by deriving
+``HIP_VISIBLE_DEVICES`` from how many devices it already lists rather than copying its
+values. Only *synthesize* a value when ``HIP_VISIBLE_DEVICES`` is not already set -- the
+import error this works around only occurs in that case, and an existing value may
+deliberately select a subset of the ROCr-visible devices. Test for
+``ROCR_VISIBLE_DEVICES`` being *set*, not merely non-empty: a scheduler can export it as
+an empty string to hide every device, and that case must still satisfy Ray's import
+guard by propagating an equally empty ``HIP_VISIBLE_DEVICES`` -- counting entries in an
+empty string would otherwise synthesize ``HIP_VISIBLE_DEVICES=0`` and wrongly reveal a
+device. The same applies to the nonempty ``-1`` sentinel some schedulers use for "no
+device", and to Slurm's own ``NoDevFiles`` sentinel -- documented for its GPU GRES
+integration -- which it exports instead when an allocation has no bound GPU device
+files: both contain no comma, so the comma-counting branch would otherwise read either
+one as one listed GPU and export ``HIP_VISIBLE_DEVICES=0``, letting Ray advertise and
+schedule onto a device ROCr never actually exposed.
+
+The snippet also exports ``ROCR_VISIBLE_DEVICES`` itself, in case it was only a plain
+shell variable rather than an exported one -- for example a setup script that assigned
+it without ``export``, then was merely sourced into the current shell. Left
+un-exported, a child process such as the one ``flwr run`` launches would inherit no
+ROCr filter at all, while the ``HIP_VISIBLE_DEVICES`` this snippet synthesizes still
+assumes that filter applied, so the child indexes into the unfiltered physical device
+set instead of the ROCr-renumbered one and ends up on the wrong GPU. This mirrors the
+export ``HIP_VISIBLE_DEVICES`` itself receives further below when it was already set
+but not exported.
+
+When ``HIP_VISIBLE_DEVICES`` is already set, do not simply trust it, either: validate
+that every value it names is actually an ordinal ROCr's filtering leaves available,
+rather than assuming any existing nonempty value is already expressed correctly. A
+scheduler, or an earlier, less careful shell setup, can copy a *physical* device ID into
+both variables -- for example ``ROCR_VISIBLE_DEVICES=3`` alongside
+``HIP_VISIBLE_DEVICES=3``. Left alone, that pair passes every check below while still
+being broken: ROCr's filter exposes that single device as ordinal ``0``, so
+``HIP_VISIBLE_DEVICES=3`` asks for an ordinal that no longer exists, and the
+verification steps later in this guide still report zero GPUs with no indication of why.
+
+A value can also be in range and syntactically well-formed while still being wrong: a
+repeated ordinal, such as ``HIP_VISIBLE_DEVICES=0,0``, passes a check that only looks at
+each value in isolation. Ray 2.56.0 sizes its advertised GPU resources from the length
+of this mask -- unaffected by the ``amdsmi`` switch above, since
+``smi_get_device_count`` still reports the node's total physical device count rather
+than anything already filtered by ``HIP_VISIBLE_DEVICES`` -- so a duplicate ordinal
+creates two schedulable slots that both map to the same ROCr-visible device, letting
+concurrent ClientApps collide on it instead of each getting a distinct GPU. A duplicate
+can also hide behind a leading-zero alias -- ``0`` and ``00`` are the same ordinal to
+HIP, but two distinct strings to a naive comparison -- so the snippet normalizes each
+value before comparing, rather than comparing the spellings it was given. It also
+rejects the mask in that case rather than accepting a syntactically-valid-looking
+duplicate.
+
+A trailing comma is a similar trap: Bash's ``read -ra`` silently drops a single empty
+field left by a trailing separator, so ``HIP_VISIBLE_DEVICES=0,1,`` parses to the same
+two values as ``0,1`` and would otherwise pass every check above unchanged. Ray does not
+make that same allowance -- it splits the raw string itself and sizes its GPU resources
+from the resulting field count, including the empty one -- so it can advertise a slot
+that no ordinal maps to. The snippet checks the raw string for a trailing comma before
+trusting what ``read -ra`` parsed from it, and rejects the mask if one is present.
+
+This snippet requires **Bash**: it uses here-strings (``<<<``), ``read -ra``, and ``[[
+... =~ ... ]]`` regex matching, none of which are POSIX ``sh`` features. Run it with
+``bash``, not with ``sh`` or a POSIX-only shell like ``dash`` -- on Debian and Ubuntu in
+particular, ``/bin/sh`` is ``dash``, so pasting this directly into a ``#!/bin/sh``
+script or a ``sh -c "..."`` invocation fails before ``HIP_VISIBLE_DEVICES`` is ever
+exported, silently leaving Ray's original import failure in place:
+
+.. code-block:: bash
+
+    unset _n
+    if [ -n "${ROCR_VISIBLE_DEVICES+x}" ]; then
+        # ROCR_VISIBLE_DEVICES may only be a plain shell variable, not an
+        # exported one (e.g. a setup script assigned it without `export`,
+        # then was merely sourced) -- a child process would then inherit no
+        # ROCr filter at all, while HIP_VISIBLE_DEVICES is still derived
+        # below as if that filter applied, pointing the child at the wrong
+        # physical device. Export it unconditionally, before using its value
+        # for anything below, since every branch here relies on the child
+        # process seeing the same mask this derivation is based on.
+        export ROCR_VISIBLE_DEVICES
+        if [ -z "$ROCR_VISIBLE_DEVICES" ] || [ "$ROCR_VISIBLE_DEVICES" = "-1" ] ||
+            [ "$ROCR_VISIBLE_DEVICES" = "NoDevFiles" ]; then
+            _n=0
+        elif [[ "$ROCR_VISIBLE_DEVICES" =~ (^,|,,|,$) ]]; then
+            # A leading, trailing, or doubled separator (e.g. `,0`, `0,`, or
+            # `0,,1`) leaves an empty field that a plain comma count would
+            # read as a listed device. Leave `_n` unset instead, handled the
+            # same "bound unknown" way as ROCR_VISIBLE_DEVICES itself being
+            # unset.
+            echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has a" \
+                 "leading, trailing, or doubled comma -- the number of" \
+                 "devices it exposes cannot be derived from it. Fix" \
+                 "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+        else
+            IFS=',' read -ra _rocr_ids <<<"$ROCR_VISIBLE_DEVICES"
+            _rocr_norm=()
+            _rocr_bad_id=0
+            _rocr_has_numeric=0
+            _rocr_has_uuid=0
+            for _id in "${_rocr_ids[@]}"; do
+                if [[ "$_id" =~ ^[0-9]+$ ]]; then
+                    # ROCr treats `0` and `00` as the same ordinal, but they
+                    # are two distinct strings to a raw-string comparison --
+                    # normalize before checking for duplicates, the same way
+                    # the HIP_VISIBLE_DEVICES validation below does.
+                    _trimmed_id="${_id#"${_id%%[!0]*}"}"
+                    [ -z "$_trimmed_id" ] && _trimmed_id=0
+                    _rocr_norm+=("$_trimmed_id")
+                    _rocr_has_numeric=1
+                elif [[ "$_id" =~ ^GPU-[0-9a-fA-F]+$ ]]; then
+                    # ROCR_VISIBLE_DEVICES also accepts a `GPU-<hex>` UUID in
+                    # place of a numeric ordinal; it still names exactly one
+                    # device, so it is counted the same as a numeric entry,
+                    # just not leading-zero-normalized. The character class
+                    # deliberately excludes `-`: allowing it throughout the
+                    # suffix (as an earlier version of this regex did) still
+                    # matches malformed values with no hex digits at all, such
+                    # as `GPU--`, and would count them as one real device too.
+                    # The hex digits are case-insensitive to ROCr but not to a
+                    # raw-string comparison -- lowercase before storing so
+                    # `GPU-abcd` and `GPU-ABCD` are recognized as the same
+                    # device by the duplicate check below, the same way
+                    # leading zeros are normalized for numeric ordinals above.
+                    _rocr_norm+=("${_id,,}")
+                    _rocr_has_uuid=1
+                else
+                    # Neither a numeric ordinal nor the documented `GPU-<hex>`
+                    # UUID syntax -- for example a typo like `bogus`. Counting
+                    # it as one real device below would let Ray size a
+                    # schedulable GPU slot that ROCr never actually exposes.
+                    # Leave `_n` unset instead, handled the same "bound
+                    # unknown" way as ROCR_VISIBLE_DEVICES itself being unset.
+                    _rocr_bad_id=1
+                fi
+            done
+            if [ "$_rocr_bad_id" -eq 1 ]; then
+                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES has an" \
+                     "entry that is neither a numeric ordinal nor a GPU-<hex>" \
+                     "UUID -- the number of devices it exposes cannot be" \
+                     "derived from it. Fix ROCR_VISIBLE_DEVICES itself and" \
+                     "re-run this snippet." >&2
+            elif [ "$_rocr_has_numeric" -eq 1 ] && [ "$_rocr_has_uuid" -eq 1 ]; then
+                # A numeric ordinal and a GPU-<hex> UUID are unrelated strings
+                # to this snippet -- it has no way to resolve the UUID back to
+                # a physical device and check whether it names the same GPU as
+                # one of the numeric entries (e.g. `0,GPU-<uuid-of-0>`). If
+                # they do name the same device, ROCr's filtered set still
+                # contains it only once, yet counting both forms as distinct
+                # would still synthesize a second, no-ROCr-visible-ordinal
+                # slot in HIP_VISIBLE_DEVICES below. Leave `_n` unset instead
+                # of guessing.
+                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES mixes" \
+                     "numeric ordinals and GPU-<hex> UUIDs -- this snippet" \
+                     "cannot tell whether an ordinal and a UUID name the same" \
+                     "physical GPU, so the number of distinct devices it" \
+                     "exposes cannot be derived from it. Resolve every entry" \
+                     "to the same identifier form (all ordinals or all UUIDs)" \
+                     "and re-run this snippet." >&2
+            else
+                _rocr_dup=$(printf '%s\n' "${_rocr_norm[@]}" | sort | uniq -d)
+                if [ -n "$_rocr_dup" ]; then
+                    # A duplicated entry (e.g. `0,0`, or `0,00` once
+                    # normalized) makes a plain comma count overstate how
+                    # many distinct devices ROCR_VISIBLE_DEVICES actually
+                    # exposes -- `0,0` is one device, not two -- so deriving
+                    # `_n` from it would size both the HIP_VISIBLE_DEVICES
+                    # synthesis and the ordinal-bounds check below off a
+                    # wrong count, and would under-count ROCr's own
+                    # filtering: only one distinct GPU remains, yet Ray would
+                    # still advertise a second, no-ordinal-backed slot. Leave
+                    # `_n` unset instead.
+                    echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                         "repeats ordinal(s) $_rocr_dup once leading zeros are" \
+                         "normalized -- the number of distinct devices it" \
+                         "exposes cannot be derived from it. Fix" \
+                         "ROCR_VISIBLE_DEVICES itself and re-run this snippet." >&2
+                else
+                    # A syntactically well-formed, deduplicated entry can
+                    # still name a device that does not exist on this host --
+                    # e.g. ROCR_VISIBLE_DEVICES=7 on a one-GPU host, or a
+                    # well-formed but nonexistent GPU-<hex> UUID. ROCr itself
+                    # exposes zero devices for such an entry, but nothing
+                    # above catches it: it already passed every syntax/mix/
+                    # duplicate check. Trusting ${#_rocr_ids[@]}` regardless
+                    # would still synthesize HIP_VISIBLE_DEVICES=0 below, and
+                    # Ray can size a schedulable GPU slot from that mask and
+                    # the host's physical device count even though ROCr never
+                    # actually exposes anything for the bad entry.
+                    if [ "$_rocr_has_uuid" -eq 1 ]; then
+                        # A GPU-<hex> UUID names one specific physical
+                        # device, but this snippet has no tool-free,
+                        # version-stable way to resolve it back to a host's
+                        # KFD topology (the on-disk `unique_id` encoding is
+                        # not guaranteed stable across ROCm versions), so it
+                        # can neither confirm nor rule out that the UUID
+                        # exists. Leave `_n` unset rather than guessing.
+                        echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                             "names a GPU-<hex> UUID -- this snippet cannot" \
+                             "verify it corresponds to a physical AMD GPU on" \
+                             "this host, so the number of devices it exposes" \
+                             "cannot be safely derived from it. Confirm the" \
+                             "UUID with \`rocm-smi --showuniqueid\` (or" \
+                             "equivalent) before trusting HIP_VISIBLE_DEVICES" \
+                             "below, or switch ROCR_VISIBLE_DEVICES to numeric" \
+                             "ordinals and re-run this snippet." >&2
+                    else
+                        # Numeric ordinals can be checked against the host's
+                        # actual AMD GPU count from KFD topology sysfs -- the
+                        # same kind of sysfs read Flower's own diagnostics use
+                        # to classify render nodes, and no less reliable here
+                        # than trusting the raw entry count.
+                        _phys_n=""
+                        if [ -d /sys/class/kfd/kfd/topology/nodes ]; then
+                            _phys_n=0
+                            _phys_n_total=0
+                            _phys_n_read=0
+                            for _node_dir in \
+                                /sys/class/kfd/kfd/topology/nodes/*/; do
+                                _phys_n_total=$((_phys_n_total + 1))
+                                # The GPU ID lives in the sibling `gpu_id`
+                                # file, not as a `gpu_id` row inside
+                                # `properties` -- a CPU-only node reports
+                                # `gpu_id` 0, so only non-zero IDs count as a
+                                # physical GPU.
+                                _gpu_id_file="${_node_dir}gpu_id"
+                                [ -r "$_gpu_id_file" ] || continue
+                                _phys_n_read=$((_phys_n_read + 1))
+                                _gpu_id=$(cat "$_gpu_id_file")
+                                if [ -n "$_gpu_id" ] && [ "$_gpu_id" != "0" ]; then
+                                    _phys_n=$((_phys_n + 1))
+                                fi
+                            done
+                            if [ "$_phys_n_total" -eq 0 ] ||
+                                [ "$_phys_n_read" -ne "$_phys_n_total" ]; then
+                                # Either no node directories were found, or at
+                                # least one node's gpu_id file was hidden or
+                                # unreadable while another's was not (e.g. a
+                                # restricted container that hides only the
+                                # assigned GPU node's file but leaves the CPU
+                                # node's readable) -- a partial read is not a
+                                # verified topology either: it undercounts
+                                # just as surely as a fully unreadable one, so
+                                # the bound must stay unknown rather than
+                                # falsely confirming a count and rejecting an
+                                # otherwise-valid mask like
+                                # ROCR_VISIBLE_DEVICES=0.
+                                _phys_n=""
+                            fi
+                        fi
+                        if [ -z "$_phys_n" ]; then
+                            # Cannot verify at all (e.g. a container without
+                            # KFD topology mounted, or with it mounted but
+                            # every per-node gpu_id file hidden/unreadable) --
+                            # same "bound unknown" treatment as a missing
+                            # ROCR_VISIBLE_DEVICES.
+                            echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                                 "is syntactically well-formed, but" \
+                                 "/sys/class/kfd/kfd/topology/nodes is" \
+                                 "missing, or its per-node gpu_id files are" \
+                                 "hidden/unreadable, on this host (e.g. a" \
+                                 "container without KFD topology mounted, or" \
+                                 "with a partial/restricted sysfs mount), so" \
+                                 "its entries cannot be confirmed to name" \
+                                 "real AMD GPUs. The number of devices it" \
+                                 "exposes cannot be safely derived from it;" \
+                                 "verify manually if ClientApps see no usable" \
+                                 "GPU." >&2
+                        else
+                            _bad_ordinal=0
+                            for _trimmed_id in "${_rocr_norm[@]}"; do
+                                if [ "${#_trimmed_id}" -gt "${#_phys_n}" ] ||
+                                    { [ "${#_trimmed_id}" -eq "${#_phys_n}" ] &&
+                                        [ "$_trimmed_id" -ge "$_phys_n" ]; }; then
+                                    _bad_ordinal=1
+                                fi
+                            done
+                            if [ "$_bad_ordinal" -eq 1 ]; then
+                                echo "WARNING: ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES" \
+                                     "names an ordinal that does not" \
+                                     "correspond to any of the $_phys_n AMD" \
+                                     "GPU(s) this host exposes (per" \
+                                     "/sys/class/kfd/kfd/topology/nodes) --" \
+                                     "the number of devices it exposes cannot" \
+                                     "be derived from it. Fix" \
+                                     "ROCR_VISIBLE_DEVICES itself and re-run" \
+                                     "this snippet." >&2
+                            else
+                                _n=${#_rocr_ids[@]}
+                            fi
+                        fi
+                    fi
+                fi
+            fi
+            unset _rocr_ids _rocr_norm _id _trimmed_id _rocr_dup _rocr_bad_id \
+                _rocr_has_numeric _rocr_has_uuid _phys_n _phys_n_total \
+                _phys_n_read _node_dir _gpu_id_file _gpu_id _bad_ordinal
+        fi
+    fi
+    if [ -z "${HIP_VISIBLE_DEVICES+x}" ]; then
+        # Only synthesize a value when `_n` was actually derived above -- it
+        # is otherwise unknown (ROCR_VISIBLE_DEVICES unset or malformed), and
+        # there is nothing to derive a mask from.
+        if [ -n "${_n+x}" ]; then
+            if [ "$_n" -gt 0 ]; then
+                export HIP_VISIBLE_DEVICES="$(seq -s, 0 $((_n - 1)))"
+            else
+                export HIP_VISIBLE_DEVICES=""
+            fi
+        fi
+    else
+        # The syntax/duplicate checks below must run even when `_n` is
+        # unknown (ROCR_VISIBLE_DEVICES unset or itself malformed) -- an
+        # existing HIP_VISIBLE_DEVICES can be malformed (e.g. `0,0` or
+        # `0,1,`) independently of ROCr, and Ray still sizes its advertised
+        # GPU resources from this mask either way. Only the ordinal-bounds
+        # check below needs `_n`, so it alone stays conditional on `_n`
+        # being known.
+        _bad_syntax=0
+        _bad_range=0
+        # Bash's arithmetic expansion (used below to normalize each ordinal)
+        # silently wraps a too-large all-digit value instead of erroring --
+        # `$((10#18446744073709551616))` evaluates to `0` with exit status 0,
+        # not a warning or failure. The ROCR_VISIBLE_DEVICES-bound check above
+        # already rejects such values via digit-length comparison without
+        # doing arithmetic, but that check is skipped entirely when
+        # ROCR_VISIBLE_DEVICES is unset, so this bound -- the largest value
+        # `$((...))` can represent -- is checked unconditionally instead.
+        _bash_int_max="9223372036854775807"
+        if [[ "$HIP_VISIBLE_DEVICES" == *, ]]; then
+            # A trailing comma leaves `read -ra` one field short of what Ray
+            # gets from splitting the raw string itself, so check the raw
+            # string before trusting the parsed array's field count.
+            _bad_syntax=1
+        fi
+        _norm_ids=()
+        IFS=',' read -ra _hip_ids <<<"$HIP_VISIBLE_DEVICES"
+        for _id in "${_hip_ids[@]}"; do
+            if ! [[ "$_id" =~ ^[0-9]+$ ]]; then
+                _bad_syntax=1
+                continue
+            fi
+            # Compare digit-string lengths rather than `[ "$_id" -ge "$_n"
+            # ]` directly: an all-digit ordinal outside Bash's integer
+            # range (e.g. a mistyped 30-digit value) makes that
+            # comparison fail with "integer expression expected" and a
+            # nonzero exit status -- which the original `||` chain
+            # treated as false, silently accepting an out-of-range
+            # ordinal. `_n` is always small, so a trimmed ordinal with
+            # more digits than `_n` is unambiguously too large without
+            # needing arithmetic on it, and one with the same digit
+            # count is bounded by `_n`'s own magnitude, so comparing it
+            # numerically is safe.
+            _trimmed_id="${_id#"${_id%%[!0]*}"}"
+            [ -z "$_trimmed_id" ] && _trimmed_id=0
+            if [ -n "${_n+x}" ] &&
+                { [ "${#_trimmed_id}" -gt "${#_n}" ] ||
+                    { [ "${#_trimmed_id}" -eq "${#_n}" ] && [ "$_trimmed_id" -ge "$_n" ]; }; }; then
+                _bad_range=1
+            elif [ "${#_trimmed_id}" -gt "${#_bash_int_max}" ] ||
+                { [ "${#_trimmed_id}" -eq "${#_bash_int_max}" ] &&
+                    [[ "$_trimmed_id" > "$_bash_int_max" ]]; }; then
+                # Same digit-length comparison as above, against Bash's own
+                # integer range rather than `_n` -- needed even when
+                # ROCR_VISIBLE_DEVICES is unset, since nothing else stops the
+                # `$((10#$_id))` below from silently wrapping this ordinal.
+                # The equal-length arm uses `[[ > ]]` (lexicographic string
+                # compare), not `[ -ge ]`/`-gt` (arithmetic): at this digit
+                # length `_trimmed_id` sits right at Bash's signed integer
+                # boundary, so it can itself be a value `-gt` cannot
+                # represent -- the same "integer expression expected"
+                # failure this branch exists to catch in the first place.
+                # Equal-length, all-digit strings compare lexicographically
+                # the same as numerically, so no arithmetic is needed here.
+                _bad_syntax=1
+            else
+                _norm_ids+=("$((10#$_id))")
+            fi
+        done
+        _dup=$(printf '%s\n' "${_norm_ids[@]}" | sort -n | uniq -d | paste -sd ',')
+        if [ "$_bad_syntax" -eq 1 ] || [ "$_bad_range" -eq 1 ]; then
+            if [ -n "${_n+x}" ]; then
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
+                     "valid selection of ordinals 0..$((_n - 1)) -- the only" \
+                     "ordinals ROCR_VISIBLE_DEVICES=$ROCR_VISIBLE_DEVICES exposes" \
+                     "after filtering -- or it has a stray leading, trailing, or" \
+                     "doubled comma. This usually means a physical device ID was" \
+                     "copied in verbatim, or a separator was left over from" \
+                     "editing the list; left unchanged, so Ray will see no usable" \
+                     "GPU. Unset HIP_VISIBLE_DEVICES and re-run this snippet, or" \
+                     "correct it to ordinals in that range with no stray" \
+                     "separators." >&2
+            else
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is not a" \
+                     "well-formed comma-separated list of ordinals -- it has a" \
+                     "non-numeric value, a value too large to represent, or a" \
+                     "stray leading, trailing, or doubled comma." \
+                     "ROCR_VISIBLE_DEVICES is not set, so no known bound exists" \
+                     "to validate ordinals against; left unchanged, so Ray may" \
+                     "advertise the wrong number of GPU slots or none at all." \
+                     "Correct it to a well-formed comma-separated list of" \
+                     "ordinals." >&2
+            fi
+        else
+            if [ -n "$_dup" ]; then
+                echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES repeats" \
+                     "ordinal(s) $_dup once leading zeros are normalized -- Ray" \
+                     "sizes its advertised GPU resources from the length of this" \
+                     "mask, so a repeated ordinal creates two schedulable slots" \
+                     "that both map to the same ROCr-visible device, letting" \
+                     "concurrent ClientApps collide on it. Left unchanged, so" \
+                     "remove the duplicate and re-run this snippet." >&2
+            else
+                if [ -z "${_n+x}" ]; then
+                    echo "WARNING: HIP_VISIBLE_DEVICES=$HIP_VISIBLE_DEVICES is" \
+                         "syntactically valid, but no device-count bound is" \
+                         "known (ROCR_VISIBLE_DEVICES is unset or could not be" \
+                         "parsed) to confirm these ordinals actually exist --" \
+                         "Ray will still size its advertised GPU resources from" \
+                         "this mask. Exported as-is; verify each ordinal maps" \
+                         "to a real device if ClientApps still see no usable" \
+                         "GPU." >&2
+                fi
+                # HIP_VISIBLE_DEVICES was already set (not synthesized above),
+                # but may only be a plain shell variable, not an exported one
+                # (e.g. a setup script assigned it without `export`) -- Ray
+                # subprocesses would then still only inherit
+                # ROCR_VISIBLE_DEVICES and hit its import guard. Export the
+                # preserved value now that it has passed the syntax/range/
+                # duplicate checks above -- a duplicate ordinal still leaves a
+                # usable (if suboptimal) mask, but exporting it would silence
+                # the warning above on every subsequent run, so the export is
+                # skipped until the duplicate is actually removed.
+                export HIP_VISIBLE_DEVICES
+            fi
+        fi
+        unset _hip_ids _id _bad_syntax _bad_range _dup _norm_ids _trimmed_id
+        unset _bash_int_max
+    fi
+    unset _n
+
+.. important::
+
+    Do not copy ``ROCR_VISIBLE_DEVICES``'s values into ``HIP_VISIBLE_DEVICES``, and do
+    not simply unset ``ROCR_VISIBLE_DEVICES`` -- on a shared host it may be how a
+    scheduler isolates your job's GPUs from everyone else's, so removing it can expose
+    devices that are not yours. The two masks instead *compose* in a specific order:
+    ROCr applies its filter first and renumbers whatever remains starting from ``0``,
+    and only then does ``HIP_VISIBLE_DEVICES`` index into that renumbered set -- not
+    into the original physical IDs. With ``ROCR_VISIBLE_DEVICES=1``, the sole visible
+    GPU becomes ordinal ``0``, so setting ``HIP_VISIBLE_DEVICES=1`` to match asks for a
+    device that no longer exists and Ray sees no GPU at all.
+
+    The snippet above sidesteps this: whatever ``ROCR_VISIBLE_DEVICES`` already
+    restricts you to, after filtering there are exactly that many devices, numbered
+    contiguously from ``0``. Selecting all of them (``0`` through ``n-1`` in
+    ``HIP_VISIBLE_DEVICES``) reproduces the original restriction exactly, while leaving
+    ``ROCR_VISIBLE_DEVICES`` itself untouched. The snippet only synthesizes this value
+    when ``HIP_VISIBLE_DEVICES`` is unset: an existing value may deliberately select a
+    subset of the renumbered space -- for example, to dedicate only one of two
+    ROCr-visible devices to this process -- so it is not overwritten. But it is not
+    assumed to already be expressed in that renumbered space either: the snippet checks
+    that every ordinal it names is ``< n``, and warns instead of silently proceeding
+    when one is not, since that is the signature of a physical device ID having been
+    copied in rather than a deliberately chosen ordinal. It also rejects a repeated
+    ordinal (``HIP_VISIBLE_DEVICES=0,0``), including one disguised by a leading zero
+    (``HIP_VISIBLE_DEVICES=0,00``) -- the snippet normalizes each value before comparing
+    rather than comparing the strings as spelled: Ray derives the number of GPU slots it
+    advertises from the length of this mask, so a duplicate would let two schedulable
+    slots map to the same underlying device instead of each naming a distinct one. The
+    same reasoning applies to a trailing comma (``HIP_VISIBLE_DEVICES=0,1,``): Bash's
+    ``read -ra`` silently drops the resulting empty field, but Ray splits the raw string
+    itself and would still size its GPU resources from it, so the snippet checks the raw
+    string for a trailing comma rather than trusting what ``read -ra`` parsed.
+
+.. important::
+
+    These exports apply only to the shell you run them in, and the local SuperLink that
+    ``flwr run`` manages copies its environment once, at startup. If a SuperLink from an
+    earlier, uncorrected session is still running, ``flwr run`` reuses it rather than
+    starting a fresh one -- which creates a trap: the two verification commands below
+    run in *your* corrected shell and pass, while every subsequent ``flwr run`` still
+    talks to a SuperLink holding the old, broken environment. A passing check is
+    therefore not proof that a run will succeed.
+
+    Stop the stale SuperLink before trusting those checks or applying simulation
+    configuration, using the inspect-then-terminate procedure in
+    :ref:`stop-background-local-superlink`. Matching on the bare process name risks
+    killing every ``flower-superlink`` process the account owns, including unrelated
+    runs; that procedure scopes the match to the managed port instead.
+
+    ``flwr run`` starts a new one automatically, which copies the corrected environment
+    of the shell that invokes it. There is no dedicated ``flwr`` command to stop just
+    the SuperLink process; ``flwr stop <run-id>`` stops a run, not the SuperLink itself.
+
+    If you manage a SuperExec separately from the one SuperLink auto-launches -- for
+    example, in a deployment that is not this local, single-command setup -- restarting
+    SuperLink alone does not refresh it. Restart that SuperExec process too.
+
+    The same singleton reuse means a ``HIP_VISIBLE_DEVICES`` export does not isolate one
+    run from another. ``flwr run`` is a client of the already-running SuperLink, not a
+    fresh launch of it: every run that reuses that SuperLink shares the one mask it
+    started with, so two simulations started from shells with different exports still
+    submit to the same process and can target the same physical GPU. A mask is a
+    property of the SuperLink, not of an individual run -- it only changes when the
+    SuperLink itself is stopped and restarted, same as above. Run simulations that need
+    different masks sequentially, stopping the SuperLink between them, rather than
+    concurrently. If you need them to run concurrently, start a separate managed local
+    SuperLink for each -- a different ``FLWR_LOCAL_SUPERLINK_HTTP_API_PORT`` (and a
+    different ``FLWR_HOME`` so they do not share state) per shell, exported before that
+    shell's first ``flwr run`` -- so each SuperLink copies its own shell's
+    ``HIP_VISIBLE_DEVICES`` at startup instead of all runs competing for one singleton.
+    See :doc:`how-to-run-flower-locally` for how those variables control the managed
+    SuperLink's address and storage location.
+
+.. important::
+
+    The guidance above assumes the single-node, Flower-managed-SuperLink flow. Flower
+    also supports :ref:`multi-node simulations <multinodesimulations>`, where you run
+    ``ray start --head`` on one node and ``ray start --address=...`` on each worker node
+    yourself, before ``flwr run``. There, restarting the SuperLink does not help at all:
+    each node's own ``ray start`` already performed AMD GPU discovery using whatever
+    ``ROCM_PATH``, ``HIP_VISIBLE_DEVICES``, and ``ROCR_VISIBLE_DEVICES`` were present in
+    *that node's* shell at the moment ``ray start`` ran there. Exporting corrected
+    values afterwards -- in the driver shell that later runs ``flwr run``, or by
+    restarting only the Flower-managed SuperLink -- changes nothing for nodes Ray itself
+    started, since Flower does not manage those processes.
+
+    For a manually started Ray cluster, ``amdsmi`` being importable, plus ``ROCM_PATH``/
+    ``ROCM_HOME`` and the ``HIP_VISIBLE_DEVICES``/``ROCR_VISIBLE_DEVICES`` handling
+    above, must therefore all hold in the shell on **every** node -- head and each
+    worker -- *before* that node's ``ray start`` command runs. If a cluster is already
+    running with the wrong environment, stop it (``ray stop`` on every node, or tear the
+    cluster down and restart it) so each node redoes GPU discovery with the corrected
+    environment; those nodes will keep reporting ``GPU=0`` until they are individually
+    fixed and restarted.
+
+*************************************
+ Verify that Ray detects the AMD GPU
+*************************************
+
+Checking your ML framework is not enough, since it and Ray discover devices
+independently. Check both.
+
+First, the framework:
+
+.. code-block:: shell
+
+    python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"
+
+This check is local to whichever host you run it on. On a :ref:`multi-node cluster
+<multinodesimulations>`, running it only on the driver/head node is not representative
+of the whole cluster: a CPU-only head correctly reports ``False, 0`` here even though
+Ray can still place GPU ``ClientApp``\s on separate worker nodes. Run it on each node
+that is expected to have a GPU, not just the driver.
+
+Then Ray, which is what the Simulation Runtime actually schedules against:
+
+.. code-block:: shell
+
+    python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
+
+If your run connects to an existing cluster through a specific ``address`` -- whether
+via ``RAY_ADDRESS`` or a manually started multi-node cluster -- reuse that same address
+here. A bare ``ray.init()`` with no address can start or attach to a *different* local
+cluster instead of the one your run actually uses, in which case this check validates
+the wrong cluster and a non-zero ``GPU`` result tells you nothing about the one that
+matters:
+
+.. code-block:: shell
+
+    RAY_ADDRESS=<the address your run connects with> \
+        python -c "import ray; ray.init(); print(ray.cluster_resources()); ray.shutdown()"
+
+The output must contain a non-zero ``GPU`` entry:
+
+.. code-block:: text
+
+    {'CPU': 8.0, 'GPU': 1.0, 'accelerator_type:AMD-Instinct-MI300X-OAM': 1.0, ...}
+
+The ``GPU`` entry is the one that matters. Ray derives ``accelerator_type`` from a
+hardcoded table of device IDs, so a card missing from that table is reported without an
+``accelerator_type`` label -- it is still counted and still scheduled normally.
+
+Only when ``GPU`` is present and non-zero will a run configured with
+``client-resources-num-gpus`` greater than zero be able to place a ``ClientApp``. With
+both checks passing, configure and run your simulation exactly as on any other
+accelerator -- see :doc:`how-to-run-simulations`:
+
+.. code-block:: shell
+
+    flwr federation simulation-config --num-supernodes 8 --client-resources-num-gpus 0.25
+    flwr run . --stream
+
+*****************
+ Troubleshooting
+*****************
+
+``ActorPool is empty. Stopping Simulation.``
+============================================
+
+This error is raised for three different reasons, and the warning immediately above it
+tells you which one applies. Despite the error message, the process does not always
+exit: the run can appear to hang after the error is printed. If that happens, interrupt
+it and scroll back for the warning that precedes it.
+
+No active Ray node is available
+-------------------------------
+
+If the preceding warning reads ``No active Ray node reported resources: ray.nodes()
+returned either no entries, or only detached ones with empty Resources...``, this
+applies regardless of whether a GPU was requested -- it also fires for a CPU-only run
+configured with ``client-resources-num-gpus 0``:
+
+.. code-block:: text
+
+    WARNING : No active Ray node reported resources: `ray.nodes()` returned either
+    no entries, or only detached ones with empty `Resources`. This is not a
+    per-node GPU discovery problem to fix on this host -- check why the Ray
+    cluster has no usable node (for example, it failed to start or every node
+    has disconnected). Reconnect with the same `address` (or `RAY_ADDRESS`) this
+    run used before calling `ray.nodes()` -- a bare `ray.init()` can start or
+    attach to a different local cluster instead of the one that just failed.
+
+Ray never reported a usable node at all, so none of the GPU-discovery diagnostics below
+apply. Check why the cluster has no active node -- for example with ``ray status``, or
+by reconnecting with the same ``address``/``RAY_ADDRESS`` your run used and calling
+``ray.nodes()`` yourself. Common causes are the cluster failing to start, every node
+disconnecting, or ``init_args`` pointing at a cluster that was never brought up.
+
+No GPU reported while a GPU was requested
+-----------------------------------------
+
+If the preceding warning reads ``Ray reports no GPU resources (GPUs=0) but each client
+requests num_gpus=...``, Ray detected no GPU at all while your ``ClientApp`` requested a
+fraction of one:
+
+.. code-block:: text
+
+    WARNING : Ray reports no GPU resources (GPUs=0) but each client requests
+    num_gpus=0.25, which no node can satisfy. This does not by itself mean GPU
+    discovery failed: the cluster may have no GPU, or Ray's GPU resources may
+    have been limited deliberately (for example `--init-args-num-gpus 0`). Set
+    `num_gpus=0` if no GPU is expected, otherwise review that limit before
+    suspecting discovery.
+
+Three different situations produce this warning, and only one of them calls for the ROCm
+fixes elsewhere in this guide:
+
+- The cluster genuinely has no GPU. Set ``client-resources-num-gpus`` to ``0`` and move
+  on.
+- Ray's GPU resources were limited deliberately, for example via ``flwr federation
+  simulation-config --init-args-num-gpus 0``. Lowering ``client-resources-num-gpus``
+  will not help here either -- no non-zero value can be satisfied by a cluster reporting
+  ``GPUs=0`` -- but neither will ``amdsmi``, ``ROCM_PATH``, or ``HIP_VISIBLE_DEVICES``,
+  since the limit is applied at ``ray.init()`` and never reaches ROCm. Review, or raise,
+  the configured ``init-args-num-gpus`` value instead.
+- ROCm reaches the GPU but Ray did not discover it. Work through `Point Ray at the ROCm
+  SMI library`_ and `Set HIP_VISIBLE_DEVICES for Ray`_, then re-run the verification
+  above.
+
+Compare what Ray actually detects (``ray.cluster_resources()``, as verified above)
+against the ``--init-args-num-gpus`` value you configured to tell the second case apart
+from the third.
+
+If the cluster also has too few CPUs for even one client, Flower emits an additional
+warning right after this one, naming that CPU shortage explicitly -- in that case,
+setting ``num_gpus=0`` alone will not be enough; also lower
+``client-resources-num-cpus`` or add CPU capacity to the cluster.
+
+On a **single-node** Ray cluster where the driver process runs on that same node, and
+``/dev/kfd`` exists, Flower follows the warning above with a second one that depends on
+what else it can detect about device access:
+
+- If the process cannot open ``/dev/kfd`` -- the missing ``render``-group access covered
+  in `Check that ROCm can reach the GPU`_ -- Flower reports a permissions problem and
+  states explicitly that fixing ``ROCM_PATH`` will not help; follow that warning's
+  instructions instead, not the ``ROCM_PATH`` steps below.
+- If opening ``/dev/kfd`` fails for a reason other than permissions (for example
+  ``ENODEV``, ``EIO``, or this process running out of file descriptors), Flower reports
+  this as inconclusive rather than a permissions problem, and does not suggest the
+  group/container fix -- check this process's open-file limit and the kernel/``dmesg``
+  log for driver errors instead.
+- If ``/dev/kfd`` is accessible but no ``/dev/dri/renderD*`` node was found at all, Flower
+  reports that ROCm reaches the GPU through both device nodes, so fixing ``ROCM_PATH``
+  will not help here either. Unlike the permission-denied case above, this is not a
+  group-membership issue -- there is no node for ``--group-add render`` to grant access
+  to -- so check that the device is passed through at all (for example a container
+  started with ``--device=/dev/kfd`` but without ``--device=/dev/dri``), and that the
+  host's ``amdgpu`` driver actually created a render node (``ls /dev/dri``).
+- If ``/dev/kfd`` is accessible and at least one render node was found, Flower determines
+  each ``/dev/dri/renderD*`` node's PCI vendor from sysfs first, independent of whether
+  that node itself can be opened -- a
+  hybrid host or container can expose an unrelated, non-AMD node (e.g. an integrated
+  Intel GPU's ``renderD128``) in any access state alongside an AMD-backed node that fails
+  to open, and only the AMD-backed node's state is actually relevant. If an AMD-backed
+  render node is permission-denied, Flower reports that render-node gap -- again stating
+  that ``ROCM_PATH`` will not help, since ROCm needs both device nodes. Fix render-node
+  access the same way as ``/dev/kfd`` access above.
+- If the AMD-backed render node instead fails to open for a reason other than
+  permissions, Flower likewise reports this as inconclusive rather than a permissions
+  problem -- check this process's open-file limit and the kernel/``dmesg`` log the same
+  way as the ``/dev/kfd`` case above. If one AMD-backed node is permission-denied while
+  another fails inconclusively, Flower reports both outcomes together rather than
+  letting one mask the other, since fixing only one would not necessarily restore GPU
+  discovery.
+- If every render node found is confirmed not AMD-backed -- for example a hybrid host or
+  container exposing only an integrated Intel GPU's ``renderD128``, in any access
+  state -- Flower reports that vendor mismatch instead, again stating that ``ROCM_PATH``
+  will not help. Every node's vendor is determined before it is opened, so a
+  permission-denied AMD node would already have been reported as such rather than
+  landing in this case -- a permissions fix cannot make an absent AMD render node
+  appear. Instead, check that the AMD device itself is passed through at all (for
+  example a container started with ``--device=/dev/kfd`` but without the AMD GPU's
+  specific ``/dev/dri/renderD*`` node), and that the host's ``amdgpu`` driver actually
+  created a render node for it (``ls /dev/dri``).
+- If no render node is confirmed AMD-backed, but this host cannot determine at least one
+  node's PCI vendor ID at all -- sysfs is missing or unreadable, as in some restricted
+  containers -- Flower reports the vendor as undetermined rather than guessing either
+  way, and does not name ``ROCM_PATH`` as the fix, since the node is not confirmed
+  AMD-backed. Check the node's vendor manually (``cat
+  /sys/class/drm/<node>/device/vendor``, expecting ``0x1002`` for AMD) before assuming
+  ``ROCM_PATH`` is the issue -- it is not if this node turns out not to be AMD's.
+- Only when ``/dev/kfd`` is accessible and an AMD-backed render node actually opens does
+  Flower name the ``ROCM_PATH`` requirement directly; in that case, follow `Point Ray at
+  the ROCm SMI library`_.
+
+Note that ``torch.cuda.is_available()`` commonly reports ``True`` in exactly this
+situation, because your ML framework locates HIP without consulting ``ROCM_PATH``.
+
+The eight checks above assume this driver process shares the cluster node's device
+namespace; Flower qualifies or skips them whenever that assumption does not hold, since
+the driver's own ``/dev/kfd``/render-node state cannot diagnose a different machine:
+
+- On a **multi-node** cluster, AMD GPU discovery already ran independently on each node
+  when ``ray start`` executed there, so Flower instead reports the node count and asks
+  you to check ``/dev/kfd`` and ``/dev/dri/renderD*`` on each node individually, not
+  just on the driver host.
+- On a **single-node** cluster where ``init_args`` joined the driver to a node on
+  another host (for example via ``address="<ip>:<port>"``), Flower instead names both
+  the reporting node's and the driver's own node ID, and points you at checking device
+  access on the node that actually reported zero GPUs, not on this host.
+- On a **single-node** cluster reached over **Ray Client**
+  (``ray.init("ray://host:port")``), Flower cannot tell whether the client and server
+  share a device namespace just from the endpoint address: a loopback literal
+  (``ray://127.0.0.1:10001``) or a hostname/LAN address that happens to resolve back to
+  this host can still be an SSH port forward or a sidecar sharing only the network
+  namespace, with the server's ``/dev`` elsewhere -- and the absence of a local match
+  does not prove the opposite either, since a NAT-hairpinned or VIP address can resolve
+  to this same host while never itself binding to a local interface. Because neither
+  outcome can be confirmed from the endpoint alone, Flower always treats a Ray Client
+  connection as ambiguous rather than attempting -- and risking -- a remoteness
+  determination: it logs a warning naming the endpoint and unconditionally runs the
+  eight checks above against this host, on the chance the connection is genuinely
+  co-located. There is no confirmed-remote case that skips the checks outright; if the
+  Ray Client server does turn out to run elsewhere, this warning's instructions do not
+  apply, and device access must be checked on that actual server host instead.
+
+CPU or GPU capacity is too small for even one client
+----------------------------------------------------
+
+If the preceding warning instead reads ``The ActorPool is empty. The system (CPUs=...,
+GPUs=...) does not meet the criteria to host at least one client...``, Ray *did* detect
+resources, but no single node has enough of them for a client on its own -- for example
+a node reporting ``CPU=1`` with ``client-resources-num-cpus`` set to ``2``, or a 1-GPU
+node with ``client-resources-num-gpus`` set to ``2``. This is a resource-sizing problem,
+not a GPU discovery problem: lower ``client-resources-num-cpus`` and/or
+``client-resources-num-gpus``, or add CPU/GPU capacity to the cluster. The ``ROCM_PATH``
+and ``HIP_VISIBLE_DEVICES`` fixes elsewhere in this guide do not apply here.
+
+Both the ML framework and Ray report zero GPUs
+==============================================
+
+When ``torch.cuda.is_available()`` is ``False`` *and* Ray reports no GPU, the problem is
+below Flower: ROCm itself cannot reach the device. The usual cause is that your account
+lacks access to ``/dev/kfd``, or that a container was started without the device flags.
+See `Check that ROCm can reach the GPU`_. The ``ROCM_PATH`` and ``HIP_VISIBLE_DEVICES``
+steps in this guide apply only once ROCm works for your ML framework.
+
+``Please use HIP_VISIBLE_DEVICES instead of ROCR_VISIBLE_DEVICES``
+==================================================================
+
+See `Set HIP_VISIBLE_DEVICES for Ray`_. Note that this is raised when Ray is imported,
+so it can appear either directly in your own process or indirectly as Ray workers that
+fail to register.
+
+A run completes but the GPU stays idle
+======================================
+
+Restarting the local SuperLink resets the simulation configuration to its defaults,
+including ``client-resources-num-gpus`` back to ``0.0``, and the run then completes on
+CPU. Apply ``flwr federation simulation-config`` *after* any restart, and confirm the
+active value before concluding that a run exercised the GPU:
+
+.. code-block:: shell
+
+    flwr federation ls --federation @none/default
