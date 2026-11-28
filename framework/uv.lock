@@ -1603,7 +1603,7 @@ requires-dist = [
     { name = "pathspec", specifier = ">=1.0.4,<2.0.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.52,<4.0.0" },
     { name = "protobuf", specifier = ">=5.28.0,<7.0.0" },
-    { name = "pycryptodome", specifier = ">=3.18.0,<4.0.0" },
+    { name = "pycryptodome", specifier = ">=3.18.0,<5.0.0" },
     { name = "pyyaml", specifier = ">=6.0.2,<7.0.0" },
     { name = "ray", marker = "python_full_version >= '3.11' and python_full_version < '3.13' and extra == 'simulation'", specifier = "==2.56.0" },
     { name = "ray", marker = "python_full_version >= '3.13' and python_full_version < '3.15' and sys_platform != 'win32' and extra == 'simulation'", specifier = "==2.56.0" },
