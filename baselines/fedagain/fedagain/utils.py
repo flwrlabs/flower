@@ -59,22 +59,19 @@ def load_results(path: str | Path) -> dict:
         return json.load(fh)
 
 
-def corrupted_weight_share(results: dict) -> list[float]:
-    """Total FedAgain weight given to corrupted clients in each round."""
+def corrupted_weight_share(results: dict, by: str = "weight") -> list[float]:
+    """Share of the aggregation weight given to corrupted clients in each round.
+
+    ``by="weight"`` uses the FedAgain trust weights and ``by="num_examples"`` the
+    data-size weights FedAvg would give to the same participants of that round.
+    """
     corrupted = set(results["corrupted_clients"])
     shares = []
     for entry in results.get("trust_history", []):
-        shares.append(
-            float(
-                sum(
-                    w
-                    for cid, w in zip(
-                        entry["client_ids"], entry["weight"], strict=False
-                    )
-                    if cid in corrupted
-                )
-            )
-        )
+        values = dict(zip(entry["client_ids"], entry[by], strict=True))
+        total = sum(values.values())
+        bad = sum(v for cid, v in values.items() if cid in corrupted)
+        shares.append(float(bad / total) if total > 0 else float("nan"))
     return shares
 
 
@@ -127,13 +124,14 @@ def plot_results(result_files: list[str], output: str, title: str = "") -> None:
             color=STRATEGY_COLORS["fedagain"],
             label="FedAgain trust weights",
         )
-        if run.get("fedavg_corrupted_share") is not None:
-            ax.axhline(
-                100 * run["fedavg_corrupted_share"],
-                linestyle="--",
-                color="gray",
-                label="data-size weighting",
-            )
+        # Data-size reference of the same participants, round by round
+        ax.plot(
+            rounds,
+            [100 * s for s in corrupted_weight_share(run, by="num_examples")],
+            linestyle="--",
+            color="gray",
+            label="data-size weighting",
+        )
         ax.set_xlabel("Round")
         ax.set_ylabel("Weight of corrupted clients (%)")
         ax.set_ylim(bottom=0)

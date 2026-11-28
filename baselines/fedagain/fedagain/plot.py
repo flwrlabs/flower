@@ -8,7 +8,13 @@ Usage (from the baseline directory, after ``run_experiments.sh``)::
 import argparse
 from pathlib import Path
 
-from fedagain.utils import STRATEGY_COLORS, STRATEGY_LABELS, load_results, plot_results
+from fedagain.utils import (
+    STRATEGY_COLORS,
+    STRATEGY_LABELS,
+    corrupted_weight_share,
+    load_results,
+    plot_results,
+)
 
 # (label, num_clients, corrupted_fraction, severity) of the paper's Fig. 11
 CORRUPTION_SCENARIOS = [
@@ -26,8 +32,8 @@ SCALABILITY_SCENARIOS = [
 def result_file(outputs: Path, args, clients: int, rho: str, sev: int, strategy: str):
     """Return the path of the JSON written by the ServerApp for one run."""
     return outputs / (
-        f"{args.dataset}_{args.partitioning}_n{clients}_rho{rho}_sev{sev}"
-        f"_{strategy}_seed{args.seed}.json"
+        f"{args.dataset}_{args.partitioning}_{args.model}_r{args.rounds}"
+        f"_n{clients}_rho{rho}_sev{sev}_{strategy}_seed{args.seed}.json"
     )
 
 
@@ -119,11 +125,11 @@ def markdown_table(outputs: Path, args, strategies: list[str]) -> str:
         path = result_file(outputs, args, clients, rho, sev, "fedagain")
         if path.exists():
             res = load_results(path)
-            if res.get("fedagain_corrupted_share"):
-                share = (
-                    f"{100 * res['fedagain_corrupted_share'][-1]:.1f}% / "
-                    f"{100 * res['fedavg_corrupted_share']:.1f}%"
-                )
+            if res.get("trust_history"):
+                # Last round, both shares over the same participants
+                trust = corrupted_weight_share(res)[-1]
+                size = corrupted_weight_share(res, by="num_examples")[-1]
+                share = f"{100 * trust:.1f}% / {100 * size:.1f}%"
         lines.append(
             f"| {label} | {clients} | {float(rho):.0%} | {sev} | "
             + " | ".join(accs)
@@ -137,6 +143,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", default="cifar10")
     parser.add_argument("--partitioning", default="label-skew")
+    parser.add_argument("--model", default="resnet18")
+    parser.add_argument("--rounds", default=10, type=int)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--outputs", default="outputs")
     parser.add_argument("--static", default="_static")

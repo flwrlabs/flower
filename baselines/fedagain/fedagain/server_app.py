@@ -1,7 +1,7 @@
 """fedagain: Flower ServerApp."""
 
 import time
-from logging import INFO
+from logging import INFO, WARNING
 from pathlib import Path
 from typing import Any, cast
 
@@ -52,13 +52,38 @@ def _build_strategy(run_config: dict, num_nodes: int) -> FedAvg:
 
 
 def run_name(run_config: dict, num_clients: int) -> str:
-    """Return the name of the result file of a run (read by ``fedagain.plot``)."""
+    """Return the name of the result file of a run (read by ``fedagain.plot``).
+
+    It holds the settings varied in the experiments. Runs that differ in other
+    settings (e.g. ``corruption-types``) should use a different ``output-dir``.
+    """
     return (
-        f"{run_config['dataset']}_{run_config['partitioning']}_n{num_clients}"
+        f"{run_config['dataset']}_{run_config['partitioning']}"
+        f"_{run_config['model']}_r{run_config['num-server-rounds']}_n{num_clients}"
         f"_rho{float(run_config['corrupted-fraction']):g}"
         f"_sev{run_config['corruption-severity']}"
         f"_{run_config['strategy']}_seed{run_config['seed']}"
     )
+
+
+def wait_for_nodes(
+    grid: Grid, poll_seconds: float = 1.0, timeout: float = 300.0
+) -> list[int]:
+    """Return the node IDs once their number is non-zero and stops changing.
+
+    The simulation starts the ServerApp before it registers the virtual
+    SuperNodes, so the first ``get_node_ids()`` can see only part of them.
+    """
+    previous: list[int] = []
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        node_ids = list(grid.get_node_ids())
+        if node_ids and len(node_ids) == len(previous):
+            return node_ids
+        previous = node_ids
+        time.sleep(poll_seconds)
+    log(WARNING, "Node count did not settle, using %d nodes", len(previous))
+    return previous
 
 
 @app.main()
@@ -72,7 +97,8 @@ def main(grid: Grid, context: Context) -> None:
     model = build_model(str(run_config["model"]), spec.num_classes, spec.in_channels)
     initial_arrays = ArrayRecord(model.state_dict())
 
-    num_nodes = len(list(grid.get_node_ids()))
+    # The number of clients defines the corrupted clients and the result name
+    num_nodes = len(wait_for_nodes(grid))
     strategy = _build_strategy(run_config, max(num_nodes, 2))
     # Same seeded selection as in the ClientApps (dataset.corrupted_clients)
     bad_clients = corrupted_clients(
@@ -116,19 +142,12 @@ def main(grid: Grid, context: Context) -> None:
         "trust_history": trust_history,
         "elapsed_seconds": elapsed,
     }
-    # Weight of the corrupted clients under data-size and FedAgain weighting
-    history = trust_history
-    if history:
-        sizes = dict(
-            zip(history[0]["client_ids"], history[0]["num_examples"], strict=False)
-        )
-        total = sum(sizes.values())
-        results["fedavg_corrupted_share"] = (
-            sum(n for cid, n in sizes.items() if cid in bad_clients) / total
-            if total > 0
-            else None
-        )
+    # Per-round weight of the corrupted clients, FedAgain vs. data-size weighting
+    if trust_history:
         results["fedagain_corrupted_share"] = corrupted_weight_share(results)
+        results["fedavg_corrupted_share"] = corrupted_weight_share(
+            results, by="num_examples"
+        )
 
     out_path = Path(str(run_config["output-dir"])).expanduser().resolve()
     out_file = out_path / f"{run_name(run_config, num_nodes)}.json"

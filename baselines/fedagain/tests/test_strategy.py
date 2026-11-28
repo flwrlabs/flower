@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
+from fedagain.server_app import wait_for_nodes
 from fedagain.strategy import (
     FedAgain,
     floating_keys,
@@ -11,6 +12,7 @@ from fedagain.strategy import (
     trust_weights,
     weighted_average,
 )
+from fedagain.utils import corrupted_weight_share
 
 
 def test_trust_weights_match_equations():
@@ -145,3 +147,47 @@ def test_configure_train_requests_benchmark_error(monkeypatch):
     assert sent["record"].config_records["config"]["compute-benchmark-error"]
     assert strategy._global_arrays is not None
     np.testing.assert_array_equal(strategy._global_arrays["w"], np.ones(2))
+
+
+def test_fedagain_ignores_non_finite_models():
+    strategy = FedAgain(min_available_nodes=2)
+    strategy._global_arrays = {"w": np.zeros(2, np.float32)}
+    metrics = {"benchmark-error": 0.5, "num-examples": 10}
+    replies = [
+        _reply({"w": np.ones(2, np.float32)}, {**metrics, "partition-id": 0}, 1),
+        _reply(
+            {"w": np.array([np.inf, 1.0], np.float32)},
+            {**metrics, "partition-id": 1},
+            2,
+        ),
+    ]
+    arrays, _ = strategy.aggregate_train(1, replies)
+    assert arrays is not None
+    np.testing.assert_array_equal(arrays["w"].numpy(), np.ones(2))
+    assert strategy.trust_history[-1]["client_ids"] == [0]
+
+
+def test_corrupted_weight_share_per_round():
+    results = {
+        "corrupted_clients": [1],
+        "trust_history": [
+            {"client_ids": [0, 1], "weight": [0.8, 0.2], "num_examples": [10, 30]},
+            {"client_ids": [1, 2], "weight": [0.5, 0.5], "num_examples": [10, 10]},
+        ],
+    }
+    np.testing.assert_allclose(corrupted_weight_share(results), [0.2, 0.5])
+    np.testing.assert_allclose(
+        corrupted_weight_share(results, by="num_examples"), [0.75, 0.5]
+    )
+
+
+def test_wait_for_nodes_waits_until_count_settles():
+    class _GrowingGrid:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def get_node_ids(self):
+            self.calls += 1
+            return list(range(min(3 * self.calls, 6)))
+
+    assert len(wait_for_nodes(_GrowingGrid(), poll_seconds=0.0)) == 6

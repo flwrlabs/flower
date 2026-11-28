@@ -9,7 +9,7 @@ description = "FedAgain: A Trust-Based and Robust Federated Learning Strategy fo
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
-    "flwr[simulation]>=1.24.0",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.5.0",
     "torch==2.8.0",
     "torchvision==0.23.0",

@@ -265,8 +265,11 @@ def _federated_dataset(run_config: dict, num_partitions: int) -> FederatedDatase
             label_skew_classes=int(run_config["label-skew-classes"]),
             label_skew_primary_share=float(run_config["label-skew-primary-share"]),
         )
+        # The run seed also drives the pre-partition shuffle (IID shards depend on it)
         FDS[key] = FederatedDataset(
-            dataset=spec.hf_name, partitioners={"train": partitioner}
+            dataset=spec.hf_name,
+            partitioners={"train": partitioner},
+            seed=int(run_config["seed"]),
         )
     return FDS[key]
 

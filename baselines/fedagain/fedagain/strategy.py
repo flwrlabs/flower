@@ -190,8 +190,25 @@ class FedAgain(FedAvg):
                 _to_numpy_dict(next(iter(content.array_records.values())))
             )
 
-        # D_k against the global model stored in configure_train (Eq. 7)
         keys = floating_keys(self._global_arrays)
+
+        # Drop non-finite models: a zero trust weight cannot cancel inf/NaN (0*inf)
+        finite = [all(np.all(np.isfinite(a[k])) for k in keys) for a in client_arrays]
+        if not all(finite):
+            dropped = [
+                cid for cid, ok in zip(client_ids, finite, strict=True) if not ok
+            ]
+            log(WARNING, "FedAgain: ignoring non-finite models from %s", dropped)
+            keep = [i for i, ok in enumerate(finite) if ok]
+            if not keep:
+                return None, None
+            client_arrays = [client_arrays[i] for i in keep]
+            errors = [errors[i] for i in keep]
+            client_ids = [client_ids[i] for i in keep]
+            num_examples = [num_examples[i] for i in keep]
+            contents = [contents[i] for i in keep]
+
+        # D_k against the global model stored in configure_train (Eq. 7)
         divergences = [
             parameter_divergence(arrs, self._global_arrays, keys)
             for arrs in client_arrays
