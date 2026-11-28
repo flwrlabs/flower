@@ -1,0 +1,167 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fedagain"
+version = "1.0.0"
+description = "FedAgain: A Trust-Based and Robust Federated Learning Strategy for an Automated Kidney Stone Identification in Ureteroscopy"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "flwr[simulation]>=1.28.0",
+    "flwr-datasets[vision]>=0.5.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "matplotlib>=3.8.0",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.optional-dependencies]
+dev = [
+    "isort==5.13.2",
+    "black==24.2.0",
+    "docformatter==1.7.5",
+    "mypy==2.3.1",
+    "pylint==3.3.1",
+    "pytest==7.4.4",
+    "pytest-watch==4.2.0",
+    "ruff==0.4.5",
+    "types-requests==2.31.0.20240125",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+addopts = "-qq"
+testpaths = ["tests"]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = false
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = "duplicate-code,too-few-public-methods,useless-import-alias"
+good-names = "i,j,k,_,x,y,X,Y,K,N,c,n"
+max-args = 12
+max-attributes = 15
+max-locals = 36
+max-branches = 20
+max-statements = 60
+max-positional-arguments = 12
+
+[tool.pylint.typecheck]
+generated-members = "numpy.*, torch.*, tensorflow.*"
+
+[[tool.mypy.overrides]]
+module = [
+    "importlib.metadata.*",
+    "importlib_metadata.*",
+]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[tool.docformatter]
+wrap-summaries = 88
+wrap-descriptions = 88
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "proto",
+]
+
+[tool.ruff.lint]
+select = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+fixable = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+ignore = ["B024", "B027", "D205", "D209"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D103"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+[tool.flwr.app.components]
+serverapp = "fedagain.server_app:app"
+clientapp = "fedagain.client_app:app"
+
+# Custom config values accessible via `context.run_config`.
+# Defaults follow the CIFAR-10 setup of the paper (Secs. 5.1 and 6.6): ResNet-18,
+# 10 rounds, label-skew partitioning and 30% of corrupted clients (severity 3).
+[tool.flwr.app.config]
+# Aggregation strategy: "fedagain", "fedavg" or "fedmedian"
+strategy = "fedagain"
+# FedAgain constant in T_k = 1 / (E_k * D_k + eps) (Eq. 8 of the paper)
+epsilon = 1e-3
+num-server-rounds = 10
+fraction-train = 1.0
+fraction-evaluate = 0.0
+# Dataset: "cifar10" or "mnist"
+dataset = "cifar10"
+# Partitioning: "iid", "dirichlet" or "label-skew"
+partitioning = "label-skew"
+dirichlet-alpha = 0.5
+# label-skew: number of primary classes per client and share of primary data
+label-skew-classes = 2
+label-skew-primary-share = 0.8
+# Fraction of each client's partition held out as its local validation set
+val-ratio = 0.1
+# Model: "resnet18" (paper) or "cnn" (small, for quick tests)
+model = "resnet18"
+local-epochs = 1
+batch-size = 32
+learning-rate = 0.01
+momentum = 0.9
+# Corrupted clients: fraction of clients whose data is corrupted (rho)
+corrupted-fraction = 0.3
+# Share of images corrupted inside each corrupted client
+corruption-ratio = 1.0
+# Corruption severity in [1, 5] (CIFAR-10-C parameters)
+corruption-severity = 3
+# "all" or a comma-separated list of corruption names (see corruptions.py)
+corruption-types = "all"
+seed = 42
+# Folder where the results (JSON + plots) are written
+output-dir = "outputs"

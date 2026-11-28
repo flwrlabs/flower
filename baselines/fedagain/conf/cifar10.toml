@@ -1,0 +1,14 @@
+# CIFAR-10 setup of the paper (Secs. 5.1 and 6.6): ResNet-18, 10 rounds,
+# 1 local epoch, batch size 32, SGD (lr 0.01), label-skew partitioning
+# (2 primary classes per client holding 80% of its data).
+dataset = "cifar10"
+model = "resnet18"
+num-server-rounds = 10
+partitioning = "label-skew"
+label-skew-classes = 2
+label-skew-primary-share = 0.8
+local-epochs = 1
+batch-size = 32
+learning-rate = 0.01
+momentum = 0.9
+corruption-ratio = 1.0
