@@ -17,4 +17,7 @@
 
 PROTOBUF_MEDIA_TYPE = "application/protobuf"
 PROTOBUF_STREAM_MEDIA_TYPE = "application/flower-protobuf-stream"
+CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE = (
+    "application/flower-federation-namespace-protobuf"
+)
 FRAME_HEADER_SIZE = 4

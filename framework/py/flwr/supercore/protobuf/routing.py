@@ -45,6 +45,7 @@ def _configure_openapi(
         "required": True,
         "content": {
             PROTOBUF_MEDIA_TYPE: {"schema": _BINARY_SCHEMA},
+            **openapi_extra.get("requestBody", {}).get("content", {}),
         },
     }
     kwargs["openapi_extra"] = openapi_extra

@@ -49,6 +49,8 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     Connector,
     CreateAgentRequest,
     CreateAgentResponse,
+    CreateFederationRequest,
+    CreateFederationResponse,
     DeleteAgentRequest,
     DeleteAgentResponse,
     DisconnectConnectorRequest,
@@ -79,6 +81,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UpdateAgentRequest,
     UpdateAgentResponse,
 )
+from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.space_pb2 import (  # pylint: disable=E0611
     CreateSpaceRequest,
     GetSpaceItemsRequest,
@@ -104,6 +107,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.error import ApiErrorCode, FlowerError, http_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.protobuf.constants import (
+    CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE,
     PROTOBUF_MEDIA_TYPE,
     PROTOBUF_STREAM_MEDIA_TYPE,
 )
@@ -377,14 +381,47 @@ def test_all_control_routes_declare_protobuf_openapi_contracts() -> None:
             inspect.unwrap(route.endpoint)
         )
         assert request_body["required"] is True
+        media_types = {PROTOBUF_MEDIA_TYPE}
+        if route.path == "/v1/control/create-federation":
+            media_types.add(CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE)
         assert request_body["content"] == {
-            PROTOBUF_MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}}
+            media_type: {"schema": {"type": "string", "format": "binary"}}
+            for media_type in media_types
         }
         assert set(success_content) == {expected_media_type}
         assert success_content[expected_media_type]["schema"] == {
             "type": "string",
             "format": "binary",
         }
+
+
+@pytest.mark.parametrize(
+    "media_type", [PROTOBUF_MEDIA_TYPE, CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE]
+)
+def test_create_federation_supports_both_protobuf_media_types(media_type: str) -> None:
+    """Both media types pass the existing protobuf request to the create handler."""
+    state = Mock(spec=LinkState)
+    app = _create_app()
+    app.dependency_overrides[get_linkstate] = lambda: state
+    request = CreateFederationRequest(federation_name="demo", handle="team")
+    expected = CreateFederationResponse(federation=Federation(name="@team/demo"))
+
+    with patch.object(
+        control_handlers, "create_federation", return_value=expected
+    ) as create:
+        response = TestClient(app).post(
+            "/v1/control/create-federation",
+            content=request.SerializeToString(),
+            headers={
+                "authorization": "Bearer access-token",
+                "content-type": media_type,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == PROTOBUF_MEDIA_TYPE
+    assert CreateFederationResponse.FromString(response.content) == expected
+    create.assert_called_once_with(request, _ACCOUNT, state)
 
 
 @pytest.mark.parametrize("database", [FLWR_IN_MEMORY_DB_NAME, ":memory:"])
@@ -1224,7 +1261,10 @@ def test_list_runs_rejects_invalid_token_without_refresh() -> None:
     authn_plugin.refresh_tokens.assert_not_called()
 
 
-def test_list_runs_rejects_non_protobuf_payload() -> None:
+@pytest.mark.parametrize(
+    "media_type", ["application/json", CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE]
+)
+def test_list_runs_rejects_unsupported_content_type(media_type: str) -> None:
     """The protobuf translation middleware validates configured request bodies."""
     linkstate = Mock(spec=LinkState)
     app = _create_app()
@@ -1234,7 +1274,7 @@ def test_list_runs_rejects_non_protobuf_payload() -> None:
         content=b"{}",
         headers={
             "authorization": "Bearer access-token",
-            "content-type": "application/json",
+            "content-type": media_type,
         },
     )
 

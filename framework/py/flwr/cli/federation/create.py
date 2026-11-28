@@ -28,12 +28,14 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
 )
 from flwr.supercore.control import ControlHttpClient
+from flwr.supercore.utils import check_federation_format
 
 from ..utils import (
     cli_output_handler,
     flwr_cli_exc_handler,
     init_http_client_from_connection,
     print_json_to_stdout,
+    validate_federation_name,
 )
 
 
@@ -41,7 +43,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
     ctx: typer.Context,
     federation_name: Annotated[
         str,
-        typer.Argument(help="Name of the federation to create."),
+        typer.Argument(help="Federation name or explicit @namespace/name."),
     ],
     superlink: Annotated[
         str | None,
@@ -77,6 +79,14 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
         # Migrate legacy usage if any
         migrate(superlink, args=ctx.args)
 
+        handle = None
+        if federation_name.startswith("@") or "/" in federation_name:
+            check_federation_format(federation_name)
+            handle, federation_name = federation_name[1:].split("/", 1)
+            valid, error = validate_federation_name(federation_name)
+            if not valid:
+                raise click.ClickException(f"Invalid federation name. {error}")
+
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
         control_client = None
@@ -88,6 +98,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
                 federation_name=federation_name,
                 description=description if description else "",
                 simulation=simulation,
+                handle=handle,
             )
             _create_federation(stub=control_client, request=request, is_json=is_json)
 
@@ -96,17 +107,27 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
                 control_client.close()
 
 
-def _create_federation(  # pylint: disable=W0613
+def _create_federation(
     stub: ControlHttpClient, request: CreateFederationRequest, is_json: bool
 ) -> None:
     """Create a federation."""
+    explicit_namespace = request.HasField("handle")
     with flwr_cli_exc_handler():
-        response: CreateFederationResponse = stub.CreateFederation(request)
+        response: CreateFederationResponse = stub.CreateFederation(
+            request, require_namespace_support=explicit_namespace
+        )
 
-    if fed_id := response.federation.name:
-        if is_json:
-            print_json_to_stdout({"success": True, "federation-id": fed_id})
-        else:
-            click.echo(f"✅ Federation '{fed_id}' created successfully.")
-    else:
+    fed_id = response.federation.name
+    if not fed_id:
         raise click.ClickException("Federation couldn't be created.")
+    if explicit_namespace:
+        expected_id = f"@{request.handle}/{request.federation_name}"
+        if fed_id != expected_id:
+            raise click.ClickException(
+                f"SuperLink returned federation '{fed_id}' instead of '{expected_id}'."
+            )
+
+    if is_json:
+        print_json_to_stdout({"success": True, "federation-id": fed_id})
+    else:
+        click.echo(f"✅ Federation '{fed_id}' created successfully.")

@@ -128,6 +128,7 @@ from flwr.proto.space_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.auth.typing import AuthenticatedUser
 from flwr.supercore.dependencies.version import VersionDependency
+from flwr.supercore.protobuf.constants import CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE
 from flwr.supercore.protobuf.routing import ProtobufRoute
 from flwr.supercore.protobuf.streaming import (
     ProtobufStreamContext,
@@ -596,7 +597,18 @@ def set_federation_icon(
     return control_handlers.set_federation_icon(request, account, linkstate)
 
 
-@router.post("/create-federation")
+@router.post(
+    "/create-federation",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                CREATE_FEDERATION_NAMESPACE_MEDIA_TYPE: {
+                    "schema": {"type": "string", "format": "binary"},
+                },
+            },
+        },
+    },
+)
 def create_federation(
     request: Annotated[CreateFederationRequest, Depends(get_protobuf_request)],
     linkstate: LinkStateDependency,
